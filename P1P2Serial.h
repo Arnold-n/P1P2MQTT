@@ -1,7 +1,7 @@
 /* P1P2Serial: Library for reading/writing Daikin/Rotex P1P2 protocol
- * Copyright (c) 2019 Arnold Niessen - licensed under GPL v2.0 (see LICENSE)
  *
- * Status:
+ * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ *
  * 20190303 v0.01 initial release; read works; write only partly tested
  *
  *     Thanks to Krakra for providing the hints and references to the HBS and MM1192 documents on
