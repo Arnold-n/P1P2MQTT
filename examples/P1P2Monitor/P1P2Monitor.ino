@@ -1,9 +1,7 @@
-/* P1P2Monitor: Monitor for reading
- * Uses P1P2Serial library for reading/writing Daikin/Rotex P1P2 protocol
+/* P1P2Monitor: Monitor for reading Daikin/Rotex P1/P2 bus using P1P2Serial library
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
- * Status:
  * 20190303 v0.01 initial release; support for raw monitoring and hex monitoring
  *
  *     Thanks to Krakra for providing the hints and references to the HBS and MM1192 documents on
@@ -30,7 +28,7 @@
 //#define CRC_GEN 0xD9    // perform CRC check; these values work for the Daikin hybrid
 #define CRC_FEED 0x00  // 
 
-#include "P1P2Serial.h"
+#include <P1P2Serial.h>
 
 // P1P2erial is written and tested for the Arduino Uno.
 // It may work on other hardware.
