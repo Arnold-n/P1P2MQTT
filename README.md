@@ -1,4 +1,4 @@
-**P1P2 serial monitor**
+**P1P2Serial Monitor**
 
 The P1P2Serial library and P1P2monitor enable reading data on the Daikin/Rotex P1/P2 serial interface using an Arduino Uno (or a similar board) and a small adapter circuit. This combination translates the P1/P2 signals into a regular serial protocol over USB which can be read by a system such as a Raspberry Pi. The P1P2Monitor program currently supports two operation modes:
 (1) raw data out over USB serial, just copying each byte to the serial line (timing information is implicit; but parity error detection is lost), or
@@ -48,12 +48,12 @@ Please see the comments in the P1P2Monitor.ino file. If RAWMONITOR is defined, b
 **Which files are included?**
 
 - LICENSE: GPL-v2.0 license for P1P2Monitor and P1P2Serial
-- P1P2Monitor.ino: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library
 - P1P2Serial.cpp and P1P2Serial.h: (GPL-licensed) P1P2Serial library, based on AltSoftSerial, and uses AltSoftSerial configuration files
-- config/AltSoftSerial_Boards.h and AltSoftSerial_Timers.h: (MIT-licensed) AltSoftSerial configuration files
-- usb2console.pi: simple python program to copy non-RAWMOMITOR USB serial input to stdout for Raspberry Pi or other host
-- usb2console-raw.pi: simple python program for use with RAWMONITOR mode to copy USB serial raw input to stdout for Raspberry Pi or other host
+- examples/P1P2Monitor/P1P2Monitor.ino: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library
+- examples/P1P2Monitor/usb2console.py: simple python program to copy non-RAWMOMITOR USB serial input to stdout for Raspberry Pi or other host
+- examples/P1P2Monitor/usb2console-raw.py: simple python program for use with RAWMONITOR mode to copy USB serial raw input to stdout for Raspberry Pi or other host
 - doc/Daikin-protocol\*: observations of protocol data for various heat pumps (work-in-progress)
+- config/AltSoftSerial_Boards.h and AltSoftSerial_Timers.h: (MIT-licensed) AltSoftSerial configuration files
 - README.md: this file
 
 **Where can I buy a MM1192?**
