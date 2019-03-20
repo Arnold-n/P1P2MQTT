@@ -2,7 +2,7 @@
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
- * 20190303 v0.01 initial release; support for raw monitoring and hex monitoring
+ * 20190303 v0.0.1 initial release; support for raw monitoring and hex monitoring
  *
  *     Thanks to Krakra for providing the hints and references to the HBS and MM1192 documents on
  *     https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms,
