@@ -272,7 +272,7 @@ Timing between packets:
 
 # Other packets
 
-## 60..8F packets for communicating field settings
+## Packet types 60..8F for communicating field settings
 
 A packet of type 60..8F communicates 5 field settings (using a payload of 20 bytes, or 4 bytes per field setting). This occurs after a restart (all field settings are sent by heat pump upon requests by the thermostat), or when a field setting is manually changed at the thermostat.
 For some reason, 4 000086/000087 packets will be inserted  even though these do not communicate any usable field settings.
@@ -280,7 +280,7 @@ For some reason, 4 000086/000087 packets will be inserted  even though these do 
 The packet type corresponds to the field settings according to the following table:
 
 | Packet type   | Field settings |
-|---------------|:-------------------------------|:---------------|
+|---------------|:-------------------------------|
 |     8C   	| 00-00 .. 00-04 |
 |     7C   	| 00-05 .. 00-09 |
 |     6C   	| 00-0A .. 00-0E |
