@@ -41,22 +41,22 @@ Timing between packets:
 |     3    	| 10         		| packet type 10 |
 |     4    	| 00/01     		| ?? |
 |     5    	| 01/81        		| Als Pref dan 81; anders 01/81. 81=hybrid?? |
-|     6    	| 01        		| ?? |
+|     6    	| 00/01        		| DHW tank (00: off; 01: on) |
 |     7    	| 00        		| ? |
 |     8    	| 00        		| ? |
 |     9    	| 00        		| ? |
 |    10    	| 00        		| ? |
-|    11    	| 14        		| room temperature setting? |
+|    11    	| 14        		| target room temperature |
 |    12    	| 00        		| ? |
 |    13    	| 00        		| ? |
-|    14    	| 00        		| ? |
+|    14    	| 00/04        		| quiet mode (00: off; 04: on) |
 |    15    	| 00        		| ? |
 |    16    	| 08        		| ? |
 |    17    	| 00        		| ? |
 |    18    	| 00        		| ? |
 |    19    	| 0F        		| ?? |
 |    20    	| 00        		| ? |
-|    21    	| 00        		| ? |
+|    21    	| 00/40/42        		| DHW tank mode (00: off; 40: normal; 42: booster) |
 |    22    	| 3C        		| DHW target temperature |
 |    23    	| 00        		| ? |
 |    24    	| XX           		| CRC checksum |
@@ -70,7 +70,7 @@ Timing between packets:
 |     3    	| 10         			| packet type 10 |
 |     4    	| 00/01               		| ?? |
 |     5    	| 00/80                		| ?? |
-|     6    	| 21/81               		| ?? |
+|     6    	| 01/21/22/31/41/42/81/A1               		| ?? valves  (x1: heating; x2: cooling; 2x: main zone; 4x: additional zone; 31: ???; 81: tank; A1: tank+main) |
 |     7    	| 01               		| ? |
 |     8    	| 3C               		| DHW target temperature |
 |     9    	| 00               		| ? |
@@ -79,8 +79,9 @@ Timing between packets:
 |    12    	| 14               		| room temperature setting? |
 |    13    	| 00               		| ? |
 |    14    	| 1A               		| ? |
-|    15-21 	| 00               		| ? |
-|    22    	| 00/02/08/09      		| operating/defrost mode? |
+|    15   	| 00/04               		| quiet mode (00: off; 04: on) |
+|    16-21 	| 00               		| ? |
+|    22    	| 00/02/08/09      		| pump and compressor (00: off; 02: defrost??; 08: pump only; 09: pump + comp) |
 |    23    	| 00/02            		| operating/defrost mode? |
 |    24    	| XX               		| CRC checksum |
 
