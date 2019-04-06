@@ -16,7 +16,7 @@ Each regular data cycle consists of a package, where the thermostat and heat pum
 
 If the user of the thermostat requests certain information in the menu items, such as energy consumed, additional packet types are inserted before such a package.
 
-Each packet has a packet type (and in certain cases a subtype) to identify the payload function. Packet type numers observed so far are:
+Each packet has a packet type (and in certain cases a subtype) to identify the payload function. Packet type numbers observed so far are:
 - 10..15 for regular data packets
 - 30 for the last packet in a package
 - 60..8F for field setting read/write operations (during operation and upon restart)
@@ -276,7 +276,7 @@ Timing between packets:
 ## Packet types 60..8F for communicating field settings
 
 A packet of type 60..8F communicates 5 field settings (using a payload of 20 bytes, or 4 bytes per field setting). This occurs after a restart (all field settings are sent by heat pump upon requests by the thermostat), or when a field setting is manually changed at the thermostat.
-For some reason, 4 000086/000087 packets will be inserted  even though these do not communicate any usable field settings.
+For some reason, 4 000086/000087 packets will be inserted at certain moments even though these do not communicate any usable field settings.
 
 The packet type corresponds to the field settings according to the following table:
 
@@ -332,7 +332,7 @@ For supported field settings:
 | 20-23   	| 00                		| 5th field value, see bytes 4-7           |
 |    24    	| XX               		| CRC checksum |
 
-For non-supported field settings
+For non-supported field settings:
 
 | Byte nr       | Value observed                |   		|
 |---------------|:-------------------------------|:---------------|
