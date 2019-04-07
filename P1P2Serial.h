@@ -2,7 +2,9 @@
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
- * 20190303 v0.0.1 initial release; read works; write only partly tested
+ * Version history
+ * 20190407 v0.9.0 Improved reading, writing, and meta-data; added support for timed writings and collision detection; added stand-alone hardware-debug mode
+ * 20190303 v0.0.1 initial release; support for raw monitoring and hex monitoring
  *
  *     Thanks to Krakra for providing the hints and references to the HBS and MM1192 documents on
  *     https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms
@@ -55,6 +57,13 @@
 #define ALTSS_BASE_FREQ F_CPU
 #endif
 
+#define MAXDELTA 250           // 0xFA=250; higher values are reserved for error values 0xFB..0xFF
+#define DELTA_PE_EOB 0xFF
+#define DELTA_PE 0xFD
+#define DELTA_EOB 0xFE
+#define DELTA_OVERRUN 0xFC
+#define DELTA_COLLISION 0xFB
+
 class P1P2Serial : public Stream
 {
 public:
@@ -85,8 +94,8 @@ public:
 	static void enable_timer0(bool enable) { }
 	static bool timing_error;
 	static void writeByte(uint8_t byte);
+	static void setDelay(uint8_t byte);
 private:
 	static void init(uint32_t cycles_per_bit);
 };
-
 #endif

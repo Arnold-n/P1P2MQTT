@@ -2,6 +2,8 @@
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
+ * Version history
+ * 20190407 v0.9.0 Improved reading, writing, and meta-data; added support for timed writings and collision detection; added stand-alone hardware-debug mode
  * 20190303 v0.0.1 initial release; support for raw monitoring and hex monitoring
  *
  *     Thanks to Krakra for providing the hints and references to the HBS and MM1192 documents on
@@ -9,7 +11,7 @@
  *     to Bart Ellast for providing explanations and sample output from his heat pump, and
  *     to Paul Stoffregen for publishing the AltSoftSerial library.
  *
- * This program is based on the public domain Echo program from the 
+ * This program is based on the public domain Echo program from the
  *     Alternative Software Serial Library, v1.2
  *     Copyright (c) 2014 PJRC.COM, LLC, Paul Stoffregen, paul@pjrc.com
  *     (AltSoftSerial itself is available under the MIT license, see
@@ -18,15 +20,19 @@
  *
  */
 
-//#define RAWMONITOR    // uncomment this for receiving and forwarding raw serial data
-			// or keep this undefined for printing messages in hexadecimal
-			//            with one line per received block
-			//            and optionally reporting of timing between data blocks
-#define MINDELTA 3	// minimum delta time needed to generate line break
-#define PRINTDELTA	// to print time between data blocks for each line
-			//            (this is not available in RAWMONITOR mode)
-//#define CRC_GEN 0xD9    // perform CRC check; these values work for the Daikin hybrid
-#define CRC_FEED 0x00  // 
+#define DEBUG_HARDWARE  // uncomment this to verify correct operation of stand-alone read/write interface
+                        // DEBUG_HARDWARE does not work in RAWMONITOR mode
+//#define RAWMONITOR      // uncomment this for receiving and forwarding raw serial data
+                        // or keep this undefined for printing messages in hexadecimal
+                        //            with one line per received block
+                        //            and optionally reporting of timing between data blocks
+#define PRINTDELTA      // to print time between data blocks at start of each line
+                        //            (this is not available in RAWMONITOR mode)
+#define CRC_GEN 0xD9    // perform CRC check; these values work for the Daikin hybrid
+#define CRC_FEED 0x00   //
+#define PRINTCRC        // prints CRC byte at end of line (otherwise it will not be printed)
+#define PRINTERRORS     // prints overrun error and parity errors as byte prefix ("-OR:" and "-PE:")
+#define SHIFTCNT        // prints package counter related to shifting bit in final packet
 
 #include <P1P2Serial.h>
 
@@ -51,62 +57,171 @@ void setup() {
 	Serial.begin(115200);
 	while (!Serial) ; // wait for Arduino Serial Monitor to open
 #ifndef RAWMONITOR
-	Serial.println("P1P2Serial monitor");
-#endif
+	Serial.println("P1P2Serial monitor v0.9.0");
+#endif // RAWMONITOR
 	P1P2Serial.begin(9600);
+#ifdef DEBUG_HARDWARE
+	P1P2Serial.write((uint8_t) 0x00);
+	P1P2Serial.write((uint8_t) 0x00);
+	P1P2Serial.write((uint8_t) 0x13);
+	P1P2Serial.write((uint8_t) 0x00);
+	P1P2Serial.write((uint8_t) 0x00);
+	P1P2Serial.write((uint8_t) 0xD0);
+	P1P2Serial.write((uint8_t) 0xDD);
+#endif // DEBUG_HARDWARE
 }
 
 #ifdef CRC_GEN
-static int crc=-1;
-static int lastc=0;
-static int lastcrc=0;
+static int crc=0;
+#endif
+#ifdef SHIFTCNT
+static int shiftcnt=0;
+static int shiftline=0;
+static int bytecnt=0;
+static int newline=1;
+static int newshift=0;
+#endif
+
+#ifdef DEBUG_HARDWARE
+static uint32_t watchdogcnt=0;
 #endif
 
 void loop() {
+#ifdef RAWMONITOR
+	// direct write-through from serial to P1P2, raw mode
+	if (Serial.available()) {
+		uint8_t c = Serial.read();
+		P1P2Serial.write(c);
+	}
+#else // RAWMONITOR
+#ifdef DEBUG_HARDWARE
+	if (++watchdogcnt > 400000) {
+		// either first loop entry, or long silence, so re-trigger write/read events
+		Serial.println("Watchdog retriggering communication");
+		watchdogcnt=0;
+		P1P2Serial.write((uint8_t) 0x00);
+		P1P2Serial.write((uint8_t) 0x00);
+		P1P2Serial.write((uint8_t) 0x13);
+		P1P2Serial.write((uint8_t) 0x00);
+		P1P2Serial.write((uint8_t) 0x00);
+		P1P2Serial.write((uint8_t) 0xD0);
+		P1P2Serial.write((uint8_t) 0xDD);
+	}
+#endif // DEBUG_HARDWARE
+#endif // RAWMONITOR
 	if (P1P2Serial.available()) {
 #ifndef RAWMONITOR
 		int delta = P1P2Serial.read_delta();
-		if (delta == 0) {
+#ifdef PRINTDELTA
+		if (newline) {
+			if (delta <= MAXDELTA) {
+				if (delta < 0x10) Serial.print("0");
+				Serial.print(delta,HEX);
+				Serial.print(": ");
+			} else {
+				Serial.print("..: ");
+			}
+			newline=0;
+		}
+#ifdef SHIFTCNT
+#ifdef PRINTERRORS
+		if (delta == DELTA_COLLISION) {
+			// collision suspicion due to verification error in reading back written data
+			Serial.print("-XX:");
+		}
+		if (delta == DELTA_OVERRUN) {
+			// buffer overrun
+			Serial.print("-OR:");
+		}
+		if ((delta == DELTA_PE) || (delta == DELTA_PE_EOB)) {
 			// parity error detected
 			Serial.print("-PE:");
 		}
-#endif
+#endif // PRINTERRORS
+			bytecnt=0;
+#endif // not RAWMONITOR
+#endif // PRINTDELTA
+#endif // RAWMONITOR
 		int c = P1P2Serial.read();
 #ifdef RAWMONITOR
 		Serial.write(c);
-#else
-		if (delta > MINDELTA) {
-#ifdef CRC_GEN
-			if (lastc != lastcrc) Serial.print(" CRC error");
-			crc = CRC_FEED;
-#endif
-			Serial.println();
-#ifdef PRINTDELTA
-			if (delta < 0x10) Serial.print("0");
-			Serial.print(delta,HEX);
-			Serial.print(" ");
-#endif
+#else // RAWMONITOR
+#ifdef SHIFTCNT
+		++bytecnt;
+		if ((bytecnt==3) && (c==0x30)) {
+			shiftline=1;
+			shiftcnt++;
+			if (shiftcnt==241) shiftcnt=0;
 		}
-		if (c < 0x10) Serial.print("0");
-		Serial.print(c,HEX);
-#ifdef CRC_GEN
-		lastcrc = crc;
-		lastc = c;
-		for (int i=0;i<8;i++) {
-			if ((crc^c) & 0x01) {
-				crc>>=1; crc ^= CRC_GEN;
-			} else {
-				crc>>=1;
+		if (shiftline) {
+			if ((bytecnt==5) && (c==0x01)) {
+				shiftcnt=240;
+				newshift=1;
 			}
-			c>>=1;
+			if ((bytecnt==15) && (c==0x01)) {
+				if (shiftcnt != 209) {
+					shiftcnt=209; // sync shift pattern
+					newshift=1;
+				}
+			}
 		}
-#endif
-#endif
+#endif // SHIFTCNT
+		if ((delta == DELTA_EOB) || (delta == DELTA_PE_EOB)) {
+#ifdef CRC_GEN
+#ifdef PRINTCRC
+			Serial.print(" CRC=");
+			if (c < 0x10) Serial.print("0");
+			Serial.print(c,HEX);
+#ifdef PRINTERRORS
+			if (c != crc) Serial.print(" CRC error");
+#endif // PRINTERRORS
+#endif // PRINTCRC
+			crc = CRC_FEED;
+#endif // CRC_GEN
+#ifdef SHIFTCNT
+			if (shiftline) {
+				Serial.print(" LC=");
+				if (shiftcnt < 0x10) Serial.print("0");
+				Serial.print(shiftcnt,HEX);
+				shiftline=0;
+			}
+#endif // SHIFTCNT
+#ifdef PRINTERRORS
+			if (newshift) Serial.print(" newshift");
+			newshift=0;
+#endif // PRINTERRORS
+			Serial.println();
+			newline=1;
+#ifdef DEBUG_HARDWARE
+			// As any write triggers a new byte to be read back,
+			// a standa-lone read circuit can be tested.
+			// Each received block triggers a new write of
+			// an example block, with correct CRC at end.
+			// But first wait for 100ms silence on bus before writing
+			P1P2Serial.setDelay(100); 
+			P1P2Serial.write((uint8_t) 0x00);
+			P1P2Serial.write((uint8_t) 0x00);
+			P1P2Serial.write((uint8_t) 0x13);
+			P1P2Serial.write((uint8_t) 0x00);
+			P1P2Serial.write((uint8_t) 0x00);
+			P1P2Serial.write((uint8_t) 0xD0);
+			P1P2Serial.write((uint8_t) 0xDD);
+			watchdogcnt = 0;
+#endif // DEBUG_HARDWARE
+		} else {
+			if (c < 0x10) Serial.print("0");
+			Serial.print(c,HEX);
+#ifdef CRC_GEN
+			for (int i=0;i<8;i++) {
+				if ((crc^c) & 0x01) {
+					crc>>=1; crc ^= CRC_GEN;
+				} else {
+					crc>>=1;
+				}
+				c>>=1;
+			}
+#endif // CRC_GEN
+		}
+#endif // not RAWMONITOR
 	}
-	/* direct write to P1P2, disabled for now
-	if (Serial.available()) {
-		c = Serial.read();
-		P1P2Serial.print(c);
-	}
-	*/
 }
