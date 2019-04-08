@@ -1,17 +1,17 @@
-**P1P2Serial Monitor**
+**P1P2Serial library and P1P2Monitor example application**
 
-The P1P2Serial library and P1P2Monitor enable reading data on the Daikin/Rotex P1/P2 serial interface using an Arduino Uno (or a similar board) and a small adapter circuit. This combination translates the P1/P2 signals into a regular serial protocol over USB which can be read by a system such as a Raspberry Pi. The P1P2Monitor program currently supports two operation modes:
-(1) raw data out over USB serial, just copying each byte to the serial line (timing information is implicit; but collission detection, buffer overrun, parity error, and CRC error detection is lost); data from USB serial is directly copied to the P1P2 interface as soon as a 1ms silence is detected on the P1P2 interface, or
-(2) hexadecimally coded data in ASCII out over USB serial, each data block starts on a new line (a data block is defined as a number of consecutively sent bytes on the interface). Optionally, the time between data blocks can be shown in milliseconds at the atart of each line. If a parity error is detected, a byte is prefixed with "-PE:". If a buffer overrun is detected, a byte is prefixed with "-OR:". If data is read as a result of a write by the monitor itself, and it differs from the byte written, it is prefixed with "-XX:" as it likely signals a collision on the interface. Optionally the last byte of each line, which is a CRC byte, is verified for correctness.
-Translating the data into human-readable form is planned, likely as host-based application. As different heat pumps use very different protocol data formats, this will be limited to certain product ranges for which users have contributed data and/or descriptions.
+The P1P2Serial library and P1P2Monitor enable reading and writing data on the Daikin/Rotex P1/P2 serial interface using an Arduino Uno (or a similar board) and a small adapter circuit. This combination translates the P1/P2 signals into a regular serial protocol over USB which can be read by a system such as a Raspberry Pi. The P1P2Monitor program currently supports two operation modes:
+(1) raw data out over USB serial, just copying each byte to the serial line and vice versa. Timing information is only implicitly available. Information on collission detection, buffer overrun, parity error, and CRC error detection is lost. Raw data from USB serial is directly copied to the P1P2 interface as soon as a 2ms silence is detected on the P1P2 interface,
+(2) hexadecimally coded data in ASCII out over USB serial. Optionally, each data block optionally starts on a new line (a data block is defined as a number of consecutively sent bytes on the interface), and the time between data blocks can be shown in milliseconds at the atart of each line. If a parity error is detected, a byte is prefixed with "-PE:". If a buffer overrun is detected, a byte is prefixed with "-OR:". If data is read as a result of a write by the monitor itself, and it differs from the byte written, it is prefixed with "-XX:" as it likely signals a collision on the interface. Optionally the last byte of each line, which is a CRC byte, is verified for correctness.
+Translating the data into human-readable form is planned, likely as a host-based application. As different heat pumps use very different protocol data formats, this will be limited to certain product ranges for which users have contributed data and/or descriptions.
 
 **How is the software licensed?**
 
 The software is licensed under GPL V2.0. Please comply with the license conditions. If you improve or add, I would be interested to hear from you.
 
-**What can I do with it?**
+**What can I do with the P1/P2 adapter?**
 
-For now, you can only read and write the data on the P1/P2 bus. Write support in version 0.0.2 includes a basic bus collision mechanism, which operates on a byte basis (and not on a bit basis). Even if a collission is detected, writing will continue. You can use this library to view and study the data on the bus, and to monitor various temperatures, flow data, energy consumption, and to send messages to the heat pump and/or to the thermostat. This would for example enable the calculation of COP values or switching certain functions.
+For now, you can only read and write the data on the P1/P2 bus. Write support in version 0.9.1 includes a basic bus collision detection, which operates on a byte basis (and not on a bit basis). Even if a collission is detected, writing will continue. You can use this library to view and study the data on the bus, and to monitor various temperatures, flow data, energy consumption, and to send messages to the heat pump and/or to the thermostat. This would for example enable the calculation of COP values or switching certain functions. You can power the P1/P2 bus if you use the P1/P2 adapter with a P1/P2 device that requires a power feed.
 
 **Why did you build this?**
 
@@ -19,24 +19,24 @@ My heat pump is a 2014 model Daikin hybrid heat pump/natural gas boiler combinat
 
 **Which interface is supported?**
 
-Daikin (or Rotex) uses various communication standards between thermostats and heat pumps. The P1/P2 standard is one of them. It is a proprietary standard. At the lowest level it is a 9600 Baud serial-like interface based on the Japanese Home Bus System (ET-2101). Technical details of this standard can be found in chapter 4 of the https://echonet.jp/wp/wp-content/uploads/pdf/General/Standard/Echonet/Version_2_11_en/spec_v211e_3.pdf.
+Daikin (or Rotex) uses various communication standards between thermostats and heat pumps. The P1/P2 standard is one of them (others are F1/F2, Modbus, BACnet, which are not supported here). The P1/P2 protocol is a proprietary standard. At the lowest level it is a two-wire 9600 baud serial-like interface based on the Japanese Home Bus System (ET-2101). Some technical details of this standard can be found in chapter 4 of the https://echonet.jp/wp/wp-content/uploads/pdf/General/Standard/Echonet/Version_2_11_en/spec_v211e_3.pdf.
 
 **How do I build a P1/P2 adapter circuit?**
 
-The P1/P2 bus is a two-wire circuit. The easiest way to make an adapter for this bus is to use the MM1192 HBS-Compatible Driver and Receiver (http://pdf.datasheetcatalog.com/datasheet_pdf/mitsumi-electric/MM1192XD.pdf) and an Arduino Uno (or Teensy or other device). 
+The easiest way to make an adapter for this bus is to use the MM1192 HBS-Compatible Driver and Receiver (http://pdf.datasheetcatalog.com/datasheet_pdf/mitsumi-electric/MM1192XD.pdf) and an Arduino Uno (or Teensy or other device). 
 
-Several adapter circuits for use as an Arduino Uno hat are provided in PDF form:
+Several adapter circuit schemas for use as an Arduino Uno hat are provided in PDF form:
  - version 1 bare-bones version without galvanic isolation (use at your own risk)
- - version 2 with galvanic isolation and isolated DC-DC converter
- - (work-in-progress) version 3 with galvanic isolation, bus-powered and/or bus-powering
+ - version 2 with galvanic isolation and an isolated DC-DC converter
+ - version 3 with galvanic isolation, adds bus-powered and/or bus-powering options to version 2
 
-The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noise P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal. I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2 [previously 3]) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2 (but please note next question on the consequences of this third modification!). A further modification, the addition of a 680pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further.
+The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noise P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal. I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2 (but please note next question on the consequences of this third modification!). Modification 2 is only needed if the adapter is not powered by the bus itself. A further modification, the addition of a 680pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 100Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
 
-Version 1 is the bare-bones version - as stated this version does not provide galvanic isolation between the P1/P2 bus and the Arduino (but if only reading circuitry is implemented this risk is limited because the resistors between the P1/P2 bus and the MM1192 are 150k Ohm; however if modification 3 (described below) is implemented the resistance is lowered to around 1k Ohm; and if write circuitry is added there really is isolation at all. Use at your own risk!
+Version 1 is the bare-bones version - as stated this version does not provide galvanic isolation between the P1/P2 bus and the Arduino (but if only reading circuitry is implemented this risk is limited because the resistors between the P1/P2 bus and the MM1192 are 150k Ohm; however if modification 2 is implemented the resistance is lowered to around 1k Ohm; and if write circuitry is added there really is isolation at all. Use at your own risk!
 
-Version 2 provides galvanic isolation. The MM1192 is powered via an isolated DC-DC converter.
+Version 2 provides galvanic isolation. The MM1192 is powered via an isolated DC-DC 5V-5V converter.
 
-Version 3 will replace the DC-DC converter with a bus-powered 5V supply and optionally a bus power feed. If you want to interface to the heat pump, which operates as a master and provides a power feed on the bus, the power on the bus can be used for the P1/P2 adapter. If you want to interface to the thermostat, which operates as a slave and requires a power feed, the adapter needs to provide 15V on the bus.
+Version 3 adds various power options to version 2. It adds a bus-powered 5V supply (as an alternative to the DC-DC 5V-5V converter), and optionally a bus power feed. If you want to interface to the heat pump, which operates as a master and provides a power feed on the bus, the power on the bus can be used to power the P1/P2 adapter. If you want to interface to a user interface or thermostat, which operates as a slave and requires a power feed, the adapter now can provide 15V on the P1/P2 bus. The schematic shows two options to power the P1/P2 bus: using a DC-DC 5V-15V converter, or using an external 15V power supply.
 
 **There is no galvanic isolation in adapter version 1! What is the risk?**
 
@@ -54,9 +54,13 @@ The data does not follow the HBS packet format or HBS timing specification. Inst
 
 The payload contains various data items, like temperatures, data flow, software serial number, operating mode, number of operating hours, energy consumed, etcetera. Temperatures and flows can be coded as value\*10, so with an accuracy of one digit after the comma: a value of 0x01B6 (hex value for 438, means 43.8). Other values may be encoded as two bytes, one byte for the value before the comma, the other behind (for example a room temperature is encoded as 0x14 0x18, or 20 24, meaning 20 24/256 or 20.1 degrees).
 
-**Which settings can be tuned in the Monitor?**
+**Which settings can be tuned in the P1P2Monitor?**
 
-Please see the comments in the P1P2Monitor.ino file. If RAWMONITOR is defined, bytes are simply copied 1-by-1 from the P1/P2 bus to the USB serial port and vice-versa. If RAWMONITOR is not defined, bytes are translated into human-readable ASCII hex. If DEBUG_HARDWARE is defined, a stand-alone self-test is performed by writing simple packets. If PRINTERRORS is defined, errors will be identified in the output: if a parity error is detected, the received byte is prefixed with the string "-PE:". After any pause in data received, a new line is started to signal the start of a packet (unless the first byte after a pause results in an error, in which case the pause time field is overwritten to signal the parity error). If PRINTDELTA is defined, the time in milliseconds between the current and previous byte is shown before the packet (but if the break is longer than 250ms, it will be reported as 250ms). If CRC_GEN and CRC_FEED are defined, a CRC check is performed and an error message is printed if the CRC byte does not match its packet.
+Please see the comments in the P1P2Monitor.ino file. If RAWMONITOR is defined, bytes are simply copied 1-by-1 from the P1/P2 bus to the USB serial port and vice-versa. If RAWMONITOR is not defined, bytes are translated into human-readable ASCII hex. If DEBUG_HARDWARE is defined, a stand-alone self-test is performed by writing simple packets. If PRINTERRORS is defined, errors will be identified in the output: if a parity error is detected, the received byte is prefixed with the string "-PE:". After any pause in data received, a new line is started to signal the start of a packet (unless the first byte after a pause results in an error, in which case the pause time field is overwritten to signal the parity error). If PRINTDELTA is defined, the time in millisecond resolution between the current and previous byte is shown before the packet. If CRC_GEN and CRC_FEED are defined, a CRC check is performed and an error message is printed if the CRC byte does not match its packet.
+
+**How to avoid bus collissions when writing?**
+
+The simple answer is: write when others don't. In practice communication seems to be initiated by the thermostat(s), and parties alternate turns. The heat pump seems to answer each request after a fixed time (25ms in my situation). P1P2Serial implements a setDelay(t) function which ensures a write does not happen until t milliseconds after the last start bit falling edge detected. Calling setDelay(2) before starting a (block)transmission is a safe way to start any block of communication. If imitating a heat pump, calling setDelay(25) would make the adapter answer 25ms after the last byte received. Use of setDelay(1) is discouraged: a byte transmission takes slightly longer than 1 ms. A setDelay(1) will set transmission to 1.146ms, the time it takes to transmit 1 byte (11 bits at 9600 baud), but this still creates a bus collision if the other party transmitting has not finished. This may be detected by a parity error or read-back verification error, but bus collision avoidance is not implemented.
 
 **Which files are included?**
 
@@ -72,7 +76,7 @@ Please see the comments in the P1P2Monitor.ino file. If RAWMONITOR is defined, b
 
 **Where can I buy a MM1192?**
 
-It is difficult to obtain. So far only a few sellers on ebay and aliexpress are selling the MM1192 and MM1007. I could not find a seller of the XL1192. The circuit could also be re-built using a few opamps.
+Only a few sellers on ebay and aliexpress are selling the MM1192 and MM1007. I could not find a seller of the XL1192. The circuit could also be re-built using a few opamps.
 
 **Do you plan to offer pre-soldered or DIY adapter circuit kits?**
 
