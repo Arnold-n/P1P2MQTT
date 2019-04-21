@@ -7,14 +7,17 @@ For the hybrid Daikin heat pump EHYHBX08AAV3, the following for data packet form
 |  1    	| 00 or 40 			| source address, 00 = thermostat,  40 = heat pump   |
 |  2    	| 00 or F0 			| 00 = not the last packet in package, F0 = last packet in package   |
 |  3    	|  XX				| packet type         |
-|  4..(N-1)   	|  XX 				| 00 = not the last packet in package, 30 = last packet |
+|  4..(N-1)   	|  XX 				| data |
 |  N   		|  XX   			|  CRC checksum   				|
 
-Hex values shown are typical values observed. The CRC checksum is calculated using an 8-bit LFSR with a feed of 0x00 and a generator value of 0xD9.
+
+**Source**
 
 Each regular data cycle consists of a package, where the thermostat and heat pump take turn as transmitter. Every approximately 770ms one package of 13 packets is communicated.
 
 If the user of the thermostat requests certain information in the menu items, such as energy consumed, additional packet types are inserted before such a package.
+
+**Packet type**
 
 Each packet has a packet type (and in certain cases a subtype) to identify the payload function. Packet type numbers observed so far are:
 - 10..15 for regular data packets
@@ -25,7 +28,27 @@ Each packet has a packet type (and in certain cases a subtype) to identify the p
 - A1/20 for incidental requests on status of motors and operation mode
 - 21 for incidental requests on tbd
 
-Timing between packets:
+**Data**
+
+The following data-types were observed:
+
+| Data type       | Definition            |
+|---------------|:-------------------------------|
+| flag8   | byte composed of 8 single-bit flags |
+| u8      | unsigned 8-bit integer 0 .. 255 |
+| s8      | signed 8-bit integer -128 .. 127 (two’s compliment) |
+| f8.8    | signed fixed point value : 1 sign bit, 7 integer bit, 8 fractional bits (two’s compliment ie. the LSB of the 16bit binary number represents 1/256th of a unit). |
+| u16     | unsigned 16-bit integer 0..65535 |
+| s16     | signed 16-bit integer -32768..32767 |
+
+Example :  A temperature of 21.5°C in f8.8 format is represented by the 2-byte value 1580 hex (1580hex = 5504dec, dividing by 256 gives 21.5). A temperature of -5.25°C in f8.8 format is represented by the 2-byte value FAC0 hex (FAC0hex = - (10000hex-FACOhex) = - 0540hex = - 1344dec, dividing by 256 gives -5.25).
+
+**CRC Checksum**
+
+The CRC checksum is calculated using an 8-bit LFSR with a feed of 0x00 and a generator value of 0xD9.
+
+**Timing between packets**
+
 - approximately 25ms between communication thermostat and communication heat pump
 - approximately 30-50ms (42/37/47/31/29/36) between communication heat pump and communication thermostat
 - approximately 140 or 160 ms between last and first packet of package
@@ -34,66 +57,65 @@ Timing between packets:
 
 #### 1. Packet "000010..."
 
-| Byte nr       | Value observed  |   		|
-|---------------|:-------------------------------|:---------------|
+| Byte nr       | Value observed  | Name  		| Data type | Bit: description |
+|---------------|:-------------------------------|:---------------|:-------------------------------|:---------------|
 |     1    	| 00       		| source: 00 = thermostat |
 |     2    	| 00         		| 00 = no end-of-package |
 |     3    	| 10         		| packet type 10 |
-|     4    	| 00/01     		| ?? |
+|     4    	| 00/01     		| Heating | flag8 | 0: power (off/on) |
 |     5    	| 01/81        		| Als Pref dan 81; anders 01/81. 81=hybrid?? |
-|     6    	| 00/01        		| DHW tank (00: off; 01: on) |
+|     6    	| 00/01        		| DHW tank | flag8 | 0: power (off/on) |
 |     7    	| 00        		| ? |
 |     8    	| 00        		| ? |
 |     9    	| 00        		| ? |
 |    10    	| 00        		| ? |
-|    11    	| 14        		| target room temperature |
+|    11    	| 14        		| Target room temperature | u8 |
 |    12    	| 00        		| ? |
-|    13    	| 00        		| ? |
-|    14    	| 00/04        		| quiet mode (00: off; 04: on) |
+|    13    	| 00/20/40/60        		| ? | flag8 | 5: ? <br> 6: ? |
+|    14    	| 00/04        		| Quiet mode | flag8 | 2: quiet mode (off/on) |
 |    15    	| 00        		| ? |
-|    16    	| 08        		| ? |
+|    16    	| 08        		| ? | flag8 | 3: ? |
 |    17    	| 00        		| ? |
 |    18    	| 00        		| ? |
-|    19    	| 0F        		| ?? |
+|    19    	| 0F        		| ?? | flag8 | 0: ? <br> 1: ? <br> 2: ? <br> 3: ? |
 |    20    	| 00        		| ? |
-|    21    	| 00/40/42        		| DHW tank mode (00: off; 40: normal; 42: booster) |
-|    22    	| 3C        		| DHW target temperature |
+|    21    	| 00/40/42        		| DHW tank mode | flag8 | 1: booster (off/on) <br> 6: operation (off/on) |
+|    22    	| 3C        		| DHW target temperature | u8 |
 |    23    	| 00        		| ? |
 |    24    	| XX           		| CRC checksum |
 
 #### 2. Packet "400010..."
 
-| Byte nr       | Value observed  |   		|
-|---------------|:-------------------------------|:---------------|
+| Byte nr       | Value observed  | Name  		| Data type | Bit: description |
+|---------------|:-------------------------------|:---------------|:-------------------------------|:---------------|
 |     1    	| 40       			| source: 40 = heat pump |
 |     2    	| 00         			| 00 = no end-of-package |
 |     3    	| 10         			| packet type 10 |
-|     4    	| 00/01               		| ?? |
-|     5    	| 00/80                		| ?? |
-|     6    	| 01/21/22/31/41/42/81/A1               		| ?? valves  (x1: heating; x2: cooling; 2x: main zone; 4x: additional zone; 31: ???; 81: tank; A1: tank+main) |
-|     7    	| 01               		| ? |
-|     8    	| 3C               		| DHW target temperature |
+|     4    	| 00/01               		| Heating | flag8 | 0: power (off/on) |
+|     5    	| 00/80                		| ?? | flag8 | 7: ? |
+|     6    	| 01/21/22/31/41/42/81/A1               		| Valves | flag8 | 0: heating (off/on) <br> 1: cooling (off/on) <br> 4: ? <br> 5: main zone (off/on) <br> 6: additional zone (off/on) <br> 7: DHW tank (off/on) |
+|     7    	| 00/01/11               		| 3-way valve | flag8 | 0: status (off/on) <br> 4: status (SHC/tank) |
+|     8    	| 3C               		| DHW target temperature | u8 |
 |     9    	| 00               		| ? |
-|    10    	| 0F               		| ? |
+|    10    	| 0F               		| ?? | flag8 | 0: ? <br> 1: ? <br> 2: ? <br> 3: ? |
 |    11    	| 00               		| ? |
-|    12    	| 14               		| room temperature setting? |
+|    12    	| 14               		| Target room temperature | u8 |
 |    13    	| 00               		| ? |
 |    14    	| 1A               		| ? |
-|    15   	| 00/04               		| quiet mode (00: off; 04: on) |
+|    15   	| 00/04               		| Quiet mode | flag8 | 2: quiet mode (off/on) |
 |    16-21 	| 00               		| ? |
-|    22    	| 00/02/08/09      		| pump and compressor (00: off; 02: defrost??; 08: pump only; 09: pump + comp) |
+|    22    	| 00/02/08/09      		| Pump and compressor | flag8 | 0: compressor (off/on) <br> 3: pump (off/on) |
 |    23    	| 00/02            		| operating/defrost mode? |
 |    24    	| XX               		| CRC checksum |
 
 #### 3. Packet "000011..."
 
-| Byte nr       | Value observed                |   		|
-|---------------|:-------------------------------|:---------------|
+| Byte nr       | Value observed  | Name  		| Data type | Bit: description |
+|---------------|:-------------------------------|:---------------|:-------------------------------|:---------------|
 |     1    	| 00       			| source: 00 = thermostat |
 |     2    	| 00         			| 00 = no end-of-package |
 |     3    	| 11         			| packet type 11 |
-|     4    	| 13/14				| room temperature (measured) in degrees |
-|     5    	| CC/E6/00/18/32/others		| and in 0.1 degrees (0x14+0x32/256=20.2 degrees) |
+|     4-5    	| XX YY				| Actual room temp | f8.8 |
 |     6    	| 00               		| ? |
 |     7    	| 00               		| ? |
 |     8    	| 00               		| ? |
@@ -104,20 +126,19 @@ Timing between packets:
 
 #### 4. Packet "400011..."
 
-| Byte nr       | Value observed                |   		|
-|---------------|:-------------------------------|:---------------|
+| Byte nr       | Value observed  | Name  		| Data type | Bit: description |
+|---------------|:-------------------------------|:---------------|:-------------------------------|:---------------|
 |     1    	| 40       			| source: 40 = heat pump |
 |     2    	| 00         			| 00 = no end-of-package |
 |     3    	| 11         			| packet type 11 |
-|   4-5    	| XX YY            		| LWT (XX.YY degrees in hex format in 0.1 degree resolution) |
-|    6     	| XX             		| ?? (varies?? slightly) |
-|    7     	| 34/42/52       		| ??  |
-|   8-9    	| XX YY            		| outside temperature (outside unit) (XX.YY in 0.5 degree resolution) |
-|  10-11   	| XX YY            		| AWT (XX.YY in 0.1 degree resolution) |
-|  12-11   	| XX YY            		| MWT (XX.YY mid-way temperature heat pump - gas boiler in 0.1 degree resolution) | |
-|  14-15   	| XX YY            		| refrigerant temperature? (XX.YY in 0.1 degree resolution) |
-|  16-17   	| XX YY            		| room temperature (XX.YY in 0.1 degree resolution) |
-|  18-19   	| XX YY            		| outside temperature in higher resolution? |
+|   4-5    	| XX YY            		| Leaving water temperature | f8.8 |
+|   6-7    	| XX YY            		| DHW temperature | f8.8 |
+|   8-9    	| XX YY            		| Outside temperature (in 0.5 degree resolution) | f8.8 |
+|  10-11   	| XX YY            		| Inlet water temperature | f8.8 |
+|  12-11   	| XX YY            		| Mid-way temperature heat pump - gas boiler | f8.8 |
+|  14-15   	| XX YY            		| Refrigerant temperature | f8.8 |
+|  16-17   	| XX YY            		| Actual room temperature | f8.8 |
+|  18-19   	| XX YY            		| Outside temperature | f8.8 |
 |  20-23   	| 00               		| ? |
 |    24    	| XX               		| CRC checksum |
 
