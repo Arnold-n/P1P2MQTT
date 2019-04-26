@@ -118,7 +118,7 @@ This timing corresponds to the description found in a design guide from Daikin w
 |    15         | 00/04                         | Quiet mode            | flag8         | 2: quiet mode (off/on) |
 |    16-21      | 00                            | ?
 |    22         | 00/02/08/09                   | Pump and compressor   | flag8         | 0: compressor (off/on) <br> 3: pump (off/on) |
-|    23         | 00/02                         |operating/defrost mode?| flag8         |
+|    23         | 00/02                         | DHW mode              | flag8         | 1: DHW mode (off/on)
 |    24         | XX                            | CRC checksum          | u8
 
 #### 3. Packet "000011..."
