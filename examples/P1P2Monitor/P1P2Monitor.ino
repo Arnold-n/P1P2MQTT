@@ -146,7 +146,6 @@ void loop() {
 			Serial.print("-PE:");
 		}
 #endif // PRINTERRORS
-			bytecnt=0;
 #endif // not RAWMONITOR
 #endif // PRINTDELTA
 #endif // RAWMONITOR
@@ -193,6 +192,7 @@ void loop() {
 				Serial.print(shiftcnt,HEX);
 				shiftline=0;
 			}
+			bytecnt=0;
 #ifdef PRINTERRORS
 			if (newshift) Serial.print(" newshift");
 			newshift=0;
