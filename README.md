@@ -70,7 +70,7 @@ The simple answer is: write when others don't. In practice communication seems t
 - examples/P1P2Monitor/usb2console.py: simple python program to copy non-RAWMOMITOR USB serial input to stdout for Raspberry Pi or other host
 - examples/P1P2Monitor/usb2console-raw.py: simple python program for use with RAWMONITOR mode to copy USB serial raw input to stdout for Raspberry Pi or other host
 - doc/Daikin-protocol\*: observations of protocol data for various heat pumps (work-in-progress)
-- circuits/\*: P1/P2 adapter schematics
+- circuits/\*: P1/P2 adapter schematics and pictures of prototype board.
 - config/AltSoftSerial_Boards.h and AltSoftSerial_Timers.h: (MIT-licensed) AltSoftSerial configuration files
 - README.md: this file
 
@@ -80,7 +80,7 @@ Only a few sellers on ebay and aliexpress are selling the MM1192 and MM1007. I c
 
 **Do you plan to offer pre-soldered or DIY adapter circuit kits?**
 
-Perhaps, if there is interest. Please contact me if you are interested.
+Please contact me if you are interested, my e-mail is in the source code header. Images of the first prototype can be found in the circuits directory. The final circuit will be based on "version3-selection". 
 
 **Acknowledgements**
 
