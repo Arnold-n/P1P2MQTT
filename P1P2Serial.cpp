@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190428 v0.9.2 Added setEcho(b), readpacket() and writepacket()
  * 20190409 v0.9.1 Improved setDelay()
  * 20190407 v0.9.0 Improved reading, writing, and meta-data; added support for timed writings and collision detection; added stand-alone hardware-debug mode
  * 20190303 v0.0.1 initial release; support for raw monitoring and hex monitoring
@@ -168,7 +169,7 @@ ISR(TIMER0_COMPA_vect)
 /**           Transmission             **/
 /****************************************/
 
-uint16_t tx_set_delay=0;
+static uint16_t tx_set_delay=0;
 
 void P1P2Serial::setDelay(uint16_t t)
 // Input parameter: 1 <= t <= MAXDELTA.
@@ -190,6 +191,9 @@ void P1P2Serial::setDelay(uint16_t t)
 //                There is likely no need to use setDelay(1) and its use is discouraged.
 // If setDelay (t) is called with 2<=t<=MAXDELTA, a delay of t ms is set
 // If setDelay (t) is called with t>MAXDELTA, t is set to MAXDELTA
+// Warning: setDelay(2) may not function properly (hardware issue?) - do not use
+// Warning: repeated use of setDelay(t) with small values of t may not function properly - do not use
+// In practice, t should likely be at least 25ms
 {
 	if (t > MAXDELTA) t = MAXDELTA;
 	tx_set_delay = t;
@@ -357,10 +361,21 @@ void P1P2Serial::flushOutput(void)
 /**            Reception               **/
 /****************************************/
 
-//Use this to ignore edges that are very near previous edges to avoid detection of oscillating edges
-//Does not seem necessary
 //#define SUPPRESS_OSCILLATION
 //#define SUPPRESS_PERIOD 20
+//Use this to ignore edges that are very near previous edges to avoid detection of oscillating edges
+//Does not seem necessary
+
+
+static uint8_t Echo=1;
+
+void P1P2Serial::setEcho(uint8_t b)
+// Set echo mode (verify and read back written data) on or off
+// off: no read-back, no bus collission detection
+// on (default): each written byte will be read back and received, collission will be detected
+{
+	Echo=b;
+}
 
 #ifdef SUPPRESS_OSCILLATION
 static uint16_t prev_edge_capture;	// previous capture of edge
@@ -381,25 +396,29 @@ ISR(CAPTURE_INTERRUPT)
 	state = rx_state;
 	if (state == 99) {
 		// DISABLE_INT_COMPARE_B(); // not needed, will be enabled immediately in next step
-		head = rx_buffer_head + 1;
-		if (head >= RX_BUFFER_SIZE) head = 0;
-		if (head != rx_buffer_tail) {
-			rx_buffer[head] = rx_byte;
-			if (rx_parity) {
-				delta_buffer[head] = DELTA_PE; // signals parity error
-			} else {
-				delta_buffer[head] = startbit_delta; // signals no parity error / no end-of-block / time from previous byte
-				if (rx_do_verification) {
-					// If in transmission mode/verification mode,
-					// check if received byte matches sent byte
-					if (rx_verification != rx_byte) delta_buffer[head] = DELTA_COLLISION;
-					rx_do_verification = 0;
+		if (Echo || !rx_do_verification) {
+			// state==99 so we detected edge of start pulse, just after a byte was sent; so verify sent byte was received
+			head = rx_buffer_head + 1;
+			if (head >= RX_BUFFER_SIZE) head = 0;
+			if (head != rx_buffer_tail) {
+				rx_buffer[head] = rx_byte;
+				if (rx_parity) {
+					delta_buffer[head] = DELTA_PE; // signals parity error
+				} else {
+					delta_buffer[head] = startbit_delta; // signals no parity error / no end-of-block / time from previous byte
+					if (rx_do_verification) {
+						// If in transmission mode/verification mode,
+						// check if received byte matches sent byte
+						// If not, we assume that the cause is a bus collision
+						if (rx_verification != rx_byte) delta_buffer[head] = DELTA_COLLISION;
+					}
 				}
+				rx_buffer_head = head;
+			} else {
+				delta_buffer[rx_buffer_head] = DELTA_OVERRUN; // overwrite delta of previous byte to signal buffer-overrun
 			}
-			rx_buffer_head = head;
-		} else {
-			delta_buffer[rx_buffer_head] = DELTA_OVERRUN; // overwrite delta of previous byte to signal buffer-overrun (-2)
 		}
+		rx_do_verification=0;
 		state = 0;
 	}
 	if (state == 0) { // if this is first edge, it must be first (start) pulse detected
@@ -470,23 +489,28 @@ ISR(COMPARE_B_INTERRUPT)
 		// no new start bit detected within expected time frame; thus pause in received data detected
 		DISABLE_INT_COMPARE_B();
 		rx_state = 0;
-		head = rx_buffer_head + 1;
-		if (head >= RX_BUFFER_SIZE) head = 0;
-		if (head != rx_buffer_tail) {
-			rx_buffer[head] = rx_byte;
-			if (rx_parity) {
-				delta_buffer[head] = DELTA_PE_EOB; // signals parity error & end-of-block
-			} else { 
-				delta_buffer[head] = DELTA_EOB; // signals end-of-block
-				if (rx_do_verification) {
-					if (rx_verification != rx_byte) delta_buffer[head] = DELTA_COLLISION;
-					rx_do_verification = 0;
+		if (Echo || !rx_do_verification) {
+			head = rx_buffer_head + 1;
+			if (head >= RX_BUFFER_SIZE) head = 0;
+			if (head != rx_buffer_tail) {
+				rx_buffer[head] = rx_byte;
+				if (rx_parity) {
+					delta_buffer[head] = DELTA_PE_EOB; // signals parity error & end-of-block
+				} else { 
+					delta_buffer[head] = DELTA_EOB; // signals end-of-block
+					if (rx_do_verification) {
+						// If in transmission mode/verification mode,
+						// check if received byte matches sent byte
+						// If not, we assume that the cause is a bus collision
+						if (rx_verification != rx_byte) delta_buffer[head] = DELTA_COLLISION;
+					}
 				}
+				rx_buffer_head = head;
+			} else {
+				delta_buffer[rx_buffer_head] = DELTA_OVERRUN; // overwrite delta of previous byte to signal buffer-overrun (-2)
 			}
-			rx_buffer_head = head;
-		} else {
-			delta_buffer[rx_buffer_head] = DELTA_OVERRUN; // overwrite delta of previous byte to signal buffer-overrun (-2)
 		}
+		rx_do_verification=0;
 		return;
 	}
 	// if parity bit was 0, state will be 10, otherwise state will be lower and we need to process the 1s
@@ -502,7 +526,7 @@ ISR(COMPARE_B_INTERRUPT)
 		//state++;				// state is not used any more
 	}
 	digitalWrite(LED_BUILTIN, rx_parity ? HIGH : LOW);
-	rx_state = 99;
+	rx_state = 99;                                  // state=99: wait for start bit falling edge
 	// rx_target = target;      // not used any more
 	SET_COMPARE_B(target+ticks_per_bit);
 }
@@ -557,6 +581,48 @@ int P1P2Serial::available(void)
 void P1P2Serial::flushInput(void)
 {
 	rx_buffer_head = rx_buffer_tail;
+}
+
+uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint8_t maxlen, uint8_t crc_gen, uint8_t crc_feed)
+{
+// Reads one packet; stores maximum of maxlen bytes into readbuf; returns #bytes stored or error value
+// If crc_gen is not zero, verifies last byte as CRC byte
+	uint8_t EOB=0;
+	uint8_t bytecnt=0;
+	uint8_t crc=crc_feed;
+	while (EOB == 0) {
+		if (available()) {
+			uint16_t delta = read_delta();
+			uint8_t c = read();
+			if ((delta == DELTA_COLLISION) || (delta == DELTA_OVERRUN) || (delta == DELTA_PE) || (delta == DELTA_PE_EOB)) return delta;
+			if (delta == DELTA_EOB) EOB = 1;
+			if ((EOB == 0) || (crc_gen == 0)) {
+				if (bytecnt < maxlen) readbuf[bytecnt++] = c;
+				if (crc_gen != 0) for (uint8_t i=0;i<8;i++) {
+					crc = (((crc^c) & 0x01) ? ((crc>>1) ^ crc_gen) : (crc >> 1));
+					c>>=1;
+				}
+			} else if (c != crc) return DELTA_CRCE;
+		}
+	}
+	return bytecnt;
+}
+
+void P1P2Serial::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen, uint8_t crc_feed)
+{
+// Writes one packet of l bytes, t ms after last bus action; 
+// If crc_gen is not zero, adds CRC byte to packet
+	setDelay(t);
+	uint8_t crc=crc_feed;
+	for (uint8_t i=0;i<l;i++) {
+		uint8_t c = writebuf[i];
+		write(c);
+		if (crc_gen != 0) for (uint8_t i=0;i<8;i++) {
+			crc = ((crc^c) & 0x01 ? ((crc>>1) ^ crc_gen) : (crc >> 1));
+			c>>=1;
+		}
+	}
+	if (crc_gen) write(crc);
 }
 
 #ifdef ALTSS_USE_FTM0

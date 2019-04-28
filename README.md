@@ -29,8 +29,9 @@ Several adapter circuit schemas for use as an Arduino Uno hat are provided in PD
  - version 1 bare-bones version without galvanic isolation (use at your own risk)
  - version 2 with galvanic isolation and an isolated DC-DC converter
  - version 3 with galvanic isolation, adds bus-powered and/or bus-powering options to version 2
+ - version 3-selection, the basis for the SMD PCB prototype version as shown in the pictures
 
-The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noise P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal. I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2 (but please note next question on the consequences of this third modification!). Modification 2 is only needed if the adapter is not powered by the bus itself. A further modification, the addition of a 680pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 100Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
+The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noise P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal. I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2 (but please note next question on the consequences of this third modification!). Modification 2 is only needed if the adapter is not powered by the bus itself. A further modification, the addition of a 470pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 200Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
 
 Version 1 is the bare-bones version - as stated this version does not provide galvanic isolation between the P1/P2 bus and the Arduino (but if only reading circuitry is implemented this risk is limited because the resistors between the P1/P2 bus and the MM1192 are 150k Ohm; however if modification 2 is implemented the resistance is lowered to around 1k Ohm; and if write circuitry is added there really is isolation at all. Use at your own risk!
 
@@ -69,6 +70,7 @@ The simple answer is: write when others don't. In practice communication seems t
 - examples/P1P2Monitor/P1P2Monitor.ino: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library
 - examples/P1P2Monitor/usb2console.py: simple python program to copy non-RAWMOMITOR USB serial input to stdout for Raspberry Pi or other host
 - examples/P1P2Monitor/usb2console-raw.py: simple python program for use with RAWMONITOR mode to copy USB serial raw input to stdout for Raspberry Pi or other host
+- examples/P1P2AdapterTest: program to test communication between two P1/P2 adapters
 - doc/Daikin-protocol\*: observations of protocol data for various heat pumps (work-in-progress)
 - circuits/\*: P1/P2 adapter schematics and pictures of prototype board.
 - config/AltSoftSerial_Boards.h and AltSoftSerial_Timers.h: (MIT-licensed) AltSoftSerial configuration files
@@ -76,11 +78,11 @@ The simple answer is: write when others don't. In practice communication seems t
 
 **Where can I buy a MM1192?**
 
-Only a few sellers on ebay and aliexpress are selling the MM1192 and MM1007. I could not find a seller of the XL1192. The circuit could also be re-built using a few opamps.
+Only a few sellers on ebay and aliexpress are selling the MM1192 and MM1007. I could not find a seller of the XL1192. The read circuit could also be re-built using a few opamps as demonstrated by https://github.com/LenShustek/M-NET-Sniffer.
 
 **Do you plan to offer pre-soldered or DIY adapter circuit kits?**
 
-Please contact me if you are interested, my e-mail is in the source code header. Images of the first prototype can be found in the circuits directory. The final circuit will be based on "version3-selection". 
+Please contact me if you are interested, my e-mail is in the source code header. Images of the first prototype can be found in the circuits directory. The final circuit will be based on the "version3-selection" schematics. 
 
 **Acknowledgements**
 
