@@ -76,7 +76,7 @@ static volatile uint8_t tx_buffer_head;
 static volatile uint8_t tx_buffer_tail;
 #define TX_BUFFER_SIZE 80
 static volatile uint8_t tx_buffer[TX_BUFFER_SIZE];
-static volatile uint8_t tx_buffer_delay[TX_BUFFER_SIZE];
+static volatile uint16_t tx_buffer_delay[TX_BUFFER_SIZE];
 
 static volatile uint16_t time_msec=0;
 static volatile uint16_t tx_wait=0;
