@@ -1,0 +1,38 @@
+#######################################
+# Syntax Coloring Map For P1P2Serial
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+P1P2Serial	KEYWORD1	P1P2Serial
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+setDelay	KEYWORD2
+writeByte	KEYWORD2
+flushOutput	KEYWORD2
+setEcho	KEYWORD2
+read_delta	KEYWORD2
+read	KEYWORD2
+peek	KEYWORD2
+available	KEYWORD2
+flushInput	KEYWORD2
+readpacket	KEYWORD2
+writepacket	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+MAXDELTA	LITERAL1
+DELTA_PE_EOB	LITERAL1
+DELTA_PE	LITERAL1
+DELTA_EOB	LITERAL1
+DELTA_OVERRUN	LITERAL1
+DELTA_COLLISION	LITERAL1
+DELTA_CRCE	LITERAL1
+DELTA_MAXLEN	LITERAL1
