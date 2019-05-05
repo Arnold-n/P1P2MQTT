@@ -3,7 +3,8 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
- * 20190428 v0.9.2 Added setEcho(b), readpacket() and writepacket()
+ * 20190505 v0.9.3 Changed error handling and corrected deltabuf type in readpacket; added mod12/mod13 counters
+ * 20190428 v0.9.2 Added setEcho(b), readpacket() and writepacket(); LCD support added
  * 20190409 v0.9.1 Improved setDelay()
  * 20190407 v0.9.0 Improved reading, writing, and meta-data; added support for timed writings and collision detection; added stand-alone hardware-debug mode
  * 20190303 v0.0.1 initial release; support for raw monitoring and hex monitoring
@@ -46,6 +47,8 @@
 #include <U8x8lib.h>
 U8X8_SSD1306_128X64_NONAME_4W_SW_SPI u8x8(/* clock=*/ 2, /* data=*/ 3, /* cs=*/ 6, /* dc=*/ 5, /* reset=*/ 4);
 static int bytecnt=0;
+static int packetcntmod12=0; // packetcntmod12 increments upon each package of 13 packets;
+static int packetcntmod13=0; // packetcntmod13 as shown on LCD remains constant except (thus signals) additional packets and/or communication errors
 #endif // LCD
 
 // P1P2erial is written and tested for the Arduino Uno.
@@ -103,6 +106,7 @@ static int newline=1;
 #ifdef DEBUG_HARDWARE
 static uint32_t watchdogcnt=0;
 #endif // DEBUG_HARDWARE
+
 
 void loop() {
 #ifdef RAWMONITOR
@@ -187,6 +191,8 @@ void loop() {
 #endif // SHIFTCNT
 		if ((delta == DELTA_EOB) || (delta == DELTA_PE_EOB)) {
 #ifdef LCD
+			packetcntmod12++; if (packetcntmod12 == 12) packetcntmod12 = 0;
+			packetcntmod13++; if (packetcntmod13 == 13) packetcntmod13 = 0;
 			bytecnt=0;
 #endif // LCD
 #ifdef SHIFTCNT
@@ -295,9 +301,10 @@ void process_for_LCD(uint8_t n,uint8_t c) {
 	if (n==1) linesrc=c;
 	if (n==3) linetype=c;
 	if (n>3)
+ 
 	switch (linetype) {
-		case 0x10 : switch (linesrc) {
-			case 0x00 : switch (n) {
+		case 0x10 :  switch (linesrc) {
+			case 0x00 : row=6;col=15;LCD_hex1(packetcntmod12); row=4;col=15;LCD_hex1(packetcntmod13); switch (n) {
 				case  4 : row=7; col=8; LCD_hex2(c);                    break; // heating on/off?
 				case  5 : row=7; col=10; LCD_hex2(c);                   break; // 0x01/0x81?
 				case 11 : /* row=X; col=X; LCD_int2(c); */              break; // target room temp
