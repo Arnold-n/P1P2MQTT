@@ -13,13 +13,19 @@ The software is licensed under GPL V2.0. Please comply with the license conditio
 
 For now, you can only read and write the data on the P1/P2 bus. Write support in version 0.9.1 includes a basic bus collision detection, which operates on a byte basis (and not on a bit basis). Even if a collission is detected, writing will continue. You can use this library to view and study the data on the bus, and to monitor various temperatures, flow data, energy consumption, and to send messages to the heat pump and/or to the thermostat. This would for example enable the calculation of COP values or switching certain functions. You can power the P1/P2 bus if you use the P1/P2 adapter with a P1/P2 device that requires a power feed.
 
+Data is output to an OLED display connected to the Arduino Uno, and to the serial over USB connection. Support for conversion to json/emoncms format for upload into emoncms (openenergymonitor.org) is in preparation.
+
 **Why did you build this?**
 
 My heat pump is a 2014 model Daikin hybrid heat pump/natural gas boiler combination. This is a very efficient combination: a heat pump is used in low power demand situations, whereas in high power demand situations a natural gas after-burner is also used in cascade operation (still allowing the heat pump to operate at low LWT temperature). This reduces natural gas usage by approximately 75% and results in a heat pump achieving, in our case, a year average COP of 3.6. Unfortunately the software in this system is very basic, and it behaves oddly. It often defrosts when totally unneeded, and in other cases not at all when air flow is entirely blocked at the outside unit (the COP will then drop dramatically towards 1.0, the heat pump could detect this situation by internally measuring the COP, but it does not seem to notice at all). It often sets the heat pump at a power setting that leaves the natural gas boiler to operate below its minimum power capability, resulting in an error message on the gas boiler and a far too low LWT, resulting in insufficient heating. Unfortunately, Daikin did not respond to or resolve these complaints. Therefore I want to understand and improve the behaviour myself via the P1/P2 bus.
 
-**Which interface is supported?**
+**What is the Daikin P1/P2 bus?**
 
 Daikin (or Rotex) uses various communication standards between thermostats and heat pumps. The P1/P2 standard is one of them (others are F1/F2, Modbus, BACnet, which are not supported here). The P1/P2 protocol is a proprietary standard. At the lowest level it is a two-wire 9600 baud serial-like interface based on the Japanese Home Bus System (ET-2101). Some technical details of this standard can be found in chapter 4 of the https://echonet.jp/wp/wp-content/uploads/pdf/General/Standard/Echonet/Version_2_11_en/spec_v211e_3.pdf.
+
+**Which interface is supported?**
+
+This project was started for the Daikin P1/P2 bus. However the underlying electrical HBS format is used by many heat pump / air conditioning manufacturers, so far we have indications that the following buses are based on the HBS format: Daikin P1/P2, Daikin F1/F2 (DIII-Net), Mitsubishi M-Net, Toshiba TCC-Link, Hitachi H-link, Panasonic/Sanyo SIII-Net, perhaps also products from Haier and York.
 
 **How do I build a P1/P2 adapter circuit?**
 
@@ -67,7 +73,7 @@ The simple answer is: write when others don't. In practice communication seems t
 
 - LICENSE: GPL-v2.0 license for P1P2Monitor and P1P2Serial
 - P1P2Serial.cpp and P1P2Serial.h: (GPL-licensed) P1P2Serial library, based on AltSoftSerial, and uses AltSoftSerial configuration files
-- examples/P1P2Monitor/P1P2Monitor.ino: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library
+- examples/P1P2Monitor/P1P2Monitor.ino: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus, and enables writing data. Reading/writing packets of data and CRC-byte generation/verification is supported. Using the u8g2 library, support for an additional SPI 128x64 display is provided (display connected directly to the Arduino Uno pins). This works for the Daikin hybrid model, it may work (partially) for other models.
 - examples/P1P2Monitor/usb2console.py: simple python program to copy non-RAWMOMITOR USB serial input to stdout for Raspberry Pi or other host
 - examples/P1P2Monitor/usb2console-raw.py: simple python program for use with RAWMONITOR mode to copy USB serial raw input to stdout for Raspberry Pi or other host
 - examples/P1P2AdapterTest: program to test communication between two P1/P2 adapters
