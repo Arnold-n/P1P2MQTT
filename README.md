@@ -43,7 +43,7 @@ Version 1 is the bare-bones version - as stated this version does not provide ga
 
 Version 2 provides galvanic isolation. The MM1192 is powered via an isolated DC-DC 5V-5V converter.
 
-Version 3 adds various power options to version 2. It adds a bus-powered 5V supply (as an alternative to the DC-DC 5V-5V converter), and optionally a bus power feed. If you want to interface to the heat pump, which operates as a master and provides a power feed on the bus, the power on the bus can be used to power the P1/P2 adapter. If you want to interface to a user interface or thermostat, which operates as a slave and requires a power feed, the adapter now can provide 15V on the P1/P2 bus. The schematic shows two options to power the P1/P2 bus: using a DC-DC 5V-15V converter, or using an external 15V power supply.
+Version 3 adds various power options to version 2. It adds a bus-powered 5V supply (as an alternative to the DC-DC 5V-5V converter), and optionally a bus power feed. If you want to interface to the heat pump, which operates as a master and provides a power feed on the bus, the power on the bus can be used to power the P1/P2 adapter. If you want to interface to a user interface or thermostat, which operates as a slave and requires a power feed, the adapter now can provide 15V on the P1/P2 bus. The schematic shows two options to power the P1/P2 bus: using a DC-DC 5V-15V converter, or using an external 15V power supply. This circuit functions properly in many cases, but not always. The circuit that uses bus power also influences the signal shape, depending on other devices and wire length this may result in miscommunications. Proper line termination may reduce this impact on the bus. However, for maximum reliability, I advise to use version 2, and only if you want to power the bus, add the two external 10mH inductors to do so.
 
 **There is no galvanic isolation in adapter version 1! What is the risk?**
 
@@ -88,7 +88,9 @@ Only a few sellers on ebay and aliexpress are selling the MM1192 and MM1007. I c
 
 **Do you plan to offer pre-soldered or DIY adapter circuit kits?**
 
-Please contact me if you are interested, my e-mail is in the source code header. Images of the first prototype can be found in the circuits directory. The final circuit will be based on the "version3-selection" schematics. 
+Yes, please contact me if you are interested, my e-mail is in the source code header. The adapter circuit is a 0.5" x 2" PCB for the Arduino Uno, and connects to GND, 5V, and to digital pins 8 and 9. It is based on version 2 (but without the LEDs). It is a single-sided PCB with SMD components (0603/0805 components, MM1192 SOP-16, SI8621 SOIC-8, and a Murata SMD-mounted 5V/5V converter). Pictures will follow.
+
+ Images of the first prototype based on version 3 can be found in the circuits directory. However as version 2 is much more reliable I am currently offerinthe The final circuit will be based on the "version3-selection" schematics. 
 
 **Acknowledgements**
 
