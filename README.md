@@ -77,7 +77,7 @@ The simple answer is: write when others don't. In practice communication seems t
 - examples/P1P2Monitor/usb2console.py: simple python program to copy non-RAWMOMITOR USB serial input to stdout for Raspberry Pi or other host
 - examples/P1P2Monitor/usb2console-raw.py: simple python program for use with RAWMONITOR mode to copy USB serial raw input to stdout for Raspberry Pi or other host
 - examples/P1P2AdapterTest: program to test communication between two P1/P2 adapters
-- doc/Daikin-protocol\*: observations of protocol data for various heat pumps (work-in-progress)
+- doc/Daikin-protocol\*: observations of protocol data for various heat pumps (work-in-progress, contributions welcome)
 - circuits/\*: P1/P2 adapter schematics and pictures of prototype board.
 - config/AltSoftSerial_Boards.h and AltSoftSerial_Timers.h: (MIT-licensed) AltSoftSerial configuration files
 - README.md: this file
@@ -96,4 +96,5 @@ Many thanks to the following persons:
 - a user called "donato35" for discovering that the P1/P2 bus is using HBS adapters (http://www.grix.it/forum/forum_thread.php?ftpage=2)
 - a user called "Krakra" published a link to a description of the HBS protocol in the Echonet standard (https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms/2551/43)
 - Bart Ellast for sharing his P1/P2 protocol data and analysis
+- designer2k2 for sharing his EWYQ005ADVP protocol data and analysis
 - Paul Stoffregen for publishing the AltSoftSerial library, on which the P1P2Serial library is heavily based.
