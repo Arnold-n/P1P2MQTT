@@ -88,9 +88,7 @@ Only a few sellers on ebay and aliexpress are selling the MM1192 and MM1007. I c
 
 **Do you plan to offer pre-soldered or DIY adapter circuit kits?**
 
-Yes, please contact me if you are interested, my e-mail is in the source code header. The adapter circuit is a 0.5" x 2" PCB for the Arduino Uno, and connects to GND, 5V, and to digital pins 8 and 9. It is based on version 2 (but without the LEDs). It is a single-sided PCB with SMD components (0603/0805 components, MM1192 SOP-16, SI8621 SOIC-8, and a Murata SMD-mounted 5V/5V converter). Pictures will follow.
-
- Images of the first prototype based on version 3 can be found in the circuits directory. However as version 2 is much more reliable I am currently offerinthe The final circuit will be based on the "version3-selection" schematics. 
+Yes, please contact me if you are interested, my e-mail is in the source code header. The adapter circuit is a 0.5" x 2" PCB for the Arduino Uno, and connects to GND, 5V, and to digital pins 8 (RX) and 9 (TX). The schematic is circuits/Daikin_P1P2_Uno_version2.pdf. It is a single-sided PCB with SMD components (0603/0805 components, MM1192 SOP-16, SI8621 SOIC-8, and a Murata SMD-mounted 5V/5V converter). Pictures will follow. Images of the first prototype based on version 3 can be found in the circuits directory. However as version 2 is more reliable in practice I am currently only offering a PCB based on version 2.
 
 **Acknowledgements**
 
