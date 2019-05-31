@@ -1,6 +1,11 @@
-# EHYHBX08AAV3 protocol data format
+# EHYHB(H/X)-AV3 and EHV(H/X)-CB protocol data format
 
-For the hybrid Daikin heat pump EHYHBX08AAV3, the following for data packet format was observed. This particular unit is functioning in weather-dependent LWT mode.
+Protocol data format for Daikin Altherma hybrid heat pump EHYHB(H/X)-AV3 and Daikin Altherma LT heat pump EHV(H/X)-CB
+
+The following data packets were observed on these particular units:
+EHYHBX08AAV3: air-to-water heat pump with gas condensing technology, functioning in weather-dependent LWT mode
+EHVX08S26CB9W: air-to-water heat pump (with cooling), functioning in weather-dependent LWT mode (so far only "main package" packets were tested)
+
 
 | Byte nr       | Hex value observed            |                |
 |---------------|:------------------------------|:---------------|
