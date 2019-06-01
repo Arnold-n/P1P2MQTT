@@ -80,7 +80,7 @@ Yes, please contact me if you are interested, my e-mail is in the source code he
 **Acknowledgements**
 
 Many thanks to the following persons:
-- a user called "donato35" for discovering that the P1/P2 bus is using HBS adapters (http://www.grix.it/forum/forum_thread.php?ftpage=2)
+- a user called "donato35" for discovering that the P1/P2 bus is using HBS adapters (http://www.grix.it/forum/forum_thread.php?ftpage=2&id_forum=1&id_thread=519140?id_forum=1)
 - a user called "Krakra" published a link to a description of the HBS protocol in the Echonet standard (https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms/2551/43)
 - Bart Ellast for sharing his P1/P2 protocol data and analysis
 - designer2k2 for sharing his EWYQ005ADVP protocol data and analysis
