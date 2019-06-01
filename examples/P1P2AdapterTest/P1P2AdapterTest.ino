@@ -49,7 +49,6 @@ void loop() {
 		case DELTA_PE       : Serial.println("Delta PE"); break;
 		case DELTA_PE_EOB   : Serial.println("Delta PE EOB"); break;
 		case DELTA_COLLISION: Serial.println("Delta collission"); break;
-		case DELTA_MAXLEN   : Serial.println("Delta maxlen"); break;
 		case DELTA_CRCE     : Serial.println("Delta CRCE"); break;
 		default             : Serial.print("Read    n="); Serial.print(n);Serial.print(" ");
 		                      for (int i=0; i<n; i++) {if (RB[i] < 0x10) Serial.print('0'); Serial.print(RB[i],HEX);}
