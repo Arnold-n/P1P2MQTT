@@ -64,7 +64,6 @@ The simple answer is: write when others don't. In practice communication seems t
 - examples/P1P2Monitor/P1P2Monitor.ino: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus, and enables writing data. Reading/writing packets of data and CRC-byte generation/verification is supported. Using the u8g2 library, support for an additional SPI 128x64 display is provided (display connected directly to the Arduino Uno pins). This works for the Daikin hybrid model, it may work (partially) for other models,
 - examples/P1P2Monitor/usb2console.py: simple python program to copy non-RAWMOMITOR USB serial input to stdout for Raspberry Pi or other host,
 - examples/P1P2Monitor/usb2console-raw.py: simple python program for use with RAWMONITOR mode to copy USB serial raw input to stdout for Raspberry Pi or other host,
-- examples/P1P2AdapterTest: program to test communication between two P1/P2 adapters,
 - doc/Daikin-protocol\*: observations of protocol data for various heat pumps (work-in-progress, contributions welcome),
 - circuits/\*: P1/P2 adapter schematic and pictures of adapter board,
 - config/AltSoftSerial_Boards.h and AltSoftSerial_Timers.h: (MIT-licensed) AltSoftSerial configuration files,
