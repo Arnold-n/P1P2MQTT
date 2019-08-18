@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190817 v0.9.4 Clean up, bug fixes, improved ms counter, prescaler reset added, time measurement changed, delta/error reporting separated
  * 20190505 v0.9.3 Changed error handling and corrected deltabuf type in readpacket
  * 20190428 v0.9.2 Added setEcho(b), readpacket() and writepacket()
  * 20190409 v0.9.1 Improved setDelay()
@@ -53,92 +54,102 @@
 static uint16_t ticks_per_bit=0;
 static uint16_t ticks_per_semibit=0;
 static uint16_t ticks_per_byte_minus_ms=0;
-static uint16_t ticks_per_timer0=0;
+static uint16_t ticks_until_mid_paritybit;
+static uint16_t prescaler_ratio_timer0_timer1;
 
 static uint8_t rx_state;
 static uint8_t rx_byte;
-static uint8_t rx_parity;
+static uint8_t rx_paritycheck;
 static uint16_t rx_target;
-static uint16_t rx_stop_ticks;
 static volatile uint8_t rx_buffer_head;
 static volatile uint8_t rx_buffer_tail;
-#define RX_BUFFER_SIZE 80
 static volatile uint8_t rx_buffer[RX_BUFFER_SIZE];
-static volatile uint16_t delta_buffer[RX_BUFFER_SIZE];
+static volatile uint8_t error_buffer[RX_BUFFER_SIZE]; // records error status
+static volatile uint16_t delta_buffer[RX_BUFFER_SIZE]; // records timing info in ms
 
-static volatile uint8_t tx_state=0;
+static volatile uint8_t tx_state;
 static uint8_t tx_byte;
-static uint8_t tx_byte2;
-static uint8_t rx_verification;
-static uint8_t rx_do_verification;
+static uint8_t tx_byte_verify;
+static uint8_t rx_byte_verify;
+bool           rx_do_verify;
 static uint8_t tx_bit;
 static uint8_t tx_paritybit;
 static volatile uint8_t tx_buffer_head;
 static volatile uint8_t tx_buffer_tail;
-#define TX_BUFFER_SIZE 80
 static volatile uint8_t tx_buffer[TX_BUFFER_SIZE];
-static volatile uint16_t tx_buffer_delay[TX_BUFFER_SIZE];
-
+static volatile uint16_t tx_buffer_delay[TX_BUFFER_SIZE]; // records timing info in ms (16 bits)
 static volatile uint16_t time_msec=0;
 static volatile uint16_t tx_wait=0;
+
+#define scheduledelay 16 // just enough to schedule timer reliably
 
 #ifndef INPUT_PULLUP
 #define INPUT_PULLUP INPUT
 #endif
 
-#define MAX_COUNTS_PER_BIT 5400  // < 65536 / 12
+#define MAX_TICKS_PER_BIT 5400  // should be less than (65536 / 12) (as this is a 16 bit counter, and there are 11 bits per byte, plus some margin)
 
-void P1P2Serial::init(uint32_t cycles_per_bit)
+void P1P2Serial::begin(uint32_t baud)
 {
-	if (cycles_per_bit < MAX_COUNTS_PER_BIT) {
-		CONFIG_TIMER_NOPRESCALE();
-	} else {
-		// Needed for 9600 baud and clocks > ~51 MHz (Arduino Due):
-		cycles_per_bit /= 8;
-		ticks_per_byte_minus_ms /= 8;
-		if (cycles_per_bit < MAX_COUNTS_PER_BIT) {
-			CONFIG_TIMER_PRESCALE_8();
-		} else {
-			return; // baud rate too low for P1P2Serial
-		}
-	}
-	ticks_per_bit = cycles_per_bit;
-	// 1 byte (11 bits) in 9600 baud takes 1.13 milliseconds;
-	// calculate exact length of 1 byte (11 bits) minus 1 millisecond:
-	ticks_per_byte_minus_ms = 11 * cycles_per_bit - (ALTSS_BASE_FREQ / 1000);
-	// stop rx after 9.5 bit periods (start bit +8 data bits + 1/2 parity bit)
-	// note don't use (uint16_t) ticks_per_bit here, use (uint32_t) cycles_per_bit (to avoid overflow)
-	ticks_per_timer0 = 64; // assuming prescale factor of timer0=64, prescale factor of TIMER=1;
-	rx_stop_ticks = (cycles_per_bit * 19) / 2; 
-	pinMode(INPUT_CAPTURE_PIN, INPUT_PULLUP);
-	digitalWrite(OUTPUT_COMPARE_A_PIN, HIGH);
-	ticks_per_semibit = ticks_per_bit/2;
-	pinMode(OUTPUT_COMPARE_A_PIN, OUTPUT);
-	rx_state = 0;
-	rx_buffer_head = 0;
-	rx_buffer_tail = 0;
-	tx_state = 0;
-	tx_buffer_head = 0;
-	tx_buffer_tail = 0;
-	CONFIG_CAPTURE_FALLING_EDGE();
-	ENABLE_INT_INPUT_CAPTURE();
-	// set up millisecond timer - code works currently only on 16MHz CPUs
-	TIMSK0 = (1<<OCIE0A);
-	TCCR0A = 2;  // TCT mode; no signal on pins
-	TCCR0B = 3;  // TCT mode; prescale 64x
-	OCR0A = 249; // count until 249; 16 MHz / (64*250) = 1 kHz
-	// set up pin for LED to show parity errors
-	pinMode(LED_BUILTIN, OUTPUT);
+  uint32_t cycles_per_bit = ((ALTSS_BASE_FREQ + baud / 2) / baud); // 1667 for 16MHz/9600baud (so < 5400, thus no prescaler needed)
+  uint8_t scale = 1;
+  if (cycles_per_bit < MAX_TICKS_PER_BIT) {
+    CONFIG_TIMER_NOPRESCALE();
+  } else {
+    // Needed for 9600 baud and clocks > ~51 MHz (Arduino Due):
+    cycles_per_bit /= 8;
+    if (cycles_per_bit < MAX_TICKS_PER_BIT) {
+      CONFIG_TIMER_PRESCALE_8();
+      scale = 8;
+    } else {
+      return; // baud rate too low for P1P2Serial
+    }
+  }
+  ticks_per_bit = cycles_per_bit;
+  ticks_per_semibit = ticks_per_bit / 2;
+  // use 32-bit cycles_per_bit here to avoid overflow:
+  ticks_per_byte_minus_ms = (11 * cycles_per_bit - (ALTSS_BASE_FREQ / 1000)) / scale; // calculate exact length of 1 byte (11 bits, 1.13ms@9600baud) minus 1 millisecond:
+  ticks_until_mid_paritybit  = ((cycles_per_bit * 19) / 2) / scale; // for setting timer to mid of parity bit (after 9.5 bit periods)
+
+  pinMode(INPUT_CAPTURE_PIN, INPUT_PULLUP);
+  digitalWrite(OUTPUT_COMPARE_A_PIN, HIGH);
+  pinMode(OUTPUT_COMPARE_A_PIN, OUTPUT);
+
+  rx_state = 0;
+  rx_buffer_head = 0;
+  rx_buffer_tail = 0;
+  tx_state = 0;
+  tx_buffer_head = 0;
+  tx_buffer_tail = 0;
+
+  rx_do_verify = 0;
+
+  tx_state = 0;
+  time_msec = 0;
+  tx_wait = 0;
+
+  CONFIG_CAPTURE_FALLING_EDGE();
+  ENABLE_INT_INPUT_CAPTURE();
+
+  // set up millisecond timer - code works currently only on 16MHz CPUs (and tested only on Uno/Mega)
+  TIMSK0 = (1<<OCIE0A);
+  TCCR0A = 2;  // TCT mode (WGM02:0=2); no signal on OC0A/OC0B pins
+  TCCR0B = 3;  // TCT mode (WGM02:0=2); timer0 prescaler is 64 (CS02:0=3)
+  OCR0A = 249; // timer0 counts until 249 and wraps; 16 MHz/(64*250) = 1 kHz
+  prescaler_ratio_timer0_timer1 = 64/scale;
+
+  // set up pin for LED to show parity errors
+  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void P1P2Serial::end(void)
 {
-	DISABLE_INT_COMPARE_B();
-	DISABLE_INT_INPUT_CAPTURE();
-	flushInput();
-	flushOutput();
-	DISABLE_INT_COMPARE_A();
-	TIMSK0 = 0;
+  DISABLE_INT_COMPARE_B();
+  DISABLE_INT_INPUT_CAPTURE();
+  flushInput();
+  flushOutput();
+  DISABLE_INT_COMPARE_A();
+  TIMSK0 = 0;
 }
 
 /****************************************/
@@ -147,215 +158,211 @@ void P1P2Serial::end(void)
 
 ISR(TIMER0_COMPA_vect)
 {
-	if (time_msec < MAXDELTA) time_msec++; // higher values reserved for error codes in delta reporting
-	if ((tx_state == 99) && (time_msec >= tx_wait)) {
-#ifdef NO_READ_DURING_WRITE
-// TODO: Disable reading
-#endif
-		tx_state = 1;
-		CONFIG_MATCH_CLEAR();
-		uint16_t t_delta=16;
-		if (time_msec == 1) t_delta=ticks_per_byte_minus_ms;
-		SET_COMPARE_A(GET_TIMER_COUNT() + t_delta);
-		// in 16 or ticks_per_byte_minus_ms ticks, start bit will follow, 
-		// (if time_msec = 1, (and thus tx_wait = 1): wait exactly 1 byte time
-		//                                            after last start bit falling edge).
-		// This will trigger an interrupt for next action to be set up.
-		// state=1 indicates that (upon start interrupt routine) this start bit has just started.
-		ENABLE_INT_COMPARE_A();
-	}
+// time_msec counts time in ms from the last start pulse (counting from the leading falling edge of the start pulse)
+// max count is 65535 ms (uint16_t)
+  if (time_msec < 0xFFFF) time_msec++; 
+  // if tx_state =99, a write is scheduled, so check if pause is long enough to start writing
+  if ((tx_state == 99) && (time_msec >= tx_wait)) {
+    // start writing:
+    // in scheduledelay or in ticks_per_byte_minus_ms ticks, falling edge of start bit  is scheduled
+    // (if time_msec = 1, (and thus tx_wait = 1): wait exactly 1 byte time
+    //                                            after last start bit falling edge).
+    // This will trigger an interrupt for next action to be set up.
+    // state=1 indicates that (upon start interrupt routine) the start bit has just begun.
+    tx_state = 1;
+    uint16_t t_delta = scheduledelay;
+    if (time_msec == 1) t_delta = ticks_per_byte_minus_ms;
+    CONFIG_MATCH_CLEAR();
+    SET_COMPARE_A(GET_TIMER_COUNT() + t_delta);
+    ENABLE_INT_COMPARE_A();
+  }
 }
 
 /****************************************/
 /**           Transmission             **/
 /****************************************/
 
-static uint16_t tx_set_delay=0;
+static uint16_t tx_setdelay = 0;
 
 void P1P2Serial::setDelay(uint16_t t)
-// Input parameter: 1 <= t <= MAXDELTA.
-// This sets delay for next byte (and next byte only) added to transmission buffer.
-// The next byte added to queue will not be transferred until t milliseconds silence 
-// since last falling edge has been detected.
+// Input parameter: 0 <= t <= 65535
+// This sets delay for next byte (and next byte only) when it is added to the transmission buffer.
+// The writing of the next byte to be added to the queue will be delayed until t milliseconds silence 
+//                since last falling edge of start bit has been detected.
 // As we also read back sent data (also for the purpose of verification),
-// this means that a delay is introduced since byte last read or written.
+// this means that a delay is introduced since the byte last read or written.
 // If a byte is added to the queue during a silence, the past silence will also be taken into account.
 // If a byte is added with a setDelay which is shorter than the past silence, transmission will start immediately.
-// If setDelay(0) is called, or setDelay() is not called, there is no delay, and
-//                a risk of a possible collision with an ongoing read
-// If setDelay(1) is called, a delay of 1.13 ms (11 bits, 1 byte) is set after
-//                the last start bit falling edge, so writing is done exactly
-//                after the last read byte (but this may collide if the read
-//                is ongoing; this situation also introduces a race condition
-//                between the adapter and the bus writing which is not detected
-//                as the write is already initiated during the "last" byte read.
-//                There is likely no need to use setDelay(1) and its use is discouraged.
-// If setDelay (t) is called with 2<=t<=MAXDELTA, a delay of t ms is set
-// If setDelay (t) is called with t>MAXDELTA, t is set to MAXDELTA
-// Warning: setDelay(2) may not function properly (hardware issue?) - do not use
-// Warning: repeated use of setDelay(t) with small values of t may not function properly - do not use
-// In practice, t should likely be at least 25ms
+// If setDelay(0) is called, or setDelay() is not called, there is no delay at all when writing. Writing will start immediately
+//                as soon as a byte is written to the write buffer, if there was no bus action, or when the previous byte write is ready.
+// If setDelay(1) is called, a delay of 1.13 ms (11 bits, 1 byte) is set after the last start bit falling edge,
+//                so writing is done exactly after the last written or read byte.
+//                This may be useful for interfacing according to the HBS timing protocol
+//                Note that if setDelay(1) is called when the bus is written to by another device, a bus collision will occur if writing by the other device also continues
+//                Use of setDelay(1) is therefore discouraged
+//                Note that SetDelay is not (yet) suited for proper HBS timing, as HBS timing measures pauses from the end of the stop bit
+//                Timing on the P1P2 bus is not so critical and SetDelay works fine for the P1P2 bus.
+// If setDelay (t) is called with 2 <= t <= 65535, a delay of t ms is set.
 {
-	if (t > MAXDELTA) t = MAXDELTA;
-	tx_set_delay = t;
+  tx_setdelay = t;
 }
 
-void P1P2Serial::writeByte(uint8_t b)
+void P1P2Serial::write(uint8_t b)
 {
-	uint8_t intr_state, head;
+  uint8_t intr_state, head;
 
-	head = tx_buffer_head + 1;
-	if (head >= TX_BUFFER_SIZE) head = 0;
-	while (tx_buffer_tail == head) ; // wait until space in buffer
-	intr_state = SREG;
-	cli(); 
-	// cli() is needed around the SET_COMPARE_A/ENABLE_INT_COMPARE_A instruction pair
-	// but not necessarily here?
-	if (tx_state) {
-		tx_buffer[head] = b;
-		tx_buffer_delay[head] = tx_set_delay; tx_set_delay=0;
-		tx_buffer_head = head;
-	} else {
-		tx_byte = b;
-		tx_byte2 = b;
-		tx_bit = 0;
-		tx_paritybit = 0;
-		if ((tx_set_delay) && (time_msec < tx_set_delay)) {
-			// set millisecond ISR up to start transmission later
-			tx_state = 99;
-			tx_wait = tx_set_delay; tx_set_delay=0;
-		} else {
-			tx_state = 1;
-			uint16_t t_delta = 16;
-			if (time_msec == 1) {
-				// compensate for time past since 1ms detection
-				if (ticks_per_byte_minus_ms > TCNT0 * ticks_per_timer0 + 16) {
-					t_delta = ticks_per_byte_minus_ms - TCNT0 * ticks_per_timer0;
-				} else {
-					t_delta = 16;
-				}
-			}
-			CONFIG_MATCH_CLEAR();
-			SET_COMPARE_A(GET_TIMER_COUNT() + t_delta);
-			// in 16 ticks (or more if time_msec=1), start bit will follow.
-			// this will trigger an interrupt for next action to be set up
-			// state=1 indicates that (upon start interrupt routine) this start bit has just started
-			ENABLE_INT_COMPARE_A();
-#ifdef NO_READ_DURING_WRITE
-// TODO: Disable reading
-#endif
-		}
-	}
-	SREG = intr_state;
+  head = tx_buffer_head + 1;
+  if (head >= TX_BUFFER_SIZE) head = 0;
+  while (tx_buffer_tail == head) ; // wait until space in write buffer
+  intr_state = SREG;
+  cli(); 
+  // cli() is needed here to avoid a race condition w.r.t. tx_state, which can change in ISR()
+  if (tx_state) {
+    // if already writing, add byte to write buffer
+    tx_buffer[head] = b;
+    tx_buffer_delay[head] = tx_setdelay; tx_setdelay=0;
+    tx_buffer_head = head;
+  } else {
+    // if not already writing, start or schedule writing
+    tx_byte = b;
+    tx_byte_verify = b; // for read-back verification
+    tx_bit = 0;
+    tx_paritybit = 0;
+    if ((tx_setdelay) && (time_msec < tx_setdelay)) {
+      // state 99: start transmission only when time_msec becomes >= tx_setdelay
+      tx_state = 99;
+      tx_wait = tx_setdelay; 
+    } else {
+      // state = 1: schedule next start bit falling edge
+      // time_msec = 0: should not happen in this part of main if-statement
+      // time_msec = 1: wait for end of byte
+      // time_msec > 1: asap (after scheduledelay ticks)
+      tx_state = 1;
+      uint16_t t_delta = scheduledelay;
+      CONFIG_MATCH_CLEAR();
+      if (time_msec == 1) {
+        // determine if we still have to wait for the end of currently received byte?
+        uint16_t ticks_wait = ticks_per_byte_minus_ms - TCNT0 * prescaler_ratio_timer0_timer1;
+        if (ticks_wait > scheduledelay) t_delta = ticks_wait; // and if so, start writing immediately after that
+      }
+      SET_COMPARE_A(GET_TIMER_COUNT() + t_delta);
+      // in scheduledelay ticks (or perhaps more if time_msec=1), start bit will follow.
+      // this will trigger an interrupt for next action to be set up
+      // state=1 indicates that (upon start of the interrupt routine) this start bit has just started
+      ENABLE_INT_COMPARE_A();
+    }
+    tx_setdelay=0;
+  }
+  SREG = intr_state;
 }
 
 ISR(COMPARE_A_INTERRUPT)
 {
-	uint8_t state, byte, bit, head, tail;
-	uint16_t target, delay;
-	state = tx_state;
-	byte = tx_byte;
-	target = GET_COMPARE_A();
-	// state indicates in which part of data pattern we are here
-	// 1,2 startbit
-	// 3,4 .. 17,18 data bits
-	// 19,20 parity bit
-	// 21 stopbit
-	// 22 after stopbit
-	while (state < 21) {
-		// calculate next (semi)bit value
-		if (state & 1) {
-			// state is odd, next semibit will be part 2 of bit (high)
-			bit = 1;
-		} else if (state < 18) {
-			// state==even, <18, next bit will be data bit part 1, LSB first
-			bit = (byte & 1);
-			tx_paritybit ^= bit;
-			byte >>= 1;
-		} else if (state ==18) {
-			// state==18, next bit will be parity bit part 1
-			bit = tx_paritybit;
-		} else {
-			// state==20, next bit will be stop bit part 1 (high / silence)
-			bit = 1;
-		}
-		target += ticks_per_semibit;
-		state++;
-		if (bit != tx_bit) {
-			if (bit) {
-				CONFIG_MATCH_SET();
-			} else {
-				CONFIG_MATCH_CLEAR();
-			}
-			SET_COMPARE_A(target);
-			tx_bit = bit;
-			tx_byte = byte;
-			tx_state = state;
-			return;
-		}
-	}
-	head = tx_buffer_head;
-	tail = tx_buffer_tail;
-	// byte sent; we are here not earlier than half-way first data bit, and not later than half-way parity bit
-	// so in time to write rx_verification byte for verifying read-back byte (for verification and collision-detection)
-	if (state == 21) {
-		rx_verification = tx_byte2;
-		rx_do_verification = 1;
-	}
-	if (head == tail) {
-		// tx buffer empty, no more bytes to send...
-		if (state == 21) {
-			// state==21, nothing to do, stop bit is already silent, but wait for end of it before finishing up in state 22
-			// state 21 takes 1 bit length, in contrast to earlier states which take a semibit length
-			tx_state = 22;
-			SET_COMPARE_A(target+ticks_per_bit);
-			// CONFIG_MATCH_SET(); // does nothing - should be set high already
-		} else {
-			// if in state==22 and buffer still empty, quit transmission mode
-			tx_state = 0;
-			CONFIG_MATCH_NORMAL(); // not sure we should do this in between transmissions
-			DISABLE_INT_COMPARE_A();
-		}
-	} else {
-		// there are more bytes to send; 
-		if (++tail >= TX_BUFFER_SIZE) tail = 0;
-		tx_buffer_tail = tail;
-		tx_byte = tx_buffer[tail];
-		tx_byte2 = tx_byte;
-		delay = tx_buffer_delay[tail];
-		tx_bit = 0;
-		tx_paritybit = 0;
-		if (delay) {
-			// it does not matter whether we are still in stop bit or beyond, we have to wait longer
-			// this relies on the fact that xx has just been reset, by reading back falling start bit edge of byte just sent
-			tx_state = 99;
-			tx_wait = delay;
-			CONFIG_MATCH_NORMAL(); // not sure whether we should need to do this in between transmissions
-			DISABLE_INT_COMPARE_A();
-#ifdef NO_READ_DURING_WRITE
-// TODO: Enable reading ; tricky, check whether we are triggering a falling edge detection here?; 
-// or missing one last byte to verify.
-// perhaps wait ?; or signal via rx_do_verification?
-#endif
-		} else {
-			if (state == 21) {
-				//as we are in (silent, high) stop bit time, we set target as time of end of stop bit
-				// next bit is startbit
-				CONFIG_MATCH_CLEAR();
-				SET_COMPARE_A(target+ticks_per_bit); // end of stop pulse part 2, is start of START pulse
-			} else {
-				// state==22, so we are (just) beyond stop bit; "out of pattern" (just received a new byte but too late to remain in sync), and we need to re-schedule new transmission
-				CONFIG_MATCH_CLEAR();
-				SET_COMPARE_A(GET_TIMER_COUNT() + 16);
-			}
-			tx_state = 1;
-		}
-	}
+  uint8_t state, byte, bit, head, tail;
+  uint16_t target, delay;
+  state = tx_state;
+  byte = tx_byte;
+  target = GET_COMPARE_A();
+  // state indicates in which part of data pattern once we enter this ISR
+  // 1,2 startbit
+  // 3,4 .. 17,18 data bits
+  // 19,20 parity bit
+  // 21 stopbit
+  // 23 after stopbit
+  // (can't happen here) 99 pausing, pausing until we can schedule next start bit falling edge
+  // (can't happen here) 0, currently not writing
+  while (state < 21) {
+    // calculate next (semi)bit value
+    if (state & 1) {
+      // state is odd, next semibit will be part 2 of bit (high)
+      bit = 1;
+    } else if (state < 18) {
+      // state=even, <18, next semibit will be data bit part 1, LSB first
+      bit = (byte & 1);
+      tx_paritybit ^= bit;
+      byte >>= 1;
+    } else if (state == 18) {
+      // state=18, next semibit will be parity bit part 1
+      bit = tx_paritybit;
+    } else {
+      // state=20, next semibit will be stop bit part 1 (high / silence)
+      bit = 1;
+    }
+    target += ticks_per_semibit;
+    state++;
+    if (bit != tx_bit) {
+      if (bit) {
+        CONFIG_MATCH_SET();
+      } else {
+        CONFIG_MATCH_CLEAR();
+      }
+      SET_COMPARE_A(target);
+      tx_bit = bit;
+      tx_byte = byte;
+      tx_state = state;
+      return;
+    }
+  }
+  if (state == 21) {
+    // ready writing byte, enable read-back verification here. If we are here, it is
+    //   -not earlier than half-way first data bit (at least one of the data bits and the parity bit is 0)
+    //   -not later than half-way parity bit (if parity bit is 0)
+    // thus we are in time, but also not too early, to write rx_byte_verify for verifying read-back byte (for verification and collision-detection)
+    // as read-back verification occurs during next start bit
+    rx_byte_verify = tx_byte_verify;
+    rx_do_verify = 1;
+  }
+  head = tx_buffer_head;
+  tail = tx_buffer_tail;
+  if (head == tail) {
+    // tx buffer empty, there are no more bytes to send...
+    if (state == 21) {
+      // state==21, nothing to do, stop bit is already silent, but wait for end of it before finishing up in state 23
+      // state 21 takes 1 bit length, in contrast to earlier states which take a semibit length
+      tx_state = 23;
+      SET_COMPARE_A(target+ticks_per_bit);
+      // CONFIG_MATCH_SET(); // does nothing - should be set high already
+    } else {
+      // if in state==23 and buffer still empty, quit transmission mode
+      tx_state = 0;
+      // CONFIG_MATCH_NORMAL(); // not sure this is needed in between transmissions
+      DISABLE_INT_COMPARE_A();
+    }
+  } else {
+    // there are more bytes to send; 
+    if (++tail >= TX_BUFFER_SIZE) tail = 0;
+    tx_buffer_tail = tail;
+    tx_byte = tx_buffer[tail];
+    tx_byte_verify = tx_byte;
+    delay = tx_buffer_delay[tail];
+    tx_bit = 0;
+    tx_paritybit = 0;
+    if (delay > 1) { // if delay=1, we effectively don't wait and we continue writing!
+      // it does not matter whether we are still in stop bit or beyond, we have to wait longer due to the delay setting
+      // this relies on the fact that xx has just been reset, by reading back falling start bit edge of byte just sent
+      tx_state = 99;
+      tx_wait = delay;
+      CONFIG_MATCH_NORMAL(); // not sure whether we should need to do this in between transmissions
+      DISABLE_INT_COMPARE_A();
+    } else {
+      if (state == 21) {
+        // as we are in (silent, high) stop bit time, we set target time at end of stop bit (= next start bit)
+        CONFIG_MATCH_CLEAR();
+        SET_COMPARE_A(target+ticks_per_bit);
+      } else {
+        // state==23: we are beyond stop bit and just received a new byte to be sent but too late to remain in sync
+        // we need to re-schedule new transmission
+        CONFIG_MATCH_CLEAR();
+        SET_COMPARE_A(GET_TIMER_COUNT() + scheduledelay);
+      }
+      tx_state = 1;
+    }
+  }
 }
 
 void P1P2Serial::flushOutput(void)
 {
-	while (tx_state) /* wait */ ;
+  while (tx_state) /* wait */ ;
 }
 
 /****************************************/
@@ -367,282 +374,279 @@ void P1P2Serial::flushOutput(void)
 //Use this to ignore edges that are very near previous edges to avoid detection of oscillating edges
 //Does not seem necessary
 
-
-static uint8_t Echo=1;
+static uint8_t Echo = 1;
 
 void P1P2Serial::setEcho(uint8_t b)
 // Set echo mode (verify and read back written data) on or off
-// off: no read-back, no bus collission detection
+// off: no read-back, no verification or bus collission detection
 // on (default): each written byte will be read back and received, collission will be detected
+// calling Echo has immediate effect
 {
-	Echo=b;
+  Echo = b;
 }
 
 #ifdef SUPPRESS_OSCILLATION
-static uint16_t prev_edge_capture;	// previous capture of edge
+static uint16_t prev_edge_capture;  // previous capture of edge
 #endif
 static uint16_t startbit_delta;
 
 ISR(CAPTURE_INTERRUPT)
 {
-	uint8_t state, head;
-	uint16_t capture, target;
-	uint16_t offset, offset_overflow;
+// called upon each falling edge detected
+// state = 99: at falling edge of start pulse shortly after previous byte (so: store and verify previously received byte)
+// state = 0: at falling edge of start pulse, after pause
+// state = 1..9: first possible data bit that this edge could belong to
+  uint8_t state, head;
+  uint16_t capture, target;
+  uint16_t offset, offset_overflow;
+  uint16_t startbit_delta_prev;
 
-	capture = GET_INPUT_CAPTURE();
+  capture = GET_INPUT_CAPTURE();
 #ifdef SUPPRESS_OSCILLATION
-	if (capture - prev_edge_capture < SUPPRESS_PERIOD) return; // to suppress oscillations
-	prev_edge_capture=capture;
+  if (capture - prev_edge_capture < SUPPRESS_PERIOD) return; // to suppress oscillations
+  prev_edge_capture = capture;
 #endif
-	state = rx_state;
-	if (state == 99) {
-		// DISABLE_INT_COMPARE_B(); // not needed, will be enabled immediately in next step
-		if (Echo || !rx_do_verification) {
-			// state==99 so we detected edge of start pulse, just after a byte was sent; so verify sent byte was received
-			head = rx_buffer_head + 1;
-			if (head >= RX_BUFFER_SIZE) head = 0;
-			if (head != rx_buffer_tail) {
-				rx_buffer[head] = rx_byte;
-				if (rx_parity) {
-					delta_buffer[head] = DELTA_PE; // signals parity error
-				} else {
-					delta_buffer[head] = startbit_delta; // signals no parity error / no end-of-block / time from previous byte
-					if (rx_do_verification) {
-						// If in transmission mode/verification mode,
-						// check if received byte matches sent byte
-						// If not, we assume that the cause is a bus collision
-						if (rx_verification != rx_byte) delta_buffer[head] = DELTA_COLLISION;
-					}
-				}
-				rx_buffer_head = head;
-			} else {
-				delta_buffer[rx_buffer_head] = DELTA_OVERRUN; // overwrite delta of previous byte to signal buffer-overrun
-			}
-		}
-		rx_do_verification=0;
-		state = 0;
-	}
-	if (state == 0) { // if this is first edge, it must be first (start) pulse detected
-		startbit_delta = time_msec;
-		TCNT0 = 0; // start new milli-second timer measurement on falling edge of start bit
-		time_msec = 0;
-		// state==0 if this is first (falling) edge
-		// start of start pulse
-		// so start timer for end of byte receipt
-		// and bit should be 0 in this case
-		SET_COMPARE_B(capture + rx_stop_ticks);
-		ENABLE_INT_COMPARE_B();
-		// rx_target set to middle of first data bit
-		rx_target = capture + ticks_per_bit + ticks_per_semibit;
-		rx_state = 1;
-		rx_parity = 0;
-	} else {
-		// state != 0, and we just received a falling edge for a data bit or parity bit
-		// check how many high/silent bits we received
-		// first bit is determined by state:
-		// state = 1..8: data bit; state=9: parity bit
-		target = rx_target;
-		offset_overflow = 65535 - ticks_per_bit;
-		while (1) { // check #silences missed and fill in ones for these silences
-			offset = capture - target;
-			if (offset > offset_overflow) break;
-			if (state <= 8) {
-				// received data bit 1
-				rx_byte = (rx_byte >> 1) + 0x80;
-				rx_parity = rx_parity ^ 0x80;
-			} else {
-				// received parity bit 1
-				rx_parity = rx_parity ^ 0x80;
-			}
-			target += ticks_per_bit;		// increase target time by 1 bit time
-			state++;
-			if (state >= 10) break;
-		}
-		// we received a (data or parity) bit 0, thus no need to modify rx_parity
-		// if it is a data bit (state<=8), perform a shift
-		if (state < 9) rx_byte >>= 1;
-		target += ticks_per_bit;	// set target time to (just after) next possible falling edge
-		state++;
-		// state now corresponds to the number of (start+data+parity) bits received so far
-		//if (state >= 10) {
-			// after all bits processed, there is no need to terminate via COMPARE mechanism any more
-			// and we could finish up here 
-			// but we still prefer to terminate via the COMPARE mechanism
-			// to finish up as it allows us to determine whether we are still in reading mode.
-		//}
-		rx_target = target;
-		rx_state = state;
-	}
-	// rx_state now corresponds to the number of (start+data+parity) bit (falling/missing) edges observed
+  state = rx_state;
+  if ((state == 99) || (state == 0)) {
+    // this is first falling edge, it must be start pulse
+    startbit_delta_prev = startbit_delta;
+    startbit_delta = time_msec;
+    GTCCR = 1; // reset prescaler to improve timing accuracy of msec-timer
+    TCNT0 = 0; // start new milli-second timer measurement on falling edge of start bit
+    time_msec = 0; // set msec counter back to 0
+                   // For HBS conformant timing, we could consider to change this to
+                   // time_msec = -2; (change type to signed, change 0xFFFF in ISR to 0x7FFFF)
+                   // TCNT0 = <value such that time_msec becomes 0 at end of stop bit>
+                   // however for P1P2 the current code works fine
+    // start timer for end of byte (at middle of parity bit)
+    SET_COMPARE_B(capture + ticks_until_mid_paritybit);
+    ENABLE_INT_COMPARE_B();
+    // rx_target set to middle of first data bit
+    rx_target = capture + ticks_per_bit + ticks_per_semibit;
+    rx_state = 1;
+    rx_paritycheck = 0;
+    if (state == 99) {
+      // state==99: we detected a falling edge of start pulse, just after a previous byte was sent or received
+      if (Echo || !rx_do_verify) { // if !rx_do_verify, we were receiving (and not reading back our own sent data)
+        // store previously received byte
+        head = rx_buffer_head + 1;
+        if (head >= RX_BUFFER_SIZE) head = 0;
+        if (head != rx_buffer_tail) {
+          rx_buffer[head] = rx_byte;
+          delta_buffer[head] = startbit_delta_prev; // time from previous byte
+          error_buffer[head] = 0;
+          if (rx_paritycheck) error_buffer[head] |= ERROR_PE; // signals parity error
+          if (rx_do_verify) {
+            // If in transmission mode/verification mode,
+            // check if received byte matches sent byte
+            // If not, this is likely caused by a bus collision
+            if (rx_byte_verify != rx_byte) { error_buffer[head] |= ERROR_READBACK; digitalWrite(LED_BUILTIN, HIGH); }
+          }
+          rx_buffer_head = head;
+        } else {
+          // signal buffer overrun for *previous* byte
+          error_buffer[rx_buffer_head] |= ERROR_OVERRUN; 
+          digitalWrite(LED_BUILTIN, HIGH);
+        }
+      }
+      rx_do_verify=0;
+    }
+  } else {
+    // state =1..9, we just received a falling edge for a data bit or parity bit
+    // check how many high/silent data bits we "missed"
+    target = rx_target;
+    offset_overflow = 65535 - ticks_per_bit;
+    while ( (capture - target) < offset_overflow) {
+      rx_byte = (rx_byte >> 1) + 0x80;
+      rx_paritycheck = rx_paritycheck ^ 0x80;
+      target += ticks_per_bit;    // increase target time by 1 bit time
+      state++;
+    }
+    // we received a (data or parity) bit 0, thus no need to modify rx_paritycheck
+    // state=1..8: we received a data bit 0; perform a shift
+    // state=9: parity bit 0; nothing to be done
+    if (state < 9) rx_byte >>= 1;
+    target += ticks_per_bit; // set target time to (one semibit after) next possible falling edge
+    state++;
+    // state now corresponds to the number of (start+data+parity) bits received so far
+    // when all bits are processed, there is no need to terminate via COMPARE mechanism any more
+    // so we could finish up here, but we don't do that because we prefer to terminate via the COMPARE mechanism
+    // to finish up as this allows us to determine whether we are still in reading mode, and to verify any read-back data.
+    rx_target = target;
+    rx_state = state;
+  }
+  // rx_state now corresponds to the number of (start+data+parity) bit (falling/missing) edges observed
 }
 
 ISR(COMPARE_B_INTERRUPT)
-// The COMPARE_B_INTERRUPT routine is always called during the parity bit (state <=10),
-// It is also called during the next start bit (state==99), but only if no start bit has been detected,
+// The COMPARE_B_INTERRUPT routine is always called during the stop bit (with state=2..10)
+// It is also called during the potential location of the next start bit (with state==99), but only if no start bit has been detected,
 // this allows detection of an end of communication block.
 {
-	uint8_t head, state;
-	uint16_t target;
+  uint8_t head, state;
+  uint16_t target;
 
-	state = rx_state;
-	target = rx_target;
-	if (state==99) {
-		// no new start bit detected within expected time frame; thus pause in received data detected
-		DISABLE_INT_COMPARE_B();
-		rx_state = 0;
-		if (Echo || !rx_do_verification) {
-			head = rx_buffer_head + 1;
-			if (head >= RX_BUFFER_SIZE) head = 0;
-			if (head != rx_buffer_tail) {
-				rx_buffer[head] = rx_byte;
-				if (rx_parity) {
-					delta_buffer[head] = DELTA_PE_EOB; // signals parity error & end-of-block
-				} else { 
-					delta_buffer[head] = DELTA_EOB; // signals end-of-block
-					if (rx_do_verification) {
-						// If in transmission mode/verification mode,
-						// check if received byte matches sent byte
-						// If not, we assume that the cause is a bus collision
-						if (rx_verification != rx_byte) delta_buffer[head] = DELTA_COLLISION;
-					}
-				}
-				rx_buffer_head = head;
-			} else {
-				delta_buffer[rx_buffer_head] = DELTA_OVERRUN; // overwrite delta of previous byte to signal buffer-overrun (-2)
-			}
-		}
-		rx_do_verification=0;
-		return;
-	}
-	// if parity bit was 0, state will be 10, otherwise state will be lower and we need to process the 1s
-	while (state < 9) {
-		rx_byte = (rx_byte >> 1) | 0x80;
-		rx_parity = rx_parity ^ 0x80;
-		target += ticks_per_bit;		// increase target time by 1 bit time
-		state++;
-	}
-	if (state == 9) {
-		rx_parity = rx_parity ^ 0x80;
-		target += ticks_per_bit;		// increase target time by 1 bit time
-		//state++;				// state is not used any more
-	}
-	digitalWrite(LED_BUILTIN, rx_parity ? HIGH : LOW);
-	rx_state = 99;                                  // state=99: wait for start bit falling edge
-	// rx_target = target;      // not used any more
-	SET_COMPARE_B(target+ticks_per_bit);
+  state = rx_state;
+  target = rx_target;
+  if (state == 99) {
+    // no new start bit detected within expected time frame; thus pause in received data detected; quit rx mode
+    DISABLE_INT_COMPARE_B();
+    rx_state = 0;
+    if (Echo || !rx_do_verify) { // if !rx_do_verify, we were receiving (and not reading back our own sent data)
+      // store previously received byte
+      head = rx_buffer_head + 1;
+      if (head >= RX_BUFFER_SIZE) head = 0;
+      if (head != rx_buffer_tail) {
+        rx_buffer[head] = rx_byte;
+        delta_buffer[head] = startbit_delta; // time from previous byte
+        error_buffer[head] = SIGNAL_EOB;
+        if (rx_paritycheck) error_buffer[head] |= ERROR_PE; // signals parity error
+        if (rx_do_verify) {
+          // If in transmission mode/verification mode,
+          // check if received byte matches sent byte
+          // If not, this is likely caused by a bus collision
+          if (rx_byte_verify != rx_byte) { error_buffer[head] |= ERROR_READBACK; digitalWrite(LED_BUILTIN, HIGH); }
+        }
+        rx_buffer_head = head;
+      } else {
+        // signal buffer overrun for *previous* byte
+        error_buffer[rx_buffer_head] |= ERROR_OVERRUN; 
+        digitalWrite(LED_BUILTIN, HIGH);
+      }
+    }
+    rx_do_verify=0;
+    return;
+  }
+  // if parity bit was 0, state will be 10, otherwise state will be lower and we need to process the 1s
+  while (state < 9) {
+    rx_byte = (rx_byte >> 1) | 0x80;
+    rx_paritycheck = rx_paritycheck ^ 0x80;
+    target += ticks_per_bit;    // increase target time by 1 bit time
+    state++;
+  }
+  if (state == 9) {
+    rx_paritycheck = rx_paritycheck ^ 0x80;
+    target += ticks_per_bit;    // increase target time by 1 bit time
+    //state++;     // state is not used any more
+  }
+  digitalWrite(LED_BUILTIN, rx_paritycheck ? HIGH : LOW);
+  rx_state = 99;       // state=99: wait for next start bit's falling edge
+  // rx_target = target;      // not used any more
+  SET_COMPARE_B(target + ticks_per_bit);
 }
 
 uint16_t P1P2Serial::read_delta(void)
+// should only be called if available()==1; otherwise, returns 0
 {
-	uint8_t head, tail;
-	uint16_t out;
+  uint8_t head, tail;
+  uint16_t out;
 
-	head = rx_buffer_head;
-	tail = rx_buffer_tail;
-	if (head == tail) return -1;
-	if (++tail >= RX_BUFFER_SIZE) tail = 0;
-	out = delta_buffer[tail];
-	return out;
+  head = rx_buffer_head;
+  tail = rx_buffer_tail;
+  if (head == tail) return 0;
+  if (++tail >= RX_BUFFER_SIZE) tail = 0;
+  out = delta_buffer[tail];
+  return out;
 }
 
-int P1P2Serial::read(void)
+uint8_t P1P2Serial::read_error(void)
+// should only be called if available()==1; otherwise, returns 0
 {
-	uint8_t head, tail, out;
+  uint8_t head, tail;
+  uint16_t out;
 
-	head = rx_buffer_head;
-	tail = rx_buffer_tail;
-	if (head == tail) return -1;
-	if (++tail >= RX_BUFFER_SIZE) tail = 0;
-	out = rx_buffer[tail];
-	rx_buffer_tail = tail;
-	return out;
+  head = rx_buffer_head;
+  tail = rx_buffer_tail;
+  if (head == tail) return 0;
+  if (++tail >= RX_BUFFER_SIZE) tail = 0;
+  out = error_buffer[tail];
+  return out;
 }
 
-int P1P2Serial::peek(void)
+uint8_t  P1P2Serial::read(void)
+// should only be called if available()==1; otherwise, returns 0
 {
-	uint8_t head, tail;
+  uint8_t head, tail, out;
 
-	head = rx_buffer_head;
-	tail = rx_buffer_tail;
-	if (head == tail) return -1;
-	if (++tail >= RX_BUFFER_SIZE) tail = 0;
-	return rx_buffer[tail];
+  head = rx_buffer_head;
+  tail = rx_buffer_tail;
+  if (head == tail) return 0;
+  if (++tail >= RX_BUFFER_SIZE) tail = 0;
+  out = rx_buffer[tail];
+  rx_buffer_tail = tail;
+  return out;
 }
 
-int P1P2Serial::available(void)
+bool P1P2Serial::available(void)
 {
-	uint8_t head, tail;
+  uint8_t head, tail;
 
-	head = rx_buffer_head;
-	tail = rx_buffer_tail;
-	if (head >= tail) return head - tail;
-	return RX_BUFFER_SIZE + head - tail;
+  head = rx_buffer_head;
+  tail = rx_buffer_tail;
+  if (head >= tail) return head - tail;
+  return RX_BUFFER_SIZE + head - tail;
 }
 
 void P1P2Serial::flushInput(void)
 {
-	rx_buffer_head = rx_buffer_tail;
+  rx_buffer_head = rx_buffer_tail;
 }
 
-uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t* deltabuf, uint8_t maxlen, uint8_t crc_gen, uint8_t crc_feed)
+uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* errorbuf, uint8_t maxlen, uint8_t crc_gen, uint8_t crc_feed)
 {
-// Reads one packet; stores maximum of maxlen bytes into readbuf; returns #bytes stored (updated: now continues in case of error)
-//                   stores metadata (delta/error code) into deltabuf
-// If crc_gen is not zero, verifies last byte as CRC byte
-	uint8_t EOB = 0;
-	uint8_t bytecnt = 0;
-	uint8_t crc = crc_feed;
-	while (EOB == 0) {
-		if (available()) {
-			uint16_t delta = read_delta();
-			uint8_t c = read();
-			if ((delta == DELTA_EOB) || (delta == DELTA_PE_EOB)) EOB = 1;
-			if ((EOB == 0) || (crc_gen == 0)) {
-				if (bytecnt < maxlen) {
-					readbuf[bytecnt] = c;
-					deltabuf[bytecnt++] = delta;
-				}
-				if (crc_gen != 0) for (uint8_t i=0;i<8;i++) {
-					crc = (((crc^c) & 0x01) ? ((crc>>1) ^ crc_gen) : (crc >> 1));
-					c>>=1;
-				}
-			} else {
-				// check crc
-				if (bytecnt < maxlen) {
-					readbuf[bytecnt] = c;
-					deltabuf[bytecnt++] = delta;
-					if ((c != crc) && (delta < MAXDELTA)) deltabuf[bytecnt] = DELTA_CRCE; // don't overwrite PE/COLL/OVERRUN error
-				}
-			}
-		}
-	}
-	return bytecnt;
+// Reads one packet (in blocking mode)
+// stores maximum of maxlen bytes of read data into readbuf
+// returns total #bytes received (until v0.9.3: #bytes stored, as of v0.9.4: #bytes received, even if not stored),
+//    if (packet size/return value > maxlen) some received bytes were not stored, some error codes may have been missed
+// reading continues in case of error
+// stores maximum of maxlen bytes of error codes into errorbuf (unless errorbuf = NULL),
+// returns timing information (pause on bus before this package) in parameter delta
+// If crc_gen is not zero, verifies last byte as CRC byte; CRC byte is also stored and is counted in return value
+  uint8_t EOB = 0;
+  uint8_t bytecnt = 0;
+  uint8_t crc = crc_feed;
+
+  while (!EOB) {
+    if (available()) {
+      uint8_t error = read_error();
+      EOB = (error & SIGNAL_EOB);
+      if (errorbuf) errorbuf[bytecnt] = error;
+      if (!bytecnt) delta = read_delta();
+      uint8_t c = read();
+      if ((EOB == 0) || (crc_gen == 0)) {
+        if (bytecnt < maxlen) {
+          readbuf[bytecnt] = c;
+        }
+        if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
+          crc = (((crc ^ c) & 0x01) ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
+          c >>= 1;
+        }
+      } else {
+        // check crc
+        if (bytecnt < maxlen) {
+          readbuf[bytecnt] = c;
+          if (c != crc) { errorbuf[bytecnt] |= ERROR_CRC; digitalWrite(LED_BUILTIN, HIGH); }
+        }
+      }
+      bytecnt++;
+    }
+  }
+  return bytecnt;
 }
 
 void P1P2Serial::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen, uint8_t crc_feed)
 {
 // Writes one packet of l bytes, t ms after last bus action; 
 // If crc_gen is not zero, adds CRC byte to packet
-	setDelay(t);
-	uint8_t crc=crc_feed;
-	for (uint8_t i=0;i<l;i++) {
-		uint8_t c = writebuf[i];
-		write(c);
-		if (crc_gen != 0) for (uint8_t i=0;i<8;i++) {
-			crc = ((crc^c) & 0x01 ? ((crc>>1) ^ crc_gen) : (crc >> 1));
-			c>>=1;
-		}
-	}
-	if (crc_gen) write(crc);
+  setDelay(t);
+  uint8_t crc=crc_feed;
+  for (uint8_t i = 0; i < l; i++) {
+    uint8_t c = writebuf[i];
+    write(c);
+    if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
+      crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
+      c>>=1;
+    }
+  }
+  if (crc_gen) write(crc);
 }
-
-#ifdef ALTSS_USE_FTM0
-void ftm0_isr(void)
-{
-	uint32_t flags = FTM0_STATUS;
-	FTM0_STATUS = 0;
-	if (flags & (1<<0) && (FTM0_C0SC & 0x40)) altss_compare_b_interrupt();
-	if (flags & (1<<5)) altss_capture_interrupt();
-	if (flags & (1<<6) && (FTM0_C6SC & 0x40)) altss_compare_a_interrupt();
-}
-#endif
