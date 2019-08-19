@@ -83,6 +83,7 @@ void setup() {
   //reset settings - for testing
   //wifiManager.resetSettings();
   //set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
+  /* Parameters need to be saved manually, on SPIFFS or otherwise, this is not implemted yet, so work for later:
   WiFiManagerParameter MqttServer("mqttserver", "MqttServer", mqttServer, 50);
   WiFiManagerParameter MqttPort("mqttport", "MqttPort", mqttPort, 10);
   WiFiManagerParameter MqttUser("mqttuser", "MqttUser", mqttUser, 20);
@@ -91,6 +92,7 @@ void setup() {
   wifiManager.addParameter(&MqttPort);
   wifiManager.addParameter(&MqttUser);
   wifiManager.addParameter(&MqttPassword);
+  */
 
   wifiManager.setAPCallback(configModeCallback);
   //fetches ssid and pass and tries to connect
@@ -108,14 +110,16 @@ void setup() {
   Serial.println("*Ready");
   Serial.print("*IP address: ");
   Serial.println(WiFi.localIP());
+  /*
   strcpy(mqttServer, MqttServer.getValue());
   strcpy(mqttPort, MqttPort.getValue());
   strcpy(mqttUser, MqttUser.getValue());
   strcpy(mqttPassword, MqttPassword.getValue());
+  */
   Serial.print("*Mqtt Server IP: ");
   Serial.println(mqttServer);
   Serial.print("*Mqtt Port: ");
-  sscanf(MqttPort.getValue(),"%i",&mqttPortNr); // note: no error testing done, fall-back to 1234 as portnr as defined above
+  //sscanf(MqttPort.getValue(),"%i",&mqttPortNr); // note: no error testing done, fall-back to 1234 as portnr as defined above
   Serial.println(mqttPortNr);
   Serial.print("*Mqtt User: ");
   Serial.println(mqttUser);
