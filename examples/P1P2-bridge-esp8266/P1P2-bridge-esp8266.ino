@@ -58,10 +58,11 @@ void configModeCallback (WiFiManager *myWiFiManager) {
   Serial.print("*");  Serial.println(myWiFiManager->getConfigPortalSSID());
 }
 
-const char* mqttServer = "192.168.your.mqttserver";   // Fill in YOUR mqttserver address
-const int mqttPort = your_mqtt_portnumber;                  // Fill in YOUR mqttserver port number
-const char* mqttUser = "YourMqttUsername";              // Fill in YOUR mqtt user
-const char* mqttPassword = "YourMqttPassword";          // Fill in YOUR mqtt password
+char mqttServer[50] = "192.168.Your.Mqttserver"; // Configuration of mqtt parameters (one-time only) via WiFiManager set-up
+char mqttPort[10] = "MqttPort";               // No re-configuration supported yet, unless wifi is switched off
+int  mqttPortNr = 1234;
+char mqttUser[20] = "MqttUser";
+char mqttPassword[30] = "MqttPassword";
 //emoncms upload via http-post not supported yet:
 //const char* emonURL="URL";                  // Fill in YOUR emoncms URL TODO
 //const char* emonAPI="APIkey";               // Fill in YOUR emoncms API key
@@ -82,6 +83,15 @@ void setup() {
   //reset settings - for testing
   //wifiManager.resetSettings();
   //set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
+  WiFiManagerParameter MqttServer("mqttserver", "MqttServer", mqttServer, 50);
+  WiFiManagerParameter MqttPort("mqttport", "MqttPort", mqttPort, 10);
+  WiFiManagerParameter MqttUser("mqttuser", "MqttUser", mqttUser, 20);
+  WiFiManagerParameter MqttPassword("mqttpassword", "MqttPassword", mqttPassword, 30);
+  wifiManager.addParameter(&MqttServer);
+  wifiManager.addParameter(&MqttPort);
+  wifiManager.addParameter(&MqttUser);
+  wifiManager.addParameter(&MqttPassword);
+
   wifiManager.setAPCallback(configModeCallback);
   //fetches ssid and pass and tries to connect
   //if it does not connect it starts an access point with the specified name
@@ -98,6 +108,19 @@ void setup() {
   Serial.println("*Ready");
   Serial.print("*IP address: ");
   Serial.println(WiFi.localIP());
+  strcpy(mqttServer, MqttServer.getValue());
+  strcpy(mqttPort, MqttPort.getValue());
+  strcpy(mqttUser, MqttUser.getValue());
+  strcpy(mqttPassword, MqttPassword.getValue());
+  Serial.print("*Mqtt Server IP: ");
+  Serial.println(mqttServer);
+  Serial.print("*Mqtt Port: ");
+  sscanf(MqttPort.getValue(),"%i",&mqttPortNr); // note: no error testing done, fall-back to 1234 as portnr as defined above
+  Serial.println(mqttPortNr);
+  Serial.print("*Mqtt User: ");
+  Serial.println(mqttUser);
+  Serial.print("*Mqtt Password: ");
+  Serial.println(mqttPassword);
   
   // OTA 
   // port defaults to 8266
@@ -142,7 +165,7 @@ void setup() {
   ArduinoOTA.begin();
 
   // Set up mqtt connection
-  client.setServer(mqttServer, mqttPort);
+  client.setServer(mqttServer, mqttPortNr);
   client.setCallback(callback);
   if (client.connect("P1P2", mqttUser, mqttPassword )) {
     Serial.println("*Connected to mqtt server");  
@@ -203,7 +226,7 @@ void process_for_mqtt_json(byte* rb, int n) {
       // only terminate json string if there is any parameter written
       if (jsonterm == 0) {
         jsonterm = 1;
-        jsonstring[jsonstringp++] = ']';
+        jsonstring[jsonstringp++] = '}';
         jsonstring[jsonstringp++] = '\0';
         client.publish("P1P2/J", jsonstring);
         // TODO HTTPPOST jsonstring to emoncms
@@ -215,10 +238,10 @@ void process_for_mqtt_json(byte* rb, int n) {
         if (kvr) {
           client.publish(key, value);
           if (jsonterm) {
-            jsonstring[jsonstringp++] = '[';
+            jsonstring[jsonstringp++] = '{';
             jsonterm = 0;
           } else {
-            jsonstring[jsonstringp++] = ';';
+            jsonstring[jsonstringp++] = ',';
           }
           jsonstring[jsonstringp++] = '"';
 
