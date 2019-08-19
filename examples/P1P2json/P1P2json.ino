@@ -65,17 +65,17 @@ void process_for_mqtt_json(byte* rb, int n) {
       // only terminate json string if there is any parameter writte
       if (jsonterm == 0) {
         jsonterm = 1;
-        Serial.println(F("]"));
+        Serial.println(F("}"));
       }
     } else {
       for (byte j = 0; j < kvrbyte; j++) {
         int kvr = ((kvrbyte == 8) ? bytes2keyvalue(rb, i, j, key, value) : kvrbyte);
         if (kvr) {
           if (jsonterm) {
-            Serial.print(F("J [\"")); 
+            Serial.print(F("J {\"")); 
             jsonterm = 0;
           } else {
-            Serial.print(F(";\""));
+            Serial.print(F(",\""));
           }
           Serial.print(key);
           Serial.print(F("\":"));
