@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190820 v0.9.5 Changed delay behaviour, timeout added
  * 20190817 v0.9.4 Clean up, bug fixes, improved ms counter, prescaler reset added, time measurement changed, delta/error reporting separated
  * 20190505 v0.9.3 Changed error handling and corrected deltabuf type in readpacket
  * 20190428 v0.9.2 Added setEcho(b), readpacket() and writepacket()
@@ -156,13 +157,15 @@ void P1P2Serial::end(void)
 /**       Millisecond counter          **/
 /****************************************/
 
+static uint16_t tx_setdelaytimeout = 2500;
+
 ISR(TIMER0_COMPA_vect)
 {
 // time_msec counts time in ms from the last start pulse (counting from the leading falling edge of the start pulse)
 // max count is 65535 ms (uint16_t)
   if (time_msec < 0xFFFF) time_msec++; 
   // if tx_state =99, a write is scheduled, so check if pause is long enough to start writing
-  if ((tx_state == 99) && (time_msec >= tx_wait)) {
+  if ((tx_state == 99) && ((time_msec == tx_wait) || ((time_msec >= tx_wait) && (time_msec >= tx_setdelaytimeout)))) {
     // start writing:
     // in scheduledelay or in ticks_per_byte_minus_ms ticks, falling edge of start bit  is scheduled
     // (if time_msec = 1, (and thus tx_wait = 1): wait exactly 1 byte time
@@ -187,12 +190,20 @@ static uint16_t tx_setdelay = 0;
 void P1P2Serial::setDelay(uint16_t t)
 // Input parameter: 0 <= t <= 65535
 // This sets delay for next byte (and next byte only) when it is added to the transmission buffer.
-// The writing of the next byte to be added to the queue will be delayed until t milliseconds silence 
-//                since last falling edge of start bit has been detected.
-// As we also read back sent data (also for the purpose of verification),
-// this means that a delay is introduced since the byte last read or written.
+// The writing of the next byte to be added to the queue will be delayed until (<= v0.9.4: at least; >= v0.9.5: exactly) t milliseconds silence 
+//                since last falling edge of start bit has been detected. (v0.9.5:) In addition, writing will follow in case of a timeout situation.
+// This means that a delay is introduced since the byte last read, or,
+// as we also read back sent data (also for the purpose of verification), since the byte last written.
 // If a byte is added to the queue during a silence, the past silence will also be taken into account.
-// If a byte is added with a setDelay which is shorter than the past silence, transmission will start immediately.
+// (<=v0.9.4:) If a byte is added with a setDelay which is shorter than the past silence, transmission will start immediately.
+// (>=v0.9.5:) If the past silence is more that t ms, but less than the timeout value, writing will be delayed until either one of the following 2 conditions is met:
+//                1) a new byte is received, after which a new pause will be clocked, or
+//                2) no new byte is received, but the total pause is or becomes longer than the value set with setDelayTimeout(t)
+//                The reason for this change in behaviour is to prevent bus collissions when writing a packet near the end of a pause.
+// If the value used as delay timeout is equal to or lower than the delay value, the writing behaviour of >=v0.9.5 equals the behaviour of library version <=v0.9.4
+// It is advised to call setDelaytimeout(t) with a value that is larger than the total cycle time of the P1P2 bus behaviour.
+// For many products the cycle repeats every 0.8..2s, so a setDelaytimeout(2500) would be appropriate. This is also the default value.
+// For some products the cycle time can be larger (15s or so), and a setDelaytimeout(20000) might be appropriate.
 // If setDelay(0) is called, or setDelay() is not called, there is no delay at all when writing. Writing will start immediately
 //                as soon as a byte is written to the write buffer, if there was no bus action, or when the previous byte write is ready.
 // If setDelay(1) is called, a delay of 1.13 ms (11 bits, 1 byte) is set after the last start bit falling edge,
@@ -205,6 +216,13 @@ void P1P2Serial::setDelay(uint16_t t)
 // If setDelay (t) is called with 2 <= t <= 65535, a delay of t ms is set.
 {
   tx_setdelay = t;
+}
+
+void P1P2Serial::setDelayTimeout(uint16_t t)
+// Input parameter: 0 <= t <= 65535
+// This sets delay timeout as described above
+{
+  tx_setdelaytimeout = t;
 }
 
 void P1P2Serial::write(uint8_t b)
@@ -228,12 +246,15 @@ void P1P2Serial::write(uint8_t b)
     tx_byte_verify = b; // for read-back verification
     tx_bit = 0;
     tx_paritybit = 0;
-    if ((tx_setdelay) && (time_msec < tx_setdelay)) {
-      // state 99: start transmission only when time_msec becomes >= tx_setdelay
+    // we could start writing from here, as we did <=v0.9.4, but we can also leave it to the ISR, which is simpler
+    // worst-case it adds some delay, but it makes the operation slightly more predictable
+    if ((tx_setdelay) && ((time_msec < tx_setdelay) || (time_msec < tx_setdelaytimeout))) {
+      // state 99: start transmission only (in msec ISR) when time_msec becomes == tx_setdelay or >= tx_setdelaytimeout
       tx_state = 99;
-      tx_wait = tx_setdelay; 
+      tx_wait = tx_setdelay;
     } else {
-      // state = 1: schedule next start bit falling edge
+      // if tx_setdelay is not set, or if it is set but we are beyond max(tx_setdelay,tx_setdelaytimeout), start writing
+      // set tx_state to 1: schedule next start bit falling edge
       // time_msec = 0: should not happen in this part of main if-statement
       // time_msec = 1: wait for end of byte
       // time_msec > 1: asap (after scheduledelay ticks)
@@ -243,7 +264,10 @@ void P1P2Serial::write(uint8_t b)
       if (time_msec == 1) {
         // determine if we still have to wait for the end of currently received byte?
         uint16_t ticks_wait = ticks_per_byte_minus_ms - TCNT0 * prescaler_ratio_timer0_timer1;
-        if (ticks_wait > scheduledelay) t_delta = ticks_wait; // and if so, start writing immediately after that
+        if (ticks_wait > scheduledelay) {
+          // and if so, start writing immediately after that
+          t_delta = ticks_wait; 
+        }
       }
       SET_COMPARE_A(GET_TIMER_COUNT() + t_delta);
       // in scheduledelay ticks (or perhaps more if time_msec=1), start bit will follow.
@@ -251,7 +275,8 @@ void P1P2Serial::write(uint8_t b)
       // state=1 indicates that (upon start of the interrupt routine) this start bit has just started
       ENABLE_INT_COMPARE_A();
     }
-    tx_setdelay=0;
+    // next byte will be written without delay
+    tx_setdelay = 0;
   }
   SREG = intr_state;
 }

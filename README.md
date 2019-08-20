@@ -2,9 +2,11 @@
 
 P1P2Serial reads and writes raw data packets on Daikin P1/P2 two-wire interface, and similar interfaces, using an Arduino Uno and a P1P2Serial shield. Preliminary support for parameter interpretation, json, mqtt, WiFi using an additional ESP8266.
 
-**New in v0.9.4**
+**New in v0.9.4/v0.9.5**
 
 ESP8266 support to interface Arduino Uno serial output from/to mqtt/json over WiFi. This works nicely on an Arduino-Uno/ESP8266 combination. Removed raw data in/out support. Separated the previously all-in-one P1P2Monitor functionality (LCD, monitor, test) into different example programs.
+
+In v0.9.5 delay behaviour when writing has been changed, with a timeout function, to avoid bus collissions. Instead of writing a packet when a pause was *at least* a certain length, a packet is written when a pause took *exactly* a certain length, or alternatively, a timeout occured.
 
 **Preferred set-up based on Arduino Uno/ESP8266**
 
@@ -69,7 +71,7 @@ The easiest way to make an adapter for this bus is to use the MM1192 HBS-Compati
 
 The preferred circuit schematics (version 2) has galvanic isolation and an isolated DC-DC converter to power the MM1192. An older circuit without galvanic isolation (version 1) and an older circuit with bus-powering and bus-powered capability (version 3) are no longer documented here, but can be found in the github historic versions.
 
-The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noise P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal in the initial version without galvanic isolation (likely due to capacitive leakage in the USB power supply for the Arduino). I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2. A further modification, the addition of a 470pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 100-200Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
+The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noisy P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal in the initial version without galvanic isolation (likely due to capacitive leakage in the USB power supply for the Arduino). I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2. A further modification, the addition of a 470pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 100-200Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
 
 XLSemi produces the XL1192 which is a direct clone of the MM1192. The XL1192 data sheet suggests that the specifications are the same, but they are not. The XL1192 has a higher voltage threshold on its input and a slightly lower (20% lower) voltage on its output channel. Using 75kOhm resistors instead of 150kOhm resistors on the input side of the XL1192 works perfect in my situation.
 

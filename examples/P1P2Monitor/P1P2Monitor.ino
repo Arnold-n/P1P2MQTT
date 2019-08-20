@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190820 v0.9.5 Changed delay behaviour, timeout added
  * 20190817 v0.9.4 Brought in line with library 0.9.4 (API changes), print last byte if crc_gen==0, removed LCD support due to performance concerns, added config over serial
                    See comments below for description of serial protocol
  * 20190505 v0.9.3 Changed error handling and corrected deltabuf type in readpacket; added mod12/mod13 counters
@@ -16,7 +17,8 @@
  * Configuration is done by sending one of the following lines over serial 
  * W<hex data> Write packet (max 32 bytes) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
  * Vx Sets reading mode verbose off/on
- * Tx sets new delay value, to be used for future packets
+ * Tx sets new delay value, to be used for future packets (default 0)
+ * Ox sets new delay timeout value, used immediately (default 2500)
  * Xx calls P1PsSerial.SetEcho(x)    sets Echo on/off
  * Gx Sets crc_gen (defaults to CRC_GEN=0xD9)
  * Hx Sets crc_feed (defaults to CRC_FEED=0x00)
@@ -25,6 +27,7 @@
  * H  Display current crc_feed value
  * X  Display current echo status
  * T  Display current delay value
+ * T  Display current delay timeout value
  * * comment lines starting with an asterisk are ignored (or copied in verbose mode)
  * These commands are case-insensitive
  * Maximum line length is 99 bytes (allowing "W 00 00 [..] 00[\r]\n" format)
@@ -68,7 +71,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) ; // wait for Arduino Serial Monitor to open
   Serial.println(F("*"));
-  Serial.println(F("*P1P2Serial-arduino monitor v0.9.4"));
+  Serial.println(F("*P1P2Serial-arduino monitor v0.9.5"));
   Serial.println(F("*"));
   delay (5000); // give ESP time to boot, it doesn't like serial input while initiating wifi
   P1P2Serial.begin(9600);
@@ -84,6 +87,7 @@ static byte EB[RB_SIZE];
 
 static byte verbose = 1;      // By default include timing and error information in output
 static int sd = 0;            // for storing delay setting for each packet written
+static int sdto = 2500;       // for storing delay timeout setting
 static byte echo = 0;         // echo setting (whether written data is read back)
 
 // next 2 functions are used to save on dynamic memory usage in main loop
@@ -130,6 +134,11 @@ void loop() {
       case 'T': if (verbose) Serial.print(F("* Delay ")); 
                 if (scanint(&RS[1], sd) == 1) if (verbose) Serial.print(F("set to "));
                 if (verbose) Serial.println(sd);
+                break;
+      case 'o' :
+      case 'O': if (verbose) Serial.print(F("* DelayTimeout ")); 
+                if (scanint(&RS[1], sdto) == 1) { if (verbose) Serial.print(F("set to ")); P1P2Serial.setDelayTimeout(sdto); }
+                if (verbose) Serial.println(sdto);
                 break;
       case 'x' :
       case 'X': if (verbose) Serial.print(F("* Echo ")); 

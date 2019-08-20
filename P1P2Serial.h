@@ -3,7 +3,8 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
- * 20190801 v0.9.4 Changed error handling
+ * 20190820 v0.9.5 Changed delay behaviour, timeout added
+ * 20190817 v0.9.4 Clean up, bug fixes, improved ms counter, prescaler reset added, time measurement changed, delta/error reporting separated
  * 20190505 v0.9.3 Changed error handling and corrected deltabuf type in readpacket
  * 20190428 v0.9.2 Added setEcho(b), readpacket() and writepacket()
  * 20190409 v0.9.1 Improved setDelay()
@@ -85,6 +86,7 @@ public:
 	static void flushOutput();
 	static void write(uint8_t byte);
 	static void setDelay(uint16_t t);
+	static void setDelayTimeout(uint16_t t);
 	static void setEcho(uint8_t b);
 	uint16_t readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* errorbuf, uint8_t maxlen, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
 	void writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen = 0, uint8_t crc_feed = 0);

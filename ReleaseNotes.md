@@ -23,6 +23,10 @@ for Arduino Uno:
 
 **P1P2Serial Library**
 
+v0.9.5 
+
+-Changed delay behaviour and added delay timeout parameter 
+
 v0.9.4
 
 - new header files for LCD and json/mqtt conversion functions
