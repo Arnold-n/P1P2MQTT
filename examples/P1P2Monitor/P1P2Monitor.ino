@@ -155,7 +155,7 @@ void loop() {
                 while ((wb < WB_SIZE) && (sscanf(&RS[wbp], "%2x%n", &wbtemp, &n) == 1)) {
                   WB[wb++] = wbtemp;
                   wbp += n;
-                  if (verbose) { if (wbtemp <= 9) Serial.print("0"); Serial.print(wbtemp, HEX);}
+                  if (verbose) { if (wbtemp <= 0x0F) Serial.print("0"); Serial.print(wbtemp, HEX);}
                 }
                 if (verbose) Serial.println();
                 P1P2Serial.writepacket(WB, wb, sd, crc_gen, crc_feed);

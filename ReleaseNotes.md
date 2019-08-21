@@ -6,6 +6,10 @@ Added documentation and improved README.
 
 **Applications**
 
+v0.9.5
+
+- minor bug fixed in reporting bytes to be written (missing leading zero for hex values 0A..0F)
+
 v0.9.4
 
 The combined functions in P1P2Monitor turned out to be too much for an Arduino Uno, leading to memory shortage and/or instability.
