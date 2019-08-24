@@ -1,10 +1,22 @@
 **Release notes**
 
+v0.9.6
+
+- Added documentation for x0Fx3x messages and external controller description
+- Changed byte counter in documentation: now byte counting in packet starts at 0 to match C coding convention
+- Moved generic protocol documentation to doc/README.md
+
 v0.9.4
 
 Added documentation and improved README.
 
 **Applications**
+
+v0.9.6
+
+- P1P2Monitor has limited control functionality to switch DHW on/off and heating/cooling on/off. Tested on 2 products only.
+- P1P2-bridge-esp savehistory functionality expanded for F035 messages
+- P1P2-bridge-esp jsonstring buffer overflow handling improved
 
 v0.9.5
 
@@ -27,9 +39,13 @@ for Arduino Uno:
 
 **P1P2Serial Library**
 
+v0.9.6
+
+- Added packetavailable() to avoid blocking in readpacket()
+
 v0.9.5 
 
--Changed delay behaviour and added delay timeout parameter 
+- Changed delay behaviour and added delay timeout parameter 
 
 v0.9.4
 

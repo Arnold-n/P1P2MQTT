@@ -1,14 +1,18 @@
 **tl;dr**
 
-P1P2Serial reads and writes raw data packets on Daikin P1/P2 two-wire interface, and similar interfaces, using an Arduino Uno and a P1P2Serial shield. Preliminary support for parameter interpretation, json, mqtt, WiFi using an additional ESP8266.
+P1P2Serial reads and writes raw data packets on Daikin P1/P2 two-wire interface, and similar interfaces, using an Arduino Uno and a P1P2Serial shield. Preliminary support for parameter interpretation, json, mqtt, WiFi using an additional ESP8266. Preliminary support to switch basic functions (DHW, heating/cooling) on/off is confirmed to work on 2 specific models.
 
-**New in v0.9.4/v0.9.5**
+**New in v0.9.6**
 
-ESP8266 support to interface Arduino Uno serial output from/to mqtt/json over WiFi. This works nicely on an Arduino-Uno/ESP8266 combination. Removed raw data in/out support. Separated the previously all-in-one P1P2Monitor functionality (LCD, monitor, test) into different example programs.
+Control of DHW and heating/cooling: possibility to switch these functions on and off. Parameter reporting of the 35 packet type used to communicate between the main controller and auxiliary controllers.
+ 
+**New in v0.9.4/v0.9.5/v0.9.5+controller**
+
+ESP8266 support to interface Arduino Uno serial output from/to mqtt/json over WiFi. This works nicely on an Arduino-Uno/ESP8266 combination. Removed raw data in/out support. Separated the previously all-in-one P1P2Monitor functionality (LCD, monitor, test) into different example programs. Added limited control function.
 
 In v0.9.5 delay behaviour when writing has been changed, with a timeout function, to avoid bus collissions. Instead of writing a packet when a pause was *at least* a certain length, a packet is written when a pause took *exactly* a certain length, or alternatively, a timeout occured.
 
-**Preferred set-up based on Arduino Uno/ESP8266**
+**Preferred set-up based on Arduino Uno/ESP8266/wifi**
 
 P1/P2 2-wire interface
       
@@ -34,6 +38,22 @@ In order to program this board, the following steps are needed:
 - select your local wifi network, enter password, and have ESP8266 connect to your WiFi
 - now, and upon each reboot, the ESP8266 connects to the MQTT server
 - the ESP8266 should also become visible in the Arduino IDE as a network port, and can be reprogrammed OTA
+
+**Preferred set-up based on Arduino Uno/Raspberry Pi/LAN,wifi**
+
+P1/P2 2-wire interface
+      
+      P1P2Adapter Shield
+      (pin 8, 9)
+      Arduino Uno running P1P2Monitor
+
+Serial interface over USB
+
+      Raspberry Pi running [ tbd ]
+
+mqtt/.. over WiFi or LAN
+
+The above set-up works nicely on an original Arduino Uno, and has the advantage that the Arduino can be flashed without dip switch settings.
 
 **P1P2Serial library and P1P2Monitor example application**
 
@@ -65,6 +85,10 @@ Daikin (or Rotex) uses various communication standards between thermostats and h
 
 This project was started for the Daikin P1/P2 bus. However the underlying electrical HBS format is used by many heat pump / air conditioning manufacturers, so far we have indications that the following buses are based on the HBS format: Daikin P1/P2, Daikin F1/F2 (DIII-Net), Mitsubishi M-NET, Toshiba TCC-Link, Hitachi H-link, Panasonic/Sanyo SIII-Net, perhaps also products from Haier and York. The logical format will likely differ. For example, Len Shustek made an impressive OPAMP-based reading circuit for the Mitsubishi M-NET and documented his protocol observations on https://github.com/LenShustek/M-NET-Sniffer. The logical format is clearly different from the Daikin format, but the P1P2Serial library and adapter will likely work for reading and writing M-NET too as the physical format is the same or similar (though the Mitsubishi format seems to have pulses of +/-2 V whereas P1/P2 has +/-5 V pulse levels).
 
+**Is it safe?**
+
+Use is entirely at your own risk. No guarantees. It is advised to connect/disconnect devices to the P1/P2 bus only if the power of all connected devices is switched off. Some Daikin manuals warn that device settings should not be changed too often, because of wear in the solid state memory in their devices - one of their manuals states a maximum of 7000 setting changes per year - without indicating the expected life time of their product. Don't change settings too often.
+
 **How do I build a P1/P2 adapter circuit?**
 
 The easiest way to make an adapter for this bus is to use the MM1192 HBS-Compatible Driver and Receiver (http://pdf.datasheetcatalog.com/datasheet_pdf/mitsumi-electric/MM1192XD.pdf) and an Arduino Uno (or Teensy or other device). 
@@ -73,7 +97,7 @@ The preferred circuit schematics (version 2) has galvanic isolation and an isola
 
 The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noisy P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal in the initial version without galvanic isolation (likely due to capacitive leakage in the USB power supply for the Arduino). I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2. A further modification, the addition of a 470pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 100-200Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
 
-XLSemi produces the XL1192 which is a direct clone of the MM1192. The XL1192 data sheet suggests that the specifications are the same, but they are not. The XL1192 has a higher voltage threshold on its input and a slightly lower (20% lower) voltage on its output channel. Using 75kOhm resistors instead of 150kOhm resistors on the input side of the XL1192 works perfect in my situation.
+XLSemi produces the XL1192 which looks like a direct clone of the MM1192. The XL1192 data sheet suggests that the specifications are the same, but they are not. The XL1192 has a higher voltage threshold on its input and a slightly lower (20% lower) voltage swing on its output channel. Using 75kOhm resistors instead of 150kOhm resistors on the input side of the XL1192 works perfect in my situation.
 
 If you want to power the bus (which is only needed if you want to communicate to a stand-alone controller which is disconnected from and thus not powered from the heat pump) you can do so by providing 15V to the bus over a 20mH inductor with a reasonably low internal resistance (for example 2 RLB1314-103KL 100mH/12ohm/100mA inductors in series).
 
@@ -99,14 +123,14 @@ The simple answer is: write when others don't. In practice communication seems t
 - ReleaseNotes.md,
 - SerialProtocol.md, describes serial protocol used by P1P2Monitor and by serial mqtt channels of P1P2-bridge-eps8266
 - P1P2Serial.cpp and P1P2Serial.h: (GPL-licensed) P1P2Serial library, based on AltSoftSerial, and uses AltSoftSerial configuration files,
-- examples/P1P2Monitor/P1P2Monitor.ino: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus on serial output, and enables writing data from serial input. Reading/writing packets of data and CRC-byte generation/verification is supported. This program has no LCD support as of version 0.9.4,
+- examples/P1P2Monitor: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus on serial output, and enables writing data from serial input. Reading/writing packets of data and CRC-byte generation/verification is supported. This program has no LCD support as of version 0.9.4,
 - examples/P1P2-bridge-esp8266: (GPL-licensed) program to convert P1P2Monitor's serial output to mqtt and json format, and preliminary support to write packets to the P1P2 bus from a mqtt channel,
 - examples/P1P2HardwareTest: (GPL-licensed) program to stand P1P2Serial adapter shield in stand-alone mode,
 - examples/P1P2json: (GPL-licensed) program to convert bus to json-formatted output on serial output. No writing to the bus is supported by this program,
 - examples/P1P2LCD: (GPL-licensed) program to show P1P2 data on a an additional SPI 128x64 display connected directly to the Arduino Uno pins. This works for the Daikin hybrid model, it may work (partially) for other models. This program requires that the u8g2 library is installed,
 - Daikin specific but product independent header file P1P2_Daikin_json.h supporting conversion to json format (this is included by the product-dependent header file(s)),
 - Daikin specific but product dependent header file P1P2_Daikin_json_EHYHB.h supporting conversion to json format, this file is included by the P1P2json example program,
-- doc/Daikin-protocol\*: observations of protocol data for various heat pumps (work-in-progress, contributions welcome),
+- doc/README.md and doc/Daikin-protocol\*: observations of protocol data for various heat pumps (work-in-progress, contributions welcome),
 - circuits/\*: P1/P2 adapter schematic and pictures of adapter board,
 - examples/P1P2Monitor/usb2console.py: simple python program to copy USB serial output from Arduino to stdout on a Raspberry Pi or other host,
 - config/AltSoftSerial_Boards.h and AltSoftSerial_Timers.h: (MIT-licensed) AltSoftSerial configuration files, copied without modification from the AltSoftserial project, and
@@ -125,6 +149,7 @@ Yes, please contact me if you are interested, my e-mail is in the source code he
 Many thanks to the following persons:
 - a user called "donato35" for discovering that the P1/P2 bus is using HBS adapters (http://www.grix.it/forum/forum_thread.php?ftpage=2&id_forum=1&id_thread=519140?id_forum=1),
 - a user called "Krakra" published a link to a description of the HBS protocol in the Echonet standard (https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms/2551/43) and shared thoughts and code on product-dependent header files,
+- Luis Lamich Arocas for providing and analyzing his log files; thanks to his work v0.9.6 version we could add support for switching DHW on/off and cooling/heating on/off (currently only confirmed to work on EHVX08S23D6V and EHYHBX08AAV3),
 - Bart Ellast for sharing his P1/P2 protocol data and analysis,
 - designer2k2 for sharing his EWYQ005ADVP protocol data and analysis, and
 - Paul Stoffregen for publishing the AltSoftSerial library, on which the P1P2Serial library is heavily based.

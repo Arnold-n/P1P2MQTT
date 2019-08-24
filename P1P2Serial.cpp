@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190823 v0.9.6 Added packetavailable()
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
  * 20190817 v0.9.4 Clean up, bug fixes, improved ms counter, prescaler reset added, time measurement changed, delta/error reporting separated
  * 20190505 v0.9.3 Changed error handling and corrected deltabuf type in readpacket
@@ -612,6 +613,19 @@ bool P1P2Serial::available(void)
   return RX_BUFFER_SIZE + head - tail;
 }
 
+bool P1P2Serial::packetavailable(void)
+{
+  uint8_t head, tail;
+
+  head = rx_buffer_head;
+  tail = rx_buffer_tail;
+  while (1) {
+    if (head == tail) return 0;
+    if (++tail >= RX_BUFFER_SIZE) tail = 0;
+    if (error_buffer[tail] & SIGNAL_EOB) return 1;
+  }
+}
+
 void P1P2Serial::flushInput(void)
 {
   rx_buffer_head = rx_buffer_tail;
@@ -620,6 +634,7 @@ void P1P2Serial::flushInput(void)
 uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* errorbuf, uint8_t maxlen, uint8_t crc_gen, uint8_t crc_feed)
 {
 // Reads one packet (in blocking mode)
+// To avoid blocking, only call this function if packetavailable()
 // stores maximum of maxlen bytes of read data into readbuf
 // returns total #bytes received (until v0.9.3: #bytes stored, as of v0.9.4: #bytes received, even if not stored),
 //    if (packet size/return value > maxlen) some received bytes were not stored, some error codes may have been missed

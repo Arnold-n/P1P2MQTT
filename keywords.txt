@@ -16,6 +16,7 @@ read	KEYWORD2
 read_error	KEYWORD2
 read_delta	KEYWORD2
 available	KEYWORD2
+packetavailable	KEYWORD2
 flushInput	KEYWORD2
 flushOutput	KEYWORD2
 write	KEYWORD2

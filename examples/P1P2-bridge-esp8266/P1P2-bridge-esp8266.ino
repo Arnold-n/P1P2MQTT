@@ -6,6 +6,8 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190824 v0.9.6 Added x0Fx35 parameter saving and reporting
+ * 20190823        Separated NetworkParams.h
  * 20190817 v0.9.4 Initial version
  *
  * P1P2erial is written and tested for the Arduino Uno and Mega.
@@ -35,8 +37,9 @@
 #include <ArduinoOTA.h>
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
-#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>          // https://github.com/tzapu/WiFiManager
 #include <PubSubClient.h>
+#include "NetworkParams.h"        // to enter Mqtt (+ later emoncms) server settings
 
 // Include Daikin product-dependent header file for parameter conversion
 //
@@ -53,19 +56,10 @@ static int outputunknown = 0; // whether json parameters include parameters for 
 
 void configModeCallback (WiFiManager *myWiFiManager) {
   Serial.println("* Entered config mode");
-  Serial.print("*");  Serial.println(WiFi.softAPIP());
+  Serial.print("* ");  Serial.println(WiFi.softAPIP());
   //if you used auto generated SSID, print it
-  Serial.print("*");  Serial.println(myWiFiManager->getConfigPortalSSID());
+  Serial.print("* ");  Serial.println(myWiFiManager->getConfigPortalSSID());
 }
-
-char mqttServer[50] = "192.168.Your.Mqttserver"; // Configuration of mqtt parameters (one-time only) via WiFiManager set-up
-char mqttPort[10] = "MqttPort";               // No re-configuration supported yet, unless wifi is switched off
-int  mqttPortNr = 1234;
-char mqttUser[20] = "MqttUser";
-char mqttPassword[30] = "MqttPassword";
-//emoncms upload via http-post not supported yet:
-//const char* emonURL="URL";                  // Fill in YOUR emoncms URL TODO
-//const char* emonAPI="APIkey";               // Fill in YOUR emoncms API key
 
 static int jsonterm = 1;
 int jsonstringp = 0;
@@ -84,10 +78,10 @@ void setup() {
   //wifiManager.resetSettings();
   //set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
   /* Parameters need to be saved manually, on SPIFFS or otherwise, this is not implemted yet, so work for later:
-  WiFiManagerParameter MqttServer("mqttserver", "MqttServer", mqttServer, 50);
-  WiFiManagerParameter MqttPort("mqttport", "MqttPort", mqttPort, 10);
-  WiFiManagerParameter MqttUser("mqttuser", "MqttUser", mqttUser, 20);
-  WiFiManagerParameter MqttPassword("mqttpassword", "MqttPassword", mqttPassword, 30);
+  WiFiManagerParameter MqttServer("mqttserver", "MqttServer", mqttServer, sizeof(mqttServer));
+  WiFiManagerParameter MqttPort("mqttport", "MqttPort", mqttPort, sizeof(mqttPort));
+  WiFiManagerParameter MqttUser("mqttuser", "MqttUser", mqttUser, sizeof(mqttUser));
+  WiFiManagerParameter MqttPassword("mqttpassword", "MqttPassword", mqttPassword, sizeof(mqttPassword));
   wifiManager.addParameter(&MqttServer);
   wifiManager.addParameter(&MqttPort);
   wifiManager.addParameter(&MqttUser);
@@ -100,15 +94,15 @@ void setup() {
   //here  "AutoConnectAP"
   //and goes into a blocking loop awaiting configuration
   if(!wifiManager.autoConnect()) {
-    Serial.println("*Failed to connect and hit timeout");
+    Serial.println("* Failed to connect and hit timeout");
     //reset and try again, or maybe put it to deep sleep
     ESP.reset();
     delay(1000);
   } 
   //if you get here you have connected to the WiFi
-  Serial.println("*Connected :)");
-  Serial.println("*Ready");
-  Serial.print("*IP address: ");
+  Serial.println("* Connected :)");
+  Serial.println("* Ready");
+  Serial.print("* IP address: ");
   Serial.println(WiFi.localIP());
   /*
   strcpy(mqttServer, MqttServer.getValue());
@@ -116,14 +110,14 @@ void setup() {
   strcpy(mqttUser, MqttUser.getValue());
   strcpy(mqttPassword, MqttPassword.getValue());
   */
-  Serial.print("*Mqtt Server IP: ");
+  Serial.print("* Mqtt Server IP: ");
   Serial.println(mqttServer);
-  Serial.print("*Mqtt Port: ");
+  Serial.print("* Mqtt Port: ");
   //sscanf(MqttPort.getValue(),"%i",&mqttPortNr); // note: no error testing done, fall-back to 1234 as portnr as defined above
   Serial.println(mqttPortNr);
-  Serial.print("*Mqtt User: ");
+  Serial.print("* Mqtt User: ");
   Serial.println(mqttUser);
-  Serial.print("*Mqtt Password: ");
+  Serial.print("* Mqtt Password: ");
   Serial.println(mqttPassword);
   
   // OTA 
@@ -147,23 +141,23 @@ void setup() {
     //Serial.println("*Start updating " + type);
   });
   ArduinoOTA.onEnd([]() {
-    Serial.println("*"); Serial.println("*End");
+    Serial.println("* "); Serial.println("*End");
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("*Progress: %u%%\r", (progress / (total / 100)));
+    Serial.printf("* Progress: %u%%\r", (progress / (total / 100)));
   });
   ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("*Error[%u]: ", error);
+    Serial.printf("* Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) {
-      Serial.println("*Auth Failed");
+      Serial.println("* Auth Failed");
     } else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("*Begin Failed");
+      Serial.println("* Begin Failed");
     } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("*Connect Failed");
+      Serial.println("* Connect Failed");
     } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("*Receive Failed");
+      Serial.println("* Receive Failed");
     } else if (error == OTA_END_ERROR) {
-      Serial.println("*End Failed");
+      Serial.println("* End Failed");
     }
   });
   ArduinoOTA.begin();
@@ -172,13 +166,16 @@ void setup() {
   client.setServer(mqttServer, mqttPortNr);
   client.setCallback(callback);
   if (client.connect("P1P2", mqttUser, mqttPassword )) {
-    Serial.println("*Connected to mqtt server");  
+    Serial.println("* Connected to mqtt server");  
+    client.subscribe("P1P2/W");
   } else {
-    Serial.print("*Mqtt server connection failed with state ");
+    Serial.print("* Mqtt server connection failed with state ");
     Serial.print(client.state());
     delay(2000);
   }
-  client.subscribe("P1P2/W");
+
+  Serial.println("* [ESP] P1P2-bridge-esp8266 v0.9.6");
+  client.publish("P1P2/S","* [ESP] P1P2-bridge-esp8266 v0.9.6");
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -186,27 +183,28 @@ void callback(char* topic, byte* payload, unsigned int length) {
 // unless the message starts with a 'U' or 'Y', in which case we decode the message on the ESP
   int temp;
   char value[98];
+
   switch (payload[0]) {
     case 'u' :
     case 'U': if (sscanf((const char*) payload + 1, "%d", &temp) == 1) {
                 if (temp) temp = 1;
                 outputunknown = temp;
                 snprintf(value, sizeof(value), "* [ESP] OutputUnknown set to %i", outputunknown);
-                client.publish("P1P2/R", value);
+                client.publish("P1P2/S", value);
               } else {
                 snprintf(value, sizeof(value), "* [ESP] OutputUnknown %i", outputunknown);
-                client.publish("P1P2/R", value);
+                client.publish("P1P2/S", value);
               }
               break;
-    case 'y' :
-    case 'Y': if (sscanf((const char*) (payload + 1), "%d", &temp) == 1) {
+    case 's' :
+    case 'S': if (sscanf((const char*) (payload + 1), "%d", &temp) == 1) {
                 if (temp) temp = 1;
                 changeonly = temp;
                 snprintf(value, sizeof(value), "* [ESP] ChangeOnly set to %i", changeonly);
-                client.publish("P1P2/R", value);
+                client.publish("P1P2/S", value);
               } else {
                 snprintf(value, sizeof(value), "* [ESP] ChangeOnly %i", changeonly);
-                client.publish("P1P2/R", value);
+                client.publish("P1P2/S", value);
               }
               break;
     default : strlcpy(value, (char*) payload, (length + 1) > sizeof(value) ? sizeof(value) : (length + 1)); // create null-terminated copy of payload
@@ -217,11 +215,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void process_for_mqtt_json(byte* rb, int n) {
   char value[KEYLEN];    
-  char key[KEYLEN + 7]; // 7 character prefix for topic
-  int rv;
-  strcpy(key,"P1P2/P/");
+  char key[KEYLEN + 9]; // 9 character prefix for topic
+  byte cat;
+  strcpy(key,"P1P2/P/U/");
   for (byte i = 3; i < n; i++) {
-    int kvrbyte = bytes2keyvalue(rb, i, 8, key + 7, value);
+    int kvrbyte = bytes2keyvalue(rb, i, 8, key + 9, value, cat);
     // returns 0 if byte does not trigger any output
     // returns 1 if a new value should be output
     // returns 8 if byte should be treated per bit
@@ -238,25 +236,35 @@ void process_for_mqtt_json(byte* rb, int n) {
       }
     } else {
       for (byte j = 0; j < kvrbyte; j++) {
-        int kvr= (kvrbyte==8) ? bytes2keyvalue(rb, i, j, key + 7, value) : kvrbyte;
+        int kvr= (kvrbyte==8) ? bytes2keyvalue(rb, i, j, key + 9, value, cat) : kvrbyte;
         if (kvr) {
-          client.publish(key, value);
-          if (jsonterm) {
-            jsonstring[jsonstringp++] = '{';
-            jsonterm = 0;
-          } else {
-            jsonstring[jsonstringp++] = ',';
+          switch (cat) {
+            case 1 : key[7] = 'P'; // parameter settings
+                     break;
+            case 2 : key[7] = 'M'; // measurement, time, date, power
+                     break;
+            case 3 : key[7] = 'F'; // F related params
+                     break;
+            case 0 : // fallthrough
+            default: key[7] = 'U'; // unknown
           }
-          jsonstring[jsonstringp++] = '"';
-
-          rv = strlcpy(jsonstring + jsonstringp, key + 7, sizeof(jsonstring) - jsonstringp);
-          if (rv >= (sizeof(jsonstring) - jsonstringp)) jsonstringp = sizeof(jsonstring); else jsonstringp += rv;
-
-          jsonstring[jsonstringp++] = '"';
-          jsonstring[jsonstringp++] = ':';
-          
-          rv = strlcpy(jsonstring + jsonstringp, value, sizeof(jsonstring) - jsonstringp);
-          if (rv >= (sizeof(jsonstring) - jsonstringp)) jsonstringp = sizeof(jsonstring); else jsonstringp += rv;
+          client.publish(key, value);
+          // don't add another parameter if remaining space is not enough for key, value, and ',' '"', '"', ':', '}', and '\0'
+          if (jsonstringp + strlen(value) + strlen(key + 9) + 6 <= sizeof(jsonstring)) {
+            if (jsonterm) {
+              jsonstring[jsonstringp++] = '{';
+              jsonterm = 0;
+            } else {
+              jsonstring[jsonstringp++] = ',';
+            }
+            jsonstring[jsonstringp++] = '"';
+            strcpy(jsonstring + jsonstringp, key + 9);
+            jsonstringp += strlen(key + 9);
+            jsonstring[jsonstringp++] = '"';
+            jsonstring[jsonstringp++] = ':';
+            strcpy(jsonstring + jsonstringp, value);
+            jsonstringp += strlen(value);
+          }
         }
       }
     }
@@ -273,28 +281,35 @@ void loop() {
   ArduinoOTA.handle();
   client.loop(); 
   if (!client.connected()) {
-    Serial.println("*Reconnecting");
+    Serial.println("* Reconnecting");
     if (client.connect("P1P2", mqttUser, mqttPassword )) {
-        Serial.println("*Reconnected");
+        Serial.println("* Reconnected");
+        client.subscribe("P1P2/W");
+        client.publish("P1P2/S","* [ESP] P1P2-bridge-esp8266 v0.9.6");
     } else {
-      Serial.println("*Not reconnected");
+      Serial.println("* Not reconnected");
       delay(1000);
     }
   } else {
     if (byte rb = Serial.readBytesUntil('\n', readbuf, RB)) {
-      if (readbuf[rb-1] == '\r') rb--;
+      if ((rb > 0) && (readbuf[rb-1] == '\r')) rb--;
       if (rb < RB) readbuf[rb++] = '\0'; else readbuf[RB-1] = '\0';
-      client.publish("P1P2/R", readbuf, rb);
+      if (readbuf[0] == 'R') {
+        client.publish("P1P2/R", readbuf, rb);
+      } else {
+        client.publish("P1P2/S", readbuf, rb);
+      }
       int rbp = 0;
       int n, rbtemp;
       if ((rb >= 10) && (readbuf[7] == ':')) rbp=9;
       byte rh=0;
       // dirty trick: check for space in serial input to avoid that " CRC" in input is recognized as hex value 0x0C...
-      while ((rh < HB) && (readbuf[rbp] != ' ') && (sscanf(&readbuf[rbp], "%2x%n", &rbtemp, &n) == 1)) {
+      while ((rh < HB) && (readbuf[rbp] != ' ') && (sscanf(readbuf + rbp, "%2x%n", &rbtemp, &n) == 1)) {
         readhex[rh++] = rbtemp;
         rbp += n;
       }
+      // n is packet length (not counting CRC byte)
       process_for_mqtt_json(readhex, rh);
-    } 
+    }
   }
 }

@@ -1,8 +1,12 @@
-/* P1P2Monitor: Monitor for reading Daikin/Rotex P1/P2 bus using P1P2Serial library
+/* P1P2Monitor: monitor program for reading Daikin/Rotex P1/P2 bus using P1P2Serial library
+ *               * includes rudimentary code to control DHW on/off and cooling/heating on/off
+ *               * the adapter behaves as an external controller like the BRP* products
+ *               * Control has only been tested on EHYHBX08AAV3 and EHVX08S23D6V
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190824 v0.9.6 Added limited control functionality
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
  * 20190817 v0.9.4 Brought in line with library 0.9.4 (API changes), print last byte if crc_gen==0, removed LCD support due to performance concerns, added config over serial
                    See comments below for description of serial protocol
@@ -14,7 +18,17 @@
  *
  * Serial protocol from/to Arduino Uno/Mega:
  * -----------------------------------------
- * Configuration is done by sending one of the following lines over serial 
+ *
+ * P1P2Monitor Configuration is done by sending one of the following lines over serial 
+ *
+ * (L,Y,Z are new and are for controlling DHW on/off and heating/cooling on/off:)
+ * Lx sets controller functionality off (x=0), on with address 0xF0 (x=1), on with address 0xF1 (x=2)
+ * Yx sets DHW on/off
+ * Zx sets cooling on/off
+ * L reports controller status
+ * Y reports DHW status as reported by main controller
+ * Z reports cooling status as reported by main controller
+ *
  * W<hex data> Write packet (max 32 bytes) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
  * Vx Sets reading mode verbose off/on
  * Tx sets new delay value, to be used for future packets (default 0)
@@ -64,6 +78,9 @@
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work for the Daikin hybrid
 #define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is present or added
                         // These values can be changed via serial port
+byte setParam = 0x31;   // Parameter in packet type 35 for switching cooling/heating on/off
+                        // 0x31 works on EHVX08S23D6V
+                        // 0x2E works on EHYHBX08AAV3
 
 P1P2Serial P1P2Serial;
 
@@ -71,9 +88,9 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) ; // wait for Arduino Serial Monitor to open
   Serial.println(F("*"));
-  Serial.println(F("*P1P2Serial-arduino monitor v0.9.5"));
+  Serial.println(F("*P1P2Monitor v0.9.6 (limited controller functionality)"));
   Serial.println(F("*"));
-  delay (5000); // give ESP time to boot, it doesn't like serial input while initiating wifi
+  // TODO try without delay (5000); // give ESP time to boot, it doesn't like serial input while initiating wifi
   P1P2Serial.begin(9600);
 }
 
@@ -99,75 +116,258 @@ int scanhex(char* s, int &b) {
   return sscanf(s,"%2x",&b);
 }
 
+#define CONTROL_ID0 0xF0     // first external controller
+#define CONTROL_ID1 0xF1     // second external controller
+byte CONTROL_ID=0x00;
+
+byte setDHW = 0;
+byte setDHWstatus = 0;
+byte DHWstatus = 0;
+byte setcooling = 0;
+byte setcoolingstatus = 0;
+byte coolingstatus = 0;
+
 void loop() {
   static byte crc_gen = CRC_GEN;
   static byte crc_feed = CRC_FEED;
   int temp;
   int wb = 0; int wbp = 1; int n; int wbtemp;
   if (Serial.available()) {
-    byte rs = Serial.readBytesUntil('\n', RS, RS_SIZE-1);
-    if (RS[rs-1] == '\r') rs--;
+    byte rs = Serial.readBytesUntil('\n', RS, RS_SIZE - 1);
+    if ((rs > 0) && (RS[rs-1] == '\r')) rs--;
     RS[rs] = '\0';
     if (rs) switch (RS[0]) {
+      case '\0': if (verbose) Serial.println("* Empty line received");
+                break;
       case '*': if (verbose) Serial.println(RS); 
                 break;
-      case 'g' :
-      case 'G': if (verbose) Serial.print(F("* Crc_gen ")); 
-                if (scanhex(&RS[1],temp) == 1) { if (verbose) Serial.print(F("set to ")); crc_gen = temp; }
-                if (verbose) { Serial.print("0x"); if (crc_gen <= 9) Serial.print(F("0")); Serial.println(crc_gen,HEX); }
+      case 'g':
+      case 'G': if (verbose) Serial.print(F("* Crc_gen "));
+                if (scanhex(&RS[1],temp) == 1) { 
+                  crc_gen = temp; 
+                  if (!verbose) break; 
+                  Serial.print(F("set to ")); crc_gen = temp; 
+                }
+                Serial.print("0x"); 
+                if (crc_gen <= 0x0F) Serial.print(F("0")); 
+                Serial.println(crc_gen, HEX);
                 break;
-      case 'h' :
-      case 'H': if (verbose) Serial.print(F("* Crc_feed ")); 
-                if (scanhex(&RS[1],temp) == 1) { if (verbose) Serial.print(F("set to ")); crc_feed = temp; }
-                if (verbose) { Serial.print("0x"); if (crc_feed <= 9) Serial.print(F("0")); Serial.println(crc_feed,HEX); }
+      case 'h':
+      case 'H': if (verbose) Serial.print(F("* Crc_feed "));
+                if (scanhex(&RS[1],temp) == 1) { 
+                  crc_feed = temp; 
+                  if (!verbose) break; 
+                  Serial.print(F("set to ")); 
+                }
+                Serial.print("0x"); 
+                if (crc_feed <= 0x0F) Serial.print(F("0")); 
+                Serial.println(crc_feed, HEX);
                 break;
-      case 'v' :
+      case 'v':
       case 'V': Serial.print(F("* Verbose "));
                 if (scanint(&RS[1], temp) == 1) {
-                  if (temp) temp = 1; 
+                  if (temp) temp = 1;
                   Serial.print(F("set to "));
                   verbose = temp;
-                } 
+                }
                 Serial.println(verbose);
                 break;
-      case 't' :
-      case 'T': if (verbose) Serial.print(F("* Delay ")); 
-                if (scanint(&RS[1], sd) == 1) if (verbose) Serial.print(F("set to "));
-                if (verbose) Serial.println(sd);
+      case 't':
+      case 'T': if (verbose) Serial.print(F("* Delay "));
+                if (scanint(&RS[1], sd) == 1) { 
+                  if (!verbose) break; 
+                  Serial.print(F("set to "));
+                }
+                Serial.println(sd);
                 break;
-      case 'o' :
-      case 'O': if (verbose) Serial.print(F("* DelayTimeout ")); 
-                if (scanint(&RS[1], sdto) == 1) { if (verbose) Serial.print(F("set to ")); P1P2Serial.setDelayTimeout(sdto); }
-                if (verbose) Serial.println(sdto);
+      case 'o':
+      case 'O': if (verbose) Serial.print(F("* DelayTimeout "));
+                if (scanint(&RS[1], sdto) == 1) { 
+                  P1P2Serial.setDelayTimeout(sdto); 
+                  if (!verbose) break; 
+                  Serial.print(F("set to ")); 
+                }
+                Serial.println(sdto);
                 break;
-      case 'x' :
-      case 'X': if (verbose) Serial.print(F("* Echo ")); 
+      case 'x':
+      case 'X': if (verbose) Serial.print(F("* Echo "));
                 if (scanint(&RS[1], temp) == 1) {
-                  if (temp) temp = 1; 
+                  if (temp) temp = 1;
                   echo = temp;
                   P1P2Serial.setEcho(echo);
-                  if (verbose) Serial.print(F("set to "));
+                  if (!verbose) break;
+                  Serial.print(F("set to "));
                 }
                 Serial.println(echo);
                 break;
-      case 'w' :
-      case 'W': if (verbose) Serial.print(F("* Writing: "));
+      case 'w':
+      case 'W': if (CONTROL_ID) {
+                  if (verbose) Serial.println(F("* Write refused; controller is on")); 
+                  break;
+                } // don't write while controller is on
+                if (verbose) Serial.print(F("* Writing: "));
                 while ((wb < WB_SIZE) && (sscanf(&RS[wbp], "%2x%n", &wbtemp, &n) == 1)) {
                   WB[wb++] = wbtemp;
                   wbp += n;
-                  if (verbose) { if (wbtemp <= 0x0F) Serial.print("0"); Serial.print(wbtemp, HEX);}
+                  if (verbose) { 
+                    if (wbtemp <= 0x0F) Serial.print("0"); 
+                    Serial.print(wbtemp, HEX);
+                  }
                 }
                 if (verbose) Serial.println();
                 P1P2Serial.writepacket(WB, wb, sd, crc_gen, crc_feed);
                 break;
+      case 'l': // set external controller answering function on/off and set CONTROL_ID address
+      case 'L': if (verbose) Serial.print(F("* Control_id ")); 
+                if (scanint(&RS[1], temp) == 1) {
+                  if (temp > 2) temp = 2; 
+                  switch (temp) {
+                    case 0 : CONTROL_ID = 0x00; break;
+                    case 1 : CONTROL_ID = CONTROL_ID0; break;
+                    case 2 : CONTROL_ID = CONTROL_ID1; break;
+                    default: break;
+                  }
+                  if (!verbose) break;
+                  Serial.print(F("set to 0x")); 
+                }
+                Serial.print("0x");
+                if (CONTROL_ID <= 0x0F) Serial.print(F("0")); 
+                Serial.println(CONTROL_ID, HEX);
+                break;
+                
+      case 'y': // set DHW on/off
+      case 'Y': if (verbose) Serial.print(F("* DHW ")); 
+                if (scanint(&RS[1], temp) == 1) {
+                  setDHW = 1;
+                  setDHWstatus = temp;
+                  if (!verbose) break;
+                  Serial.print(F("set to ")); 
+                  Serial.println(setDHWstatus);
+                  break;
+                }
+                Serial.println(DHWstatus);
+                break;
+      case 'p': // select parameter to write in z step below
+      case 'P': if (verbose) Serial.print(F("* Param2Write ")); 
+                if (scanhex(&RS[1], temp) == 1) {
+                  setParam = temp;
+                  if (!verbose) break;
+                  Serial.print(F("set to 0x")); 
+                  Serial.println(setParam, HEX);
+                  break;
+                }
+                Serial.println(setParam, HEX);
+                break;
+      case 'z' :// set heating/cooling mode on/off
+      case 'Z': if (verbose) Serial.print(F("* Cooling/heating ")); 
+                if (scanint(&RS[1], temp) == 1) {
+                  setcooling = 1;
+                  setcoolingstatus = temp;
+                  if (!verbose) break;
+                  Serial.print(F("set to ")); 
+                  Serial.println(setcoolingstatus);
+                  break;
+                }
+                Serial.println(coolingstatus);
+                break;
+      case 'u':
+      case 'U':
+      case 's':
+      case 'S': // u and x: reserved for esp configuration
       default : Serial.print(F("* Command not understood: "));
                 Serial.println(RS);
                 break;
     }
   }
-  if (P1P2Serial.available()) {
+  if (P1P2Serial.packetavailable()) {
     uint16_t delta;
     int n = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, crc_gen, crc_feed);
+    // perhaps we need to remember which packets are announced in the 00F030 packet,
+    // though I think that is not necessary.
+    // if ((RB[0] == 0x00) && (RB[1] == CONTROL_ID) && (RB[2] == 0x30)) {
+    //   for (byte i = 3; i < n; i++) writeFx[i] = RB[i];
+    // }
+    byte w;
+    if ((n > 4) && (RB[0] == 0x00) && (RB[1] == CONTROL_ID) && ((RB[2] & 0x30) == 0x30)) {
+      WB[0] = 0x40;
+      WB[1] = RB[1];
+      WB[2] = RB[2];
+      if (crc_gen) n--; // omit CRC from received-byte-counter
+      switch (RB[2]) {
+        case 0x30 : // in: 17 byte; out: 17 byte; out pattern WB[7] should contain a 01 if we want to communicate a new setting
+                    for (w = 3; w < n; w++) WB[w] = 0x00;
+                    // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcooling/setDHW needs to be changed to request a F035 message
+                    if (setDHW || setcooling) WB[7] = 0x01;
+                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                    break;
+        case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function unknown.. copy primary controller bytes for now
+                    for (w = 3; w < n; w++) WB[w] = RB[w];
+                    WB[7] = 0xB4;
+                    WB[8] = 0x10; // could be part of serial nr? If so, would it matter that we use the same nr as the BRP?
+                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                    break;
+        case 0x32 : // in: 19 byte: out 19 byte, out is copy in
+                    for (w = 3; w < n; w++) WB[w] = RB[w];
+                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                    break;
+        case 0x33 : // not seen
+                    break;
+        case 0x34 : // not seen
+                    break;
+        case 0x35 : // in: 21 byte; out 21 byte; in is parameters; out is FF except for first packet which starts with 930000 (why?)
+                    // parameters in the 00F035 message may indicate status changes in the heat pump
+                    // A parameter consists of 3 bytes: 1 byte nr, and (likely) 2 byte value
+                    // for now we only check for the following parameters: 
+                    // DHW 400000
+                    // cooling 310000
+                    // change bytes for triggering cooling on/off
+                    for (w = 3; w < n; w++) WB[w] = 0xFF;
+                    w = 3;
+                    // if (cooling/DHW)  WB[3..5 (6..8)] = 31000/40000
+                    if (setDHW) { WB[w++] = 0x40; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
+                    if (setcooling) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingstatus; setcooling = 0; }
+                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                    for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingstatus = RB[w+2];
+                    for (w = 3; w < n; w++) if ((RB[w] == 0x40) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
+                    break;
+        case 0x36 : // in: 23 byte; out 23 byte; in is parameters??; out is FF
+                    // fallthrough
+        case 0x37 : // not seen, but we still reply with a packet with the same length and only FF as payload for devices that do request this type of message
+                    // fallthrough
+        case 0x38 : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
+                    // but let's also reply with a packet with the same length and only FF as payload
+                    // fallthrough
+        case 0x39 : // in: 21 byte; out 21 byte; in is parameters??; out is FF
+                    // fallthrough
+        case 0x3A : // in: 21 byte; out 21 byte; in is parameters??; out is FF
+                    // fallthrough
+        case 0x3B : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
+                    // but let's also reply with a packet with the same length and only FF as payload
+                    // fallthrough
+        case 0x3C : // in: 23 byte; out 23 byte; in is parameters??; out is FF
+                    // fallthrough
+        case 0x3D : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
+                    // but let's also reply with a packet with the same length and only FF as payload
+                    for (w = 3; w < n - 1; w++) WB[w] = 0xFF;
+                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                    break;
+        case 0x3E : if (RB[3]) {
+                      // 0x3E01, 0x3E02, ... in: 23 byte; out: 23 byte; out 40F13E01(even for higher) + 19xFF
+                      WB[3] = 0x01;
+                      for (w = 4; w < n; w++) WB[w] = 0xFF;
+                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                    } else {
+                      // 0x3E00 in: 8 byte out: 8 byte; 40F13E00 (4x FF)
+                      WB[3] = 0x00;
+                      for (w = 4; w < n; w++) WB[w] = 0xFF;
+                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                    }
+                    break;
+        default   : // not seen
+                    break;
+      }
+      if (crc_gen) n++; // reverse CRC exclusion - include CRC in serial output
+    }
     if (verbose) {
       Serial.print(F("R"));
       if (delta < 10000) Serial.print(F(" "));
@@ -178,7 +378,7 @@ void loop() {
       Serial.print(delta);
       Serial.print(F(": "));
     }
-    for (int i = 0;i<n;i++) {
+    for (int i = 0;i < n;i++) {
       if (verbose && (EB[i] & ERROR_READBACK)) {
         // collision suspicion due to verification error in reading back written data
         Serial.print(F("-XX:"));

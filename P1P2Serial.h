@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190824 v0.9.6 Added packetavailable()
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
  * 20190817 v0.9.4 Clean up, bug fixes, improved ms counter, prescaler reset added, time measurement changed, delta/error reporting separated
  * 20190505 v0.9.3 Changed error handling and corrected deltabuf type in readpacket
@@ -82,6 +83,7 @@ public:
         uint8_t read_error(); // returns error code for last received byte
 	uint16_t read_delta(); // returns time difference between this and previous received byte
 	bool available();
+	bool packetavailable();
 	static void flushInput();
 	static void flushOutput();
 	static void write(uint8_t byte);
