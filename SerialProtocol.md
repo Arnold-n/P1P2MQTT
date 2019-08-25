@@ -12,11 +12,11 @@ For monitoring purposes (P1P2Monitor and P1P2Controller):
 - Gx Sets crc_gen (default 0xD9)
 - Hx Sets crc_feed (default 0x00)
 - V  Display current verbose mode
-- G  Display current crc_gen value
-- H  Display current crc_feed value
-- X  Display current echo status
 - T  Display current delay value
 - O  Display current delay timeout value
+- X  Display current echo status
+- G  Display current crc_gen value
+- H  Display current crc_feed value
 - \* comment lines starting with an asterisk are ignored (and are echoed in verbose mode)
 
 And for controlling purposes (P1P2Controller only):
@@ -25,11 +25,11 @@ And for controlling purposes (P1P2Controller only):
      (for EHVX08S23D6V: use 1 if you don't have another auxiliary controller, use 2 if you do)
 - Wx sets DHW on/off (using parameter 0x40 from the set of parameters used in packet type 35)
 - Zx sets heating/cooling on/off (using parameter 0x31 in packet type 35; for other devices this should be a different parameter)
-- Px sets the parameter number in packet type 35 (0x00..0xFF) to user for heating/cooling on/off (default 0x31 forEHVX08S23D6V, use 0x2E for EHYHBX08AAV3)
+- Px sets the parameter number in packet type 35 (0x00..0xFF) to use for heating/cooling on/off (default 0x31 forEHVX08S23D6V, use 0x2E for EHYHBX08AAV3)
 - L reports current controller mode (0, 1, or 2)
 - W reports DHW status as reported by main controller
 - Z reports heating/cooling status as reported by main controller
-- P reports parameter number in packet type 35
+- P reports parameter number in packet type 35 used for cooling/heating on/off
 
 These commands are case-insensitive. The maximum line length is 98 bytes (allowing "W 00 00 [..] 00\n" format for a 32-byte write packet).
 

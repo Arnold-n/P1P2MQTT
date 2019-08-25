@@ -21,13 +21,15 @@
  *
  * P1P2Monitor Configuration is done by sending one of the following lines over serial 
  *
- * (L,Y,Z are new and are for controlling DHW on/off and heating/cooling on/off:)
+ *    (L,W,Z are new and are for controlling DHW on/off and heating/cooling on/off:)
  * Lx sets controller functionality off (x=0), on with address 0xF0 (x=1), on with address 0xF1 (x=2)
- * Yx sets DHW on/off
+ * Wx sets DHW on/off
  * Zx sets cooling on/off
+ * Px sets the parameter number in packet type 35 (0x00..0xFF) to use for heating/cooling on/off (default 0x31 forEHVX08S23D6V, use 0x2E for EHYHBX08AAV3)
  * L reports controller status
- * Y reports DHW status as reported by main controller
+ * W reports DHW status as reported by main controller
  * Z reports cooling status as reported by main controller
+ * P reports parameter number in packet type 35 used for heating/cooling on/off
  *
  * W<hex data> Write packet (max 32 bytes) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
  * Vx Sets reading mode verbose off/on
@@ -37,17 +39,18 @@
  * Gx Sets crc_gen (defaults to CRC_GEN=0xD9)
  * Hx Sets crc_feed (defaults to CRC_FEED=0x00)
  * V  Display current verbose mode
+ * T  Display current delay value
+ * O  Display current delay timeout value
+ * X  Display current echo status
  * G  Display current crc_gen value
  * H  Display current crc_feed value
- * X  Display current echo status
- * T  Display current delay value
- * T  Display current delay timeout value
  * * comment lines starting with an asterisk are ignored (or copied in verbose mode)
  * These commands are case-insensitive
  * Maximum line length is 99 bytes (allowing "W 00 00 [..] 00[\r]\n" format)
  *
  *     Thanks to Krakra for providing coding suggestions, the hints and references to the HBS and MM1192 documents on
  *     https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms, 
+ *     to Luis Lamich Arocas for sharing logfiles and testing the new controlling functions for the EHVX08S23D6V,
  *     and to Paul Stoffregen for publishing the AltSoftSerial library.
  *
  * This program is based on the public domain Echo program from the
@@ -86,11 +89,10 @@ P1P2Serial P1P2Serial;
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial) ; // wait for Arduino Serial Monitor to open
+  while (!Serial);      // wait for Arduino Serial Monitor to open
   Serial.println(F("*"));
   Serial.println(F("*P1P2Monitor v0.9.6 (limited controller functionality)"));
   Serial.println(F("*"));
-  // TODO try without delay (5000); // give ESP time to boot, it doesn't like serial input while initiating wifi
   P1P2Serial.begin(9600);
 }
 
