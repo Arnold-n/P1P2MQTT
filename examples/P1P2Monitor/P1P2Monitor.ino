@@ -25,7 +25,7 @@
  * Lx sets controller functionality off (x=0), on with address 0xF0 (x=1), on with address 0xF1 (x=2)
  * Wx sets DHW on/off
  * Zx sets cooling on/off
- * Px sets the parameter number in packet type 35 (0x00..0xFF) to use for heating/cooling on/off (default 0x31 forEHVX08S23D6V, use 0x2E for EHYHBX08AAV3)
+ * Px sets the parameter number in packet type 35 (0x00..0xFF) to use for heating/cooling on/off (default 0x31 forEHVX08S23D6V, use 0x2F for EHYHBX08AAV3)
  * L reports controller status
  * W reports DHW status as reported by main controller
  * Z reports cooling status as reported by main controller
@@ -83,7 +83,7 @@
                         // These values can be changed via serial port
 byte setParam = 0x31;   // Parameter in packet type 35 for switching cooling/heating on/off
                         // 0x31 works on EHVX08S23D6V
-                        // 0x2E works on EHYHBX08AAV3
+                        // 0x2F works on EHYHBX08AAV3
 
 P1P2Serial P1P2Serial;
 

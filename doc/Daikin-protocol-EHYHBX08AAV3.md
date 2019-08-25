@@ -1,13 +1,12 @@
 # EHYHB(H/X)-AV3 and EHV(H/X)-CB protocol data format
 
-Protocol data format for Daikin Altherma hybrid heat pump EHYHB(H/X)-AV3 and Daikin Altherma LT heat pump EHV(H/X)-CB
+Protocol data format for Daikin Altherma hybrid heat pump for the EHYHBX08AAV3 (perhaps all EHYHB(H/X)-AV3 models) and (at least partially for the) Daikin Altherma LT heat pump EHV(H/X)-CB
 
 Please read the README.md first.
 
 The following data packets were observed on these particular units:
 EHYHBX08AAV3: air-to-water heat pump with gas condensing technology, functioning in weather-dependent LWT mode
 EHVX08S26CB9W: air-to-water heat pump (with cooling), functioning in weather-dependent LWT mode (so far only "main package" packets were tested)
-
 
 **Cycle**
 
@@ -314,6 +313,8 @@ F1 has been observed as 2nd external controller in some devices.
 
 #### Packet "00F035.." and "40F035"
 
+A few hundred parameters can be exchanged via packet type 35. Some are fixed (a range of parameters is used to communicate the device ID), others are relating to operating settings. Unfortunately temperating settings are not visible here.
+
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00 or 40                        | Request or response               | u8
@@ -322,7 +323,53 @@ F1 has been observed as 2nd external controller in some devices.
 |     3-20      | XX YY ZZ                      | communicates value ZZ of parameter YYXX; padding form is FFFFFF | u16 + u8
 |     21        | XX                            | CRC checksum          | u8
 
-A few hundred parameters can be exchanged via packet type 35. Some are fixed (a range of parameters is used to communicate the device ID), others are relating to operating settings. Unfortunately temperating settings are not visible here.
+The parameter range for the is 0x0000-0x144.
+
+| Param nr      | Hex value observed            | Description           | Data type     | Bit: description |
+|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
+|    13         | 01                            | ?                     |               |
+|    21         | 01                            | ?                     |               |
+|    22         | 01                            | ?                     |               |
+|    27         | 01                            | ?                     |               |
+|    2E         | 00/01                         | Related to heating/cooling on/off |   |
+|    2F         | 00/01                         | Related to heating/cooling on/off  (setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on) |   |
+|    37         | 00/01/04                      | Related to heating/cooling and DHW on/off |   |
+|    39         | 01                            | ?                     |               |
+|    3A         | 01                            | ?                     |               |
+|    3F         | 00/01                         | Related to DHW on/off |               |
+|    40         | 00/01                         | Related to DHW on/off (setting this parameter in a 40Fx35 response to 0x00/0x01 switches DHW off/on) |               |
+|    4E         | 01                            | ?                     |               |
+|    4F         | 01                            | ?                     |               |
+|    55         | 03                            | ?                     |               |
+|    56         | 03                            | ?                     |               |
+|    5C         | 7F                            | ?                     |               |
+|    88         | 01                            | ?                     |               |
+|    8D         | 02                            | ?                     |               |
+|    93         | 02                            | ?                     |               |
+|    98         | 01                            | indication manual setting? |          |
+|    9A         | 4B                            | ?                     |               |
+|    9D         | XX                            | counter, # solid state writes |       |
+|    A2         | XX                            | counter, ?            |               |
+|    B4         | 01                            | ?                     |               |
+|    B6         | 01                            | ?                     |               |
+|    B7         | 01                            | ?                     |               |
+|    C2         | 01                            | ?                     |               |
+|    C3         | 07                            | ?                     |               |
+|    C5         | 05                            | ?                     |               |
+|    C6         | 09                            | ?                     |               |
+|    C7         | 08                            | ?                     |               |
+|    C8         | 01                            | ?                     |               |
+|    C9         | 01                            | ?                     |               |
+|    CA         | 02                            | ?                     |               |
+|    CC         | 04                            | ?                     |               |
+|   10C         | 01                            | ?                     |               |
+|   11B         | 0E                            | ?                     |               |
+|   11C         | 03                            | ?                     |               |
+|   11F         | 04                            | ?                     |               |
+|   121         | 07                            | ?                     |               |
+|   122         | 04                            | ?                     |               |
+|   13A..145    | 45 48 59 48 42 58 30 38 41 41 56 33 | "EHYHBX08AAV3"  | ASCII         |
+|   others      | 00                            | ?                     |               |
 
 ## Packet types 60..8F for communicating field settings
 
