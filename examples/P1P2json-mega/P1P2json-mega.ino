@@ -26,12 +26,15 @@
  */
 
 #include <P1P2Serial.h>
+#include <Ethernet.h>
+#include <EthernetUdp.h>
 
 // choices needed to be made before including header file:
-#define outputunknown 1   // whether json parameters include parameters even if functionality is unknown
+#define outputunknown 0   // whether json parameters include parameters even if functionality is unknown
 #define changeonly    1   // whether json parameters are repeated if unchanged
                           //   (only for parameters for which savehistory() is active,
                           //   and excluding parameters as indicated in ignorechange())
+#define udpMessages   1   // send json as an UDP message (W5500 compatible ethernet shield is required)                          
 
 #include "P1P2_Daikin_ParameterConversion_EHYHB.h"
 
@@ -41,6 +44,23 @@
 
 P1P2Serial P1P2Serial;
 
+byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
+unsigned int listenPort = 10003;                                  // listening port
+unsigned int sendPort = 10000;                                    // sending port
+unsigned int remPort = 10002;                                     // remote port
+IPAddress ip(192, 168, 1, 33);                                       // IP address
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress sendIpAddress(255, 255, 255, 255);                      // remote IP or 255, 255, 255, 255 for broadcast (faster)
+
+#define inputPacketBufferSize UDP_TX_PACKET_MAX_SIZE
+char inputPacketBuffer[UDP_TX_PACKET_MAX_SIZE];
+#define outputPacketBufferSize 100
+char outputPacketBuffer[outputPacketBufferSize];
+
+EthernetUDP udpRecv;                                              // for future functionality....
+EthernetUDP udpSend;
+
 void setup() {
   Serial.begin(115200);
   while (!Serial) ; // wait for Arduino Serial Monitor to open
@@ -48,6 +68,11 @@ void setup() {
   Serial.println(F("*P1P2json-mega v0.9.6"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
+  if (udpMessages) {
+    Ethernet.begin(mac, ip);
+    udpRecv.begin(listenPort);
+    udpSend.begin(sendPort);
+  }
 }
 
 static byte RB[RB_SIZE];
@@ -69,6 +94,10 @@ void process_for_mqtt_json(byte* rb, int n) {
       if (jsonterm == 0) {
         jsonterm = 1;
         Serial.println(F("}"));
+        if (udpMessages) {
+          udpSend.print(F("}"));
+          udpSend.endPacket();
+        }
       }
     } else {
       for (byte j = 0; j < kvrbyte; j++) {
@@ -76,13 +105,23 @@ void process_for_mqtt_json(byte* rb, int n) {
         if (kvr) {
           if (jsonterm) {
             Serial.print(F("J {\"")); 
+            if (udpMessages) {
+              udpSend.beginPacket(sendIpAddress, remPort);
+              udpSend.print(F("{\""));
+            }
             jsonterm = 0;
           } else {
             Serial.print(F(",\""));
+            if (udpMessages) udpSend.print(F(",\""));
           }
           Serial.print(key);
           Serial.print(F("\":"));
           Serial.print(value);
+          if (udpMessages) {
+            udpSend.print(key);
+            udpSend.print(F("\":"));
+            udpSend.print(value);
+          }
         }
       }
     }
