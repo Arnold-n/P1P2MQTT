@@ -53,11 +53,6 @@ IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress sendIpAddress(255, 255, 255, 255);                      // remote IP or 255, 255, 255, 255 for broadcast (faster)
 
-#define inputPacketBufferSize UDP_TX_PACKET_MAX_SIZE
-char inputPacketBuffer[UDP_TX_PACKET_MAX_SIZE];
-#define outputPacketBufferSize 100
-char outputPacketBuffer[outputPacketBufferSize];
-
 EthernetUDP udpRecv;                                              // for future functionality....
 EthernetUDP udpSend;
 
