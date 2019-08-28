@@ -18,7 +18,7 @@ P1/P2 2-wire interface
       
       P1P2Adapter Shield
       (pin 8, 9)
-      Arduino Uno running P1P2Monitor
+      Arduino Uno running P1P2Monitor (with JSON undefined)
 
 Serial interface
 
@@ -45,7 +45,7 @@ P1/P2 2-wire interface
       
       P1P2Adapter Shield
       (pin 8, 9)
-      Arduino Uno running P1P2Monitor
+      Arduino Uno running P1P2Monitor (with JSON undefined)
 
 Serial interface over USB
 
@@ -54,6 +54,18 @@ Serial interface over USB
 mqtt/.. over WiFi or LAN
 
 The above set-up works nicely on an original Arduino Uno, and has the advantage that the Arduino can be flashed without dip switch settings.
+
+**Preferred set-up based on Arduino Mega/W5500
+
+P1/P2 2-wire interface
+      
+      P1P2Adapter Shield
+      (pin 48, 46 (not: 8, 9))
+      Arduino Mega running P1P2Monitor with JSON and JSONUDP defined
+
+      W5500 ethernet shield
+
+json over UDP via LAN
 
 **P1P2Serial library and P1P2Monitor example application**
 
@@ -123,10 +135,11 @@ The simple answer is: write when others don't. In practice communication seems t
 - ReleaseNotes.md,
 - SerialProtocol.md, describes serial protocol used by P1P2Monitor and by serial mqtt channels of P1P2-bridge-eps8266
 - P1P2Serial.cpp and P1P2Serial.h: (GPL-licensed) P1P2Serial library, based on AltSoftSerial, and uses AltSoftSerial configuration files,
-- examples/P1P2Monitor: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus on serial output, and enables writing data from serial input. Reading/writing packets of data and CRC-byte generation/verification is supported. This program has no LCD support as of version 0.9.4,
+- examples/P1P2Monitor: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus on serial output, and enables writing data from serial input. Reading/writing packets of data and CRC-byte generation/verification is supported. This program has no LCD support as of version 0.9.4, json/udp support has been added as of version 0.9.6
 - examples/P1P2-bridge-esp8266: (GPL-licensed) program to convert P1P2Monitor's serial output to mqtt and json format, and preliminary support to write packets to the P1P2 bus from a mqtt channel,
 - examples/P1P2HardwareTest: (GPL-licensed) program to stand P1P2Serial adapter shield in stand-alone mode,
-- examples/P1P2json: (GPL-licensed) program to convert bus to json-formatted output on serial output. No writing to the bus is supported by this program,
+- (to be outphased:) examples/P1P2json: (GPL-licensed) program to convert bus to json-formatted output on serial output. No writing to the bus is supported by this program,
+- (to be outphased:) examples/P1P2json-mega: (GPL-licensed) program to convert bus to json-formatted output on serial output and UDP. No writing to the bus is supported by this program,
 - examples/P1P2LCD: (GPL-licensed) program to show P1P2 data on a an additional SPI 128x64 display connected directly to the Arduino Uno pins. This works for the Daikin hybrid model, it may work (partially) for other models. This program requires that the u8g2 library is installed,
 - Daikin specific but product independent header file P1P2_Daikin_json.h supporting conversion to json format (this is included by the product-dependent header file(s)),
 - Daikin specific but product dependent header file P1P2_Daikin_json_EHYHB.h supporting conversion to json format, this file is included by the P1P2json example program,
