@@ -1,15 +1,17 @@
-/* P1P2Monitor: monitor program for reading Daikin/Rotex P1/P2 bus using P1P2Serial library
- *               * includes rudimentary code to control DHW on/off and cooling/heating on/off
- *               * the adapter behaves as an external controller like the BRP* products
- *               * Control has only been tested on EHYHBX08AAV3 and EHVX08S23D6V
+/* P1P2Monitor: Monitor for reading Daikin/Rotex P1/P2 bus using P1P2Serial library, output in json format, over UDP,
+ *           and limited control (DHW on/off, cooling/heating on/off) for some models.
+ *           Control has only been tested on EHYHBX08AAV3 and EHVX08S23D6V
+ *           If all available options are selected (SAVEHISTORY, JSON, JSONUDP, MONITOR, MONITORCONTROL) this program
+ *           too large for Arduino Uno, but will fit in an Arduino Mega.
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
- * 20190824 v0.9.6 Added limited control functionality
+ * 20190828        Fused P1P2Monitor and P1P2json-mega (with udp support provided by Budulinek)
+ * 20190827 v0.9.6 Added limited control functionality, json conversion files merged with esp8266 files
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
- * 20190817 v0.9.4 Brought in line with library 0.9.4 (API changes), print last byte if crc_gen==0, removed LCD support due to performance concerns, added config over serial
-                   See comments below for description of serial protocol
+ * 20190817 v0.9.4 Brought in line with library 0.9.4 (API changes), print last byte if crc_gen==0, added json support
+ *                 See comments below for description of serial protocol
  * 20190505 v0.9.3 Changed error handling and corrected deltabuf type in readpacket; added mod12/mod13 counters
  * 20190428 v0.9.2 Added setEcho(b), readpacket() and writepacket(); LCD support added
  * 20190409 v0.9.1 Improved setDelay()
@@ -21,15 +23,20 @@
  *
  * P1P2Monitor Configuration is done by sending one of the following lines over serial 
  *
- *    (L,W,Z are new and are for controlling DHW on/off and heating/cooling on/off:)
+ *    (L, W, Z, P are new and are for controlling DHW on/off and heating/cooling on/off:)
  * Lx sets controller functionality off (x=0), on with address 0xF0 (x=1), on with address 0xF1 (x=2)
  * Wx sets DHW on/off
  * Zx sets cooling on/off
  * Px sets the parameter number in packet type 35 (0x00..0xFF) to use for heating/cooling on/off (default 0x31 forEHVX08S23D6V, use 0x2F for EHYHBX08AAV3)
  * L reports controller status
  * W reports DHW status as reported by main controller
- * Z reports cooling status as reported by main controller
- * P reports parameter number in packet type 35 used for heating/cooling on/off
+ * Z reports cooling/heating status as reported by main controller
+ * P reports parameter number in packet type 35 used for cooling/heating on/off
+ *
+ * Ux Sets mode whether to include (in json format) unknown bits and bytes off/on (if JSON is defined) (default off)
+ * Sx Sets mode whether to include (in json format) only changed parameters (if JSON is defined) (default on)
+ * U  Display display-unknown mode (if JSON is defined)
+ * S  Display changed-only mode (if JSON is defined)
  *
  * W<hex data> Write packet (max 32 bytes) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
  * Vx Sets reading mode verbose off/on
@@ -48,7 +55,7 @@
  * These commands are case-insensitive
  * Maximum line length is 99 bytes (allowing "W 00 00 [..] 00[\r]\n" format)
  *
- *     Thanks to Krakra for providing coding suggestions, the hints and references to the HBS and MM1192 documents on
+ *     Thanks to Krakra for providing coding suggestions and UDP support, the hints and references to the HBS and MM1192 documents on
  *     https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms, 
  *     to Luis Lamich Arocas for sharing logfiles and testing the new controlling functions for the EHVX08S23D6V,
  *     and to Paul Stoffregen for publishing the AltSoftSerial library.
@@ -76,7 +83,78 @@
  * Sanguino          13        14         12
  */
 
+
+// The following options can be defined, but not all of them on Arduino Uno or the result will be too large or unstable.
+// Suggestion to either uncomment JSONUDP or MONITOR and it may just work.
+// It will fit in an Arduino Mega.
+                       // prog-size data-size   function
+                       //    kB        kB
+                       //     4       1.2       (no options selected, data-size requirement can be reduced by lowering RX_BUFFER_SIZE (value 200, *5, usage 1000 bytes) 
+                       //                                          or TX_BUFFER_SIZE (value 33, *3, usage 99 bytes) in P1P2Serial.h)
+#define SERIALDATAOUT  //     0       0          outputs data packets on serial
+#define MONITOR        //     5       0.2        outputs data (and errors, if any) on Serial output
+#define MONITORCONTROL //     1       0          controls DHW on/off and cooling/heating on/off
+#define JSON           //    14       0.2        generate JSON messages for serial or UDP
+//#define JSONUDP        //     6       0.2        transmit JSON messages over UDP (requires JSON to be defined)
+#define JSONSERIAL     //     0       0          outputs JSON messages on serial
+#define SAVEHISTORY    //     2       0.2-2.7    (data-size depends on product-dependent parameter choices) saves packet history enabling the use of "UnknownOnly" to output changed values only (no effect if JSON is not defined)
+                       // --------------------
+                       //    32       2.0-4.5    total
+
 #include <P1P2Serial.h>
+
+P1P2Serial P1P2Serial;
+
+#ifdef JSON
+// choices needed to be made before including header file:
+static bool outputunknown = 0; // whether json parameters include parameters even if functionality is unknown
+static bool changeonly =  1;   // whether json parameters are included only if changed
+                               //   (only for parameters for which savehistory() is active,
+#include "P1P2_Daikin_ParameterConversion_EHYHB.h"
+
+#ifdef JSONUDP
+// send json as an UDP message (W5500 compatible ethernet shield is required)                          
+//    Connections W5500: Arduino Mega pins 50 (MISO), 51 (MOSI), 52 (SCK), and 10 (SS) (https://www.arduino.cc/en/Reference/Ethernet)
+//                       Pin 53 (hardware SS) is not used but must be kept as output. In addition, connect RST, GND, and 5V.
+#include <Ethernet.h>
+#include <EthernetUdp.h>
+#include "NetworkParams.h"
+
+//EthernetUDP udpRecv;                                              // for future functionality....
+EthernetUDP udpSend;
+#endif /* JSONUDP */
+#endif /* JSON */
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial);      // wait for Arduino Serial Monitor to open
+  Serial.println(F("*"));
+  Serial.print(F("*P1P2"));
+// TODO Monitor/control printing
+#ifdef MONITOR
+  Serial.print(F("Monitor"));
+#ifdef MONITORCONTROL
+  Serial.print(F("+control"));
+#endif /* MONITORCONTROL */
+#endif /* MONITOR */
+#ifdef JSON
+  Serial.print(F("+json"));
+#ifdef JSONUDP
+  Serial.print(F("+udp"));
+#endif /* JSONUDP */
+#endif /* JSON */
+#ifdef SAVEHISTORY
+  Serial.print(F("+savehist"));
+#endif
+  Serial.println(F(" v0.9.6"));
+  Serial.println(F("*"));
+  P1P2Serial.begin(9600);
+#ifdef JSONUDP
+  Ethernet.begin(mac, ip);
+//  udpRecv.begin(listenPort);                                      // for future functionality...
+  udpSend.begin(sendPort);
+#endif /* JSONUDP */
+}
 
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work for the Daikin hybrid
 #define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is present or added
@@ -85,16 +163,6 @@ byte setParam = 0x31;   // Parameter in packet type 35 for switching cooling/hea
                         // 0x31 works on EHVX08S23D6V
                         // 0x2F works on EHYHBX08AAV3
 
-P1P2Serial P1P2Serial;
-
-void setup() {
-  Serial.begin(115200);
-  while (!Serial);      // wait for Arduino Serial Monitor to open
-  Serial.println(F("*"));
-  Serial.println(F("*P1P2Monitor v0.9.6 (limited controller functionality)"));
-  Serial.println(F("*"));
-  P1P2Serial.begin(9600);
-}
 
 #define RS_SIZE 99      // buffer to store data read from serial port, max line length on serial input is 99 (3 characters per byte, plus 'W" and '\r\n')
 static char RS[RS_SIZE];
@@ -108,6 +176,73 @@ static byte verbose = 1;      // By default include timing and error information
 static int sd = 0;            // for storing delay setting for each packet written
 static int sdto = 2500;       // for storing delay timeout setting
 static byte echo = 0;         // echo setting (whether written data is read back)
+
+#ifdef JSON
+static byte jsonterm = 1; // indicates whether json string has been terminated or not
+
+void process_for_mqtt_json(byte* rb, int n) {
+  char value[KEYLEN];
+  char key[KEYLEN];
+  byte cat; // used for esp not for Arduino
+  for (byte i = 3; i < n; i++) {
+    int kvrbyte = bytes2keyvalue(rb, i, 8, key, value, cat);
+    // bytes2keyvalue returns 0 if byte does not trigger any output
+    //                        1 if a new value should be output
+    //                        8 if byte should be treated per bit
+    //                        9 if json string should be terminated (intended for ESP8266, 1 json string per package)
+    if (kvrbyte == 9) {
+      // we terminate json string after each packet read so we can ignore kvrbyte=9 signal
+    } else {
+      for (byte j = 0; j < kvrbyte; j++) {
+        int kvr = ((kvrbyte == 8) ? bytes2keyvalue(rb, i, j, key, value, cat) : kvrbyte);
+        if (kvr) {
+          if (jsonterm) {
+#ifdef JSONSERIAL
+            Serial.print(F("J {\"")); 
+#endif /* JSONSERIAL */
+#ifdef JSONUDP
+            udpSend.beginPacket(sendIpAddress, remPort);
+            udpSend.print(F("{\""));
+#endif /* JSONUDP */
+            jsonterm = 0;
+          } else {
+#ifdef JSONSERIAL
+            Serial.print(F(",\""));
+#endif /* JSONSERIAL */
+#ifdef JSONUDP
+            udpSend.print(F(",\""));
+#endif /* JSONUDP */
+          }
+#ifdef JSONSERIAL
+          Serial.print(key);
+          Serial.print(F("\":"));
+          Serial.print(value);
+#endif /* JSONSERIAL */
+#ifdef JSONUDP
+          udpSend.print(key);
+          udpSend.print(F("\":"));
+          udpSend.print(value);
+#endif /* JSONUDP */
+        }
+      }
+    }
+  }
+  if (jsonterm == 0) {
+    // only terminate json string if any parameter was written
+    jsonterm = 1;
+#ifdef JSONSERIAL
+    Serial.println(F("}"));
+#endif /* JSONSERIAL */
+#ifdef JSONUDP
+    udpSend.print(F("}"));
+    udpSend.endPacket();
+#endif /* JSONUDP */
+  }
+#ifdef SAVEHISTORY
+  savehistory(rb, n);
+#endif /* SAVEHISTORY */
+}
+#endif /* JSON */
 
 // next 2 functions are used to save on dynamic memory usage in main loop
 int scanint(char* s, int &b) {
@@ -125,30 +260,31 @@ byte CONTROL_ID=0x00;
 byte setDHW = 0;
 byte setDHWstatus = 0;
 byte DHWstatus = 0;
-byte setcooling = 0;
-byte setcoolingstatus = 0;
-byte coolingstatus = 0;
+byte setcoolingheating = 0;
+byte setcoolingheatingstatus = 0;
+byte coolingheatingstatus = 0;
 
 void loop() {
   static byte crc_gen = CRC_GEN;
   static byte crc_feed = CRC_FEED;
   int temp;
   int wb = 0; int wbp = 1; int n; int wbtemp;
+#ifdef MONITOR
   if (Serial.available()) {
     byte rs = Serial.readBytesUntil('\n', RS, RS_SIZE - 1);
     if ((rs > 0) && (RS[rs-1] == '\r')) rs--;
     RS[rs] = '\0';
     if (rs) switch (RS[0]) {
-      case '\0': if (verbose) Serial.println("* Empty line received");
+      case '\0': if (verbose) Serial.println(F("* Empty line received"));
                 break;
       case '*': if (verbose) Serial.println(RS); 
                 break;
       case 'g':
       case 'G': if (verbose) Serial.print(F("* Crc_gen "));
-                if (scanhex(&RS[1],temp) == 1) { 
+                if (scanhex(&RS[1], temp) == 1) { 
                   crc_gen = temp; 
                   if (!verbose) break; 
-                  Serial.print(F("set to ")); crc_gen = temp; 
+                  Serial.print(F("set to "));
                 }
                 Serial.print("0x"); 
                 if (crc_gen <= 0x0F) Serial.print(F("0")); 
@@ -156,7 +292,7 @@ void loop() {
                 break;
       case 'h':
       case 'H': if (verbose) Serial.print(F("* Crc_feed "));
-                if (scanhex(&RS[1],temp) == 1) { 
+                if (scanhex(&RS[1], temp) == 1) { 
                   crc_feed = temp; 
                   if (!verbose) break; 
                   Serial.print(F("set to ")); 
@@ -263,43 +399,61 @@ void loop() {
       case 'z' :// set heating/cooling mode on/off
       case 'Z': if (verbose) Serial.print(F("* Cooling/heating ")); 
                 if (scanint(&RS[1], temp) == 1) {
-                  setcooling = 1;
-                  setcoolingstatus = temp;
+                  setcoolingheating = 1;
+                  setcoolingheatingstatus = temp;
                   if (!verbose) break;
                   Serial.print(F("set to ")); 
-                  Serial.println(setcoolingstatus);
+                  Serial.println(setcoolingheatingstatus);
                   break;
                 }
-                Serial.println(coolingstatus);
+                Serial.println(coolingheatingstatus);
                 break;
+#ifdef JSON
       case 'u':
-      case 'U':
+      case 'U': if (verbose) Serial.print(F("* OutputUnknown "));
+                if (scanint(&RS[1], temp) == 1) {
+                  if (temp) temp = 1;
+                  outputunknown = temp;
+                  if (!verbose) break;
+                  Serial.print(F("set to "));
+                }
+                Serial.println(outputunknown);
+                break;
       case 's':
-      case 'S': // u and x: reserved for esp configuration
+      case 'S': if (verbose) Serial.print(F("* ChangeOnly "));
+                if (scanint(&RS[1], temp) == 1) {
+                  if (temp) temp = 1;
+                  changeonly = temp;
+                  if (!verbose) break;
+                  Serial.print(F("set to"));
+                }
+                Serial.println(changeonly);
+                break;
+#endif
       default : Serial.print(F("* Command not understood: "));
                 Serial.println(RS);
                 break;
     }
   }
+#endif /* MONITOR */
   if (P1P2Serial.packetavailable()) {
     uint16_t delta;
-    int n = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, crc_gen, crc_feed);
-    // perhaps we need to remember which packets are announced in the 00F030 packet,
-    // though I think that is not necessary.
-    // if ((RB[0] == 0x00) && (RB[1] == CONTROL_ID) && (RB[2] == 0x30)) {
-    //   for (byte i = 3; i < n; i++) writeFx[i] = RB[i];
-    // }
+    int nread = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, crc_gen, crc_feed);
+#ifdef MONITOR
+#ifdef MONITORCONTROL
     byte w;
-    if ((n > 4) && (RB[0] == 0x00) && (RB[1] == CONTROL_ID) && ((RB[2] & 0x30) == 0x30)) {
+    if ((nread > 4) && (RB[0] == 0x00) && (RB[1] == CONTROL_ID) && ((RB[2] & 0x30) == 0x30)) {
       WB[0] = 0x40;
       WB[1] = RB[1];
       WB[2] = RB[2];
+      int n = nread;
       if (crc_gen) n--; // omit CRC from received-byte-counter
+      if (n > WB_SIZE) { n = WB_SIZE; Serial.print(F("* Surprise: received packet of size ")); Serial.println(nread);}
       switch (RB[2]) {
         case 0x30 : // in: 17 byte; out: 17 byte; out pattern WB[7] should contain a 01 if we want to communicate a new setting
                     for (w = 3; w < n; w++) WB[w] = 0x00;
-                    // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcooling/setDHW needs to be changed to request a F035 message
-                    if (setDHW || setcooling) WB[7] = 0x01;
+                    // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcoolingheating/setDHW needs to be changed to request a F035 message
+                    if (setDHW || setcoolingheating) WB[7] = 0x01;
                     P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
                     break;
         case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function unknown.. copy primary controller bytes for now
@@ -320,16 +474,15 @@ void loop() {
                     // parameters in the 00F035 message may indicate status changes in the heat pump
                     // A parameter consists of 3 bytes: 1 byte nr, and (likely) 2 byte value
                     // for now we only check for the following parameters: 
-                    // DHW 400000
-                    // cooling 310000
-                    // change bytes for triggering cooling on/off
+                    // DHW parameter 0x40
+                    // coolingheating parameter 0x31 or 0x2F (as defined in setParam)
                     for (w = 3; w < n; w++) WB[w] = 0xFF;
+                    // change bytes for triggering coolingheating on/off
                     w = 3;
-                    // if (cooling/DHW)  WB[3..5 (6..8)] = 31000/40000
                     if (setDHW) { WB[w++] = 0x40; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
-                    if (setcooling) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingstatus; setcooling = 0; }
+                    if (setcoolingheating) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheating = 0; }
                     P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                    for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingstatus = RB[w+2];
+                    for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
                     for (w = 3; w < n; w++) if ((RB[w] == 0x40) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
                     break;
         case 0x36 : // in: 23 byte; out 23 byte; in is parameters??; out is FF
@@ -368,19 +521,20 @@ void loop() {
         default   : // not seen
                     break;
       }
-      if (crc_gen) n++; // reverse CRC exclusion - include CRC in serial output
     }
+#endif MONITORCONTROL
+#ifdef SERIALDATAOUT
     if (verbose) {
-      Serial.print(F("R"));
+      Serial.print(F("R")); // TODO
       if (delta < 10000) Serial.print(F(" "));
-      if (delta < 1000) Serial.print(F("0")); else { Serial.print(delta / 1000);delta %= 1000; };
+      if (delta < 1000) Serial.print(F("0")); else { Serial.print(delta / 1000); delta %= 1000; };
       Serial.print(F("."));
       if (delta < 100) Serial.print(F("0"));
       if (delta < 10) Serial.print(F("0"));
       Serial.print(delta);
       Serial.print(F(": "));
     }
-    for (int i = 0;i < n;i++) {
+    for (int i = 0; i < nread; i++) {
       if (verbose && (EB[i] & ERROR_READBACK)) {
         // collision suspicion due to verification error in reading back written data
         Serial.print(F("-XX:"));
@@ -390,7 +544,7 @@ void loop() {
         Serial.print(F("-PE:"));
       }
       byte c = RB[i];
-      if (crc_gen && verbose && (i == n-1)) {
+      if (crc_gen && verbose && (i == nread - 1)) {
         Serial.print(F(" CRC="));
       }
       if (c < 0x10) Serial.print(F("0"));
@@ -405,5 +559,10 @@ void loop() {
       }
     }
     Serial.println();
+#endif /* SERIALDATAOUT */
+#endif /* MONITOR */
+#ifdef JSON
+    if (!(EB[nread - 1] & ERROR_CRC)) process_for_mqtt_json(RB, nread - 1);
+#endif /* JSON */
   }
 }
