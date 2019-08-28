@@ -1,7 +1,8 @@
 /* P1P2json-mega: Monitor for reading Daikin/Rotex P1/P2 bus using P1P2Serial library, output in json format
  *           This does not support writing as the Arduino Uno is memory-limited,
  *           also no error reporting done in this version.
- *           Does not fit on Arduino Uno; if needed change PARAMLEN to 2 in device-dependent header file; a low memory warning remains to stability may be an issue
+ *           Does not really fit on Arduino Uno; if compiled for Uno the history arrays will be limited in size,
+ *           and the option to print changed values only will work only partially, and a low memory warning remains so stability may be an issue
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
@@ -35,6 +36,8 @@
                           //   (only for parameters for which savehistory() is active,
                           //   and excluding parameters as indicated in ignorechange())
 #define udpMessages   1   // send json as an UDP message (W5500 compatible ethernet shield is required)                          
+                          //    Connections W5500: Arduino Mega pins 50 (MISO), 51 (MOSI), 52 (SCK), and 10 (SS) (https://www.arduino.cc/en/Reference/Ethernet)
+                          //                       Pin 53 (hardware SS) is not used but must be kept as output. In addition, connect RST, GND, and 5V.
 
 #include "P1P2_Daikin_ParameterConversion_EHYHB.h"
 
@@ -44,14 +47,7 @@
 
 P1P2Serial P1P2Serial;
 
-byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
-unsigned int listenPort = 10003;                                  // listening port
-unsigned int sendPort = 10000;                                    // sending port
-unsigned int remPort = 10002;                                     // remote port
-IPAddress ip(192, 168, 1, 33);                                       // IP address
-IPAddress gateway(192, 168, 1, 1);
-IPAddress subnet(255, 255, 255, 0);
-IPAddress sendIpAddress(255, 255, 255, 255);                      // remote IP or 255, 255, 255, 255 for broadcast (faster)
+#include "NetworkParams.h"
 
 EthernetUDP udpRecv;                                              // for future functionality....
 EthernetUDP udpSend;
@@ -60,7 +56,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) ; // wait for Arduino Serial Monitor to open
   Serial.println(F("*"));
-  Serial.println(F("*P1P2json-mega v0.9.6"));
+  Serial.println(F("*P1P2json v0.9.6"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
   if (udpMessages) {
@@ -85,15 +81,7 @@ void process_for_mqtt_json(byte* rb, int n) {
     //                        8 if byte should be treated per bit
     //                        9 if json string should be terminated
     if (kvrbyte == 9) {
-      // only terminate json string if there is any parameter writte
-      if (jsonterm == 0) {
-        jsonterm = 1;
-        Serial.println(F("}"));
-        if (udpMessages) {
-          udpSend.print(F("}"));
-          udpSend.endPacket();
-        }
-      }
+      // we terminate json string after each packet read so we can ignore kvrbyte=9 signal
     } else {
       for (byte j = 0; j < kvrbyte; j++) {
         int kvr = ((kvrbyte == 8) ? bytes2keyvalue(rb, i, j, key, value, cat) : kvrbyte);
@@ -118,6 +106,15 @@ void process_for_mqtt_json(byte* rb, int n) {
             udpSend.print(value);
           }
         }
+      }
+    }
+    if (jsonterm == 0) {
+      // only terminate json string if any parameter was written
+      jsonterm = 1;
+      Serial.println(F("}"));
+      if (udpMessages) {
+        udpSend.print(F("}"));
+        udpSend.endPacket();
       }
     }
   }

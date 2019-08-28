@@ -16,9 +16,18 @@ float FN_f8s8(uint8_t *b)            { return ((float)(int8_t) b[-1]) + ((float)
 #ifdef __AVR__
 #define KEY(K) strlcpy_PF(key, F(K), KEYLEN-1)
 #else /* not __AVR__ */
-//#include <pgmspace.h>
+#ifdef ESP8266
+#include <pgmspace.h>
 #define KEY(K) strlcpy(key, K, KEYLEN-1)
+#else /* ! ESP8266 */
+// assume RPi
+#define RPI
+#define KEY(K) { strncpy(key, K, KEYLEN-1); key[KEYLEN-1] = '0'; }
+#endif /* ESP8266 */
 #endif /* __AVR__ */
+
+
+
 
 // save-history pointers
 static byte rbhistory[RBHLEN];           // history storage
@@ -39,29 +48,57 @@ void savehistory(byte *rb, int n) {
     if (!savehistorylen[shi]) {
       if (savehistoryend + (n - shign) <= RBHLEN) {
         savehistoryp[shi] = savehistoryend;
+#ifdef RPI
+        printf("* Savehistory allocating %i - \n",savehistoryend);
+#else /* RPI */
         Serial.print("* Savehistory allocating ");
         Serial.print(savehistoryend);
         Serial.print("-");
+#endif /* RPI */
         savehistorylen[shi] = n - shign;
         savehistoryend += (n - shign);
+#ifdef RPI
+        printf("%i for 0x%x%x-0x%x%x\n",savehistoryend, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
+#else /* RPI */
         Serial.print(savehistoryend);
-        Serial.print(" for ");
+        Serial.print(F(" for "));
+        if (rb[0] < 0x10) Serial.print("0");
+        Serial.println(rb[0],HEX);
+        Serial.print(" ");
+        if (rb[2] < 0x10) Serial.print("0");
         Serial.println(rb[2],HEX);
+#endif /* RPI */
       } else if (savehistoryend < RBHLEN) {
         // not enough space available, store what we can
         savehistoryp[shi] = savehistoryend;
         savehistorylen[shi] = (RBHLEN - savehistoryend);
         savehistoryend += RBHLEN;
+#ifdef RPI
+        printf("* Not enough memory, shortage %i for %x%x-%x%x\n", (n-shign) + savehistoryend - RBHLEN, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
+#else /* RPI */
         Serial.print("* Not enough memory, shortage ");
-        Serial.print((n-shign) + savehistoryend - RBHLEN);
-        Serial.print(" for ");
+        Serial.print((n - shign) + savehistoryend - RBHLEN);
+        Serial.print(F(" for "));
+        if (rb[0] < 0x10) Serial.print("0");
+        Serial.println(rb[0],HEX);
+        Serial.print(" ");
+        if (rb[2] < 0x10) Serial.print("0");
         Serial.println(rb[2],HEX);
+#endif /* RPI */
       } else {
         // no space left
+#ifdef RPI
+        printf("* Warning: memory shortage %i for %x%x-%x%x\n", (n-shign), rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
+#else /* RPI */
         Serial.print("* Warning: memory shortage ");
-        Serial.print((n-shign));
-        Serial.print(" for ");
+        Serial.print((n - shign));
+        Serial.print(F(" for "));
+        if (rb[0] < 0x10) Serial.print("0");
+        Serial.println(rb[0],HEX);
+        Serial.print(" ");
+        if (rb[2] < 0x10) Serial.print("0");
         Serial.println(rb[2],HEX);
+#endif /* RPI */
       }
     }
     if (savehistorylen[shi]) {
@@ -144,7 +181,7 @@ bool newbitval(byte *rb, byte i, byte p) {
 byte handleparam(char* key, char* value, byte* rb, uint8_t i) {
   int paramnr = (((uint16_t) rb[i-1]) << 8) | rb[i-2];
   byte paramval = rb[i];
-  //if ((!outputunknown) || !newbytesval(rb, i, 1)) return 0;
+  //TODO if (!outputunknown) return 0;
   if (!newbytesval(rb, i, 0)) return 0;
   if (paramnr == 0xFFFF) return 0; // no param
   if (paramnr == 0xA2) return 0; // counter; useless?
@@ -156,7 +193,7 @@ byte handleparam(char* key, char* value, byte* rb, uint8_t i) {
 byte unknownbyte(char* key, char* value, byte* rb, uint8_t i) {
   if (!outputunknown || !newbytesval(rb, i, 1)) return 0;
   snprintf(key, KEYLEN, "Byte-0x%X%X-0x%X%X-%i", rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F, i);
-  snprintf(value, KEYLEN, "%x%x", rb[i] >> 4, rb[i] & 0x0F);
+  snprintf(value, KEYLEN, "0x%x%x", rb[i] >> 4, rb[i] & 0x0F);
   return 1;
 }
 
@@ -168,22 +205,30 @@ byte unknownbit(char* key, char* value, byte* rb, uint8_t i, uint8_t j) {
 }
 
 // macros for use in device-dependent code
-// note that snprintf(.. , "%f", ..) is not supported on Arduino/Atmega so use dtostrf instead
 #define UNKNOWN     {(cat = 0);}
 #define SETTING     {(cat = 1);}
 #define MEASUREMENT {(cat = 2);}
 #define PARAM35     {(cat = 3);}
+#define TEMPFLOWP   {(cat = 4);}
 
 #define BITBASIS         { return newbytesval(rb, i, 1) << 3; } // returns 8 if at least one bit of a byte changed, otherwise 0
 #define VALUE_u8         { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%i", rb[i]);              return 1; }
-#define VALUE_u24        { if (!newbytesval(rb, i, 3)) return 0; snprintf(value, KEYLEN, "%i", FN_u24(&rb[i]));     return 1; }
+#define VALUE_u24        { if (!newbytesval(rb, i, 3)) return 0; snprintf(value, KEYLEN, "%li", FN_u24(&rb[i]));     return 1; }
 #define VALUE_u8_add2k   { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%i", rb[i]+2000);         return 1; }
 #define VALUE_u8delta    { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%i", FN_u8delta(&rb[i])); return 1; }
-#define VALUE_flag8      { if (!newbitval(rb, i, j)) return 0; snprintf(value, KEYLEN, "%i", FN_flag8(rb[i], j)); return 1; }
+#define VALUE_flag8      { if (!newbitval(rb, i, j))   return 0; snprintf(value, KEYLEN, "%i", FN_flag8(rb[i], j)); return 1; }
+#ifdef RPI
+#define VALUE_f8_8       { if (!newbytesval(rb, i, 2)) return 0; snprintf(value, KEYLEN, "%11f", FN_f8_8(&rb[i]));  return 1; }
+#define VALUE_f8s8       { if (!newbytesval(rb, i, 2)) return 0; snprintf(value, KEYLEN, "%11f", FN_f8s8(&rb[i]));  return 1; }
+#define VALUE_u8div10    { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%11f", FN_u8div10(&rb[i])); return 1; }
+#define VALUE_F(v, ch)   { if (changeonly && !ch)      return 0; snprintf(value, KEYLEN, "%11f", v);                return 1; }
+#else /* RPI */
+// note that snprintf(.. , "%f", ..) is not supported on Arduino/Atmega so use dtostrf instead
 #define VALUE_f8_8       { if (!newbytesval(rb, i, 2)) return 0; dtostrf(FN_f8_8(&rb[i]), 1, 1, value);             return 1; }
 #define VALUE_f8s8       { if (!newbytesval(rb, i, 2)) return 0; dtostrf(FN_f8s8(&rb[i]), 1, 1, value);             return 1; }
 #define VALUE_u8div10    { if (!newbytesval(rb, i, 1)) return 0; dtostrf(FN_u8div10(&rb[i]), 1, 1, value);          return 1; }
 #define VALUE_F(v, ch)   { if (changeonly && !ch)      return 0; dtostrf(v, 1, 1, value);                           return 1; }
+#endif /* RPI */
 #define VALUE_H4         { if (!newbytesval(rb, i, 4)) return 0; snprintf(value, KEYLEN, "%X%X%X%X%X%X%X%X", rb[i-3] >> 4, rb[i-3] & 0x0F, rb[i-2] >> 4, rb[i-2] & 0x0F, rb[i-1] >> 4, rb[i-1] & 0x0F, rb[i] >> 4, rb[i] & 0x0F); return 1; }
 #define HANDLEPARAM      { PARAM35; return handleparam(key, value, rb, i);}
 #define UNKNOWNBYTE      { UNKNOWN; return unknownbyte(key, value, rb, i);}
