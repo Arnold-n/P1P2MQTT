@@ -2,7 +2,7 @@
 
 P1P2Serial reads and writes raw data packets on Daikin P1/P2 two-wire interface, and similar interfaces, using an Arduino Uno and a P1P2Serial shield. Preliminary support for parameter interpretation, json, mqtt, WiFi using an additional ESP8266. Preliminary support to switch basic functions (DHW, heating/cooling) on/off is confirmed to work on 2 specific models.
 
-**New in v0.9.6**
+**New in v0.9.7**
 
 - Improved reliability and fixed hang/hick-up bug (switch from TIMER0 to TIMER2, improved serial input handling, ignore packets with CRC error)
 - Added counter request functionality to P1P2Monitor
