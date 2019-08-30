@@ -1,6 +1,11 @@
+/* PP1P2_Daikin_ParameterConversion.h product-ndependent code
+ *                     
+ * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ *
+ */
+
 #ifndef P1P2_Daikin_json
 #define P1P2_Daikin_json
-// P1P2-Daikin-json product-independent code
 
 // these conversion functions look at the current and often also one or more past byte(s) in the byte array
 bool FN_flag8(uint8_t b, uint8_t n)  { return (b >> n) & 0x01; }
@@ -100,7 +105,7 @@ void savehistory(byte *rb, int n) {
   #endif /* RPI */
         }
       } else {
-     //         Serial.print("* ELSE savehistorylen[shi] "); Serial.println(savehistorylen[shi]);
+        // Serial.print("* savehistorylen[shi] "); Serial.println(savehistorylen[shi]);
       }
       if (savehistorylen[shi]) {
         for (byte i = shign;((i < n) && (i < shign + savehistorylen[shi])); i++) {
@@ -218,22 +223,22 @@ byte unknownbit(char* key, char* value, byte* rb, uint8_t i, uint8_t j) {
 #define TEMPFLOWP   {(cat = 4);}
 
 #define BITBASIS         { return newbytesval(rb, i, 1) << 3; } // returns 8 if at least one bit of a byte changed, otherwise 0
-#define VALUE_u8         { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%i", rb[i]);              return 1; }
-#define VALUE_u24        { if (!newbytesval(rb, i, 3)) return 0; snprintf(value, KEYLEN, "%li", FN_u24(&rb[i]));     return 1; }
-#define VALUE_u8_add2k   { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%i", rb[i]+2000);         return 1; }
-#define VALUE_u8delta    { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%i", FN_u8delta(&rb[i])); return 1; }
-#define VALUE_flag8      { if (!newbitval(rb, i, j))   return 0; snprintf(value, KEYLEN, "%i", FN_flag8(rb[i], j)); return 1; }
+#define VALUE_u8         { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%i", rb[i]);                return 1; }
+#define VALUE_u24        { if (!newbytesval(rb, i, 3)) return 0; snprintf(value, KEYLEN, "%lui", FN_u24(&rb[i]));     return 1; }
+#define VALUE_u8_add2k   { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%i", rb[i]+2000);           return 1; }
+#define VALUE_u8delta    { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%i", FN_u8delta(&rb[i]));   return 1; }
+#define VALUE_flag8      { if (!newbitval(rb, i, j))   return 0; snprintf(value, KEYLEN, "%i", FN_flag8(rb[i], j));   return 1; }
 #ifdef RPI
-#define VALUE_f8_8       { if (!newbytesval(rb, i, 2)) return 0; snprintf(value, KEYLEN, "%11f", FN_f8_8(&rb[i]));  return 1; }
-#define VALUE_f8s8       { if (!newbytesval(rb, i, 2)) return 0; snprintf(value, KEYLEN, "%11f", FN_f8s8(&rb[i]));  return 1; }
+#define VALUE_f8_8       { if (!newbytesval(rb, i, 2)) return 0; snprintf(value, KEYLEN, "%11f", FN_f8_8(&rb[i]));    return 1; }
+#define VALUE_f8s8       { if (!newbytesval(rb, i, 2)) return 0; snprintf(value, KEYLEN, "%11f", FN_f8s8(&rb[i]));    return 1; }
 #define VALUE_u8div10    { if (!newbytesval(rb, i, 1)) return 0; snprintf(value, KEYLEN, "%11f", FN_u8div10(&rb[i])); return 1; }
-#define VALUE_F(v, ch)   { if (changeonly && !ch)      return 0; snprintf(value, KEYLEN, "%11f", v);                return 1; }
+#define VALUE_F(v, ch)   { if (changeonly && !ch)      return 0; snprintf(value, KEYLEN, "%11f", v);                  return 1; }
 #else /* RPI */
 // note that snprintf(.. , "%f", ..) is not supported on Arduino/Atmega so use dtostrf instead
-#define VALUE_f8_8       { if (!newbytesval(rb, i, 2)) return 0; dtostrf(FN_f8_8(&rb[i]), 1, 2, value);             return 1; }
-#define VALUE_f8s8       { if (!newbytesval(rb, i, 2)) return 0; dtostrf(FN_f8s8(&rb[i]), 1, 1, value);             return 1; }
-#define VALUE_u8div10    { if (!newbytesval(rb, i, 1)) return 0; dtostrf(FN_u8div10(&rb[i]), 1, 1, value);          return 1; }
-#define VALUE_F(v, ch)   { if (changeonly && !ch)      return 0; dtostrf(v, 1, 1, value);                           return 1; }
+#define VALUE_f8_8       { if (!newbytesval(rb, i, 2)) return 0; dtostrf(FN_f8_8(&rb[i]), 1, 2, value);               return 1; }
+#define VALUE_f8s8       { if (!newbytesval(rb, i, 2)) return 0; dtostrf(FN_f8s8(&rb[i]), 1, 1, value);               return 1; }
+#define VALUE_u8div10    { if (!newbytesval(rb, i, 1)) return 0; dtostrf(FN_u8div10(&rb[i]), 1, 1, value);            return 1; }
+#define VALUE_F(v, ch)   { if (changeonly && !ch)      return 0; dtostrf(v, 1, 1, value);                             return 1; }
 #endif /* RPI */
 #define VALUE_H4         { if (!newbytesval(rb, i, 4)) return 0; snprintf(value, KEYLEN, "%X%X%X%X%X%X%X%X", rb[i-3] >> 4, rb[i-3] & 0x0F, rb[i-2] >> 4, rb[i-2] & 0x0F, rb[i-1] >> 4, rb[i-1] & 0x0F, rb[i] >> 4, rb[i] & 0x0F); return 1; }
 #define HANDLEPARAM      { PARAM35; return handleparam(key, value, rb, i);}

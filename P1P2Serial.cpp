@@ -3,7 +3,8 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
- * 20190823 v0.9.6 Added packetavailable()
+ * 20190829 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
+ * 20190824 v0.9.6 Added packetavailable()
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
  * 20190817 v0.9.4 Clean up, bug fixes, improved ms counter, prescaler reset added, time measurement changed, delta/error reporting separated
  * 20190505 v0.9.3 Changed error handling and corrected deltabuf type in readpacket
@@ -57,7 +58,7 @@ static uint16_t ticks_per_bit=0;
 static uint16_t ticks_per_semibit=0;
 static uint16_t ticks_per_byte_minus_ms=0;
 static uint16_t ticks_until_mid_paritybit;
-static uint16_t prescaler_ratio_timer0_timer1;
+static uint16_t prescaler_ratio_timer2_timer1;
 
 static uint8_t rx_state;
 static uint8_t rx_byte;
@@ -134,11 +135,12 @@ void P1P2Serial::begin(uint32_t baud)
   ENABLE_INT_INPUT_CAPTURE();
 
   // set up millisecond timer - code works currently only on 16MHz CPUs (and tested only on Uno/Mega)
-  TIMSK0 = (1<<OCIE0A);
-  TCCR0A = 2;  // TCT mode (WGM02:0=2); no signal on OC0A/OC0B pins
-  TCCR0B = 3;  // TCT mode (WGM02:0=2); timer0 prescaler is 64 (CS02:0=3)
-  OCR0A = 249; // timer0 counts until 249 and wraps; 16 MHz/(64*250) = 1 kHz
-  prescaler_ratio_timer0_timer1 = 64/scale;
+  // Used to work om TIMER0, which is also used for millis and readBytesUntil, so now user TIMER2 to avoid interference
+  TIMSK2 = (1<<OCIE2A); // was: TIMSK0 = (1<<OCIE0A); was: s/2/0/g
+  TCCR2A = 2;  // CTC mode (WGM02:0=2); no signal on OC2A/OC2B pins; was: s/2/0/g
+  TCCR2B = 4;  // timer2 prescaler is 64 (CS02:0=4) ( was: TCCR0B = 3;  // timer0 prescaler is 64 (CS02:0=3))
+  OCR2A = 249; // timer2 counts until 249 and wraps; 16 MHz/(64*250) = 1 kHz
+  prescaler_ratio_timer2_timer1 = 64/scale;
 
   // set up pin for LED to show parity errors
   pinMode(LED_BUILTIN, OUTPUT);
@@ -151,7 +153,7 @@ void P1P2Serial::end(void)
   flushInput();
   flushOutput();
   DISABLE_INT_COMPARE_A();
-  TIMSK0 = 0;
+  TIMSK2 = 0;
 }
 
 /****************************************/
@@ -160,7 +162,7 @@ void P1P2Serial::end(void)
 
 static uint16_t tx_setdelaytimeout = 2500;
 
-ISR(TIMER0_COMPA_vect)
+ISR(TIMER2_COMPA_vect)
 {
 // time_msec counts time in ms from the last start pulse (counting from the leading falling edge of the start pulse)
 // max count is 65535 ms (uint16_t)
@@ -264,7 +266,7 @@ void P1P2Serial::write(uint8_t b)
       CONFIG_MATCH_CLEAR();
       if (time_msec == 1) {
         // determine if we still have to wait for the end of currently received byte?
-        uint16_t ticks_wait = ticks_per_byte_minus_ms - TCNT0 * prescaler_ratio_timer0_timer1;
+        uint16_t ticks_wait = ticks_per_byte_minus_ms - TCNT2 * prescaler_ratio_timer2_timer1;
         if (ticks_wait > scheduledelay) {
           // and if so, start writing immediately after that
           t_delta = ticks_wait; 
@@ -424,7 +426,7 @@ ISR(CAPTURE_INTERRUPT)
 // state = 1..9: first possible data bit that this edge could belong to
   uint8_t state, head;
   uint16_t capture, target;
-  uint16_t offset, offset_overflow;
+  uint16_t offset_overflow;
   uint16_t startbit_delta_prev;
 
   capture = GET_INPUT_CAPTURE();
@@ -438,11 +440,11 @@ ISR(CAPTURE_INTERRUPT)
     startbit_delta_prev = startbit_delta;
     startbit_delta = time_msec;
     GTCCR = 1; // reset prescaler to improve timing accuracy of msec-timer
-    TCNT0 = 0; // start new milli-second timer measurement on falling edge of start bit
+    TCNT2 = 0; // start new milli-second timer measurement on falling edge of start bit
     time_msec = 0; // set msec counter back to 0
                    // For HBS conformant timing, we could consider to change this to
                    // time_msec = -2; (change type to signed, change 0xFFFF in ISR to 0x7FFFF)
-                   // TCNT0 = <value such that time_msec becomes 0 at end of stop bit>
+                   // TCNT2 = <value such that time_msec becomes 0 at end of stop bit>
                    // however for P1P2 the current code works fine
     // start timer for end of byte (at middle of parity bit)
     SET_COMPARE_B(capture + ticks_until_mid_paritybit);

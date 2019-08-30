@@ -24,6 +24,7 @@ setDelay	KEYWORD2
 setEcho	KEYWORD2
 readpacket	KEYWORD2
 writepacket	KEYWORD2
+readBytesUntilInclusive	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)

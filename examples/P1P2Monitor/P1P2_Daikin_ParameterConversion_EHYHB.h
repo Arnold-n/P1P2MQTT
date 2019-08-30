@@ -1,7 +1,11 @@
+/* PP1P2_Daikin_ParameterConversion_EHYHB.h product-dependent code for EHYHBX08AAV3 and perhaps other EHYHB models
+ *                     
+ * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ *
+ */
+
 #ifndef P1P2_Daikin_json_EHYHB
 #define P1P2_Daikin_json_EHYHB
-
-// P1P2-Daikin-json product-dependent code for EHYHBX08AAV3 and perhaps other EHYHB models
 
 // history size parameters (only relevant if SAVEHISTORY is defined)
 #define RBHLEN 500   // max #bytes saved to store packet payloads
@@ -190,10 +194,8 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         case  3 :             return 0;
         case  4 :             KEY("TempLWT");
                               LWT=FN_f8_8(&rb[i]);              TEMPFLOWP;   VALUE_f8_8;
-//        case  5 :             return 0;
-//        case  6 :             KEY("TempDHWQ");                  MEASUREMENT; VALUE_f8_8;
-        case  5 :             UNKNOWNBYTE;
-        case  6 :             UNKNOWNBYTE;
+        case  5 :             return 0;
+        case  6 :             KEY("TempExtOptQ");               TEMPFLOWP;   VALUE_f8_8;
         case  7 :             return 0;
         case  8 :             KEY("TempOut1");                  TEMPFLOWP;   VALUE_f8_8;
         case  9 :             return 0;
@@ -317,10 +319,10 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case  9 :           KEY("Counter2q");                 MEASUREMENT; VALUE_u24;
           case 10 :           return 0;
           case 11 :           return 0;
-          case 12 :           KEY("Counter3q");                 MEASUREMENT; VALUE_u24;
+          case 12 :           KEY("ConsElecHeating");           MEASUREMENT; VALUE_u24; // value is incorrect on my system ? or only kWh meter input?
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("ConsElec");                  MEASUREMENT; VALUE_u24;
+          case 15 :           KEY("ConsElec");                  MEASUREMENT; VALUE_u24; // value is zero on my system ?
           default :           UNKNOWNBYTE;
         }
         case 0x01 : switch (i) {                                // packet B8 subtype 01
@@ -363,7 +365,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case  3 :           return 0;
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("NoStartAttempts");           MEASUREMENT; VALUE_u24;
+          case 15 :           KEY("NrStartAttempts");           MEASUREMENT; VALUE_u24;
           default :           UNKNOWNBYTE;
         }
         case 0x05 : switch (i) {                                // packet B8 subtype 05
@@ -382,7 +384,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case 15 :           KEY("Counter9q");                 MEASUREMENT; VALUE_u24;
           case 16 :           return 0;
           case 17 :           return 0;
-          case 18 :           KEY("Counter10q");                MEASUREMENT; VALUE_u24;
+          case 18 :           KEY("BoilerNrStartsDHW");         MEASUREMENT; VALUE_u24;
           case 19 :           return 0;
           case 20 :           return 0;
           case 21 :           KEY("Counter11q");                MEASUREMENT; VALUE_u24;

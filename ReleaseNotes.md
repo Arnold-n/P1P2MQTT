@@ -1,54 +1,36 @@
 **Release notes**
 
+v0.9.7
+
+- Fixed hang/hick-up bug (switch from TIMER0 to TIMER2)
+- Improved reliability of serial input to P1P2Monitor
+- Ignore packets if CRC error detected
+- Misc improvements
+- Added counter request functionality to P1P2Monitor
+- Rewrote release note format
+
 v0.9.6
 
+- !! P1P2Monitor has limited control functionality to switch DHW on/off and heating/cooling on/off. Tested on 2 products only.
+- json functionality merged into P1P2Monitor
+- udp functionality added to P1P2Monitor
+- P1P2-bridge-esp8266 savehistory functionality expanded for F035 messages
+- P1P2-bridge-esp8266 jsonstring buffer overflow handling improved
+- Reduced Serialprint clutter from ESP via P1P2Monitor to Mqtt
+- Added packetavailable() to avoid blocking in readpacket()
 - Added documentation for x0Fx3x messages and external controller description
 - Changed byte counter in documentation: now byte counting in packet starts at 0 to match C coding convention
 - Moved generic protocol documentation to doc/README.md
 
-v0.9.4
+v0.9.5 
 
-Added documentation and improved README.
-
-**Applications**
-
-v0.9.6
-
-- P1P2Monitor has limited control functionality to switch DHW on/off and heating/cooling on/off. Tested on 2 products only.
-- P1P2-bridge-esp savehistory functionality expanded for F035 messages
-- P1P2-bridge-esp jsonstring buffer overflow handling improved
-
-v0.9.5
-
+- Changed delay behaviour and added delay timeout parameter 
 - minor bug fixed in reporting bytes to be written (missing leading zero for hex values 0A..0F)
 
 v0.9.4
 
-The combined functions in P1P2Monitor turned out to be too much for an Arduino Uno, leading to memory shortage and/or instability.
-In this version applications were separated into
-
-for ESP8266:
-- P1P2-bridge-esp8266 program for mqtt/json/serial-over-mqtt support to be used with P1P2Monitor (see SerialProtocol.md for serial protocol description)
-
-for Arduino Uno:
-- P1P2Monitor from/to serial port (see SerialProtocol.md for serial protocol description)
-- P1P2LCD for showing data on LCD display
-- P1P2json for outputting parameters in json format on serial out (no serial in/no bus writing support)
-- P1P2HardwareTest for stand-alone hardware test
-
-
-**P1P2Serial Library**
-
-v0.9.6
-
-- Added packetavailable() to avoid blocking in readpacket()
-
-v0.9.5 
-
-- Changed delay behaviour and added delay timeout parameter 
-
-v0.9.4
-
+- Added documentation and improved README.
+- The combined functions in P1P2Monitor turned out to be too much for an Arduino Uno, leading to memory shortage and/or instability - use separate example applications per function
 - new header files for LCD and json/mqtt conversion functions
 - Library clean up, deleted unused functions, deleted relation to Stream
 - several bug fixes

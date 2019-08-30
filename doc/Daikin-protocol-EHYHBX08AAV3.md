@@ -10,7 +10,7 @@ EHVX08S26CB9W: air-to-water heat pump (with cooling), functioning in weather-dep
 
 **Cycle**
 
-Each regular data cycle consists of a package, where the thermostat and heat pump take turn as transmitter in a request-response pattern. Every approximately 770ms one package of 12 (alternating) packets is communicated this way, followed by a 13th packet which requests data from an external controller - which is not present in this sytem so there is no reply.
+Each regular data cycle consists of a package, where the thermostat and heat pump take turn as transmitter in a request-response pattern. Every approximately 770ms one package of 12 (alternating) packets is communicated this way, followed by a 13th packet which requests data from an external controller - which is not present in this sytem so there is no reply, and the cycle restarts after a 140/160ms time-out period. If there is a reply to the 13th packet, additional request/response pairs are being communicated.
 
 If the user of the thermostat requests certain information in the menu items, such as energy consumed, additional packet types are inserted before such a package.
 
@@ -24,32 +24,6 @@ Each packet has a packet type (and in certain cases a subtype) to identify the p
 - B8 (+subtype) for incidental requests of consumption usage and count of operating hours
 - A1/20 for incidental requests on status of motors and operation mode
 - 21 for incidental requests on tbd
-
-**Data**
-
-The following data-types were observed:
-
-| Data type     | Definition                     |
-|---------------|:-------------------------------|
-| flag8         | byte composed of 8 single-bit flags
-| u8            | unsigned 8-bit integer 0 .. 255
-| u16           | unsigned 16-bit integer 0..65535
-| u24           | unsigned 24-bit integer 0..16777215
-| f8.8          | signed fixed point value : 1 sign bit, 7 integer bit, 8 fractional bits (two’s compliment, see explanation below)
-| f8/8          | Daikin-style fixed point value: 1st byte is value before comma, and 2nd byte is first digit after comma (see explanation below)
-| s-abs4        | Daikin-style temperature deviation: bit 4 is sign bit, bits 0-3 is absolute value of deviation
-
-Explanation of f8.8 format: a temperature of 21.5°C in f8.8 format is represented by the 2-byte value in 1/256th of a unit as 1580 hex (1580hex = 5504dec, dividing by 256 gives 21.5). A temperature of -5.25°C in f8.8 format is represented by the 2-byte value FAC0 hex (FAC0hex = - (10000hex-FACOhex) = - 0540hex = - 1344dec, dividing by 256 gives -5.25).
-
-Explanation of f8/8 format: a temperature of 21.5°C in f8/8 format is represented by the byte value of 21 (0x15) followed by the byte value of 5 (0x05). So far this format was only detected for the setpoint temperature, which is usually not negative, so we don't know how negative numbers are stored in this format.
-
-The following data-types have not yet been observed with certainty:
-
-| Data type     | Definition                    |
-|---------------|:------------------------------|
-| s8            | signed 8-bit integer -128 .. 127 (two’s compliment)
-| s16           | signed 16-bit integer -32768..32767
-
 
 **Timing between packets**
 
@@ -110,8 +84,8 @@ This timing corresponds to the description found in a design guide from Daikin w
 |    13         | 1A                            | ?
 |    14         | 00/04                         | Quiet mode            | flag8         | 2: quiet mode (off/on) |
 |    15-20      | 00                            | ?
-|    21         | 00/02/08/09                   | Pump and compressor   | flag8         | 0: compressor (off/on) <br> 3: pump (off/on) |
-|    22         | 00/02                         | DHW mode              | flag8         | 1: DHW mode (off/on)
+|    21         | 00/02/08/09                   | Pump and compressor   | flag8         | 0: compressor (off/on) <br> 3: Circ.pump (off/on) |
+|    22         | 00/02                         | DHW active            | flag8         | 1: DHW active1 (off/on) <br> 0: mode?? |
 |    23         | XX                            | CRC checksum          | u8
 
 #### 3. Packet "000011..."
@@ -138,7 +112,7 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | 11                            | packet type 11        | u8
 |   3-4         | XX YY                         | LWT temperature       | f8.8
-|   5-6         | XX YY                         | DHW temperature       | f8.8
+|   5-6         | XX YY                         | (optional external outside temp sensor?)    | f8.8
 |   7-8         | XX YY                         | Outside temperature (in 0.5 degree resolution) | f8.8 |
 |   9-10        | XX YY                         | RWT                   | f8.8 |
 |  11-12        | XX YY                         | Mid-way temperature heat pump - gas boiler | f8.8 |
@@ -178,9 +152,9 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     3         | 40                            | ?? |
 |     4         | 40                            | ?? |
 |    5-12       | 00                            | ? |
-|    13         | 00/10                         | Preference input(s) | flag8 | 4: preference kWh input
+|    13         | 00/10                         | kWh preference input(s) | flag8 | 4: preference kWh input
 |    14         | 7F                            | first packet after restart 00; else 7F | u8
-|    15         | 00/01/40/41/80/81/C1          | operating mode        | flag8 | 0: heat pump?<br>6: gas?<br> 7: DHW?
+|    15         | 00/01/40/41/80/81/C1          | operating mode        | flag8 | 0: heat pump?<br>6: gas?<br> 7: DHW active2 ?
 |    16         | 04                            | ?
 |    17-22      | 00                            | ?
 |    23         | XX                            | CRC checksum          | u8
@@ -229,7 +203,7 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     9         | 07                            | ?? first package 0x37 instead of 0x07 | u8
 |    10         | 00                            | ? |
 |    11         | 00/01/02/11                   | delta-T | s-abs4
-|    12         | 00?/02/05                     | ?? |
+|    12         | 00?/02/05                     | ?? night/eco related mode ?  7:00: 02 9:00: 05 |
 |   13-14       | 00                            | ? |
 |   15          | 00/37                         | first package 0x37 instead of 0x00 |
 |   16-17       | 00                            | ? |
@@ -242,17 +216,17 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     0         | 40                            | Response              | u8
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | 14                            | packet type 14        | u8
-|     3         | 2B                            | ?? |
-|     4         | 00                            | ? |
-|     5         | 13                            | ?? |
-|     6         | 00                            | ? |
-|     7         | 2D                            | ?? |
-|     8         | 00                            | ? |
-|     9         | 07                            | ?? |
-|    10         | 00                            | ? |
-|    11         | 03/01/02/11                   | delta-T |
-|    12         | 00/02/05                      | ?? |
-|   13-17       | 00                            | ? |
+|     3         | 2B                            | echo of 000014-03 ? |
+|     4         | 00                            | echo of 000014-04 ? |
+|     5         | 13                            | echo of 000014-05 ? |
+|     6         | 00                            | echo of 000014-06 ? |
+|     7         | 2D                            | echo of 000014-07 ? |
+|     8         | 00                            | echo of 000014-08 ? |
+|     9         | 07                            | echo of 000014-09 ? |
+|    10         | 00                            | echo of 000014-10 ? |
+|    11         | 03/01/02/11                   | echo of 000014-11 delta-T |
+|    12         | 00/02/05                      | echo of 000014-12 |
+|   13-17       | 00                            | echo of 000014-{13-17} ? |
 |   18-19       | 1C-24 00-09                   | Target temperature LWT main zone in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8
 |   20-21       | 1C-24 00-09                   | Target temperature LWT add zone  in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8
 |     23        | XX                            | CRC checksum          | u8
@@ -265,8 +239,7 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | 15                            | packet type 15        | u8
 |     3         | 00                            | ? |
-|     4         | 01/09/0A                      | operating mode?
-|     5         | F4/C4/D6/F0                   | operating mode?
+|     4-5       | 01/09/0A F4/C4/D6/F0          | operating mode? 7:30: 01D6
 |     6         | 00                            | ?
 |     7         | 03                            | ??
 |     8         | 20                            | ??
@@ -289,7 +262,7 @@ This timing corresponds to the description found in a design guide from Daikin w
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request               | u8
-|     1         | F0                            | Slave address of external controller         | u8 
+|     1         | F0                            | Slave address: external controller 0       | u8 
 |     2         | 30                            | packet type 30        | u8
 |     3-16      | 00-03                         | indicate whether additional packets "00F03x" will be sent | u8
 |     17        | XX                            | CRC checksum          | u8
@@ -303,7 +276,7 @@ F1 has been observed as 2nd external controller in some devices.
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response              | u8
-|     1         | F0                            | Slave address of external controller         | u8 
+|     1         | F0                            | Slave address: external controller 0       | u8 
 |     2         | 30                            | packet type 30        | u8
 |     3-16      | 00-01                         | indicate whether additional packets requests "00F03x" are needed; byte 3 for 00F031 .. byte 16 for 00F03E  | u8
 |     17        | XX                            | CRC checksum          | u8
@@ -311,14 +284,14 @@ F1 has been observed as 2nd external controller in some devices.
 
 # Other packets
 
-#### Packet "00F035.." and "40F035"
+#### Packet "00F035.." and "40F035.."
 
 A few hundred parameters can be exchanged via packet type 35. Some are fixed (a range of parameters is used to communicate the device ID), others are relating to operating settings. Unfortunately temperating settings are not visible here.
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 00 or 40                        | Request or response               | u8
-|     1         | F0                            | Slave address of external controller         | u8 
+|     0         | 00 or 40                      | Request or response               | u8
+|     1         | F0                            | Slave address: external controller 0       | u8 
 |     2         | 35                            | packet type 35        | u8
 |     3-20      | XX YY ZZ                      | communicates value ZZ of parameter YYXX; padding form is FFFFFF | u16 + u8
 |     21        | XX                            | CRC checksum          | u8
@@ -327,7 +300,10 @@ The parameter range for the is 0x0000-0x144.
 
 | Param nr      | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
+|    0E         | 00/01                         | Circ.pump off/on      |               |
+|    11         | 00/01                         | DHW active            |               |
 |    13         | 01                            | ?                     |               |
+|    19         | 00/01                         | kWh preference input off/on|               |
 |    21         | 01                            | ?                     |               |
 |    22         | 01                            | ?                     |               |
 |    27         | 01                            | ?                     |               |
@@ -340,6 +316,7 @@ The parameter range for the is 0x0000-0x144.
 |    40         | 00/01                         | Related to DHW on/off (setting this parameter in a 40Fx35 response to 0x00/0x01 switches DHW off/on) |               |
 |    4E         | 01                            | ?                     |               |
 |    4F         | 01                            | ?                     |               |
+|    50         | 00/01                         | DHW active            |               |
 |    55         | 03                            | ?                     |               |
 |    56         | 03                            | ?                     |               |
 |    5C         | 7F                            | ?                     |               |

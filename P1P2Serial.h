@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190829 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
  * 20190824 v0.9.6 Added packetavailable()
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
  * 20190817 v0.9.4 Clean up, bug fixes, improved ms counter, prescaler reset added, time measurement changed, delta/error reporting separated
@@ -69,8 +70,8 @@
 #define ERROR_CRC       0x08 // CRC error
 #define SIGNAL_EOB      0x10 // signaling end of block
 
-#define RX_BUFFER_SIZE 200 // read buffer overruns may occur if this is too low
-#define TX_BUFFER_SIZE 33
+#define RX_BUFFER_SIZE 50  // read buffer overruns may occur if this is too low
+#define TX_BUFFER_SIZE 33  // write buffer size
 
 class P1P2Serial
 {

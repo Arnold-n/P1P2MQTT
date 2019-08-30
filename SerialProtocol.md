@@ -5,6 +5,7 @@ For the serial communication to the Arduino Uno running P1P2Monitor or P1P2Contr
 For monitoring purposes (P1P2Monitor and P1P2Controller):
 
 - W\<hex data\> Write packet (max 32 bytes) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
+- Cx counterrequest triggers single cycle of 6 B8 packets to request counters from heat pump; temporarily blocks controller function
 - Vx Sets reading mode verbose off/on
 - Tx sets new delay value in ms, to be used for future packets (default 0)
 - Ox sets new delay timeout value in ms, to be used immediately (default 2500)
@@ -31,13 +32,14 @@ And for controlling purposes (P1P2Controller only):
 - Z reports heating/cooling status as reported by main controller
 - P reports parameter number in packet type 35 used for cooling/heating on/off
 
-These commands are case-insensitive. The maximum line length is 98 bytes (allowing "W 00 00 [..] 00\n" format for a 32-byte write packet).
+These commands are case-insensitive. The maximum line length is 98 bytes (allowing "W 00 00 [..] 00\n" format for a 32-byte write packet). A line which is longer will be ignored. When a partial line is received with a break of >5ms, the partial line and anything following it until an EOL will be ignored. The first line will also be ignored for robustness reasons.
 
-The above commands can also be used via the mqtt channel P1P2/W (response via P1P2/R) on the ESP running P1P2-bridge-esp8266. In addition, the following commands are 
-available to configure the ESP parameter conversion. These commands are captured and handled by the ESP and not forwarded to the Arduino:
+The above commands can also be used via the mqtt channel P1P2/W (response via P1P2/R) on the ESP running P1P2-bridge-esp8266.
 
-- Ux Sets mode whether to include (in json format and whether to publish on mqtt) unknown bits and bytes off/on
-- Sx Sets mode whether to repeat (in json format and whether to publish on mqtt) unchanged parameters
+In addition, the following commands are available to configure parameter conversion on the ESP or on the P1P2Monitor if JSON is compiled-in.
+The ESP captures and handles these commands and does not forward them to the Arduino.
+
+- Ux Sets mode off/on (0/1) whether to include (in json format and on ESP also on mqtt) unknown bits and bytes
+- Sx Sets mode off/on (0/1) whether to include (in json format and on ESP also on mqtt) only changed parameters
 - U  Display display-unknown mode
 - S  Display changed-only mode
-

@@ -1,14 +1,25 @@
+/* PP1P2_Daikin_ParameterConversion_EHYHB.h product-dependent code for EHYHBX08AAV3 and perhaps other EHYHB models
+ *                     
+ * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ *
+ */
+
 #ifndef P1P2_Daikin_json_EHYHB
 #define P1P2_Daikin_json_EHYHB
 
-// P1P2-Daikin-json product-dependent code for EHYHBX08AAV3 and perhaps other EHYHB models
-
-// history size parameters
-#define RBHLEN 500   // max #bytes saved (166 bytes needed for messages 0x10..0x15 below)
-#define RBHNP  18    // #of messages to be saved in historymax 127 given that shi is int8_t
-#define KEYLEN 40    // max length of key/topic or value/payload
-#define PARAMLEN 512 // nr of 00F035/00F135/40F035/40F135 params to be saved
+// history size parameters (only relevant if SAVEHISTORY is defined)
+#define RBHLEN 500   // max #bytes saved to store packet payloads
+#define PARAMLEN 512 // max nr of 00F035/00F135/40F035/40F135 params to be saved (per packet, so mem use is *4)
+#define RBHNP  18    // #of packet types of messages to be saved in historymax 127 given that shi is int8_t
 #define PARAMSTART 0 // first param nr saved
+// Reduce memory usage if the code is to be run on an Arduino Uno:
+#ifdef __AVR_ATmega328P__
+#define RBHLEN   166   // should be >= 1, 166 is sufficient for 0x10..0x15 packets
+#define PARAMLEN 1     // should be >= 1
+#define RBHNP   12     // should be >= 1, 12 is sufficient for 0x10..0x15 packets
+#endif /* __AVR_ATmega328P__ */
+
+#define KEYLEN 40    // max length of key/topic or value/payload
 
 #include "P1P2_Daikin_ParameterConversion.h" // for Daikin product-independent code
 
@@ -30,10 +41,13 @@ int8_t savehistoryindex(byte *rb) {
 // returns a value in the range of 0..(RBHNP-1) if message is to be saved as a packet
 // Example below: save messages 0x10..0x15 from sources 0x00 and 0x40
 //                save messages 0xB8_subtype 0x00-0x05 from source 0x40
+  int8_t rv;
   if ((rb[2] >= 0x10) && (rb[2] <= 0x15) && ((rb[0] & 0xBF) == 0x00)) {
-    return ((rb[2] & 0x0F) + ((rb[0] & 0x40) ? 6 : 0));
+    rv = ((rb[2] & 0x0F) + ((rb[0] & 0x40) ? 6 : 0));
+    if (rv < RBHNP) return rv; else return -1;
   } else if ((rb[2] == 0xB8) && (rb[0] == 0x40) && (rb[3] <= 0x05)) {
-    return (rb[3] + 12);
+    rv = (rb[3] + 12);
+    if (rv < RBHNP) return rv; else return -1;
   }
   if (((rb[0] & 0xBF) == 0x00) && ((rb[1] & 0xFE) == 0xF0) && (rb[2] == 0x35)) return -0x35; // for now only slave addresses 0xF0 and 0xF1
   return -1;
@@ -69,7 +83,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
 // BITBASIS (for j==8): this byte is to be treated on a bitbasis (by re-calling this function with j=0..7
 //                      switch-statement for j is needed as shown below
 //                      indicate for j=0..7: "KEY("KnownParameter"); VALUE_flag8" if bit usage is known
-//                      indicate for j=0..7: "UNKNWONBIT", key will then be set to "Bit-0x[source]-0x[packetnr]-0x[location]-[bitnr]"
+//                      indicate for j=0..7: "UNKNOWNBIT", key will then be set to "Bit-0x[source]-0x[packetnr]-0x[location]-[bitnr]"
 // BITBASIS_UNKNOWN:    shortcut for entire bit-switch statement if bit usage of all bits is unknown
 // UNKNOWNBYTE:         parameter function is unknown, key will be "Byte-0x[source]-0x[packetnr]-0x[location]"
 // VALUE_u8:            1-byte unsigned integer value at current location rb[i]
@@ -121,7 +135,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
                     case  6 : KEY("DHWoperation");              SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
-        case 21 :             KEY("DHWTarget1");                  SETTING;   VALUE_u8;
+        case 21 :             KEY("DHWTarget1");                SETTING;     VALUE_u8;
         default :             UNKNOWNBYTE;
       }
       case 0x40 : switch (i) {
@@ -157,12 +171,13 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         case 21 : switch (j) {
                     case  8 : BITBASIS;
                     case  0 : KEY("Compressor");                SETTING;     VALUE_flag8;
-                    case  3 : KEY("Pump");                      SETTING;     VALUE_flag8;
+                    case  3 : KEY("CircPump");                  SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
         case 22 : switch (j) {
                     case  8 : BITBASIS;
                     case  2 : KEY("DHWmode");                   SETTING;     VALUE_flag8;
+                    case  1 : KEY("DHW active1");               SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
         default :             UNKNOWNBYTE;
@@ -178,23 +193,23 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
       case 0x40 : switch (i) {
         case  3 :             return 0;
         case  4 :             KEY("TempLWT");
-                              LWT=FN_f8_8(&rb[i]);              MEASUREMENT; VALUE_f8_8;
+                              LWT=FN_f8_8(&rb[i]);              TEMPFLOWP;   VALUE_f8_8;
         case  5 :             return 0;
-        case  6 :             KEY("TempDHWQ");                  MEASUREMENT; VALUE_f8_8;
+        case  6 :             KEY("TempExtOptQ");               TEMPFLOWP;   VALUE_f8_8;
         case  7 :             return 0;
-        case  8 :             KEY("TempOut1");                  MEASUREMENT; VALUE_f8_8;
+        case  8 :             KEY("TempOut1");                  TEMPFLOWP;   VALUE_f8_8;
         case  9 :             return 0;
         case 10 :             KEY("TempRWT");
-                              RWT=FN_f8_8(&rb[i]);              MEASUREMENT; VALUE_f8_8;
+                              RWT=FN_f8_8(&rb[i]);              TEMPFLOWP;   VALUE_f8_8;
         case 11 :             return 0;
         case 12 :             KEY("TempMWT");
-                              MWT=FN_f8_8(&rb[i]);              MEASUREMENT; VALUE_f8_8;
+                              MWT=FN_f8_8(&rb[i]);              TEMPFLOWP;   VALUE_f8_8;
         case 13 :             return 0;
-        case 14 :             KEY("TempRefr1");                 MEASUREMENT; VALUE_f8_8;
+        case 14 :             KEY("TempRefr1");                 TEMPFLOWP;   VALUE_f8_8;
         case 15 :             return 0;
-        case 16 :             KEY("TempRoom2");                 MEASUREMENT; VALUE_f8_8;
+        case 16 :             KEY("TempRoom2");                 TEMPFLOWP;   VALUE_f8_8;
         case 17 :             return 0;
-        case 18 :             KEY("TempOut2");                  MEASUREMENT; VALUE_f8_8;
+        case 18 :             KEY("TempOut2");                  TEMPFLOWP;   VALUE_f8_8;
         default :             UNKNOWNBYTE;
       }
       default :               UNKNOWNBYTE;
@@ -223,7 +238,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
                     case  8 : BITBASIS;
                     case  0 : KEY("HeatPump1");                 SETTING;     VALUE_flag8;
                     case  6 : KEY("Gas");                       SETTING;     VALUE_flag8;
-                    case  7 : KEY("DHW");                       SETTING;     VALUE_flag8;
+                    case  7 : KEY("DHW active2");               SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
         default :             UNKNOWNBYTE;
@@ -237,7 +252,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
       case 0x40 : switch (i) {
         case  3 :             KEY("TempDHW3");                  SETTING;     VALUE_u8;
         case 12 :             KEY("Flow");
-                              Flow = rb[i] * 0.1;               MEASUREMENT; VALUE_u8div10;
+                              Flow = rb[i] * 0.1;               TEMPFLOWP;   VALUE_u8div10;
         case 13 :             // fallthrough
         case 14 :             // fallthrough
         case 15 :             return 0;
@@ -267,7 +282,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
     }
       case 0x40 : switch (i) {
         case  5 :             return 0;
-        case  6 :             KEY("Temprefr2");                 MEASUREMENT; VALUE_f8_8;
+        case  6 :             KEY("Temprefr2");                 TEMPFLOWP;   VALUE_f8_8;
         default :             UNKNOWNBYTE;
       }
       default :               UNKNOWNBYTE;
@@ -280,12 +295,12 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
                               ch = 0;
                               if (P1 != P1prev) ch = 1;
                               P1prev = P1;
-                              KEY("P1");                        MEASUREMENT; VALUE_F(P1, ch);
+                              KEY("P1");                        TEMPFLOWP;   VALUE_F(P1, ch);
       case  4 :               P2 = (MWT - RWT) * Flow * 0.07;   // power produced by heat pump boiler
                               ch = 0;
                               if (P2 != P2prev) ch = 1;
                               P2prev = P2;
-                              KEY("P2");                        MEASUREMENT; VALUE_F(P2, ch);
+                              KEY("P2");                        TEMPFLOWP;   VALUE_F(P2, ch);
       case  5 :               TERMINATEJSON;                    // terminate json string at end of package
       default :               return 0;                         // these bytes change but don't carry real information
                                                                 // they are used to request or announce further 3x packets
@@ -304,10 +319,10 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case  9 :           KEY("Counter2q");                 MEASUREMENT; VALUE_u24;
           case 10 :           return 0;
           case 11 :           return 0;
-          case 12 :           KEY("Counter3q");                 MEASUREMENT; VALUE_u24;
+          case 12 :           KEY("ConsElecHeating");           MEASUREMENT; VALUE_u24; // value is incorrect on my system ? or only kWh meter input?
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("ConsElec");                  MEASUREMENT; VALUE_u24;
+          case 15 :           KEY("ConsElec");                  MEASUREMENT; VALUE_u24; // value is zero on my system ?
           default :           UNKNOWNBYTE;
         }
         case 0x01 : switch (i) {                                // packet B8 subtype 01
@@ -350,7 +365,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case  3 :           return 0;
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("NoStartAttempts");           MEASUREMENT; VALUE_u24;
+          case 15 :           KEY("NrStartAttempts");           MEASUREMENT; VALUE_u24;
           default :           UNKNOWNBYTE;
         }
         case 0x05 : switch (i) {                                // packet B8 subtype 05
@@ -369,7 +384,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case 15 :           KEY("Counter9q");                 MEASUREMENT; VALUE_u24;
           case 16 :           return 0;
           case 17 :           return 0;
-          case 18 :           KEY("Counter10q");                MEASUREMENT; VALUE_u24;
+          case 18 :           KEY("BoilerNrStartsDHW");         MEASUREMENT; VALUE_u24;
           case 19 :           return 0;
           case 20 :           return 0;
           case 21 :           KEY("Counter11q");                MEASUREMENT; VALUE_u24;

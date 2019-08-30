@@ -4,6 +4,11 @@ P1P2Serial reads and writes raw data packets on Daikin P1/P2 two-wire interface,
 
 **New in v0.9.6**
 
+- Improved reliability and fixed hang/hick-up bug (switch from TIMER0 to TIMER2, improved serial input handling, ignore packets with CRC error)
+- Added counter request functionality to P1P2Monitor
+
+**New in v0.9.6**
+
 Control of DHW and heating/cooling: possibility to switch these functions on and off. Parameter reporting of the 35 packet type used to communicate between the main controller and auxiliary controllers.
  
 **New in v0.9.4/v0.9.5/v0.9.5+controller**

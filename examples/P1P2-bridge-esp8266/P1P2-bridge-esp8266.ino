@@ -6,6 +6,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190829 v0.9.7 Minor improvements
  * 20190824 v0.9.6 Added x0Fx35 parameter saving and reporting
  * 20190823        Separated NetworkParams.h
  * 20190817 v0.9.4 Initial version
@@ -46,12 +47,13 @@
 // Note that this program does not use the (avr only) P1P2Serial library
 // so we need to include the json header files with a relative reference below
 //
-static int changeonly = 1;    // whether json parameters are included if unchanged
-static int outputunknown = 0; // whether json parameters include parameters for which we don't know function
+static bool changeonly = 1;    // whether json parameters are included if unchanged
+static bool outputunknown = 0; // whether json parameters include parameters for which we don't know function
+#define SAVEHISTORY           // Always to be defined for ESP8266, as we have plenty of memory
 #include "P1P2_Daikin_ParameterConversion_EHYHB.h"
 
 // WiFimanager uses Serial output for debugging purposes - messages on serial output start with an asterisk
-// these messages are routes to the Arduino Uno/P1P2Monitor
+// these messages are routed to the Arduino Uno/P1P2Monitor
 // but P1P2Monitor on Arduino/ATMega ignores any serial input starting with an asterisk
 
 void configModeCallback (WiFiManager *myWiFiManager) {
@@ -174,8 +176,8 @@ void setup() {
     delay(2000);
   }
 
-  Serial.println("* [ESP] P1P2-bridge-esp8266 v0.9.6");
-  client.publish("P1P2/S","* [ESP] P1P2-bridge-esp8266 v0.9.6");
+  Serial.println("* [ESP] P1P2-bridge-esp8266 v0.9.7");
+  client.publish("P1P2/S","* [ESP] P1P2-bridge-esp8266 v0.9.7");
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -225,8 +227,8 @@ void process_for_mqtt_json(byte* rb, int n) {
     // returns 8 if byte should be treated per bit
     // returns 9 if json string should be terminated
     if (kvrbyte == 9) {
-      // only terminate json string if there is any parameter written
       if (jsonterm == 0) {
+        // only terminate json string and publish if at least one parameter was written
         jsonterm = 1;
         jsonstring[jsonstringp++] = '}';
         jsonstring[jsonstringp++] = '\0';
@@ -241,9 +243,11 @@ void process_for_mqtt_json(byte* rb, int n) {
           switch (cat) {
             case 1 : key[7] = 'P'; // parameter settings
                      break;
-            case 2 : key[7] = 'M'; // measurement, time, date, power
+            case 2 : key[7] = 'M'; // measurements, time, date
                      break;
             case 3 : key[7] = 'F'; // F related params
+                     break;
+            case 4 : key[7] = 'T'; // Temp Flow Power measurements
                      break;
             case 0 : // fallthrough
             default: key[7] = 'U'; // unknown
@@ -285,15 +289,15 @@ void loop() {
     if (client.connect("P1P2", mqttUser, mqttPassword )) {
         Serial.println("* Reconnected");
         client.subscribe("P1P2/W");
-        client.publish("P1P2/S","* [ESP] P1P2-bridge-esp8266 v0.9.6");
+        client.publish("P1P2/S","* [ESP] P1P2-bridge-esp8266 v0.9.7");
     } else {
       Serial.println("* Not reconnected");
       delay(1000);
     }
   } else {
     if (byte rb = Serial.readBytesUntil('\n', readbuf, RB)) {
-      if ((rb > 0) && (readbuf[rb-1] == '\r')) rb--;
-      if (rb < RB) readbuf[rb++] = '\0'; else readbuf[RB-1] = '\0';
+      if ((rb > 0) && (readbuf[rb - 1] == '\r')) rb--;
+      if (rb < RB) readbuf[rb++] = '\0'; else readbuf[RB - 1] = '\0';
       if (readbuf[0] == 'R') {
         client.publish("P1P2/R", readbuf, rb);
       } else {
@@ -301,8 +305,8 @@ void loop() {
       }
       int rbp = 0;
       int n, rbtemp;
-      if ((rb >= 10) && (readbuf[7] == ':')) rbp=9;
-      byte rh=0;
+      if ((rb >= 10) && (readbuf[7] == ':')) rbp = 9;
+      byte rh = 0;
       // dirty trick: check for space in serial input to avoid that " CRC" in input is recognized as hex value 0x0C...
       while ((rh < HB) && (readbuf[rbp] != ' ') && (sscanf(readbuf + rbp, "%2x%n", &rbtemp, &n) == 1)) {
         readhex[rh++] = rbtemp;

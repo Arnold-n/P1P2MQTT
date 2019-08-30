@@ -7,6 +7,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190829 v0.9.7 Improved Serial input handling, added B8 counter request
  * 20190828        Fused P1P2Monitor and P1P2json-mega (with udp support provided by Budulinek)
  * 20190827 v0.9.6 Added limited control functionality, json conversion files merged with esp8266 files
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
@@ -20,6 +21,8 @@
  *
  * Serial protocol from/to Arduino Uno/Mega:
  * -----------------------------------------
+ *
+ *
  *
  * P1P2Monitor Configuration is done by sending one of the following lines over serial 
  *
@@ -39,6 +42,7 @@
  * S  Display changed-only mode (if JSON is defined)
  *
  * W<hex data> Write packet (max 32 bytes) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
+ * Cx counterrequest triggers single cycle of 6 B8 packets to request counters from heat pump; temporarily blocks controller function
  * Vx Sets reading mode verbose off/on
  * Tx sets new delay value, to be used for future packets (default 0)
  * Ox sets new delay timeout value, used immediately (default 2500)
@@ -94,10 +98,10 @@
 #define SERIALDATAOUT  //     0       0          outputs data packets on serial
 #define MONITOR        //     5       0.2        outputs data (and errors, if any) on Serial output
 #define MONITORCONTROL //     1       0          controls DHW on/off and cooling/heating on/off
-#define JSON           //    14       0.2        generate JSON messages for serial or UDP
-//#define JSONUDP        //     6       0.2        transmit JSON messages over UDP (requires JSON to be defined)
-#define JSONSERIAL     //     0       0          outputs JSON messages on serial
-#define SAVEHISTORY    //     2       0.2-2.7    (data-size depends on product-dependent parameter choices) saves packet history enabling the use of "UnknownOnly" to output changed values only (no effect if JSON is not defined)
+//#define JSON           //    14       0.2        generate JSON messages for serial or UDP
+//#define JSONUDP        //     6       0.2        transmit JSON messages over UDP (requires JSON to be defined, tested on Mega+W5500 ethernet shield)
+//#define JSONSERIAL     //     0       0          outputs JSON messages on serial
+//#define SAVEHISTORY    //     2       0.2-2.7    (data-size depends on product-dependent parameter choices) saves packet history enabling the use of "UnknownOnly" to output changed values only (no effect if JSON is not defined)
                        // --------------------
                        //    32       2.0-4.5    total
 
@@ -125,9 +129,38 @@ EthernetUDP udpSend;
 #endif /* JSONUDP */
 #endif /* JSON */
 
+// copied from Stream.cpp, adapted to have readBytesUntil() include the terminator character:
+// with the regular Serial.readBytesUntil(), we can't distinguish a time-out from a terminated string which is not too long
+int timedRead()
+{
+  static unsigned long startMillis;
+  int c;
+  startMillis = millis();
+  do {
+    c = Serial.read();
+    if (c >= 0) return c;
+  } while(millis() - startMillis < 5); // timeout 5 ms
+  return -1;     // -1 indicates timeout
+}
+
+size_t readBytesUntilIncluding(char terminator, char *buffer, size_t length)
+{
+  if (length < 1) return 0;
+  size_t index = 0;
+  while (index < length) {
+    int c = timedRead();
+    if (c < 0) break;
+    *buffer++ = (char)c;
+    index++;
+    if (c == terminator) break;
+  }
+  return index; // return number of characters, not including null terminator
+}
+
 void setup() {
   Serial.begin(115200);
   while (!Serial);      // wait for Arduino Serial Monitor to open
+  // Serial.setTimeout(5); // hardcoded in timedRead above
   Serial.println(F("*"));
   Serial.print(F("*P1P2"));
 // TODO Monitor/control printing
@@ -142,11 +175,14 @@ void setup() {
 #ifdef JSONUDP
   Serial.print(F("+udp"));
 #endif /* JSONUDP */
+#ifdef JSONSERIAL
+  Serial.print(F("+serial"));
+#endif /* JSONSERIAL */
 #endif /* JSON */
 #ifdef SAVEHISTORY
   Serial.print(F("+savehist"));
 #endif
-  Serial.println(F(" v0.9.6"));
+  Serial.println(F(" v0.9.7"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
 #ifdef JSONUDP
@@ -263,266 +299,300 @@ byte DHWstatus = 0;
 byte setcoolingheating = 0;
 byte setcoolingheatingstatus = 0;
 byte coolingheatingstatus = 0;
+byte counterrequest = 0;
 
 void loop() {
   static byte crc_gen = CRC_GEN;
   static byte crc_feed = CRC_FEED;
   int temp;
   int wb = 0; int wbp = 1; int n; int wbtemp;
+  static byte ignoreremainder = 1; // 1 is more robust to avoid misreading a partial message upon reboot, but be aware the first line received will be ignored.
 #ifdef MONITOR
   if (Serial.available()) {
-    byte rs = Serial.readBytesUntil('\n', RS, RS_SIZE - 1);
-    if ((rs > 0) && (RS[rs-1] == '\r')) rs--;
-    RS[rs] = '\0';
-    if (rs) switch (RS[0]) {
-      case '\0': if (verbose) Serial.println(F("* Empty line received"));
-                break;
-      case '*': if (verbose) Serial.println(RS); 
-                break;
-      case 'g':
-      case 'G': if (verbose) Serial.print(F("* Crc_gen "));
-                if (scanhex(&RS[1], temp) == 1) { 
-                  crc_gen = temp; 
-                  if (!verbose) break; 
-                  Serial.print(F("set to "));
-                }
-                Serial.print("0x"); 
-                if (crc_gen <= 0x0F) Serial.print(F("0")); 
-                Serial.println(crc_gen, HEX);
-                break;
-      case 'h':
-      case 'H': if (verbose) Serial.print(F("* Crc_feed "));
-                if (scanhex(&RS[1], temp) == 1) { 
-                  crc_feed = temp; 
-                  if (!verbose) break; 
-                  Serial.print(F("set to ")); 
-                }
-                Serial.print("0x"); 
-                if (crc_feed <= 0x0F) Serial.print(F("0")); 
-                Serial.println(crc_feed, HEX);
-                break;
-      case 'v':
-      case 'V': Serial.print(F("* Verbose "));
-                if (scanint(&RS[1], temp) == 1) {
-                  if (temp) temp = 1;
-                  Serial.print(F("set to "));
-                  verbose = temp;
-                }
-                Serial.println(verbose);
-                break;
-      case 't':
-      case 'T': if (verbose) Serial.print(F("* Delay "));
-                if (scanint(&RS[1], sd) == 1) { 
-                  if (!verbose) break; 
-                  Serial.print(F("set to "));
-                }
-                Serial.println(sd);
-                break;
-      case 'o':
-      case 'O': if (verbose) Serial.print(F("* DelayTimeout "));
-                if (scanint(&RS[1], sdto) == 1) { 
-                  P1P2Serial.setDelayTimeout(sdto); 
-                  if (!verbose) break; 
-                  Serial.print(F("set to ")); 
-                }
-                Serial.println(sdto);
-                break;
-      case 'x':
-      case 'X': if (verbose) Serial.print(F("* Echo "));
-                if (scanint(&RS[1], temp) == 1) {
-                  if (temp) temp = 1;
-                  echo = temp;
-                  P1P2Serial.setEcho(echo);
-                  if (!verbose) break;
-                  Serial.print(F("set to "));
-                }
-                Serial.println(echo);
-                break;
-      case 'w':
-      case 'W': if (CONTROL_ID) {
-                  if (verbose) Serial.println(F("* Write refused; controller is on")); 
-                  break;
-                } // don't write while controller is on
-                if (verbose) Serial.print(F("* Writing: "));
-                while ((wb < WB_SIZE) && (sscanf(&RS[wbp], "%2x%n", &wbtemp, &n) == 1)) {
-                  WB[wb++] = wbtemp;
-                  wbp += n;
-                  if (verbose) { 
-                    if (wbtemp <= 0x0F) Serial.print("0"); 
-                    Serial.print(wbtemp, HEX);
-                  }
-                }
-                if (verbose) Serial.println();
-                P1P2Serial.writepacket(WB, wb, sd, crc_gen, crc_feed);
-                break;
-      case 'l': // set external controller answering function on/off and set CONTROL_ID address
-      case 'L': if (verbose) Serial.print(F("* Control_id ")); 
-                if (scanint(&RS[1], temp) == 1) {
-                  if (temp > 2) temp = 2; 
-                  switch (temp) {
-                    case 0 : CONTROL_ID = 0x00; break;
-                    case 1 : CONTROL_ID = CONTROL_ID0; break;
-                    case 2 : CONTROL_ID = CONTROL_ID1; break;
-                    default: break;
-                  }
-                  if (!verbose) break;
-                  Serial.print(F("set to 0x")); 
-                }
-                Serial.print("0x");
-                if (CONTROL_ID <= 0x0F) Serial.print(F("0")); 
-                Serial.println(CONTROL_ID, HEX);
-                break;
-                
-      case 'y': // set DHW on/off
-      case 'Y': if (verbose) Serial.print(F("* DHW ")); 
-                if (scanint(&RS[1], temp) == 1) {
-                  setDHW = 1;
-                  setDHWstatus = temp;
-                  if (!verbose) break;
-                  Serial.print(F("set to ")); 
-                  Serial.println(setDHWstatus);
-                  break;
-                }
-                Serial.println(DHWstatus);
-                break;
-      case 'p': // select parameter to write in z step below
-      case 'P': if (verbose) Serial.print(F("* Param2Write ")); 
-                if (scanhex(&RS[1], temp) == 1) {
-                  setParam = temp;
-                  if (!verbose) break;
-                  Serial.print(F("set to 0x")); 
-                  Serial.println(setParam, HEX);
-                  break;
-                }
-                Serial.println(setParam, HEX);
-                break;
-      case 'z' :// set heating/cooling mode on/off
-      case 'Z': if (verbose) Serial.print(F("* Cooling/heating ")); 
-                if (scanint(&RS[1], temp) == 1) {
-                  setcoolingheating = 1;
-                  setcoolingheatingstatus = temp;
-                  if (!verbose) break;
-                  Serial.print(F("set to ")); 
-                  Serial.println(setcoolingheatingstatus);
-                  break;
-                }
-                Serial.println(coolingheatingstatus);
-                break;
+    byte rs = readBytesUntilIncluding('\n', RS, RS_SIZE - 1);
+    if (rs > 0) {
+      if (ignoreremainder) { 
+        // we should ignore this serial input block except for this check:
+        // if this message ends with a '\n', we should act on next serial input
+        if (RS[rs - 1] == '\n') ignoreremainder = 0;
+      } else if (RS[rs - 1] != '\n') {
+        // message not terminated with '\n', too long or interrupted, so ignore
+        ignoreremainder = 1; // message without \n, ignore next input(s)
+        if (verbose) {
+          Serial.println(F("* Input line too long, interrupted or not EOL-terminated, ignored"));
+        }
+      } else {
+        if ((--rs > 0) && (RS[rs - 1] == '\r')) rs--;
+        RS[rs] = '\0';
+        switch (RS[0]) {
+          case '\0': if (verbose) Serial.println(F("* Empty line received"));
+                    break;
+          case '*': if (verbose) Serial.println(RS); 
+                    break;
+          case 'g':
+          case 'G': if (verbose) Serial.print(F("* Crc_gen "));
+                    if (scanhex(&RS[1], temp) == 1) { 
+                      crc_gen = temp; 
+                      if (!verbose) break; 
+                      Serial.print(F("set to "));
+                    }
+                    Serial.print("0x"); 
+                    if (crc_gen <= 0x0F) Serial.print(F("0")); 
+                    Serial.println(crc_gen, HEX);
+                    break;
+          case 'h':
+          case 'H': if (verbose) Serial.print(F("* Crc_feed "));
+                    if (scanhex(&RS[1], temp) == 1) { 
+                      crc_feed = temp; 
+                      if (!verbose) break; 
+                      Serial.print(F("set to ")); 
+                    }
+                    Serial.print("0x"); 
+                    if (crc_feed <= 0x0F) Serial.print(F("0")); 
+                    Serial.println(crc_feed, HEX);
+                    break;
+          case 'v':
+          case 'V': Serial.print(F("* Verbose "));
+                    if (scanint(&RS[1], temp) == 1) {
+                      if (temp) temp = 1;
+                      Serial.print(F("set to "));
+                      verbose = temp;
+                    }
+                    Serial.println(verbose);
+                    break;
+          case 't':
+          case 'T': if (verbose) Serial.print(F("* Delay "));
+                    if (scanint(&RS[1], sd) == 1) { 
+                      if (!verbose) break; 
+                      Serial.print(F("set to "));
+                    }
+                    Serial.println(sd);
+                    break;
+          case 'o':
+          case 'O': if (verbose) Serial.print(F("* DelayTimeout "));
+                    if (scanint(&RS[1], sdto) == 1) { 
+                      P1P2Serial.setDelayTimeout(sdto); 
+                      if (!verbose) break; 
+                      Serial.print(F("set to ")); 
+                    }
+                    Serial.println(sdto);
+                    break;
+          case 'x':
+          case 'X': if (verbose) Serial.print(F("* Echo "));
+                    if (scanint(&RS[1], temp) == 1) {
+                      if (temp) temp = 1;
+                      echo = temp;
+                      P1P2Serial.setEcho(echo);
+                      if (!verbose) break;
+                      Serial.print(F("set to "));
+                    }
+                    Serial.println(echo);
+                    break;
+          case 'w':
+          case 'W': if (CONTROL_ID) {
+                      if (verbose) Serial.println(F("* Write refused; controller is on")); 
+                      break;
+                    } // don't write while controller is on
+                    if (verbose) Serial.print(F("* Writing: "));
+                    while ((wb < WB_SIZE) && (sscanf(&RS[wbp], "%2x%n", &wbtemp, &n) == 1)) {
+                      WB[wb++] = wbtemp;
+                      wbp += n;
+                      if (verbose) { 
+                        if (wbtemp <= 0x0F) Serial.print("0"); 
+                        Serial.print(wbtemp, HEX);
+                      }
+                    }
+                    if (verbose) Serial.println();
+                    P1P2Serial.writepacket(WB, wb, sd, crc_gen, crc_feed);
+                    break;
+          case 'l': // set external controller answering function on/off and set CONTROL_ID address
+          case 'L': if (verbose) Serial.print(F("* Control_id ")); 
+                    if (scanint(&RS[1], temp) == 1) {
+                      if (temp > 2) temp = 2; 
+                      switch (temp) {
+                        case 0 : CONTROL_ID = 0x00; break;
+                        case 1 : CONTROL_ID = CONTROL_ID0; break;
+                        case 2 : CONTROL_ID = CONTROL_ID1; break;
+                        default: break;
+                      }
+                      if (!verbose) break;
+                      Serial.print(F("set to 0x")); 
+                    }
+                    Serial.print("0x");
+                    if (CONTROL_ID <= 0x0F) Serial.print(F("0")); 
+                    Serial.println(CONTROL_ID, HEX);
+                    break;
+                    
+          case 'y': // set DHW on/off
+          case 'Y': if (verbose) Serial.print(F("* DHW ")); 
+                    if (scanint(&RS[1], temp) == 1) {
+                      setDHW = 1;
+                      setDHWstatus = temp;
+                      if (!verbose) break;
+                      Serial.print(F("set to ")); 
+                      Serial.println(setDHWstatus);
+                      break;
+                    }
+                    Serial.println(DHWstatus);
+                    break;
+          case 'p': // select parameter to write in z step below
+          case 'P': if (verbose) Serial.print(F("* Param2Write ")); 
+                    if (scanhex(&RS[1], temp) == 1) {
+                      setParam = temp;
+                      if (!verbose) break;
+                      Serial.print(F("set to 0x")); 
+                      Serial.println(setParam, HEX);
+                      break;
+                    }
+                    Serial.println(setParam, HEX);
+                    break;
+          case 'c': // set counterrequest cycle
+          case 'C': if (verbose) Serial.print(F("* Counterrequest ")); 
+                    if (scanint(&RS[1], temp) == 1) {
+                      if (temp) temp = 1;
+                      counterrequest = temp;
+                      if (!verbose) break;
+                      Serial.println(F(" cycle initited")); 
+                    }
+                    break;
+          case 'z': // set heating/cooling mode on/off
+          case 'Z': if (verbose) Serial.print(F("* Cooling/heating ")); 
+                    if (scanint(&RS[1], temp) == 1) {
+                      setcoolingheating = 1;
+                      setcoolingheatingstatus = temp;
+                      if (!verbose) break;
+                      Serial.print(F("set to ")); 
+                      Serial.println(setcoolingheatingstatus);
+                      break;
+                    }
+                    Serial.println(coolingheatingstatus);
+                    break;
 #ifdef JSON
-      case 'u':
-      case 'U': if (verbose) Serial.print(F("* OutputUnknown "));
-                if (scanint(&RS[1], temp) == 1) {
-                  if (temp) temp = 1;
-                  outputunknown = temp;
-                  if (!verbose) break;
-                  Serial.print(F("set to "));
-                }
-                Serial.println(outputunknown);
-                break;
-      case 's':
-      case 'S': if (verbose) Serial.print(F("* ChangeOnly "));
-                if (scanint(&RS[1], temp) == 1) {
-                  if (temp) temp = 1;
-                  changeonly = temp;
-                  if (!verbose) break;
-                  Serial.print(F("set to"));
-                }
-                Serial.println(changeonly);
-                break;
+          case 'u':
+          case 'U': if (verbose) Serial.print(F("* OutputUnknown "));
+                    if (scanint(&RS[1], temp) == 1) {
+                      if (temp) temp = 1;
+                      outputunknown = temp;
+                      if (!verbose) break;
+                      Serial.print(F("set to "));
+                    }
+                    Serial.println(outputunknown);
+                    break;
+          case 's':
+          case 'S': if (verbose) Serial.print(F("* ChangeOnly "));
+                    if (scanint(&RS[1], temp) == 1) {
+                      if (temp) temp = 1;
+                      changeonly = temp;
+                      if (!verbose) break;
+                      Serial.print(F("set to"));
+                    }
+                    Serial.println(changeonly);
+                    break;
 #endif
-      default : Serial.print(F("* Command not understood: "));
-                Serial.println(RS);
-                break;
+          default:  Serial.print(F("* Command not understood: "));
+                    Serial.println(RS);
+                    break;
+        }
+      }
     }
   }
 #endif /* MONITOR */
-  if (P1P2Serial.packetavailable()) {
+  while (P1P2Serial.packetavailable()) {
     uint16_t delta;
     int nread = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, crc_gen, crc_feed);
 #ifdef MONITOR
 #ifdef MONITORCONTROL
-    byte w;
-    if ((nread > 4) && (RB[0] == 0x00) && (RB[1] == CONTROL_ID) && ((RB[2] & 0x30) == 0x30)) {
-      WB[0] = 0x40;
-      WB[1] = RB[1];
-      WB[2] = RB[2];
-      int n = nread;
-      if (crc_gen) n--; // omit CRC from received-byte-counter
-      if (n > WB_SIZE) { n = WB_SIZE; Serial.print(F("* Surprise: received packet of size ")); Serial.println(nread);}
-      switch (RB[2]) {
-        case 0x30 : // in: 17 byte; out: 17 byte; out pattern WB[7] should contain a 01 if we want to communicate a new setting
-                    for (w = 3; w < n; w++) WB[w] = 0x00;
-                    // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcoolingheating/setDHW needs to be changed to request a F035 message
-                    if (setDHW || setcoolingheating) WB[7] = 0x01;
-                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                    break;
-        case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function unknown.. copy primary controller bytes for now
-                    for (w = 3; w < n; w++) WB[w] = RB[w];
-                    WB[7] = 0xB4;
-                    WB[8] = 0x10; // could be part of serial nr? If so, would it matter that we use the same nr as the BRP?
-                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                    break;
-        case 0x32 : // in: 19 byte: out 19 byte, out is copy in
-                    for (w = 3; w < n; w++) WB[w] = RB[w];
-                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                    break;
-        case 0x33 : // not seen
-                    break;
-        case 0x34 : // not seen
-                    break;
-        case 0x35 : // in: 21 byte; out 21 byte; in is parameters; out is FF except for first packet which starts with 930000 (why?)
-                    // parameters in the 00F035 message may indicate status changes in the heat pump
-                    // A parameter consists of 3 bytes: 1 byte nr, and (likely) 2 byte value
-                    // for now we only check for the following parameters: 
-                    // DHW parameter 0x40
-                    // coolingheating parameter 0x31 or 0x2F (as defined in setParam)
-                    for (w = 3; w < n; w++) WB[w] = 0xFF;
-                    // change bytes for triggering coolingheating on/off
-                    w = 3;
-                    if (setDHW) { WB[w++] = 0x40; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
-                    if (setcoolingheating) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheating = 0; }
-                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                    for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
-                    for (w = 3; w < n; w++) if ((RB[w] == 0x40) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
-                    break;
-        case 0x36 : // in: 23 byte; out 23 byte; in is parameters??; out is FF
-                    // fallthrough
-        case 0x37 : // not seen, but we still reply with a packet with the same length and only FF as payload for devices that do request this type of message
-                    // fallthrough
-        case 0x38 : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
-                    // but let's also reply with a packet with the same length and only FF as payload
-                    // fallthrough
-        case 0x39 : // in: 21 byte; out 21 byte; in is parameters??; out is FF
-                    // fallthrough
-        case 0x3A : // in: 21 byte; out 21 byte; in is parameters??; out is FF
-                    // fallthrough
-        case 0x3B : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
-                    // but let's also reply with a packet with the same length and only FF as payload
-                    // fallthrough
-        case 0x3C : // in: 23 byte; out 23 byte; in is parameters??; out is FF
-                    // fallthrough
-        case 0x3D : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
-                    // but let's also reply with a packet with the same length and only FF as payload
-                    for (w = 3; w < n - 1; w++) WB[w] = 0xFF;
-                    P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                    break;
-        case 0x3E : if (RB[3]) {
-                      // 0x3E01, 0x3E02, ... in: 23 byte; out: 23 byte; out 40F13E01(even for higher) + 19xFF
-                      WB[3] = 0x01;
-                      for (w = 4; w < n; w++) WB[w] = 0xFF;
+    if (!(EB[nread - 1] & ERROR_CRC)) {
+      byte w;
+      if ((counterrequest) && (nread > 4) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30)) {
+        WB[0] = 0x00;
+        WB[1] = 0x00;
+        WB[2] = 0xB8;
+        WB[3] = (counterrequest - 1);
+        P1P2Serial.writepacket(WB, 4, 10, crc_gen, crc_feed);
+        if (++counterrequest == 7) counterrequest = 0;
+      } else if ((nread > 4) && (RB[0] == 0x00) && (RB[1] == CONTROL_ID) && ((RB[2] & 0x30) == 0x30)) {
+        WB[0] = 0x40;
+        WB[1] = RB[1];
+        WB[2] = RB[2];
+        int n = nread;
+        if (crc_gen) n--; // omit CRC from received-byte-counter
+        if (n > WB_SIZE) { n = WB_SIZE; Serial.print(F("* Surprise: received packet of size ")); Serial.println(nread);}
+        switch (RB[2]) {
+          case 0x30 : // in: 17 byte; out: 17 byte; out pattern WB[7] should contain a 01 if we want to communicate a new setting
+                      for (w = 3; w < n; w++) WB[w] = 0x00;
+                      // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcoolingheating/setDHW needs to be changed to request a F035 message
+                      if (setDHW || setcoolingheating) WB[7] = 0x01;
                       P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                    } else {
-                      // 0x3E00 in: 8 byte out: 8 byte; 40F13E00 (4x FF)
-                      WB[3] = 0x00;
-                      for (w = 4; w < n; w++) WB[w] = 0xFF;
+                      break;
+          case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function unknown.. copy primary controller bytes for now
+                      for (w = 3; w < n; w++) WB[w] = RB[w];
+                      WB[7] = 0xB4;
+                      WB[8] = 0x10; // could be part of serial nr? If so, would it matter that we use the same nr as the BRP?
                       P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                    }
-                    break;
-        default   : // not seen
-                    break;
+                      break;
+          case 0x32 : // in: 19 byte: out 19 byte, out is copy in
+                      for (w = 3; w < n; w++) WB[w] = RB[w];
+                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                      break;
+          case 0x33 : // not seen
+                      break;
+          case 0x34 : // not seen
+                      break;
+          case 0x35 : // in: 21 byte; out 21 byte; in is parameters; out is FF except for first packet which starts with 930000 (why?)
+                      // parameters in the 00F035 message may indicate status changes in the heat pump
+                      // A parameter consists of 3 bytes: 1 byte nr, and (likely) 2 byte value
+                      // for now we only check for the following parameters: 
+                      // DHW parameter 0x40
+                      // coolingheating parameter 0x31 or 0x2F (as defined in setParam)
+                      for (w = 3; w < n; w++) WB[w] = 0xFF;
+                      // change bytes for triggering coolingheating on/off
+                      w = 3;
+                      if (setDHW) { WB[w++] = 0x40; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
+                      if (setcoolingheating) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheating = 0; }
+                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                      for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
+                      for (w = 3; w < n; w++) if ((RB[w] == 0x40) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
+                      break;
+          case 0x36 : // in: 23 byte; out 23 byte; in is parameters??; out is FF
+                      // fallthrough
+          case 0x37 : // not seen, but we still reply with a packet with the same length and only FF as payload for devices that do request this type of message
+                      // fallthrough
+          case 0x38 : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
+                      // but let's also reply with a packet with the same length and only FF as payload
+                      // fallthrough
+          case 0x39 : // in: 21 byte; out 21 byte; in is parameters??; out is FF
+                      // fallthrough
+          case 0x3A : // in: 21 byte; out 21 byte; in is parameters??; out is FF
+                      // fallthrough
+          case 0x3B : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
+                      // but let's also reply with a packet with the same length and only FF as payload
+                      // fallthrough
+          case 0x3C : // in: 23 byte; out 23 byte; in is parameters??; out is FF
+                      // fallthrough
+          case 0x3D : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
+                      // but let's also reply with a packet with the same length and only FF as payload
+                      for (w = 3; w < n - 1; w++) WB[w] = 0xFF;
+                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                      break;
+          case 0x3E : if (RB[3]) {
+                        // 0x3E01, 0x3E02, ... in: 23 byte; out: 23 byte; out 40F13E01(even for higher) + 19xFF
+                        WB[3] = 0x01;
+                        for (w = 4; w < n; w++) WB[w] = 0xFF;
+                        P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                      } else {
+                        // 0x3E00 in: 8 byte out: 8 byte; 40F13E00 (4x FF)
+                        WB[3] = 0x00;
+                        for (w = 4; w < n; w++) WB[w] = 0xFF;
+                        P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
+                      }
+                      break;
+          default   : // not seen
+                      break;
+        }
       }
     }
-#endif MONITORCONTROL
+#endif /* MONITORCONTROL */
 #ifdef SERIALDATAOUT
     if (verbose) {
       Serial.print(F("R")); // TODO
