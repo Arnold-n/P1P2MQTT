@@ -12,7 +12,7 @@ bool FN_flag8(uint8_t b, uint8_t n)  { return (b >> n) & 0x01; }
 uint32_t FN_u24(uint8_t *b)          { return ((b[-2] << 16) | ((b[-1]) << 8) | (b[0]));}
 uint16_t FN_u16(uint8_t *b)          { return (                ((b[-1]) << 8) | (b[0]));}
 int8_t FN_u8delta(uint8_t *b)        { int c=b[0]; if (c & 0x10) return -(c & 0x0F); else return (c & 0x0F); }
-float FN_u8div10(uint8_t *b)         { return b[0] * 0.1;}
+float FN_u8div10(uint8_t *b)         { if (b[-1] == 0xFF) return 0; else return b[0] * 0.1;}
 float FN_f8_8(uint8_t *b)            { return (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
 
 
