@@ -110,7 +110,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
       case 0x00 : switch (i) {
         case  3 : switch (j) {
                     case  8 : BITBASIS;
-                    case  0 : KEY("HeatingOn1");                  SETTING;     VALUE_flag8;
+                    case  0 : KEY("HeatingOn1");                SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
         case  4 : switch (j) {
@@ -121,25 +121,25 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
                   }
         case  5 : switch (j) {
                     case  8 : BITBASIS;
-                    case  0 : KEY("DHWon");                  SETTING;     VALUE_flag8;
+                    case  0 : KEY("DHWon");                     SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
         case 10 :             KEY("RoomTarget1");                            VALUE_u8;
         case 12 :             // fallthrough
         case 13 : switch (j) {
                     case  8 : BITBASIS;
-                    case  2 : KEY("QuietMode1");                  SETTING;     VALUE_flag8;
+                    case  2 : KEY("QuietMode1");                SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
         case 15 :             // fallthrough
         case 18 :             BITBASIS_UNKNOWN;
         case 20 : switch (j) {
                     case  8 : BITBASIS;
-                    case  1 : KEY("DHWboosterActive");                SETTING;     VALUE_flag8;
-                    case  6 : KEY("DHWactive");              SETTING;     VALUE_flag8;
+                    case  1 : KEY("DHWboosterActive");          SETTING;     VALUE_flag8;
+                    case  6 : KEY("DHWactive");                 SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
-        case 21 :             KEY("DHWcomfort1");                SETTING;     VALUE_u8;
+        case 21 :             KEY("DHWcomfort1");               SETTING;     VALUE_u8;
         default :             UNKNOWNBYTE;
       }
       case 0x40 : switch (i) {
@@ -151,11 +151,11 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         case  4 :             BITBASIS_UNKNOWN;
         case  5 : switch (j) {
                     case  8 : BITBASIS;
-                    case  0 : KEY("HeatingValve");                  SETTING;     VALUE_flag8;
-                    case  1 : KEY("CoolingValve");                   SETTING;     VALUE_flag8;
-                    case  5 : KEY("MainZoneValve");                  SETTING;     VALUE_flag8;
-                    case  6 : KEY("AddZoneValve");                   SETTING;     VALUE_flag8;
-                    case  7 : KEY("DHWtankValve");                   SETTING;     VALUE_flag8;
+                    case  0 : KEY("HeatingValve");              SETTING;     VALUE_flag8;
+                    case  1 : KEY("CoolingValve");              SETTING;     VALUE_flag8;
+                    case  5 : KEY("MainZoneValve");             SETTING;     VALUE_flag8;
+                    case  6 : KEY("AddZoneValve");              SETTING;     VALUE_flag8;
+                    case  7 : KEY("DHWtankValve");              SETTING;     VALUE_flag8;
                     default :                                   UNKNOWNBIT;
                   }
         case  6 : switch (j) {
@@ -169,7 +169,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         case 11 :             KEY("RoomTarget2");                            VALUE_u8;
         case 14 : switch (j) {
                     case  8 : BITBASIS;
-                    case  2 : KEY("QuietMode2");                 SETTING;     VALUE_flag8;
+                    case  2 : KEY("QuietMode2");                SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
         case 21 : switch (j) {
@@ -181,7 +181,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         case 22 : switch (j) {
                     case  8 : BITBASIS;
                     case  2 : KEY("DHWmode");                   SETTING;     VALUE_flag8;
-//                    case  1 : KEY("DHW active1");               SETTING;     VALUE_flag8;
+//                    case  1 : KEY("DHWactive1");                SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
         default :             UNKNOWNBYTE;
@@ -197,17 +197,17 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
       case 0x40 : switch (i) {
         case  3 :             return 0;
         case  4 :             KEY("TempLWT");                   // Leaving water temperature
-                              LWT=FN_f8_8(&rb[i]);              TEMPFLOWP;   VALUE_f8_8;
-        case  5 :             return 0;                         // Domestic hot water temperature
+                              LWT = FN_f8_8(&rb[i]);            TEMPFLOWP;   VALUE_f8_8;
+        case  5 :             return 0;                         // Domestic hot water temperature (on some models)
         case  6 :             KEY("TempDHW");                   TEMPFLOWP;   VALUE_f8_8;
         case  7 :             return 0;                         // Outside air temperature (low res)
         case  8 :             KEY("TempOut1");                  TEMPFLOWP;   VALUE_f8_8;
         case  9 :             return 0;
         case 10 :             KEY("TempRWT");                   // Return water temperature
-                              RWT=FN_f8_8(&rb[i]);              TEMPFLOWP;   VALUE_f8_8;
+                              RWT = FN_f8_8(&rb[i]);            TEMPFLOWP;   VALUE_f8_8;
         case 11 :             return 0;
         case 12 :             KEY("TempMWT");                   // Leaving water temperature on the heat exchanger
-                              MWT=FN_f8_8(&rb[i]);              TEMPFLOWP;   VALUE_f8_8;
+                              MWT = FN_f8_8(&rb[i]);            TEMPFLOWP;   VALUE_f8_8;
         case 13 :             return 0;                         // Refrigerant temperature
         case 14 :             KEY("TempRefr1");                 TEMPFLOWP;   VALUE_f8_8;
         case 15 :             return 0;                         // Room temperature
@@ -242,7 +242,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
                     case  8 : BITBASIS;
                     case  0 : KEY("HeatPump1");                 SETTING;     VALUE_flag8;
                     case  6 : KEY("Gas");                       SETTING;     VALUE_flag8;
-//                    case  7 : KEY("DHW active2");               SETTING;     VALUE_flag8;
+//                    case  7 : KEY("DHWactive2");                SETTING;     VALUE_flag8;
                     default : UNKNOWNBIT;
                   }
         default :             UNKNOWNBYTE;
@@ -254,10 +254,10 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         default :             UNKNOWNBYTE;
       }
       case 0x40 : switch (i) {
-        case  3 :             KEY("TargetDHW");                  SETTING;     VALUE_u8;
+        case  3 :             KEY("TargetDHW");                 SETTING;     VALUE_u8;
         case 11 :             return 0;                                                          // FF = No flow
         case 12 :             KEY("Flow");
-                              Flow = rb[i] * 0.1;               TEMPFLOWP;   VALUE_u8div10;
+                              Flow = FN_u8div10(&rb[i]);        TEMPFLOWP;   VALUE_u8div10;
         case 13 :             // fallthrough
         case 14 :             // fallthrough
         case 15 :             return 0;
@@ -268,17 +268,17 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
     }
     case 0x14 : switch (linesrc) {
       case 0x00 : switch (i) {
-        case 11 :             KEY("TargetDeltaMain1");                SETTING;     VALUE_u8delta;
-        case 13 :             KEY("TargetDeltaAdd1");                SETTING;     VALUE_u8delta;
+        case 11 :             KEY("TargetDeltaMain1");          SETTING;     VALUE_u8delta;
+        case 13 :             KEY("TargetDeltaAdd1");           SETTING;     VALUE_u8delta;
         default :             UNKNOWNBYTE;
       }
       case 0x40 : switch (i) {
-        case 11 :             KEY("TargetDeltaMain2");                SETTING;     VALUE_u8delta;
-        case 13 :             KEY("TargetDeltaAdd2");                SETTING;     VALUE_u8delta;
+        case 11 :             KEY("TargetDeltaMain2");          SETTING;     VALUE_u8delta;
+        case 13 :             KEY("TargetDeltaAdd2");           SETTING;     VALUE_u8delta;
         case 18 :             return 0;
-        case 19 :             KEY("TargetMainZone");             SETTING;     VALUE_f8s8;
+        case 19 :             KEY("TargetMainZone");            SETTING;     VALUE_f8s8;
         case 20 :             return 0;
-        case 21 :             KEY("TargetpAddZone");              SETTING;     VALUE_f8s8;
+        case 21 :             KEY("TargetAddZone");             SETTING;     VALUE_f8s8;
         default :             UNKNOWNBYTE;
       }
       default :               UNKNOWNBYTE;
