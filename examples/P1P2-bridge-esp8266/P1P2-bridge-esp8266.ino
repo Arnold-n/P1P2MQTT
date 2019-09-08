@@ -292,10 +292,10 @@ void loop() {
   if (!client.connected()) {
     Serial.println("* Reconnecting");
     if (client.connect("P1P2", mqttUser, mqttPassword )) {
-        Serial.println("* Reconnected");
-        client.subscribe("P1P2/W");
-        client.publish("P1P2/S","* [ESPr] P1P2-bridge-esp8266 v0.9.8");
-        Serial.readBytesUntil('\n', readbuf, RB) // try to avoid reading a partial line in loop below
+      Serial.println("* Reconnected");
+      client.subscribe("P1P2/W");
+      client.publish("P1P2/S","* [ESPr] P1P2-bridge-esp8266 v0.9.8");
+      Serial.readBytesUntil('\n', readbuf, RB); // try to avoid reading a partial line in loop below
     } else {
       Serial.println("* Not reconnected");
       delay(1000);
