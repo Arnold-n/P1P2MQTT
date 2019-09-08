@@ -3,7 +3,8 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
- * 20190829 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
+ * 20190908 v0.9.8 Removed EOB signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
+ * 20190831 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
  * 20190824 v0.9.6 Added packetavailable()
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
  * 20190817 v0.9.4 Clean up, bug fixes, improved ms counter, prescaler reset added, time measurement changed, delta/error reporting separated
@@ -68,6 +69,7 @@
 #define ERROR_OVERRUN   0x02 // read buffer overrun
 #define ERROR_READBACK  0x04 // read-back error, likely bus collission
 #define ERROR_CRC       0x08 // CRC error
+#define ERROR_FLAGS     0x0F // Mask used to avoid that SIGNAL_EOB ends up in errorbuf results of readpacket
 #define SIGNAL_EOB      0x10 // signaling end of block
 
 #define RX_BUFFER_SIZE 50  // read buffer overruns may occur if this is too low
@@ -80,9 +82,9 @@ public:
 	~P1P2Serial() { end(); }
 	static void begin(uint32_t baud);
 	static void end();
-	uint8_t read();
-        uint8_t read_error(); // returns error code for last received byte
-	uint16_t read_delta(); // returns time difference between this and previous received byte
+	uint8_t read();      // returns next byte in read buffer
+        uint8_t read_error(); // returns error code or EOB signal for next byte in read buffer, to be called before read()
+	uint16_t read_delta(); // returns time difference between next byte in read buffer and previously read byte, to be called before read()
 	bool available();
 	bool packetavailable();
 	static void flushInput();

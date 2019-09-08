@@ -1,5 +1,5 @@
 /* PP1P2_Daikin_ParameterConversion_EHYHB.h product-dependent code for EHYHBX08AAV3 and perhaps other EHYHB models
- *                     
+ *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  */
@@ -9,14 +9,18 @@
 
 // history size parameters (only relevant if SAVEHISTORY is defined)
 #define RBHLEN 500   // max #bytes saved to store packet payloads
-#define PARAMLEN 512 // max nr of 00F035/00F135/40F035/40F135 params to be saved (per packet, so mem use is *4)
-#define RBHNP  18    // #of packet types of messages to be saved in historymax 127 given that shi is int8_t
-#define PARAMSTART 0 // first param nr saved
+#define PARAM35LEN 512 // max nr of 00F035/00F135/40F035/40F135 params to be saved (per packet, so mem use is *4)
+#define PARAM36LEN  48 // max nr of 00F036/00F136/40F036/40F136 params to be saved (per packet, so mem use is *4)
+#define RBHNP  38    // #of packet types of messages to be saved in historymax 127 given that shi is int8_t
+#define PARAM35START 0 // first param nr saved
+#define PARAM36START 0 // first param nr saved
+#define NHYST 30     // nr of values for hysteresis comparison
 // Reduce memory usage if the code is to be run on an Arduino Uno:
 #ifdef __AVR_ATmega328P__
 #define RBHLEN   166   // should be >= 1, 166 is sufficient for 0x10..0x15 packets
-#define PARAMLEN 1     // should be >= 1
+#define PARAM35LEN 1     // should be >= 1
 #define RBHNP   12     // should be >= 1, 12 is sufficient for 0x10..0x15 packets
+#define NHYST   15     // nr of values for hysteresis comparison (15 for this model)
 #endif /* __AVR_ATmega328P__ */
 
 #define KEYLEN 40    // max length of key/topic or value/payload
@@ -38,18 +42,23 @@ int8_t savehistoryindex(byte *rb) {
 //    and if so, returns index of rbhistoryp to store history data
 // returns -1 if this packet is not to be saved
 // returns -0x35 if packet is a 00F035/00F135/40F035/40F135 packet to be handled separately, parameters in packet will be saved by saveparam()
+// returns -0x36 if packet is a 00F036/00F136/40F036/40F136 packet to be handled separately, parameters in packet will be saved by saveparam()
 // returns a value in the range of 0..(RBHNP-1) if message is to be saved as a packet
 // Example below: save messages 0x10..0x15 from sources 0x00 and 0x40
 //                save messages 0xB8_subtype 0x00-0x05 from source 0x40
   int8_t rv;
+  if (((rb[0] & 0xBF) == 0x00) && ((rb[1] & 0xFE) == 0xF0) && (rb[2] == 0x35)) return -0x35; // for now only slave addresses 0xF0 and 0xF1
+  if (((rb[0] & 0xBF) == 0x00) && ((rb[1] & 0xFE) == 0xF0) && (rb[2] == 0x36)) return -0x36; // for now only slave addresses 0xF0 and 0xF1
   if ((rb[2] >= 0x10) && (rb[2] <= 0x15) && ((rb[0] & 0xBF) == 0x00)) {
     rv = ((rb[2] & 0x0F) + ((rb[0] & 0x40) ? 6 : 0));
     if (rv < RBHNP) return rv; else return -1;
   } else if ((rb[2] == 0xB8) && (rb[0] == 0x40) && (rb[3] <= 0x05)) {
     rv = (rb[3] + 12);
     if (rv < RBHNP) return rv; else return -1;
+  } else if (((rb[2] & 0xF0) == 0x30) && (rb[2] != 0x30) && (rb[1] == 0xF0) && ((rb[0] & 0xBF) == 0x00)) { // only 0xF0 0x31-0x3F
+    rv = ((rb[2] - 0x31) + 18);
+    if (rv < RBHNP) return rv; else return -1;
   }
-  if (((rb[0] & 0xBF) == 0x00) && ((rb[1] & 0xFE) == 0xF0) && (rb[2] == 0x35)) return -0x35; // for now only slave addresses 0xF0 and 0xF1
   return -1;
 }
 
@@ -73,7 +82,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
 //
 // the macro's defined below for KEY and VALUE aim to make the compound switch statement somewhat readable,
 // for reuse for other heat pumps
-// the keyword SETTING, MEASUREMENT, or PARAM35 determine which mqtt subtopic will be used to communicate the results.
+// the keyword SETTING, MEASUREMENT, or PARAM3x determine which mqtt subtopic will be used to communicate the results.
 //
 // no break statements are needed as the macro's include a return statement
 //
@@ -100,9 +109,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
 
   byte linetype = rb[2];
   byte linesrc = rb[0];
-  byte ch = 0;
   float P1, P2;      // these variables cannot be declared within the case statement - not sure why not?
-  static float P1prev = 0, P2prev = 0;
   static float LWT = 0, RWT = 0, MWT = 0, Flow = 0;
 
   switch (linetype) {
@@ -191,29 +198,29 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
     case 0x11 : switch (linesrc) {
       case 0x00 : switch (i) {
         case  3 :             return 0;                         // Room temperature
-        case  4 :             KEY("TempRoom1");                 MEASUREMENT; VALUE_f8_8;
+        case  4 :             KEY("TempRoom1");                 TEMPFLOWP;   VALUE_f8_8(0, 0.4, 0.6);
         default :             UNKNOWNBYTE;
       }
       case 0x40 : switch (i) {
         case  3 :             return 0;
         case  4 :             KEY("TempLWT");                   // Leaving water temperature
-                              LWT = FN_f8_8(&rb[i]);            TEMPFLOWP;   VALUE_f8_8;
+                              LWT = FN_f8_8(&rb[i]);            TEMPFLOWP;   VALUE_f8_8(1, 0.09, 0.15);
         case  5 :             return 0;                         // Domestic hot water temperature (on some models)
-        case  6 :             KEY("TempDHW");                   TEMPFLOWP;   VALUE_f8_8;
+        case  6 :             KEY("TempDHW");                   TEMPFLOWP;   VALUE_f8_8(2, 0.09, 0.15);   // unconnected on EHYHBX08AAV3?, then reading -40
         case  7 :             return 0;                         // Outside air temperature (low res)
-        case  8 :             KEY("TempOut1");                  TEMPFLOWP;   VALUE_f8_8;
+        case  8 :             KEY("TempOut1");                  TEMPFLOWP;   VALUE_f8_8(3, 0.4, 0.6);
         case  9 :             return 0;
         case 10 :             KEY("TempRWT");                   // Return water temperature
-                              RWT = FN_f8_8(&rb[i]);            TEMPFLOWP;   VALUE_f8_8;
+                              RWT = FN_f8_8(&rb[i]);            TEMPFLOWP;   VALUE_f8_8(4, 0.09, 0.15);
         case 11 :             return 0;
         case 12 :             KEY("TempMWT");                   // Leaving water temperature on the heat exchanger
-                              MWT = FN_f8_8(&rb[i]);            TEMPFLOWP;   VALUE_f8_8;
+                              MWT = FN_f8_8(&rb[i]);            TEMPFLOWP;   VALUE_f8_8(5, 0.09, 0.15);
         case 13 :             return 0;                         // Refrigerant temperature
-        case 14 :             KEY("TempRefr1");                 TEMPFLOWP;   VALUE_f8_8;
+        case 14 :             KEY("TempRefr1");                 TEMPFLOWP;   VALUE_f8_8(6, 0.09, 0.15);
         case 15 :             return 0;                         // Room temperature
-        case 16 :             KEY("TempRoom2");                 TEMPFLOWP;   VALUE_f8_8;
+        case 16 :             KEY("TempRoom2");                 TEMPFLOWP;   VALUE_f8_8(7, 0.4, 0.6);
         case 17 :             return 0;                         // Outside air temperature
-        case 18 :             KEY("TempOut2");                  TEMPFLOWP;   VALUE_f8_8;
+        case 18 :             KEY("TempOut2");                  TEMPFLOWP;   VALUE_f8_8(8, 0.4, 0.6);
         default :             UNKNOWNBYTE;
       }
       default :               UNKNOWNBYTE;
@@ -255,9 +262,9 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
       }
       case 0x40 : switch (i) {
         case  3 :             KEY("TargetDHW");                 SETTING;     VALUE_u8;
-        case 11 :             return 0;                                                          // FF = No flow
+        case 11 :             return 0;                                                          // 0xFF = No flow
         case 12 :             KEY("Flow");
-                              Flow = FN_u8div10(&rb[i]);        TEMPFLOWP;   VALUE_u8div10;
+                              Flow = FN_u8div10(&rb[i]);        TEMPFLOWP;   VALUE_u8div10(9, 0.09, 0.15);
         case 13 :             // fallthrough
         case 14 :             // fallthrough
         case 15 :             return 0;
@@ -276,9 +283,9 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         case 11 :             KEY("TargetDeltaMain2");          SETTING;     VALUE_u8delta;
         case 13 :             KEY("TargetDeltaAdd2");           SETTING;     VALUE_u8delta;
         case 18 :             return 0;
-        case 19 :             KEY("TargetMainZone");            SETTING;     VALUE_f8s8;
+        case 19 :             KEY("TargetMainZone");            SETTING;     VALUE_f8s8(10, 0.2, 0.6);
         case 20 :             return 0;
-        case 21 :             KEY("TargetAddZone");             SETTING;     VALUE_f8s8;
+        case 21 :             KEY("TargetAddZone");             SETTING;     VALUE_f8s8(11, 0.2, 0.6);
         default :             UNKNOWNBYTE;
       }
       default :               UNKNOWNBYTE;
@@ -289,7 +296,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
     }
       case 0x40 : switch (i) {
         case  5 :             return 0;
-        case  6 :             KEY("Temprefr2");                 TEMPFLOWP;   VALUE_f8_8;
+        case  6 :             KEY("Temprefr2");                 TEMPFLOWP;   VALUE_f8_8(12, 0.4, 0.6);
         default :             UNKNOWNBYTE;
       }
       default :               UNKNOWNBYTE;
@@ -299,15 +306,9 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
                                                                 // as this is the final packet in a package
                                                                 // we (ab)use this to communicate calculated power
                               P1 = (LWT - MWT) * Flow * 0.07;   // power produced by gas boiler
-                              ch = 0;
-                              if (P1 != P1prev) ch = 1;
-                              P1prev = P1;
-                              KEY("P1");                        TEMPFLOWP;   VALUE_F(P1, ch);
-      case  4 :               P2 = (MWT - RWT) * Flow * 0.07;   // power produced by heat pump boiler
-                              ch = 0;
-                              if (P2 != P2prev) ch = 1;
-                              P2prev = P2;
-                              KEY("P2");                        TEMPFLOWP;   VALUE_F(P2, ch);
+                              KEY("P1");                        TEMPFLOWP;   VALUE_F(P1, 13, 0.09, 0.15);
+      case  4 :               P2 = (MWT - RWT) * Flow * 0.07;   // power produced by heat pump
+                              KEY("P2");                        TEMPFLOWP;   VALUE_F(P2, 14, 0.09, 0.15);
       case  5 :               TERMINATEJSON;                    // terminate json string at end of package
       default :               return 0;                         // these bytes change but don't carry real information
                                                                 // they are used to request or announce further 3x packets
@@ -326,10 +327,10 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case  9 :           KEY("Counter2q");                 MEASUREMENT; VALUE_u24;
           case 10 :           return 0;
           case 11 :           return 0;
-          case 12 :           KEY("ConsElecHeating");           MEASUREMENT; VALUE_u24; // value is incorrect on my system ? or only kWh meter input?
+          case 12 :           KEY("ConsElecHeating");           MEASUREMENT; VALUE_u24; // or only kWh meter input?
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("ConsElec");                  MEASUREMENT; VALUE_u24; // value is zero on my system ?
+          case 15 :           KEY("ConsElec");                  MEASUREMENT; VALUE_u24; // reports 0?
           default :           UNKNOWNBYTE;
         }
         case 0x01 : switch (i) {                                // packet B8 subtype 01
@@ -401,6 +402,26 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
       }
       default :               UNKNOWNBYTE;
     }
+    case 0x31 : switch (linesrc) {
+      case 0x00 : switch (i) {                                  // param packet from main controller to external controller
+        case  3 :             BITBASIS_UNKNOWN;
+        case  4 :             KEY("F031-4");                      MEASUREMENT; VALUE_u8hex;
+        case  5 :             KEY("F031-5");                      MEASUREMENT; VALUE_u8hex;
+        case  6 :             KEY("F031-6");                      MEASUREMENT; VALUE_u8hex;
+        case  7 :             KEY("F031-7");                      MEASUREMENT; VALUE_u8hex;
+        case  8 :             KEY("F031-8");                      MEASUREMENT; VALUE_u8hex;
+        case  9 :             KEY("YearExt");                      MEASUREMENT; VALUE_u8_add2k;
+        case 10 :             KEY("MonthExt");                     MEASUREMENT; VALUE_u8;
+        case 11 :             KEY("DayExt");                       MEASUREMENT; VALUE_u8;
+        case 12 :             KEY("HoursExt");                     MEASUREMENT; VALUE_u8;
+        case 13 :             KEY("MinExt");                       MEASUREMENT; VALUE_u8;
+        case 14 :             KEY("SecExt");                       MEASUREMENT; VALUE_u8;
+        default:              return 0;
+      }
+      case 0x40 : switch (i) {                                  // param packet from main controller to external controller
+        default:              return 0;
+      }
+    }
     case 0x35 : switch (linesrc) {
       case 0x00 : switch (i) {                                  // param packet from main controller to external controller
         case 5 :              // fallthrough
@@ -421,7 +442,50 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         default:              return 0;
       }
     }
+    case 0x36 : switch (linesrc) {
+      case 0x00 : switch (i) {                                  // param packet from main controller to external controller
+        case 6 :              // fallthrough
+        case 10:              // fallthrough
+        case 14:              // fallthrough
+        case 18:              // fallthrough
+        case 22:                                                SETTING;     HANDLEPARAM;
+        default:              return 0;
+      }
+      case 0x40 : switch (i) {                                  // param packet from main controller to external controller
+        case 6 :              // fallthrough
+        case 10:              // fallthrough
+        case 14:              // fallthrough
+        case 18:              // fallthrough
+        case 22:                                                SETTING;     HANDLEPARAM;
+        default:              return 0;
+      }
+    }
     default :                 UNKNOWNBYTE;
   }
 }
+
+/* WIP: 
+byte paramnr2key(byte* rb, uint16_t paramnr, uint16_t paramval, byte j, char* key, char* value) {
+// Generates key based on rb, paramnr, j
+// if j=8, byte-based handling is performed
+// if 0<=j<=7, bit-based handling of bit j of byte rb[i] is performed.
+// Upon return, key and value contain the topic/payload for a mqtt message also usable as a key/value for a json message
+// Return value:
+// 0 no value to return
+// 1 (new) value to print/output
+// 8 this byte should be treated on bit basis by calling bits2keyvalue() with 0<=j<=7
+// 9 as return value indicates the json message should be terminated
+//
+
+  byte linetype = rb[2];
+  byte linesrc = rb[0];
+
+  // TODO how to handle bit basis?
+  switch (paramnr) {
+    case 0xA2 : return 0;
+    case 0x2E :; //KEY3("Heating1");            SETTING; VALUE_FLAG8;
+    default:   ;// UNKNOWNBYTE3;;
+  }
+}
+*/
 #endif /* P1P2_Daikin_json_EHYHB */

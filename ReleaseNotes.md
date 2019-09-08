@@ -1,5 +1,10 @@
 **Release notes**
 
+v0.9.8
+
+- Added hysteresis functionality in temperature reporting
+- Errors returned in errorbuf by readpacket() on longer contain EOB flag, only real error flags
+
 v0.9.7
 
 - Fixed hang/hick-up bug (switch from TIMER0 to TIMER2)

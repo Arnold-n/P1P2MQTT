@@ -2,11 +2,12 @@
  *           and limited control (DHW on/off, cooling/heating on/off) for some models.
  *           Control has only been tested on EHYHBX08AAV3 and EHVX08S23D6V
  *           If all available options are selected (SAVEHISTORY, JSON, JSONUDP, MONITOR, MONITORCONTROL) this program
- *           too large for Arduino Uno, but will fit in an Arduino Mega.
+ *           may just fit in an Arduino Uno, and it will certainly fit in an Arduino Mega.
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190908 v0.9.8 Minor improvements: error handling, hysteresis, improved output (a.o. x0Fx36)
  * 20190829 v0.9.7 Improved Serial input handling, added B8 counter request
  * 20190828        Fused P1P2Monitor and P1P2json-mega (with udp support provided by Budulinek)
  * 20190827 v0.9.6 Added limited control functionality, json conversion files merged with esp8266 files
@@ -182,14 +183,16 @@ void setup() {
 #ifdef SAVEHISTORY
   Serial.print(F("+savehist"));
 #endif
-  Serial.println(F(" v0.9.7"));
+  Serial.println(F(" v0.9.8"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
+#ifdef JSON
 #ifdef JSONUDP
   Ethernet.begin(mac, ip);
 //  udpRecv.begin(listenPort);                                      // for future functionality...
   udpSend.begin(sendPort);
 #endif /* JSONUDP */
+#endif /* JSON */
 }
 
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work for the Daikin hybrid
@@ -525,10 +528,10 @@ void loop() {
                       if (setDHW || setcoolingheating) WB[7] = 0x01;
                       P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
                       break;
-          case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function unknown.. copy primary controller bytes for now
+          case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function partly date/time, partly unknown
                       for (w = 3; w < n; w++) WB[w] = RB[w];
-                      WB[7] = 0xB4;
-                      WB[8] = 0x10; // could be part of serial nr? If so, would it matter that we use the same nr as the BRP?
+                      // TODO WB[7] = 0xB4;
+                      // TODO WB[8] = 0x10; // could be part of serial nr? If so, would it matter that we use the same nr as the BRP?
                       P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
                       break;
           case 0x32 : // in: 19 byte: out 19 byte, out is copy in
@@ -595,7 +598,13 @@ void loop() {
 #endif /* MONITORCONTROL */
 #ifdef SERIALDATAOUT
     if (verbose) {
-      Serial.print(F("R")); // TODO
+      bool readerror = 0;
+      for (int i=0; i < nread; i++) readerror |= EB[i];
+      if (readerror) {
+        Serial.print(F("*"));
+      } else {
+        Serial.print(F("R"));
+      }
       if (delta < 10000) Serial.print(F(" "));
       if (delta < 1000) Serial.print(F("0")); else { Serial.print(delta / 1000); delta %= 1000; };
       Serial.print(F("."));

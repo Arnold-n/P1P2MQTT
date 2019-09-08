@@ -6,6 +6,8 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190908 v0.9.8 Minor improvements: error handling, hysteresis, improved output (a.o. x0Fx36)
+ * 20190831 v0.9.7 Error handling improved
  * 20190829 v0.9.7 Minor improvements
  * 20190824 v0.9.6 Added x0Fx35 parameter saving and reporting
  * 20190823        Separated NetworkParams.h
@@ -72,6 +74,8 @@ PubSubClient client(espClient);
 
 void setup() {
   Serial.begin(115200);
+  while (!Serial);      // wait for Arduino Serial Monitor to open
+  Serial.setTimeout(5); // don't block client.loop longer than necessary
   
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
@@ -164,6 +168,8 @@ void setup() {
   });
   ArduinoOTA.begin();
 
+  Serial.println("* [ESPs] P1P2-bridge-esp8266 v0.9.8");
+
   // Set up mqtt connection
   client.setServer(mqttServer, mqttPortNr);
   client.setCallback(callback);
@@ -176,8 +182,7 @@ void setup() {
     delay(2000);
   }
 
-  Serial.println("* [ESP] P1P2-bridge-esp8266 v0.9.7");
-  client.publish("P1P2/S","* [ESP] P1P2-bridge-esp8266 v0.9.7");
+  client.publish("P1P2/S","* [ESPm] P1P2-bridge-esp8266 v0.9.8");
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -289,7 +294,8 @@ void loop() {
     if (client.connect("P1P2", mqttUser, mqttPassword )) {
         Serial.println("* Reconnected");
         client.subscribe("P1P2/W");
-        client.publish("P1P2/S","* [ESP] P1P2-bridge-esp8266 v0.9.7");
+        client.publish("P1P2/S","* [ESPr] P1P2-bridge-esp8266 v0.9.8");
+        Serial.readBytesUntil('\n', readbuf, RB) // try to avoid reading a partial line in loop below
     } else {
       Serial.println("* Not reconnected");
       delay(1000);
@@ -300,20 +306,21 @@ void loop() {
       if (rb < RB) readbuf[rb++] = '\0'; else readbuf[RB - 1] = '\0';
       if (readbuf[0] == 'R') {
         client.publish("P1P2/R", readbuf, rb);
+        int rbp = 0;
+        int n, rbtemp;
+        if ((rb >= 10) && (readbuf[7] == ':')) rbp = 9;
+        byte rh = 0;
+        // check for errors is done in P1P2Monitor as of v0.9.7 (31 August 2019 version)
+        // dirty trick: check for space in serial input to avoid that " CRC" in input is recognized as hex value 0x0C...
+        while ((rh < HB) && (readbuf[rbp] != ' ') && (sscanf(readbuf + rbp, "%2x%n", &rbtemp, &n) == 1)) {
+          readhex[rh++] = rbtemp;
+          rbp += n;
+        }
+        // rh is packet length (not counting CRC byte)
+        process_for_mqtt_json(readhex, rh);
       } else {
         client.publish("P1P2/S", readbuf, rb);
       }
-      int rbp = 0;
-      int n, rbtemp;
-      if ((rb >= 10) && (readbuf[7] == ':')) rbp = 9;
-      byte rh = 0;
-      // dirty trick: check for space in serial input to avoid that " CRC" in input is recognized as hex value 0x0C...
-      while ((rh < HB) && (readbuf[rbp] != ' ') && (sscanf(readbuf + rbp, "%2x%n", &rbtemp, &n) == 1)) {
-        readhex[rh++] = rbtemp;
-        rbp += n;
-      }
-      // n is packet length (not counting CRC byte)
-      process_for_mqtt_json(readhex, rh);
     }
   }
 }

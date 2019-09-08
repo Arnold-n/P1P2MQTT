@@ -3,7 +3,8 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
- * 20190829 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
+ * 20190908 v0.9.8 Removed EOB signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
+ * 20190831 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
  * 20190824 v0.9.6 Added packetavailable()
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
  * 20190817 v0.9.4 Clean up, bug fixes, improved ms counter, prescaler reset added, time measurement changed, delta/error reporting separated
@@ -652,7 +653,7 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* erro
     if (available()) {
       uint8_t error = read_error();
       EOB = (error & SIGNAL_EOB);
-      if (errorbuf) errorbuf[bytecnt] = error;
+      if (errorbuf) errorbuf[bytecnt] = (error & ERROR_FLAGS);
       if (!bytecnt) delta = read_delta();
       uint8_t c = read();
       if ((EOB == 0) || (crc_gen == 0)) {

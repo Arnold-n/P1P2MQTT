@@ -4,7 +4,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
- * 20190917 v0.9.4 Brought in line with library 0.9.4 (API changes), print last byte if crc_gen==0, added json support
+ * 20190817 v0.9.4 Brought in line with library 0.9.4 (API changes), print last byte if crc_gen==0, added json support
  *                 (separated from P1P2Monitor)
  *
  * P1P2erial is written and tested for the Arduino Uno and Mega.

@@ -113,12 +113,12 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     2         | 11                            | packet type 11        | u8
 |   3-4         | XX YY                         | LWT temperature       | f8.8
 |   5-6         | XX YY                         | (optional external outside temp sensor?)    | f8.8
-|   7-8         | XX YY                         | Outside temperature (in 0.5 degree resolution) | f8.8 |
+|   7-8         | XX YY                         | Outside temperature 1 (raw; in 0.5 degree resolution) | f8.8 |
 |   9-10        | XX YY                         | RWT                   | f8.8 |
 |  11-12        | XX YY                         | Mid-way temperature heat pump - gas boiler | f8.8 |
 |  13-14        | XX YY                         | Refrigerant temperature | f8.8 |
 |  15-16        | XX YY                         | Actual room temperature | f8.8 |
-|  17-18        | XX YY                         | Outside temperature | f8.8 |
+|  17-18        | XX YY                         | Outside temperature 2 (stabilized; does not change during defrosts; adds extra variations not in raw outside temperature, perhaps averaged over samples | f8.8 |
 |  19-22        | 00                            | ? |
 |    23         | XX                            | CRC checksum          | u8
 
@@ -284,6 +284,29 @@ F1 has been observed as 2nd external controller in some devices.
 
 # Other packets
 
+#### Packet "00F031.." (and "40F031")
+
+| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
+|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
+|     0         | 00                            | Request               | u8
+|     1         | F0                            | Slave address: external controller 0       | u8 
+|     2         | 31                            | packet type 31        | u8
+|     3-5       | 00                            | ?                     | u8
+|     6         | 01,81                         | ?                     | u8
+|     7         | B4                            | ?                     | u8
+|     8         | 11,15,51,55                   | ?                     | u8
+|     9         | 13 (example)                  | date - year (0x13 = 2019) | u8
+|     10        | 01-0C                         | date - month          | u8
+|     11        | 01-1F                         | date - day of month   | u8
+|     12        | 00-17                         | time - hours          | u8
+|     13        | 00-3B                         | time - minutes        | u8
+|     14        | 00-3B                         | time - seconds        | u8
+|     15        | XX                            | CRC checksum          | u8
+
+
+
+
+
 #### Packet "00F035.." and "40F035.."
 
 A few hundred parameters can be exchanged via packet type 35. Some are fixed (a range of parameters is used to communicate the device ID), others are relating to operating settings. Unfortunately temperating settings are not visible here.
@@ -383,7 +406,7 @@ The packet type corresponds to the field settings according to the following tab
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | XX                            | packet type (60..8F) | u8
 |  3-22         | 00                            | All fields empty
 |    23         | XX                            | CRC checksum          | u8
@@ -395,7 +418,7 @@ For supported field settings:
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | XX                            | packet type (60..62,64-65,68-6E,70-75,78-85,88-8F) | u8
 |  3            | XX                            | 1st field value (usually 0xC0 is added to this value)  | u8
 |  4            | XX                            | maximum field value  | u8
@@ -412,7 +435,7 @@ For non-supported field settings:
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | FF                            | FF as packet type answer if request is for packet type (63,66-67,6F,76-77,86,87) | u8
 |     3         | XX                            | CRC checksum          | u8
 
@@ -421,16 +444,16 @@ For non-supported field settings:
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | XX                            | packet type (60..8F) | u8
 |  3            | XX                            | 1st field, old value (no 0xC0 added), or new value (0x40 added) | u8
 |  4            | XX                            | maximum field value  | u8
 |  5            | XX                            | offset for field value  | u8
 |  6            | 00/08/0A/28/2A/8A/92/AA       | field setting info  | flag8 | see above
-|  7-10         | 00                            | 2nd field value, see bytes 4-7           | u8,u8,u8,flag8
-| 11-14         | 00                            | 3rd field value, see bytes 4-7           | u8,u8,u8,flag8
-| 15-18         | 00                            | 4th field value, see bytes 4-7           | u8,u8,u8,flag8
-| 19-22         | 00                            | 5th field value, see bytes 4-7           | u8,u8,u8,flag8
+|  7-10         | 00                            | 2nd field value, see bytes 3-6           | u8,u8,u8,flag8
+| 11-14         | 00                            | 3rd field value, see bytes 3-6           | u8,u8,u8,flag8
+| 15-18         | 00                            | 4th field value, see bytes 3-6           | u8,u8,u8,flag8
+| 19-22         | 00                            | 5th field value, see bytes 3-6           | u8,u8,u8,flag8
 |    23         | XX                            | CRC checksum          | u8
 
 #### Packet "4000XX.." Field setting reply by heat pump during restart process
@@ -440,16 +463,16 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | XX                            | packet type (60..8F) | u8
 |  3            | XX                            | 1st field value (usually 0xC0 is added to this value)  | u8
 |  4            | XX                            | maximum field value  | u8
 |  5            | XX                            | offset for field value  | u8
 |  6            | 00/08/0A/28/2A/8A/92/AA       | field setting info  | flag8 | see above
-|  7-10         | 00                            | 2nd field value, see bytes 4-7           | u8,u8,u8,flag8
-| 11-14         | 00                            | 3rd field value, see bytes 4-7           | u8,u8,u8,flag8
-| 15-18         | 00                            | 4th field value, see bytes 4-7           | u8,u8,u8,flag8
-| 19-22         | 00                            | 5th field value, see bytes 4-7           | u8,u8,u8,flag8
+|  7-10         | 00                            | 2nd field value, see bytes 3-6           | u8,u8,u8,flag8
+| 11-14         | 00                            | 3rd field value, see bytes 3-6           | u8,u8,u8,flag8
+| 15-18         | 00                            | 4th field value, see bytes 3-6           | u8,u8,u8,flag8
+| 19-22         | 00                            | 5th field value, see bytes 3-6           | u8,u8,u8,flag8
 |    23         | XX                            | CRC checksum          | u8
 
 ## A1/20 for motors and operation mode
@@ -459,9 +482,11 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | A1                            | packet type A1 | u8
-|  3-20         | 00                            | ?
+|     3         | 00                            | ?
+|  4-17         | 30                            | ASCII '0'             | u8
+| 18-20         | 00                            | ?
 |    21         | XX                            | CRC checksum          | u8
 
 #### 002. Packet "4000A100.."
@@ -469,9 +494,35 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response               |
-|     1         | 00                            | no end-of-package |
+|     1         | 00                            | slave address: heat pump |
 |     2         | A1                            | packet type A1 |
-|  3-20         | 00                            | ? |
+|     3         | 00                            | ?
+|  4-17         | 00                            | ASCII '\0'             | u8
+| 18-20         | 00                            | ?
+|    21         | XX                            | CRC checksum          | u8
+
+#### 001. Packet "0000B100.."
+
+| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
+|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
+|     0         | 00                            | Request                 | u8
+|     1         | 00                            | slave address: heat pump | u8
+|     2         | B1                            | packet type A1 | u8
+|     3         | 00                            | ?
+|  4-18         | 30                            | ASCII '0'             | u8
+| 19-20         | 00                            | ?
+|    21         | XX                            | CRC checksum          | u8
+
+#### 002. Packet "4000B100.."
+
+| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
+|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
+|     0         | 40                            | Response               |
+|     1         | 00                            | slave address: heat pump |
+|     2         | B1                            | packet type A1 |
+|     3         | 00                            | ?
+|  4-15         | XX                            | ASCII "EHYHBH08AAV3"   | u8
+| 16-20         | 00                            | ?
 |    21         | XX                            | CRC checksum          | u8
 
 #### 003. Packet "00002000.."
@@ -479,7 +530,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | 20                            | packet type 20 | u8
 |     3         | 00                            | ?
 |     4         | XX                            | CRC checksum          | u8
@@ -489,7 +540,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response               | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | 20                            | packet type 20 | u8
 |    3-22       | XX                            | various values??, tbd |
 |    23         | XX                            | CRC checksum | u8
@@ -501,7 +552,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 00                            | packet subtype 00 | u8
 |     4         | XX                            | CRC checksum | u8
@@ -511,7 +562,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 00                            | packet subtype 00 | u8
 |  4-9          | 00                            | two 3-byte numbers? | u24
@@ -526,7 +577,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 01                            | packet subtype 00 | u8
 |     4         | XX                            | CRC checksum | u8
@@ -536,7 +587,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 01                            | packet subtype 01 | u8
 |  4-6          | XX XX XX                      | heat produced | u24
@@ -550,7 +601,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 02                            | packet subtype 02 | u8
 |     4         | XX                            | CRC checksum | u8
@@ -560,7 +611,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 02                            | packet subtype 02 | u8
 |  4-6          | XX XX XX                      | number of pump hours | u24
@@ -574,7 +625,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 03                            | packet subtype 03 | u8
 |     4         | XX                            | CRC checksum | u8
@@ -584,7 +635,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 03                            | packet subtype 03 | u8
 |  4-21         | 00                            | ? | u8
@@ -596,7 +647,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 04                            | packet subtype 04 | u8
 |     4         | XX                            | CRC checksum | u8
@@ -606,7 +657,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 04                            | packet subtype 04 | u8
 |  4-12         | 00                            | ? | u8
@@ -619,7 +670,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 05                            | packet subtype 05 | u8
 |     4         | XX                            | CRC checksum | u8
@@ -629,7 +680,7 @@ Format is the same for supported and non-supported field settings
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
-|     1         | 00                            | no end-of-package | u8
+|     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 05                            | packet subtype 05 | u8
 |  4-6          | XX XX XX                      | number of boiler hours heating | u24

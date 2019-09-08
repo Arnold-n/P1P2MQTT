@@ -2,14 +2,13 @@
 
 P1P2Serial reads and writes raw data packets on Daikin P1/P2 two-wire interface, and similar interfaces, using an Arduino Uno and a P1P2Serial shield. Preliminary support for parameter interpretation, json, mqtt, WiFi using an additional ESP8266. Preliminary support to switch basic functions (DHW, heating/cooling) on/off is confirmed to work on 2 specific models.
 
-**New in v0.9.7**
+**New in v0.9.6-v0.9.8**
 
-- Improved reliability and fixed hang/hick-up bug (switch from TIMER0 to TIMER2, improved serial input handling, ignore packets with CRC error)
-- Added counter request functionality to P1P2Monitor
-
-**New in v0.9.6**
-
-Control of DHW and heating/cooling: possibility to switch these functions on and off. Parameter reporting of the 35 packet type used to communicate between the main controller and auxiliary controllers.
+- 0.9.8 Added hysteresis functionality in temperature reporting
+- 0.9.8 Removed EOB from errorbuf as returned by readpacket; ignore packets with errors; ignore first serial line as it may be a partial line
+- 0.9.7 Improved reliability and fixed hang/hick-up bug (switch from TIMER0 to TIMER2, improved serial input handling, ignore packets with CRC error)
+- 0.9.7 Added counter request functionality to P1P2Monitor
+- 0.9.6 Control of DHW and heating/cooling: possibility to switch these functions on and off. Parameter reporting of the 35 packet type used to communicate between the main controller and auxiliary controllers.
  
 **New in v0.9.4/v0.9.5/v0.9.5+controller**
 
@@ -17,7 +16,7 @@ ESP8266 support to interface Arduino Uno serial output from/to mqtt/json over Wi
 
 In v0.9.5 delay behaviour when writing has been changed, with a timeout function, to avoid bus collissions. Instead of writing a packet when a pause was *at least* a certain length, a packet is written when a pause took *exactly* a certain length, or alternatively, a timeout occured.
 
-**Preferred set-up based on Arduino Uno/ESP8266/wifi**
+**Set-up based on Arduino Uno/ESP8266/wifi**
 
 P1/P2 2-wire interface
       
@@ -44,7 +43,7 @@ In order to program this board, the following steps are needed:
 - now, and upon each reboot, the ESP8266 connects to the MQTT server
 - the ESP8266 should also become visible in the Arduino IDE as a network port, and can be reprogrammed OTA
 
-**Preferred set-up based on Arduino Uno/Raspberry Pi/LAN,wifi**
+**Set-up based on Arduino Uno/Raspberry Pi/LAN, wifi**
 
 P1/P2 2-wire interface
       
@@ -60,7 +59,7 @@ mqtt/.. over WiFi or LAN
 
 The above set-up works nicely on an original Arduino Uno, and has the advantage that the Arduino can be flashed without dip switch settings.
 
-**Preferred set-up based on Arduino Mega/W5500
+**Set-up based on Arduino Mega/W5500**
 
 P1/P2 2-wire interface
       
@@ -138,19 +137,21 @@ The simple answer is: write when others don't. In practice communication seems t
 
 - LICENSE: GPL-v2.0 license for P1P2Serial library and the P1P2\* example programs,
 - ReleaseNotes.md,
-- SerialProtocol.md, describes serial protocol used by P1P2Monitor and by serial mqtt channels of P1P2-bridge-eps8266
-- P1P2Serial.cpp and P1P2Serial.h: (GPL-licensed) P1P2Serial library, based on AltSoftSerial, and uses AltSoftSerial configuration files,
-- examples/P1P2Monitor: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus on serial output, and enables writing data from serial input. Reading/writing packets of data and CRC-byte generation/verification is supported. This program has no LCD support as of version 0.9.4, json/udp support has been added as of version 0.9.6
+- SerialProtocol.md, describes serial protocol used by P1P2Monitor and P1P2-bridge-esp8266
+- MqttProtocol.md, describes mqtt channels used by P1P2-bridge-esp8266
+- P1P2Serial.cpp and P1P2Serial.h: (GPL-licensed) P1P2Serial library, based on AltSoftSerial (uses AltSoftSerial configuration files),
+- examples/P1P2Monitor: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus on serial output, and enables writing data from serial input. Reading/writing packets of data and CRC-byte generation/verification is supported. This program has no LCD support as of version 0.9.4, json/udp support (output via serial or udp) has been added as of version 0.9.6,
 - examples/P1P2-bridge-esp8266: (GPL-licensed) program to convert P1P2Monitor's serial output to mqtt and json format, and preliminary support to write packets to the P1P2 bus from a mqtt channel,
+- (to be released soon, work in progress:) examples/P1P2Convert: (GPL-licensed) host-based (Linux Ubuntu / Raspberry Pi) program to convert P1P2Monitor's serial output (directly from USB or from recorded logs) to mqtt/json format, making reverse-engineering protocol data easier,
 - examples/P1P2HardwareTest: (GPL-licensed) program to stand P1P2Serial adapter shield in stand-alone mode,
 - (to be outphased:) examples/P1P2json: (GPL-licensed) program to convert bus to json-formatted output on serial output. No writing to the bus is supported by this program,
 - (to be outphased:) examples/P1P2json-mega: (GPL-licensed) program to convert bus to json-formatted output on serial output and UDP. No writing to the bus is supported by this program,
 - examples/P1P2LCD: (GPL-licensed) program to show P1P2 data on a an additional SPI 128x64 display connected directly to the Arduino Uno pins. This works for the Daikin hybrid model, it may work (partially) for other models. This program requires that the u8g2 library is installed,
 - Daikin specific but product independent header file P1P2_Daikin_json.h supporting conversion to json format (this is included by the product-dependent header file(s)),
 - Daikin specific but product dependent header file P1P2_Daikin_json_EHYHB.h supporting conversion to json format, this file is included by the P1P2json example program,
-- doc/README.md and doc/Daikin-protocol\*: observations of protocol data for various heat pumps (work-in-progress, contributions welcome),
+- doc/README.md and doc/Daikin-protocol\*: generic and product-dependent observations of protocol data for various heat pumps (work-in-progress, contributions welcome),
 - circuits/\*: P1/P2 adapter schematic and pictures of adapter board,
-- examples/P1P2Monitor/usb2console.py: simple python program to copy USB serial output from Arduino to stdout on a Raspberry Pi or other host,
+- examples/P1P2Monitor/usb2console.py: simple python program to copy USB serial output from Arduino to stdout on a Raspberry Pi or other host (for logging and/or processing by P1P2-bridge-ubuntu),
 - config/AltSoftSerial_Boards.h and AltSoftSerial_Timers.h: (MIT-licensed) AltSoftSerial configuration files, copied without modification from the AltSoftserial project, and
 - README.md: this file.
 
