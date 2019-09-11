@@ -15,17 +15,23 @@
 #define PARAM35START 0 // first param nr saved
 #define PARAM36START 0 // first param nr saved
 #define NHYST 30     // nr of values for hysteresis comparison
-// Reduce memory usage if the code is to be run on an Arduino Uno:
 #ifdef __AVR_ATmega328P__
-#define RBHLEN   166   // should be >= 1, 166 is sufficient for 0x10..0x15 packets
+// Reduce memory usage if the code is to be run on an Arduino Uno:
+#define RBHLEN   166   // should be >= 1, 166 is sufficient for 0x10..0x16 packets
 #define PARAM35LEN 1     // should be >= 1
-#define RBHNP   12     // should be >= 1, 12 is sufficient for 0x10..0x15 packets
+#define RBHNP   14     // should be >= 1, 14 is sufficient for 0x10..0x16 packets
 #define NHYST   15     // nr of values for hysteresis comparison (15 for this model)
 #endif /* __AVR_ATmega328P__ */
 
 #define KEYLEN 40    // max length of key/topic or value/payload
 
 #include "P1P2_Daikin_ParameterConversion.h" // for Daikin product-independent code
+
+#ifdef RPI
+char TimeString[17]="2000-00-00 00:00";
+char TimeString2[20]="2000-00-00 00:00:00";
+byte SelectTimeString2=0;
+#endif /* RPI */
 
 // device dependent code starts here:
 // ----------------------------------
@@ -49,14 +55,14 @@ int8_t savehistoryindex(byte *rb) {
   int8_t rv;
   if (((rb[0] & 0xBF) == 0x00) && ((rb[1] & 0xFE) == 0xF0) && (rb[2] == 0x35)) return -0x35; // for now only slave addresses 0xF0 and 0xF1
   if (((rb[0] & 0xBF) == 0x00) && ((rb[1] & 0xFE) == 0xF0) && (rb[2] == 0x36)) return -0x36; // for now only slave addresses 0xF0 and 0xF1
-  if ((rb[2] >= 0x10) && (rb[2] <= 0x15) && ((rb[0] & 0xBF) == 0x00)) {
-    rv = ((rb[2] & 0x0F) + ((rb[0] & 0x40) ? 6 : 0));
+  if ((rb[2] >= 0x10) && (rb[2] <= 0x16) && ((rb[0] & 0xBF) == 0x00)) {
+    rv = ((rb[2] & 0x0F) + ((rb[0] & 0x40) ? 7 : 0));
     if (rv < RBHNP) return rv; else return -1;
   } else if ((rb[2] == 0xB8) && (rb[0] == 0x40) && (rb[3] <= 0x05)) {
-    rv = (rb[3] + 12);
+    rv = (rb[3] + 14);
     if (rv < RBHNP) return rv; else return -1;
   } else if (((rb[2] & 0xF0) == 0x30) && (rb[2] != 0x30) && (rb[1] == 0xF0) && ((rb[0] & 0xBF) == 0x00)) { // only 0xF0 0x31-0x3F
-    rv = ((rb[2] - 0x31) + 18);
+    rv = ((rb[2] - 0x31) + 20);
     if (rv < RBHNP) return rv; else return -1;
   }
   return -1;
@@ -229,11 +235,27 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
       case 0x00 : switch (i) {
         case  3 :             BITBASIS_UNKNOWN;
         case  4 :             KEY("DayOfWeek");                 MEASUREMENT; VALUE_u8;    // Monday: 0
-        case  5 :             KEY("Hours");                     MEASUREMENT; VALUE_u8;
-        case  6 :             KEY("Min");                       MEASUREMENT; VALUE_u8;
-        case  7 :             KEY("Year");                      MEASUREMENT; VALUE_u8_add2k;
-        case  8 :             KEY("Month");                     MEASUREMENT; VALUE_u8;
-        case  9 :             KEY("Day");                       MEASUREMENT; VALUE_u8;
+        case  5 :             if (SelectTimeString2) SelectTimeString2--;
+                              // Switch to TimeString if we have not seen a 00Fx31 packet for a few cycli (>6 in view of counter request blocking 6 cycli)
+                              TimeString[11] = '0' + (rb[i] / 10);
+                              TimeString[12] = '0' + (rb[i] % 10);
+                              KEY("Hours");                     MEASUREMENT; VALUE_u8;
+        case  6 :             
+                              TimeString[14] = '0' + (rb[i] / 10);
+                              TimeString[15] = '0' + (rb[i] % 10);
+                              KEY("Min");                       MEASUREMENT; VALUE_u8;
+        case  7 :             
+                              TimeString[2] = '0' + (rb[i] / 10);
+                              TimeString[3] = '0' + (rb[i] % 10);
+                              KEY("Year");                      MEASUREMENT; VALUE_u8_add2k;
+        case  8 :             
+                              TimeString[5] = '0' + (rb[i] / 10);
+                              TimeString[6] = '0' + (rb[i] % 10);
+                              KEY("Month");                     MEASUREMENT; VALUE_u8;
+        case  9 :             
+                              TimeString[8] = '0' + (rb[i] / 10);
+                              TimeString[9] = '0' + (rb[i] % 10);
+                              KEY("Day");                       MEASUREMENT; VALUE_u8;
         case 15 :             // fallthrough
         case 16 :             BITBASIS_UNKNOWN;
         default :             UNKNOWNBYTE;
@@ -410,12 +432,31 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         case  6 :             KEY("F031-6");                      MEASUREMENT; VALUE_u8hex;
         case  7 :             KEY("F031-7");                      MEASUREMENT; VALUE_u8hex;
         case  8 :             KEY("F031-8");                      MEASUREMENT; VALUE_u8hex;
-        case  9 :             KEY("YearExt");                      MEASUREMENT; VALUE_u8_add2k;
-        case 10 :             KEY("MonthExt");                     MEASUREMENT; VALUE_u8;
-        case 11 :             KEY("DayExt");                       MEASUREMENT; VALUE_u8;
-        case 12 :             KEY("HoursExt");                     MEASUREMENT; VALUE_u8;
-        case 13 :             KEY("MinExt");                       MEASUREMENT; VALUE_u8;
-        case 14 :             KEY("SecExt");                       MEASUREMENT; VALUE_u8;
+        case  9 :             SelectTimeString2=10;
+                              // Keep on TimeString2 unless we have not seen a 00Fx31 packet for a few cycli (>6 in view of counter request blocking 6 cycli)
+                              TimeString2[2] = '0' + (rb[i] / 10);
+                              TimeString2[3] = '0' + (rb[i] % 10);
+                              KEY("YearExt");                      MEASUREMENT; VALUE_u8_add2k;
+        case 10 :             
+                              TimeString2[5] = '0' + (rb[i] / 10);
+                              TimeString2[6] = '0' + (rb[i] % 10);
+                              KEY("MonthExt");                     MEASUREMENT; VALUE_u8;
+        case 11 :             
+                              TimeString2[8] = '0' + (rb[i] / 10);
+                              TimeString2[9] = '0' + (rb[i] % 10);
+                              KEY("DayExt");                       MEASUREMENT; VALUE_u8;
+        case 12 :             
+                              TimeString2[11] = '0' + (rb[i] / 10);
+                              TimeString2[12] = '0' + (rb[i] % 10);
+                              KEY("HoursExt");                     MEASUREMENT; VALUE_u8;
+        case 13 :             
+                              TimeString2[14] = '0' + (rb[i] / 10);
+                              TimeString2[15] = '0' + (rb[i] % 10);
+                              KEY("MinExt");                       MEASUREMENT; VALUE_u8;
+        case 14 :             
+                              TimeString2[17] = '0' + (rb[i] / 10);
+                              TimeString2[18] = '0' + (rb[i] % 10);
+                              KEY("SecExt");                       MEASUREMENT; VALUE_u8;
         default:              return 0;
       }
       case 0x40 : switch (i) {                                  // param packet from main controller to external controller

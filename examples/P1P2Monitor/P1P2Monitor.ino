@@ -530,8 +530,9 @@ void loop() {
                       break;
           case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function partly date/time, partly unknown
                       for (w = 3; w < n; w++) WB[w] = RB[w];
-                      // TODO WB[7] = 0xB4;
-                      // TODO WB[8] = 0x10; // could be part of serial nr? If so, would it matter that we use the same nr as the BRP?
+                      WB[7] = 0xB4; // 180 ?? product type for LAN adapter?
+                      WB[8] = 0x10; //  16 ??
+                      // same 0xB4 0x10 values also seen at EHVX08S26CB9W so enable this change
                       P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
                       break;
           case 0x32 : // in: 19 byte: out 19 byte, out is copy in
@@ -544,9 +545,10 @@ void loop() {
                       break;
           case 0x35 : // in: 21 byte; out 21 byte; in is parameters; out is FF except for first packet which starts with 930000 (why?)
                       // parameters in the 00F035 message may indicate status changes in the heat pump
-                      // A parameter consists of 3 bytes: 1 byte nr, and (likely) 2 byte value
+                      // A parameter consists of 3 bytes: 2 bytes for param nr, and 1 byte for value
                       // for now we only check for the following parameters: 
                       // DHW parameter 0x40
+                      // EHVX08S26CB9W DHWbooster parameter 0x48
                       // coolingheating parameter 0x31 or 0x2F (as defined in setParam)
                       for (w = 3; w < n; w++) WB[w] = 0xFF;
                       // change bytes for triggering coolingheating on/off
@@ -557,24 +559,36 @@ void loop() {
                       for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
                       for (w = 3; w < n; w++) if ((RB[w] == 0x40) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
                       break;
-          case 0x36 : // in: 23 byte; out 23 byte; in is parameters??; out is FF
+          case 0x36 : // in: 23 byte; out 23 byte; in is 4-byte parameters??; out is FF
+                      // seen in EHVX08S26CB9W, reply is FF as expected
+                      // A parameter consists of 4 bytes: 2 bytes for param nr, and 2 bytes for value
                       // fallthrough
           case 0x37 : // not seen, but we still reply with a packet with the same length and only FF as payload for devices that do request this type of message
+                      // seen in EHVX08S26CB9W, reply is FF as expected
+                      // contains 5-byte parameters
                       // fallthrough
           case 0x38 : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
                       // but let's also reply with a packet with the same length and only FF as payload
+                      // seen in EHVX08S26CB9W, reply is FF as expected
+                      // A parameter consists of 6 bytes: ?? bytes for param nr, and ?? bytes for value/??
                       // fallthrough
           case 0x39 : // in: 21 byte; out 21 byte; in is parameters??; out is FF
+                      // seen in EHVX08S26CB9W, reply is FF as expected
+                      // A parameter consists of 6 bytes: ?? bytes for param nr, and ?? bytes for value/??
                       // fallthrough
           case 0x3A : // in: 21 byte; out 21 byte; in is parameters??; out is FF
+                      // not seen in EHVX08S26CB9W
                       // fallthrough
           case 0x3B : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
+                      // not seen in EHVX08S26CB9W
                       // but let's also reply with a packet with the same length and only FF as payload
                       // fallthrough
           case 0x3C : // in: 23 byte; out 23 byte; in is parameters??; out is FF
+                      // not seen in EHVX08S26CB9W
                       // fallthrough
           case 0x3D : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
                       // but let's also reply with a packet with the same length and only FF as payload
+                      // not seen in EHVX08S26CB9W
                       for (w = 3; w < n - 1; w++) WB[w] = 0xFF;
                       P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
                       break;

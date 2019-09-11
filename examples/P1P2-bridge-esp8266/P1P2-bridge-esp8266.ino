@@ -176,13 +176,13 @@ void setup() {
   if (client.connect("P1P2", mqttUser, mqttPassword )) {
     Serial.println("* Connected to mqtt server");  
     client.subscribe("P1P2/W");
+    client.publish("P1P2/S","* [ESPm] P1P2-bridge-esp8266 v0.9.8");
+    Serial.readBytesUntil('\n', readbuf, RB); // try to avoid reading a partial line in loop below
   } else {
     Serial.print("* Mqtt server connection failed with state ");
     Serial.print(client.state());
     delay(2000);
   }
-
-  client.publish("P1P2/S","* [ESPm] P1P2-bridge-esp8266 v0.9.8");
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {

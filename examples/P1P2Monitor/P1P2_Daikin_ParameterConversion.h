@@ -57,7 +57,7 @@ void savehistory(byte *rb, int n) {
         if (savehistoryend + (n - shign) <= RBHLEN) {
           savehistoryp[shi] = savehistoryend;
   #ifdef RPI
-          printf("* Savehistory allocating %i - \n",savehistoryend);
+          printf("* Savehistory allocating %i - ",savehistoryend);
   #else /* RPI */
           //Serial.print(F("* Savehistory allocating "));
           //Serial.print(savehistoryend);
@@ -66,7 +66,7 @@ void savehistory(byte *rb, int n) {
           savehistorylen[shi] = n - shign;
           savehistoryend += (n - shign);
   #ifdef RPI
-          printf("%i for 0x%x%x-0x%x%x\n",savehistoryend, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
+          printf("%i for 0x%X%X-0x%X%X\n",savehistoryend, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
   #else /* RPI */
           //Serial.print(savehistoryend);
           //Serial.print(F(" for "));
@@ -82,7 +82,7 @@ void savehistory(byte *rb, int n) {
           savehistorylen[shi] = (RBHLEN - savehistoryend);
           savehistoryend += RBHLEN;
   #ifdef RPI
-          printf("* Not enough memory, shortage %i for %x%x-%x%x\n", (n-shign) + savehistoryend - RBHLEN, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
+          printf("* Not enough memory, shortage %i for %X%X-%X%X\n", (n-shign) + savehistoryend - RBHLEN, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
   #else /* RPI */
           //Serial.print(F("* Not enough memory, shortage "));
           //Serial.print((n - shign) + savehistoryend - RBHLEN);
@@ -96,7 +96,7 @@ void savehistory(byte *rb, int n) {
         } else {
           // no space left
   #ifdef RPI
-          printf("* Warning: memory shortage %i for %x%x-%x%x\n", (n-shign), rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
+          printf("* Warning: memory shortage %i for %X%X-%X%X\n", (n-shign), rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
   #else /* RPI */
           //Serial.print("* Warning: memory shortage ");
           //Serial.print((n - shign));
@@ -263,7 +263,7 @@ byte handleparam(char* key, char* value, byte* rb, uint8_t i) {
 byte unknownbyte(char* key, char* value, byte* rb, uint8_t i) {
   if (!outputunknown || !newbytesval(rb, i, 1)) return 0;
   snprintf(key, KEYLEN, "Byte-0x%X%X-0x%X%X-%i", rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F, i);
-  snprintf(value, KEYLEN, "0x%x%x", rb[i] >> 4, rb[i] & 0x0F);
+  snprintf(value, KEYLEN, "0x%X%X", rb[i] >> 4, rb[i] & 0x0F);
   return 1;
 }
 

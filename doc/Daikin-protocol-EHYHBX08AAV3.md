@@ -337,6 +337,7 @@ The parameter range for the is 0x0000-0x144.
 |    3A         | 01                            | ?                     |               |
 |    3F         | 00/01                         | Related to DHW on/off |               |
 |    40         | 00/01                         | Related to DHW on/off (setting this parameter in a 40Fx35 response to 0x00/0x01 switches DHW off/on) |               |
+|    48         | 00/01                         | Related to DHW booster on/off |               |
 |    4E         | 01                            | ?                     |               |
 |    4F         | 01                            | ?                     |               |
 |    50         | 00/01                         | DHW active            |               |

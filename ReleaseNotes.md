@@ -2,6 +2,7 @@
 
 v0.9.8
 
+- [+20190911] amended savehistory to include coverage for packet type 16; added P1P2Convert for Linux/RPi postprocessing of logs
 - Added hysteresis functionality in temperature reporting
 - Errors returned in errorbuf by readpacket() on longer contain EOB flag, only real error flags
 
