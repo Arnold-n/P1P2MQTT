@@ -24,11 +24,11 @@ And for controlling purposes (P1P2Controller only):
 - Lx sets external controller mode and address: x=0: off, x=1: controller address 0xF0, x=2: controller address 0xF1
      (for EHYHBX08AAV3: use 1, cannot be combined with another auxiliary controller)
      (for EHVX08S23D6V: use 1 if you don't have another auxiliary controller, use 2 if you do)
-- Wx sets DHW on/off (using parameter 0x40 from the set of parameters used in packet type 35)
+- Yx sets DHW on/off (using parameter 0x40 from the set of parameters used in packet type 35)
 - Zx sets heating/cooling on/off (using parameter 0x31 in packet type 35; for other devices this should be a different parameter)
 - Px sets the parameter number in packet type 35 (0x00..0xFF) to use for heating/cooling on/off (default 0x31 forEHVX08S23D6V, use 0x2F for EHYHBX08AAV3)
 - L reports current controller mode (0, 1, or 2)
-- W reports DHW status as reported by main controller
+- Y reports DHW status as reported by main controller
 - Z reports heating/cooling status as reported by main controller
 - P reports parameter number in packet type 35 used for cooling/heating on/off
 
