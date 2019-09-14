@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190914 v0.9.10 upon bus collision detection, write buffer is emptied
  * 20190914 v0.9.9 Added writeready()
  * 20190908 v0.9.8 Removed EOB signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
  * 20190831 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
@@ -478,7 +479,7 @@ ISR(CAPTURE_INTERRUPT)
             // If not, this is likely caused by a bus collision
             if (rx_byte_verify != rx_byte) { error_buffer[head] |= ERROR_READBACK; digitalWrite(LED_BUILTIN, HIGH); }
             // As of version 0.9.10: if a bus collision is suspected, stop further collissions by emptying write buffer
-            tx_buffer_head = tx_buffer_tail;
+            tx_buffer_tail = tx_buffer_head;
           }
           rx_buffer_head = head;
         } else {
@@ -545,7 +546,7 @@ ISR(COMPARE_B_INTERRUPT)
           // If not, this is likely caused by a bus collision
           if (rx_byte_verify != rx_byte) { error_buffer[head] |= ERROR_READBACK; digitalWrite(LED_BUILTIN, HIGH); }
           // As of version 0.9.10: if a bus collision is suspected, stop further collissions by emptying write buffer
-          tx_buffer_head = tx_buffer_tail;
+          tx_buffer_tail = tx_buffer_head;
         }
         rx_buffer_head = head;
       } else {
