@@ -5,7 +5,7 @@ For the serial communication to the Arduino Uno running P1P2Monitor or P1P2Contr
 For monitoring purposes (P1P2Monitor and P1P2Controller):
 
 - W\<hex data\> Write packet (max 32 bytes) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
-- Cx counterrequest triggers single cycle of 6 B8 packets to request counters from heat pump; temporarily blocks controller function
+- C  Request counters: triggers single cycle of 6 B8 packets to request counters from heat pump; temporarily blocks controller function; only works if controller function is on
 - Vx Sets reading mode verbose off/on
 - Tx sets new delay value in ms, to be used for future packets (default 50 (older versions: 0))
 - Ox sets new delay timeout value in ms, to be used immediately (default 2500)

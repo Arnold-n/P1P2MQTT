@@ -29,12 +29,12 @@
  * P1P2Monitor Configuration is done by sending one of the following lines over serial 
  *
  *    (L, W, Z, P are new and are for controlling DHW on/off and heating/cooling on/off:)
- * Lx sets controller functionality off (x=0), on with address 0xF0 (x=1), on with address 0xF1 (x=2)
- * Wx sets DHW on/off
+ * Lx sets controller functionality off (x=0), on (x=1), address (0xF0/0xF1) autodetected
+ * Yx sets DHW on/off
  * Zx sets cooling on/off
  * Px sets the parameter number in packet type 35 (0x00..0xFF) to use for heating/cooling on/off (default 0x31 forEHVX08S23D6V, use 0x2F for EHYHBX08AAV3)
  * L reports controller status
- * W reports DHW status as reported by main controller
+ * Y reports DHW status as reported by main controller
  * Z reports cooling/heating status as reported by main controller
  * P reports parameter number in packet type 35 used for cooling/heating on/off
  *
@@ -44,7 +44,7 @@
  * S  Display changed-only mode (if JSON is defined)
  *
  * W<hex data> Write packet (max 32 bytes) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
- * Cx counterrequest triggers single cycle of 6 B8 packets to request counters from heat pump; temporarily blocks controller function
+ * C  counterrequest triggers single cycle of 6 B8 packets to request counters from heat pump; temporarily blocks controller function
  * Vx Sets reading mode verbose off/on
  * Tx sets new delay value, to be used for future packets (default 0)
  * Ox sets new delay timeout value, used immediately (default 2500)
@@ -298,8 +298,8 @@ int scanhex(char* s, int &b) {
   return sscanf(s,"%2x",&b);
 }
 
-#define CONTROL_ID0 0xF0     // first external controller
-#define CONTROL_ID1 0xF1     // second external controller
+//#define CONTROL_ID0 0xF0     // first external controller
+//#define CONTROL_ID1 0xF1     // second external controller
 byte CONTROL_ID=0x00;
 
 byte setDHW = 0;
@@ -434,9 +434,11 @@ void loop() {
                           CONTROL_ID = 0xF1;
                         } else {
                           Serial.println(F("* No free slave address for controller found. Control functionality not enabled. You may with to re-try later (and perhaps switch external controllers off)"));
+                          counterrequest = 0;
                           CONTROL_ID = 0x00;
                         }
                       } else {
+                        counterrequest = 0;
                         CONTROL_ID = 0x00;
                       }
                       if (!verbose) break;
@@ -474,12 +476,11 @@ void loop() {
                     Serial.println(setParam, HEX);
                     break;
           case 'c': // set counterrequest cycle
-          case 'C': if (verbose) Serial.print(F("* Counterrequest ")); 
-                    if (scanint(&RS[1], temp) == 1) {
-                      if (temp) temp = 1;
-                      counterrequest = temp;
-                      if (!verbose) break;
-                      Serial.println(F(" cycle initited")); 
+                    if (CONTROL_ID) {
+                      counterrequest = 1;
+                      Serial.print(F("* Counter-request cycle initiated")); 
+                    } else {
+                      Serial.println(F("* Counter-request cycle refused because controller function is off"));
                     }
                     break;
           case 'z': // set heating/cooling mode on/off
@@ -531,7 +532,7 @@ void loop() {
 #ifdef MONITORCONTROL
     if (!(EB[nread - 1] & ERROR_CRC)) {
       byte w;
-      if ((counterrequest) && (nread > 4) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30)) {
+      if (CONTROL_ID && (counterrequest) && (nread > 4) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30)) {
         WB[0] = 0x00;
         WB[1] = 0x00;
         WB[2] = 0xB8;
@@ -551,6 +552,7 @@ void loop() {
             Serial.print(F("* (New?!) external controller answering to address 0x"));
             Serial.print(RB[1], HEX);
             Serial.println(F(" detected, switching control functionality off"));
+            counterrequest = 0;
             CONTROL_ID = 0x00;
           }
         }
