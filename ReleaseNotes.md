@@ -1,5 +1,9 @@
 **Release notes**
 
+v0.9.10
+
+- P1P2Serial library: upon bus collision detection, write buffer is emptied
+
 v0.9.9
 
 - P1P2Monitor: autodetection of external controller slave address (thanks to the sugestion of Krakra)

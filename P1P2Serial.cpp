@@ -477,6 +477,8 @@ ISR(CAPTURE_INTERRUPT)
             // check if received byte matches sent byte
             // If not, this is likely caused by a bus collision
             if (rx_byte_verify != rx_byte) { error_buffer[head] |= ERROR_READBACK; digitalWrite(LED_BUILTIN, HIGH); }
+            // As of version 0.9.10: if a bus collision is suspected, stop further collissions by emptying write buffer
+            tx_buffer_head = tx_buffer_tail;
           }
           rx_buffer_head = head;
         } else {
@@ -542,6 +544,8 @@ ISR(COMPARE_B_INTERRUPT)
           // check if received byte matches sent byte
           // If not, this is likely caused by a bus collision
           if (rx_byte_verify != rx_byte) { error_buffer[head] |= ERROR_READBACK; digitalWrite(LED_BUILTIN, HIGH); }
+          // As of version 0.9.10: if a bus collision is suspected, stop further collissions by emptying write buffer
+          tx_buffer_head = tx_buffer_tail;
         }
         rx_buffer_head = head;
       } else {
