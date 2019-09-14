@@ -476,7 +476,7 @@ void loop() {
                     Serial.println(setParam, HEX);
                     break;
           case 'c': // set counterrequest cycle
-                    if (CONTROL_ID) {
+          case 'C': if (CONTROL_ID) {
                       counterrequest = 1;
                       Serial.print(F("* Counter-request cycle initiated")); 
                     } else {
