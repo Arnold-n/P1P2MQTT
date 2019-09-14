@@ -1,5 +1,11 @@
 **Release notes**
 
+v0.9.9
+
+- P1P2Monitor: autodetection of external controller slave address (thanks to the sugestion of Krakra)
+- P1P2Monitor: reduced bus collision situations
+- P1P2Serial library: added writeready() function
+
 v0.9.8
 
 - [+20190911] amended savehistory to include coverage for packet type 16; added P1P2Convert for Linux/RPi postprocessing of logs

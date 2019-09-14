@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190914 v0.9.9 Added writeready()
  * 20190908 v0.9.8 Removed EOB signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
  * 20190831 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
  * 20190824 v0.9.6 Added packetavailable()
@@ -89,6 +90,7 @@ public:
 	bool packetavailable();
 	static void flushInput();
 	static void flushOutput();
+	static bool writeready();
 	static void write(uint8_t byte);
 	static void setDelay(uint16_t t);
 	static void setDelayTimeout(uint16_t t);

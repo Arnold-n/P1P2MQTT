@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190914 v0.9.9 Added writeready()
  * 20190908 v0.9.8 Removed EOB signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
  * 20190831 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
  * 20190824 v0.9.6 Added packetavailable()
@@ -218,6 +219,7 @@ void P1P2Serial::setDelay(uint16_t t)
 //                Note that SetDelay is not (yet) suited for proper HBS timing, as HBS timing measures pauses from the end of the stop bit
 //                Timing on the P1P2 bus is not so critical and SetDelay works fine for the P1P2 bus.
 // If setDelay (t) is called with 2 <= t <= 65535, a delay of t ms is set.
+// It is recommended to NOT use setDelay(0) or setDelay(1), unless really needed, because of the the risk of bus collision.
 {
   tx_setdelay = t;
 }
@@ -227,6 +229,11 @@ void P1P2Serial::setDelayTimeout(uint16_t t)
 // This sets delay timeout as described above
 {
   tx_setdelaytimeout = t;
+}
+
+bool P1P2Serial::writeready(void)
+{
+  return (tx_buffer_tail == tx_buffer_head);
 }
 
 void P1P2Serial::write(uint8_t b)
@@ -250,7 +257,7 @@ void P1P2Serial::write(uint8_t b)
     tx_byte_verify = b; // for read-back verification
     tx_bit = 0;
     tx_paritybit = 0;
-    // we could start writing from here, as we did <=v0.9.4, but we can also leave it to the ISR, which is simpler
+    // we could initiate start writing here, as we did <=v0.9.4, but we can better leave it to the ISR, which is simpler
     // worst-case it adds some delay, but it makes the operation slightly more predictable
     if ((tx_setdelay) && ((time_msec < tx_setdelay) || (time_msec < tx_setdelaytimeout))) {
       // state 99: start transmission only (in msec ISR) when time_msec becomes == tx_setdelay or >= tx_setdelaytimeout
@@ -681,6 +688,7 @@ void P1P2Serial::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t c
 {
 // Writes one packet of l bytes, t ms after last bus action; 
 // If crc_gen is not zero, adds CRC byte to packet
+// Note that t=0 or t=1 increases risk of bus collisions, don't use it if not needed.
   setDelay(t);
   uint8_t crc=crc_feed;
   for (uint8_t i = 0; i < l; i++) {

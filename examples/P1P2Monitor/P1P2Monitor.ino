@@ -7,6 +7,7 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20190914 v0.9.9 Controller/write safety related improvements; automatic controller ID detection
  * 20190908 v0.9.8 Minor improvements: error handling, hysteresis, improved output (a.o. x0Fx36)
  * 20190829 v0.9.7 Improved Serial input handling, added B8 counter request
  * 20190828        Fused P1P2Monitor and P1P2json-mega (with udp support provided by Budulinek)
@@ -183,7 +184,7 @@ void setup() {
 #ifdef SAVEHISTORY
   Serial.print(F("+savehist"));
 #endif
-  Serial.println(F(" v0.9.8"));
+  Serial.println(F(" v0.9.9"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
 #ifdef JSON
@@ -198,6 +199,11 @@ void setup() {
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work for the Daikin hybrid
 #define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is present or added
                         // These values can be changed via serial port
+#define F030DELAY 100   // Time delay for external controller simulation, should be larger than any response of other external controllers (which is typically 25-80 ms)
+#define F03XDELAY  30   // Time delay for external controller simulation, should preferably be a bit larger than any regular response from external controllers (which is typically 25 ms)
+#define F0THRESHOLD 5   // Number of 00Fx30 messages to be unanswered before we feel safe to act as this controller
+int8_t FxAbsentCnt[2]={-1, -1}; // FxAbsentCnt[x] counts number of unanswered 00Fx30 messages; 
+                        // if -1 than no Fx request or response seen (relevant to detect whether F1 controller is supported or not)
 byte setParam = 0x31;   // Parameter in packet type 35 for switching cooling/heating on/off
                         // 0x31 works on EHVX08S23D6V
                         // 0x2F works on EHYHBX08AAV3
@@ -212,7 +218,7 @@ static byte RB[RB_SIZE];
 static byte EB[RB_SIZE];
 
 static byte verbose = 1;      // By default include timing and error information in output
-static int sd = 0;            // for storing delay setting for each packet written
+static int sd = 50;           // for storing delay setting for each packet written (changed to 50ms which seems to be a bit safer than 0)
 static int sdto = 2500;       // for storing delay timeout setting
 static byte echo = 0;         // echo setting (whether written data is read back)
 
@@ -366,6 +372,10 @@ void loop() {
           case 't':
           case 'T': if (verbose) Serial.print(F("* Delay "));
                     if (scanint(&RS[1], sd) == 1) { 
+                      if (sd < 2) {
+                        sd = 2;
+                        Serial.print(F("[use of delay 0 or 1 not recommended, increasing to 2] "));
+                      }
                       if (!verbose) break; 
                       Serial.print(F("set to "));
                     }
@@ -406,26 +416,39 @@ void loop() {
                       }
                     }
                     if (verbose) Serial.println();
-                    P1P2Serial.writepacket(WB, wb, sd, crc_gen, crc_feed);
+                    if (P1P2Serial.writeready()) {
+                      P1P2Serial.writepacket(WB, wb, sd, crc_gen, crc_feed);
+                    } else {
+                      Serial.println(F("* Refusing to write packet while previous packet wasn't finished"));
+                    }
                     break;
-          case 'l': // set external controller answering function on/off and set CONTROL_ID address
-          case 'L': if (verbose) Serial.print(F("* Control_id ")); 
-                    if (scanint(&RS[1], temp) == 1) {
-                      if (temp > 2) temp = 2; 
-                      switch (temp) {
-                        case 0 : CONTROL_ID = 0x00; break;
-                        case 1 : CONTROL_ID = CONTROL_ID0; break;
-                        case 2 : CONTROL_ID = CONTROL_ID1; break;
-                        default: break;
+          case 'l': // set external controller function on/off; CONTROL_ID address is set automatically
+          case 'L': if (scanint(&RS[1], temp) == 1) {
+                      if (temp > 1) temp = 1; 
+                      if (temp) {
+                        if (FxAbsentCnt[0] == F0THRESHOLD) {
+                          Serial.println(F("* Control_ID 0xF0 supported, no external controller found for 0xF0, switching control functionality on 0xF0 on"));
+                          CONTROL_ID = 0xF0;
+                        } else if (FxAbsentCnt[1] == F0THRESHOLD) {
+                          Serial.println(F("* Control_ID 0xF1 supported, no external controller found for 0xF1, switching control functionality on 0xF1 on"));
+                          CONTROL_ID = 0xF1;
+                        } else {
+                          Serial.println(F("* No free slave address for controller found. Control functionality not enabled. You may with to re-try later (and perhaps switch external controllers off)"));
+                          CONTROL_ID = 0x00;
+                        }
+                      } else {
+                        CONTROL_ID = 0x00;
                       }
                       if (!verbose) break;
-                      Serial.print(F("set to 0x")); 
+                      Serial.print(F("* Control_id set to 0x")); 
+                      if (CONTROL_ID <= 0x0F) Serial.print("0"); 
+                      Serial.println(CONTROL_ID, HEX);
+                      break;
                     }
-                    Serial.print("0x");
-                    if (CONTROL_ID <= 0x0F) Serial.print(F("0")); 
+                    if (verbose) Serial.print(F("* Control_id is 0x")); 
+                    if (CONTROL_ID <= 0x0F) Serial.print("0"); 
                     Serial.println(CONTROL_ID, HEX);
                     break;
-                    
           case 'y': // set DHW on/off
           case 'Y': if (verbose) Serial.print(F("* DHW ")); 
                     if (scanint(&RS[1], temp) == 1) {
@@ -443,10 +466,11 @@ void loop() {
                     if (scanhex(&RS[1], temp) == 1) {
                       setParam = temp;
                       if (!verbose) break;
-                      Serial.print(F("set to 0x")); 
-                      Serial.println(setParam, HEX);
+                      Serial.print(F("set to ")); 
                       break;
                     }
+                    Serial.print(F("0x")); 
+                    if (setParam <= 0x0F) Serial.print(F("0")); 
                     Serial.println(setParam, HEX);
                     break;
           case 'c': // set counterrequest cycle
@@ -512,100 +536,143 @@ void loop() {
         WB[1] = 0x00;
         WB[2] = 0xB8;
         WB[3] = (counterrequest - 1);
-        P1P2Serial.writepacket(WB, 4, 10, crc_gen, crc_feed);
+        if (P1P2Serial.writeready()) {
+          P1P2Serial.writepacket(WB, 4, F03XDELAY, crc_gen, crc_feed);
+        } else {
+          Serial.println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
+        }
         if (++counterrequest == 7) counterrequest = 0;
-      } else if ((nread > 4) && (RB[0] == 0x00) && (RB[1] == CONTROL_ID) && ((RB[2] & 0x30) == 0x30)) {
-        WB[0] = 0x40;
-        WB[1] = RB[1];
-        WB[2] = RB[2];
-        int n = nread;
-        if (crc_gen) n--; // omit CRC from received-byte-counter
-        if (n > WB_SIZE) { n = WB_SIZE; Serial.print(F("* Surprise: received packet of size ")); Serial.println(nread);}
-        switch (RB[2]) {
-          case 0x30 : // in: 17 byte; out: 17 byte; out pattern WB[7] should contain a 01 if we want to communicate a new setting
-                      for (w = 3; w < n; w++) WB[w] = 0x00;
-                      // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcoolingheating/setDHW needs to be changed to request a F035 message
-                      if (setDHW || setcoolingheating) WB[7] = 0x01;
-                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                      break;
-          case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function partly date/time, partly unknown
-                      for (w = 3; w < n; w++) WB[w] = RB[w];
-                      WB[7] = 0xB4; // 180 ?? product type for LAN adapter?
-                      WB[8] = 0x10; //  16 ??
-                      // same 0xB4 0x10 values also seen at EHVX08S26CB9W so enable this change
-                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                      break;
-          case 0x32 : // in: 19 byte: out 19 byte, out is copy in
-                      for (w = 3; w < n; w++) WB[w] = RB[w];
-                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                      break;
-          case 0x33 : // not seen
-                      break;
-          case 0x34 : // not seen
-                      break;
-          case 0x35 : // in: 21 byte; out 21 byte; in is parameters; out is FF except for first packet which starts with 930000 (why?)
-                      // parameters in the 00F035 message may indicate status changes in the heat pump
-                      // A parameter consists of 3 bytes: 2 bytes for param nr, and 1 byte for value
-                      // for now we only check for the following parameters: 
-                      // DHW parameter 0x40
-                      // EHVX08S26CB9W DHWbooster parameter 0x48
-                      // coolingheating parameter 0x31 or 0x2F (as defined in setParam)
-                      for (w = 3; w < n; w++) WB[w] = 0xFF;
-                      // change bytes for triggering coolingheating on/off
-                      w = 3;
-                      if (setDHW) { WB[w++] = 0x40; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
-                      if (setcoolingheating) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheating = 0; }
-                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                      for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
-                      for (w = 3; w < n; w++) if ((RB[w] == 0x40) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
-                      break;
-          case 0x36 : // in: 23 byte; out 23 byte; in is 4-byte parameters??; out is FF
-                      // seen in EHVX08S26CB9W, reply is FF as expected
-                      // A parameter consists of 4 bytes: 2 bytes for param nr, and 2 bytes for value
-                      // fallthrough
-          case 0x37 : // not seen, but we still reply with a packet with the same length and only FF as payload for devices that do request this type of message
-                      // seen in EHVX08S26CB9W, reply is FF as expected
-                      // contains 5-byte parameters
-                      // fallthrough
-          case 0x38 : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
-                      // but let's also reply with a packet with the same length and only FF as payload
-                      // seen in EHVX08S26CB9W, reply is FF as expected
-                      // A parameter consists of 6 bytes: ?? bytes for param nr, and ?? bytes for value/??
-                      // fallthrough
-          case 0x39 : // in: 21 byte; out 21 byte; in is parameters??; out is FF
-                      // seen in EHVX08S26CB9W, reply is FF as expected
-                      // A parameter consists of 6 bytes: ?? bytes for param nr, and ?? bytes for value/??
-                      // fallthrough
-          case 0x3A : // in: 21 byte; out 21 byte; in is parameters??; out is FF
-                      // not seen in EHVX08S26CB9W
-                      // fallthrough
-          case 0x3B : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
-                      // not seen in EHVX08S26CB9W
-                      // but let's also reply with a packet with the same length and only FF as payload
-                      // fallthrough
-          case 0x3C : // in: 23 byte; out 23 byte; in is parameters??; out is FF
-                      // not seen in EHVX08S26CB9W
-                      // fallthrough
-          case 0x3D : // not seen on EHVX08S23D6VXX, seen on hybrid, we don't know what the reply should be, 
-                      // but let's also reply with a packet with the same length and only FF as payload
-                      // not seen in EHVX08S26CB9W
-                      for (w = 3; w < n - 1; w++) WB[w] = 0xFF;
-                      P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                      break;
-          case 0x3E : if (RB[3]) {
-                        // 0x3E01, 0x3E02, ... in: 23 byte; out: 23 byte; out 40F13E01(even for higher) + 19xFF
-                        WB[3] = 0x01;
+      } else if ((nread > 4) && (RB[0] == 0x40) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
+        // external controller reply - note this could be our own (slow, delta=F030DELAY) reply so only reset count if delta < F0DELAY (- margin)
+        if (delta < F030DELAY - 2) {
+          FxAbsentCnt[RB[1] & 0x01] = 0;
+          if (RB[1] == CONTROL_ID) {
+            // this should only happen if an external controller is connected after CONTROL_ID is set
+            Serial.print(F("* (New?!) external controller answering to address 0x"));
+            Serial.print(RB[1], HEX);
+            Serial.println(F(" detected, switching control functionality off"));
+            CONTROL_ID = 0x00;
+          }
+        }
+      } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
+        if ((RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x01] < F0THRESHOLD)) {
+          FxAbsentCnt[RB[1] & 0x01]++;
+          if (FxAbsentCnt[RB[1] & 0x01] == F0THRESHOLD) {
+            Serial.print(F("* No external controller answering to address 0x"));
+            Serial.print(RB[1], HEX);
+            Serial.println(F(" detected, switching control functionality can be switched on (using L1)"));
+          }
+        }
+        if (CONTROL_ID && (RB[1] == CONTROL_ID)) {
+          WB[0] = 0x40;
+          WB[1] = RB[1];
+          WB[2] = RB[2];
+          int n = nread;
+          int d = F03XDELAY;
+          bool wr = 0;
+          if (crc_gen) n--; // omit CRC from received-byte-counter
+          if (n > WB_SIZE) { 
+            n = WB_SIZE; 
+            Serial.print(F("* Surprise: received 00Fx3x packet of size ")); 
+            Serial.println(nread);
+          }
+          switch (RB[2]) {
+            case 0x30 : // in: 17 byte; out: 17 byte; out pattern WB[7] should contain a 01 if we want to communicate a new setting
+                        for (w = 3; w < n; w++) WB[w] = 0x00;
+                        // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcoolingheating/setDHW needs to be changed to request a F035 message
+                        if (setDHW || setcoolingheating) WB[7] = 0x01;
+                        d = F030DELAY;
+                        wr = 1;
+                        break;
+            case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function partly date/time, partly unknown
+                        for (w = 3; w < n; w++) WB[w] = RB[w];
+                        WB[7] = 0xB4; // 180 ?? product type for LAN adapter?
+                        WB[8] = 0x10; //  16 ??
+                        wr = 1;
+                        // same 0xB4 0x10 values also seen at EHVX08S26CB9W so enable this change
+                        break;
+            case 0x32 : // in: 19 byte: out 19 byte, out is copy in
+                        for (w = 3; w < n; w++) WB[w] = RB[w];
+                        wr = 1;
+                        break;
+            case 0x33 : // not seen, no response
+                        break;
+            case 0x34 : // not seen, no response
+                        break;
+            case 0x35 : // in: 21 byte; out 21 byte; 3-byte parameters reply with FF  
+                        // LAN adapter replies first packet which starts with 930000 (why?)
+                        // A parameter consists of 3 bytes: 2 bytes for param nr, and 1 byte for value
+                        // parameters in the 00F035 message may indicate status changes in the heat pump
+                        // for now we only check for the following parameters: 
+                        // DHW parameter 0x40
+                        // EHVX08S26CB9W DHWbooster parameter 0x48
+                        // coolingheating parameter 0x31 or 0x2F (as defined in setParam)
+                        // parameters 0144- or 0162- ASCII name of device
+                        for (w = 3; w < n; w++) WB[w] = 0xFF;
+                        // change bytes for triggering coolingheating on/off
+                        w = 3;
+                        if (setDHW) { WB[w++] = 0x40; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
+                        if (setcoolingheating) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheating = 0; }
+                        for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
+                        for (w = 3; w < n; w++) if ((RB[w] == 0x40) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
+                        wr = 1;
+                        break;
+            case 0x36 : // in: 23 byte; out 23 byte; 4-byte parameters; reply with FF
+                        // A parameter consists of 4 bytes: 2 bytes for param nr, and 2 bytes for value
+                        // fallthrough
+            case 0x37 : // in: 23 byte; out 23 byte; 5-byte parameters; reply with FF
+                        // not seen in EHVX08S23D6V
+                        // seen in EHVX08S26CB9W (value: 00001001010100001001)
+                        // seen in EHYHBX08AAV3 (could it be date?: 000013081F = 31 aug 2019)
+                        // fallthrough
+            case 0x38 : // in: 21 byte; out 21 byte; 6-byte parameters; reply with FF
+                        // parameter range 0000-001E; kwH/hour counters?
+                        // not seen in EHVX08S23D6V
+                        // seen in EHVX08S26CB9W
+                        // seen in EHYHBX08AAV3
+                        // A parameter consists of 6 bytes: ?? bytes for param nr, and ?? bytes for value/??
+                        // fallthrough
+            case 0x39 : // in: 21 byte; out 21 byte; 6-byte parameters; reply with FF
+                        // fallthrough
+            case 0x3A : // in: 21 byte; out 21 byte; 3-byte parameters; reply with FF
+                        // fallthrough
+            case 0x3B : // in: 23 byte; out 23 byte; 4-byte parameters; reply with FF
+                        // not seen in EHVX08S23D6V
+                        // seen in EHVX08S26CB9W
+                        // seen in EHYHBX08AAV3
+                        // fallthrough
+            case 0x3C : // in: 23 byte; out 23 byte; 5 or 10-byte parameters; reply with FF
+                        // fallthrough
+            case 0x3D : // in: 21 byte; out: 21 byte; 6-byte parameters; reply with FF
+                        // parameter range 0000-001F; kwH/hour counters?
+                        // not seen in EHVX08S23D6V
+                        // seen in EHVX08S26CB9W
+                        // seen in EHYHBX08AAV3
+                        for (w = 3; w < n - 1; w++) WB[w] = 0xFF;
+                        wr = 1;
+                        break;
+            case 0x3E : // schedule related packet
+                        if (RB[3]) {
+                          // 0x3E01, 0x3E02, ... in: 23 byte; out: 23 byte; out 40F13E01(even for higher) + 19xFF
+                          // schedule-related
+                          WB[3] = 0x01;
+                        } else {
+                          // 0x3E00 in: 8 byte out: 8 byte; 40F13E00 (4x FF)
+                          WB[3] = 0x00;
+                        }
                         for (w = 4; w < n; w++) WB[w] = 0xFF;
-                        P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                      } else {
-                        // 0x3E00 in: 8 byte out: 8 byte; 40F13E00 (4x FF)
-                        WB[3] = 0x00;
-                        for (w = 4; w < n; w++) WB[w] = 0xFF;
-                        P1P2Serial.writepacket(WB, n, 25, crc_gen, crc_feed);
-                      }
-                      break;
-          default   : // not seen
-                      break;
+                        wr = 1;
+                        break;
+            default   : // not seen, no response
+                        break;
+          }
+          if (wr) {
+            if (P1P2Serial.writeready()) {
+              P1P2Serial.writepacket(WB, n, d, crc_gen, crc_feed);
+            } else {
+              Serial.println(F("* Refusing to write packet while previous packet wasn't finished"));
+            }
+          }
         }
       }
     }

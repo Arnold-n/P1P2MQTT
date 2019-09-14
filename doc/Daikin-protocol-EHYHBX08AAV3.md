@@ -112,13 +112,13 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | 11                            | packet type 11        | u8
 |   3-4         | XX YY                         | LWT temperature       | f8.8
-|   5-6         | XX YY                         | (optional external outside temp sensor?)    | f8.8
+|   5-6         | XX YY                         | DHW temperature (if connected) | f8.8
 |   7-8         | XX YY                         | Outside temperature 1 (raw; in 0.5 degree resolution) | f8.8 |
 |   9-10        | XX YY                         | RWT                   | f8.8 |
 |  11-12        | XX YY                         | Mid-way temperature heat pump - gas boiler | f8.8 |
 |  13-14        | XX YY                         | Refrigerant temperature | f8.8 |
 |  15-16        | XX YY                         | Actual room temperature | f8.8 |
-|  17-18        | XX YY                         | Outside temperature 2 (stabilized; does not change during defrosts; adds extra variations not in raw outside temperature, perhaps averaged over samples | f8.8 |
+|  17-18        | XX YY                         | External temperature sensor (if connected); otherwise Outside temperature 2 derirved from external unit sensor, but stabilized; it does not change during defrosts; it also adds extra variations not in raw outside temperature, perhaps due to averaging over samples | f8.8 |
 |  19-22        | 00                            | ? |
 |    23         | XX                            | CRC checksum          | u8
 
@@ -185,7 +185,10 @@ This timing corresponds to the description found in a design guide from Daikin w
 |    12         | 00-E0                         | flow (in 0.1 l/min) | u8
 |    13-14      | xxxx                          | software version inner unit | u16
 |    15-16      | xxxx                          | software version outer unit | u16
-|     17        | XX                            | CRC checksum          | u8
+| EHV only:    17        | 00                            | ??                    | u8
+| EHV only:    18        | 00                            | ??                    | u8
+| EHY:    17        | XX                            | CRC checksum          | u8
+| EHY:    19        | XX                            | CRC checksum          | u8
 
 #### 9. Packet "000014.."
 
@@ -229,7 +232,7 @@ This timing corresponds to the description found in a design guide from Daikin w
 |   13-17       | 00                            | echo of 000014-{13-17} ? |
 |   18-19       | 1C-24 00-09                   | Target temperature LWT main zone in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8
 |   20-21       | 1C-24 00-09                   | Target temperature LWT add zone  in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8
-|     23        | XX                            | CRC checksum          | u8
+|     22        | XX                            | CRC checksum          | u8
 
 #### 11. Packet "000015.."
 
@@ -255,9 +258,51 @@ This timing corresponds to the description found in a design guide from Daikin w
 |    3-4        | 00                            | ?
 |    5-6        | FD-FF,00-08 00/80             | Refrigerant temperature in 0.5 degree resolution | f8.8
 |    7-8        | 00                            | ?
-|      9        | XX                            | CRC checksum          | u8
+|EHY:  9        | XX                            | CRC checksum          | u8
+|EHV:  9        | 00-19                         | parameter number      | u8
+|EHV: 10        | 00                            | (part of parameter or parameter value?)                    | u8
+|EHV: 11        | XX                            | ??                    | u8
+|EHV: 12        | XX                            | CRC checksum          | u8
 
-#### 13. Packet "00F030.."
+
+| Parameter number  | Parameter Value           | Description           | Data type     | Bit: description |
+|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
+|EHV: 5         | 96                            | 15.0 degree  ?        | u8div10
+|EHV: 8         | 73,78,7D                      | 11.5, 12.0, 12.5 ?    | u8div10
+|EHV: A         | C3,C8                         | 19.5, 20.0            | u8div10
+|EHV: C         | 6E,73,78                      | 11.0, 11.5, 12.0      | u8div10
+|EHV: E         | B9,BE                         | 18.5, 19.0            | u8div10
+|EHV: F         | 68,6B                         | 10.4, 10.7            | u8div10
+|EHV: 10        | 05                            |  0.5                  | u8div10
+|EHV: 19        | 01                            |  0.1                  | u8div10
+|EHV: others    | 00                            | ??                    | u8
+
+#### 13. Packet "000016.." (EHV only)
+
+| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
+|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
+|     0         | 00                            | Request               | u8
+|     1         | 00                            | slave address: heat pump | u8
+
+|     5-6       | 32 14                         | room temperature?
+
+|     2         | 16                            | packet type 16        | u8
+|    3-10       | 00                            | ?
+|     11        | E6                            | ??                    | u8
+|     12        | XX                            | CRC checksum          | u8
+
+#### 14. Packet "400016.." (EHV only)
+
+| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
+|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
+|     0         | 40                            | Response              | u8
+|     1         | 00                            | slave address: heat pump | u8
+|     2         | 16                            | packet type 16        | u8
+|    3-10       | 00                            | ?
+|     11        | E6                            | ??                    | u8
+|     12        | XX                            | CRC checksum          | u8
+
+#### 15. Packet "00F030.."
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
