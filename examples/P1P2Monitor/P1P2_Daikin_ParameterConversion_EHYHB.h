@@ -27,11 +27,10 @@
 
 #include "P1P2_Daikin_ParameterConversion.h" // for Daikin product-independent code
 
-#ifdef RPI
 char TimeString[17]="2000-00-00 00:00";
 char TimeString2[20]="2000-00-00 00:00:00";
 byte SelectTimeString2=0;
-#endif /* RPI */
+
 
 // device dependent code starts here:
 // ----------------------------------
