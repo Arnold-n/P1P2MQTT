@@ -1,5 +1,5 @@
 /* P1P2Monitor: Monitor for reading Daikin/Rotex P1/P2 bus using P1P2Serial library, output in json format, over UDP,
- *           and limited control (DHW on/off, cooling/heating on/off) for some models.
+ *           and limited control (DHW on/off, coolinsg/heating on/off) for some models.
  *           Control has only been tested on EHYHBX08AAV3 and EHVX08S23D6V
  *           If all available options are selected (SAVEHISTORY, JSON, JSONUDP, MONITOR, MONITORCONTROL) this program
  *           may just fit in an Arduino Uno, and it will certainly fit in an Arduino Mega.
@@ -100,10 +100,11 @@
 #define SERIALDATAOUT  //     0       0          outputs data packets on serial
 #define MONITOR        //     5       0.2        outputs data (and errors, if any) on Serial output
 #define MONITORCONTROL //     1       0          controls DHW on/off and cooling/heating on/off
-//#define JSON           //    14       0.2        generate JSON messages for serial or UDP
-//#define JSONUDP        //     6       0.2        transmit JSON messages over UDP (requires JSON to be defined, tested on Mega+W5500 ethernet shield)
-//#define JSONSERIAL     //     0       0          outputs JSON messages on serial
-//#define SAVEHISTORY    //     2       0.2-2.7    (data-size depends on product-dependent parameter choices) saves packet history enabling the use of "UnknownOnly" to output changed values only (no effect if JSON is not defined)
+#define JSON           //    14       0.2        generate JSON messages for serial or UDP
+//#define JSONUDP      //     6       0.2        transmit JSON messages over UDP (requires JSON to be defined, tested on Mega+W5500 ethernet shield)
+#define JSONSERIAL     //     0       0          outputs JSON messages on serial
+//#define SAVEHISTORY  //     2       0.2-2.7    (data-size depends on product-dependent parameter choices) saves packet history enabling the use of "UnknownOnly" to output changed values only (no effect if JSON is not defined)
+#define MQTTTOPICS     //                        generate MQTT topics
                        // --------------------
                        //    32       2.0-4.5    total
 
@@ -204,9 +205,12 @@ void setup() {
 #define F0THRESHOLD 5   // Number of 00Fx30 messages to be unanswered before we feel safe to act as this controller
 int8_t FxAbsentCnt[2]={-1, -1}; // FxAbsentCnt[x] counts number of unanswered 00Fx30 messages; 
                         // if -1 than no Fx request or response seen (relevant to detect whether F1 controller is supported or not)
-byte setParam = 0x31;   // Parameter in packet type 35 for switching cooling/heating on/off
+byte setParam = 0x2D;   // Parameter in packet type 35 for switching cooling/heating on/off
                         // 0x31 works on EHVX08S23D6V
                         // 0x2F works on EHYHBX08AAV3
+                        // 0x2D works on EHVX08S26CA9W
+byte setParamDHW = 0x3E; // 0x40 works on EHVX08S23D6V 
+                        // 0x3E works on EHVX08S26CA9W
 
 
 #define RS_SIZE 99      // buffer to store data read from serial port, max line length on serial input is 99 (3 characters per byte, plus 'W" and '\r\n')
@@ -224,6 +228,51 @@ static byte echo = 0;         // echo setting (whether written data is read back
 
 #ifdef JSON
 static byte jsonterm = 1; // indicates whether json string has been terminated or not
+
+#ifdef MQTTTOPICS
+void process_for_mqtt_topics(byte* rb, int n) {
+  char value[KEYLEN];    
+  char key[KEYLEN + 9]; // 9 character prefix for topic
+  byte cat;
+  strcpy(key,"P1P2/P/U/");
+  for (byte i = 3; i < n; i++) {
+    int kvrbyte = bytes2keyvalue(rb, i, 8, key + 9, value, cat);
+    // returns 0 if byte does not trigger any output
+    // returns 1 if a new value should be output
+    // returns 8 if byte should be treated per bit
+    // returns 9 if json string should be terminated
+    if (kvrbyte == 9) {
+      if (jsonterm == 0) {
+        // only terminate json string and publish if at least one parameter was written
+        jsonterm = 1;
+      }
+    } else {
+      for (byte j = 0; j < kvrbyte; j++) {
+        int kvr= (kvrbyte==8) ? bytes2keyvalue(rb, i, j, key + 9, value, cat) : kvrbyte;
+        if (kvr) {
+          switch (cat) {
+            case 1 : key[7] = 'P'; // parameter settings
+                     break;
+            case 2 : key[7] = 'M'; // measurements, time, date
+                     break;
+            case 3 : key[7] = 'F'; // F related params
+                     break;
+            case 4 : key[7] = 'T'; // Temp Flow Power measurements
+                     break;
+            case 0 : // fallthrough
+            default: key[7] = 'U'; // unknown
+          }
+          Serial.print(F("T "));
+          Serial.print(key);
+          Serial.print(F(":"));
+          Serial.print(value);
+          Serial.println();
+        }
+      }
+    }
+  }
+}
+#endif MQTTTOPICS
 
 void process_for_mqtt_json(byte* rb, int n) {
   char value[KEYLEN];
@@ -300,7 +349,7 @@ int scanhex(char* s, int &b) {
 
 //#define CONTROL_ID0 0xF0     // first external controller
 //#define CONTROL_ID1 0xF1     // second external controller
-byte CONTROL_ID=0x00;
+byte CONTROL_ID=0xF0;
 
 byte setDHW = 0;
 byte setDHWstatus = 0;
@@ -469,7 +518,6 @@ void loop() {
                       setParam = temp;
                       if (!verbose) break;
                       Serial.print(F("set to ")); 
-                      break;
                     }
                     Serial.print(F("0x")); 
                     if (setParam <= 0x0F) Serial.print(F("0")); 
@@ -545,7 +593,7 @@ void loop() {
         if (++counterrequest == 7) counterrequest = 0;
       } else if ((nread > 4) && (RB[0] == 0x40) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
         // external controller reply - note this could be our own (slow, delta=F030DELAY) reply so only reset count if delta < F0DELAY (- margin)
-        if (delta < F030DELAY - 2) {
+        if (delta < F03XDELAY - 2) {
           FxAbsentCnt[RB[1] & 0x01] = 0;
           if (RB[1] == CONTROL_ID) {
             // this should only happen if an external controller is connected after CONTROL_ID is set
@@ -606,17 +654,17 @@ void loop() {
                         // A parameter consists of 3 bytes: 2 bytes for param nr, and 1 byte for value
                         // parameters in the 00F035 message may indicate status changes in the heat pump
                         // for now we only check for the following parameters: 
-                        // DHW parameter 0x40
+                        // DHW parameter setParamDHW
                         // EHVX08S26CB9W DHWbooster parameter 0x48
                         // coolingheating parameter 0x31 or 0x2F (as defined in setParam)
                         // parameters 0144- or 0162- ASCII name of device
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         // change bytes for triggering coolingheating on/off
                         w = 3;
-                        if (setDHW) { WB[w++] = 0x40; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
+                        if (setDHW) { WB[w++] = setParamDHW; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
                         if (setcoolingheating) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheating = 0; }
                         for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
-                        for (w = 3; w < n; w++) if ((RB[w] == 0x40) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
+                        for (w = 3; w < n; w++) if ((RB[w] == setParamDHW) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
                         wr = 1;
                         break;
             case 0x36 : // in: 23 byte; out 23 byte; 4-byte parameters; reply with FF
@@ -721,6 +769,11 @@ void loop() {
       }
     }
     Serial.println();
+
+#ifdef MQTTTOPICS
+    if (!(EB[nread - 1] & ERROR_CRC)) process_for_mqtt_topics(RB, nread - 1);
+#endif MQTTTOPICS
+
 #endif /* SERIALDATAOUT */
 #endif /* MONITOR */
 #ifdef JSON
