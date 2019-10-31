@@ -693,7 +693,7 @@ void loop() {
                         // not seen in EHVX08S23D6V
                         // seen in EHVX08S26CB9W
                         // seen in EHYHBX08AAV3
-                        for (w = 3; w < n - 1; w++) WB[w] = 0xFF;
+                        for (w = 3; w < n; w++) WB[w] = 0xFF;
                         wr = 1;
                         break;
             case 0x3E : // schedule related packet
