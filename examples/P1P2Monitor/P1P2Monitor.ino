@@ -1,12 +1,13 @@
 /* P1P2Monitor: Monitor for reading Daikin/Rotex P1/P2 bus using P1P2Serial library, output in json format, over UDP,
  *           and limited control (DHW on/off, cooling/heating on/off) for some models.
  *           Control has only been tested on EHYHBX08AAV3 and EHVX08S23D6V
- *           If all available options are selected (SAVEHISTORY, JSON, JSONUDP, MONITOR, MONITORCONTROL) this program
- *           may just fit in an Arduino Uno, and it will certainly fit in an Arduino Mega.
+ *           If to many options are selected (SAVEHISTORY, JSON, MQTTTOPICS, OUTPUTUDP, OUTPUTSERIAL, MONITOR, MONITORCONTROL, MONITORSERIAL) this program
+ *           will not fit in an Arduino Uno, but it will fit in an Arduino Mega.
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20191018 v0.9.10 Added MQTT topic like output over serial/udp, and parameter support for EHVX08S26CA9W (both thanks to jarosolanic)
  * 20190914 v0.9.9 Controller/write safety related improvements; automatic controller ID detection
  * 20190908 v0.9.8 Minor improvements: error handling, hysteresis, improved output (a.o. x0Fx36)
  * 20190829 v0.9.7 Improved Serial input handling, added B8 counter request
@@ -91,34 +92,35 @@
 
 
 // The following options can be defined, but not all of them on Arduino Uno or the result will be too large or unstable.
-// Suggestion to either uncomment JSONUDP or MONITOR and it may just work.
+// Suggestion to either uncomment what you do not need.
 // It will fit in an Arduino Mega.
-                       // prog-size data-size   function
-                       //    kB        kB
-                       //     4       1.2       (no options selected, data-size requirement can be reduced by lowering RX_BUFFER_SIZE (value 200, *5, usage 1000 bytes) 
-                       //                                          or TX_BUFFER_SIZE (value 33, *3, usage 99 bytes) in P1P2Serial.h)
-#define SERIALDATAOUT  //     0       0          outputs data packets on serial
-#define MONITOR        //     5       0.2        outputs data (and errors, if any) on Serial output
-#define MONITORCONTROL //     1       0          controls DHW on/off and cooling/heating on/off
-//#define JSON           //    14       0.2        generate JSON messages for serial or UDP
-//#define JSONUDP        //     6       0.2        transmit JSON messages over UDP (requires JSON to be defined, tested on Mega+W5500 ethernet shield)
-//#define JSONSERIAL     //     0       0          outputs JSON messages on serial
-//#define SAVEHISTORY    //     2       0.2-2.7    (data-size depends on product-dependent parameter choices) saves packet history enabling the use of "UnknownOnly" to output changed values only (no effect if JSON is not defined)
-                       // --------------------
-                       //    32       2.0-4.5    total
+                         // prog-size data-size   function
+                         //    kB        kB
+                         //     4       0.6       (no options selected, data-size requirement mainly determined by RX_BUFFER_SIZE (value 50, *5, usage 250 bytes)
+                         //                                          and TX_BUFFER_SIZE (value 33, *3, usage 99 bytes) in P1P2Serial.h)
+#define MONITOR          //     5       0.2        outputs data (and errors, if any) on Serial output
+#define MONITORCONTROL   //     1       0          controls DHW on/off and cooling/heating on/off (requires MONITOR to be defined)
+#define MONITORSERIAL    //     0       0          outputs raw hex data packets on serial (requires MONITOR to be defined)
+#define JSON             //    14       0.2        generate JSON messages for serial or UDP
+#define MQTTTOPICS       //    15       0.1        generate MQTT topics for serial or UDP
+//#define OUTPUTUDP        //     6       0.2        transmit JSON and/or MQTT messages over UDP (requires JSON and/or MQTTTOPICS to be defined, tested on Mega+W5500 ethernet shield)
+#define OUTPUTSERIAL     //     0       0          outputs JSON and/or MQTT messages on serial (requires JSON and/or MQTTTOPICS to be defined)
+#define SAVEHISTORY      //     2       0.2-2.7    (data-size depends on product-dependent parameter choices) saves packet history enabling the use of "UnknownOnly" to output changed values only (no effect if JSON and MQTTTOPICS are not defined)
+                         // --------------------
+                         //    38       2          total (for all functions enabled, sketch too big)
 
 #include <P1P2Serial.h>
 
 P1P2Serial P1P2Serial;
 
-#ifdef JSON
+#if defined JSON || defined MQTTTOPICS
 // choices needed to be made before including header file:
 static bool outputunknown = 0; // whether json parameters include parameters even if functionality is unknown
 static bool changeonly =  1;   // whether json parameters are included only if changed
                                //   (only for parameters for which savehistory() is active,
 #include "P1P2_Daikin_ParameterConversion_EHYHB.h"
 
-#ifdef JSONUDP
+#ifdef OUTPUTUDP
 // send json as an UDP message (W5500 compatible ethernet shield is required)                          
 //    Connections W5500: Arduino Mega pins 50 (MISO), 51 (MOSI), 52 (SCK), and 10 (SS) (https://www.arduino.cc/en/Reference/Ethernet)
 //                       Pin 53 (hardware SS) is not used but must be kept as output. In addition, connect RST, GND, and 5V.
@@ -128,8 +130,8 @@ static bool changeonly =  1;   // whether json parameters are included only if c
 
 //EthernetUDP udpRecv;                                              // for future functionality....
 EthernetUDP udpSend;
-#endif /* JSONUDP */
-#endif /* JSON */
+#endif /* OUTPUTUDP */
+#endif /* JSON || MQTTTOPICS */
 
 // copied from Stream.cpp, adapted to have readBytesUntil() include the terminator character:
 // with the regular Serial.readBytesUntil(), we can't distinguish a time-out from a terminated string which is not too long
@@ -165,7 +167,6 @@ void setup() {
   // Serial.setTimeout(5); // hardcoded in timedRead above
   Serial.println(F("*"));
   Serial.print(F("*P1P2"));
-// TODO Monitor/control printing
 #ifdef MONITOR
   Serial.print(F("Monitor"));
 #ifdef MONITORCONTROL
@@ -174,25 +175,28 @@ void setup() {
 #endif /* MONITOR */
 #ifdef JSON
   Serial.print(F("+json"));
-#ifdef JSONUDP
-  Serial.print(F("+udp"));
-#endif /* JSONUDP */
-#ifdef JSONSERIAL
-  Serial.print(F("+serial"));
-#endif /* JSONSERIAL */
 #endif /* JSON */
+#ifdef MQTTTOPICS
+  Serial.print(F("+mqtttopics"));
+#endif /* MQTTTOPICS */
+#ifdef OUTPUTUDP
+  Serial.print(F("+udp"));
+#endif /* OUTPUTUDP */
+#ifdef OUTPUTSERIAL
+  Serial.print(F("+serial"));
+#endif /* OUTPUTSERIAL */
 #ifdef SAVEHISTORY
   Serial.print(F("+savehist"));
 #endif
-  Serial.println(F(" v0.9.9"));
+  Serial.println(F(" v0.9.10"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
 #ifdef JSON
-#ifdef JSONUDP
+#ifdef OUTPUTUDP
   Ethernet.begin(mac, ip);
 //  udpRecv.begin(listenPort);                                      // for future functionality...
   udpSend.begin(sendPort);
-#endif /* JSONUDP */
+#endif /* OUTPUTUDP */
 #endif /* JSON */
 }
 
@@ -207,7 +211,9 @@ int8_t FxAbsentCnt[2]={-1, -1}; // FxAbsentCnt[x] counts number of unanswered 00
 byte setParam = 0x31;   // Parameter in packet type 35 for switching cooling/heating on/off
                         // 0x31 works on EHVX08S23D6V
                         // 0x2F works on EHYHBX08AAV3
-
+                        // 0x2D works on EHVX08S26CA9W
+byte setParamDHW = 0x40; // 0x40 works on EHVX08S23D6V 
+                         // 0x3E works on EHVX08S26CA9W
 
 #define RS_SIZE 99      // buffer to store data read from serial port, max line length on serial input is 99 (3 characters per byte, plus 'W" and '\r\n')
 static char RS[RS_SIZE];
@@ -224,70 +230,108 @@ static byte echo = 0;         // echo setting (whether written data is read back
 
 #ifdef JSON
 static byte jsonterm = 1; // indicates whether json string has been terminated or not
+#endif /* JSON */
 
-void process_for_mqtt_json(byte* rb, int n) {
+#if defined JSON || defined MQTTTOPICS
+void process_packet(byte* rb, int n) {
+  char key[KEYLEN + 9]; // 9 character prefix for topic
   char value[KEYLEN];
-  char key[KEYLEN];
-  byte cat; // used for esp not for Arduino
+  byte cat; // used for esp but not for Aduino
+  strcpy(key,"P1P2/P/U/");
   for (byte i = 3; i < n; i++) {
-    int kvrbyte = bytes2keyvalue(rb, i, 8, key, value, cat);
-    // bytes2keyvalue returns 0 if byte does not trigger any output
-    //                        1 if a new value should be output
-    //                        8 if byte should be treated per bit
-    //                        9 if json string should be terminated (intended for ESP8266, 1 json string per package)
-    if (kvrbyte == 9) {
-      // we terminate json string after each packet read so we can ignore kvrbyte=9 signal
-    } else {
+    int kvrbyte = bytes2keyvalue(rb, i, 8, key + 9, value, cat);
+    // returns 0 if byte does not trigger any output
+    // returns 1 if a new value should be output
+    // returns 8 if byte should be treated per bit
+    // returns 9 if json string should be terminated (intended for ESP8266 only), on Arduino
+    //           we terminate json string after each packet read so we can ignore kvrbyte=9 signal
+    if (kvrbyte != 9) {
       for (byte j = 0; j < kvrbyte; j++) {
-        int kvr = ((kvrbyte == 8) ? bytes2keyvalue(rb, i, j, key, value, cat) : kvrbyte);
+        int kvr = (kvrbyte == 8) ? bytes2keyvalue(rb, i, j, key + 9, value, cat) : kvrbyte;
         if (kvr) {
+#ifdef MQTTTOPICS
+          switch (cat) {
+            case 1 : key[7] = 'P'; // parameter settings
+                     break;
+            case 2 : key[7] = 'M'; // measurements, time, date
+                     break;
+            case 3 : key[7] = 'F'; // F related params
+                     break;
+            case 4 : key[7] = 'T'; // Temp Flow Power measurements
+                     break;
+            case 0 : // fallthrough
+            default: key[7] = 'U'; // unknown
+          }
+#ifdef OUTPUTSERIAL
+          Serial.print(F("T "));
+          Serial.print(key);
+          Serial.print(F(":"));
+          Serial.println(value);
+#endif /* OUTPUTSERIAL */
+#ifdef MQTTTOPICSUDP
+          udpSend.beginPacket(sendIpAddress, remPort);
+          udpSend.print(key);
+          udpSend.print(F(":"));
+          udpSend.print(value);
+          udpSend.endPacket();
+#endif /* MQTTTOPICSUDP */
+#endif /* MQTTTOPICS */
+#ifdef JSON
           if (jsonterm) {
-#ifdef JSONSERIAL
+#ifdef OUTPUTSERIAL
             Serial.print(F("J {\"")); 
-#endif /* JSONSERIAL */
-#ifdef JSONUDP
+#endif /* OUTPUTSERIAL */
+#ifdef OUTPUTUDP
             udpSend.beginPacket(sendIpAddress, remPort);
             udpSend.print(F("{\""));
-#endif /* JSONUDP */
+#endif /* OUTPUTUDP */
             jsonterm = 0;
           } else {
-#ifdef JSONSERIAL
+#ifdef OUTPUTSERIAL
             Serial.print(F(",\""));
-#endif /* JSONSERIAL */
-#ifdef JSONUDP
+#endif /* OUTPUTSERIAL */
+#ifdef OUTPUTUDP
             udpSend.print(F(",\""));
-#endif /* JSONUDP */
+#endif /* OUTPUTUDP */
           }
-#ifdef JSONSERIAL
-          Serial.print(key);
+#ifdef OUTPUTSERIAL
+          Serial.print(key + 9);
           Serial.print(F("\":"));
           Serial.print(value);
-#endif /* JSONSERIAL */
-#ifdef JSONUDP
-          udpSend.print(key);
+#ifdef MQTTTOPICS
+          // terminate each json parameter to allow mqtt topics to be printed on separate lines
+          jsonterm = 1;
+          Serial.println(F("}"));
+#endif /* MQTTTOPICS */
+#endif /* OUTPUTSERIAL */
+#ifdef OUTPUTUDP
+          udpSend.print(key + 9);
           udpSend.print(F("\":"));
           udpSend.print(value);
-#endif /* JSONUDP */
+#endif /* OUTPUTUDP */
+#endif /* JSON */
         }
       }
     }
   }
+#ifdef JSON
   if (jsonterm == 0) {
     // only terminate json string if any parameter was written
     jsonterm = 1;
-#ifdef JSONSERIAL
+#ifdef OUTPUTSERIAL
     Serial.println(F("}"));
-#endif /* JSONSERIAL */
-#ifdef JSONUDP
+#endif /* OUTPUTSERIAL */
+#ifdef OUTPUTUDP
     udpSend.print(F("}"));
     udpSend.endPacket();
-#endif /* JSONUDP */
+#endif /* OUTPUTUDP */
   }
+#endif /* JSON */
 #ifdef SAVEHISTORY
   savehistory(rb, n);
 #endif /* SAVEHISTORY */
 }
-#endif /* JSON */
+#endif /* JSON || MQTTTOPICS */
 
 // next 2 functions are used to save on dynamic memory usage in main loop
 int scanint(char* s, int &b) {
@@ -469,7 +513,6 @@ void loop() {
                       setParam = temp;
                       if (!verbose) break;
                       Serial.print(F("set to ")); 
-                      break;
                     }
                     Serial.print(F("0x")); 
                     if (setParam <= 0x0F) Serial.print(F("0")); 
@@ -544,8 +587,8 @@ void loop() {
         }
         if (++counterrequest == 7) counterrequest = 0;
       } else if ((nread > 4) && (RB[0] == 0x40) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
-        // external controller reply - note this could be our own (slow, delta=F030DELAY) reply so only reset count if delta < F0DELAY (- margin)
-        if (delta < F030DELAY - 2) {
+        // external controller reply - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < F03XDELAY (- margin)
+        if (delta < F03XDELAY - 2) {
           FxAbsentCnt[RB[1] & 0x01] = 0;
           if (RB[1] == CONTROL_ID) {
             // this should only happen if an external controller is connected after CONTROL_ID is set
@@ -606,17 +649,17 @@ void loop() {
                         // A parameter consists of 3 bytes: 2 bytes for param nr, and 1 byte for value
                         // parameters in the 00F035 message may indicate status changes in the heat pump
                         // for now we only check for the following parameters: 
-                        // DHW parameter 0x40
+                        // DHW parameter setParamDHW
                         // EHVX08S26CB9W DHWbooster parameter 0x48
                         // coolingheating parameter 0x31 or 0x2F (as defined in setParam)
                         // parameters 0144- or 0162- ASCII name of device
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         // change bytes for triggering coolingheating on/off
                         w = 3;
-                        if (setDHW) { WB[w++] = 0x40; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
+                        if (setDHW) { WB[w++] = setParamDHW; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
                         if (setcoolingheating) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheating = 0; }
                         for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
-                        for (w = 3; w < n; w++) if ((RB[w] == 0x40) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
+                        for (w = 3; w < n; w++) if ((RB[w] == setParamDHW) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
                         wr = 1;
                         break;
             case 0x36 : // in: 23 byte; out 23 byte; 4-byte parameters; reply with FF
@@ -650,7 +693,7 @@ void loop() {
                         // not seen in EHVX08S23D6V
                         // seen in EHVX08S26CB9W
                         // seen in EHYHBX08AAV3
-                        for (w = 3; w < n - 1; w++) WB[w] = 0xFF;
+                        for (w = 3; w < n; w++) WB[w] = 0xFF;
                         wr = 1;
                         break;
             case 0x3E : // schedule related packet
@@ -679,7 +722,7 @@ void loop() {
       }
     }
 #endif /* MONITORCONTROL */
-#ifdef SERIALDATAOUT
+#ifdef MONITORSERIAL
     if (verbose) {
       bool readerror = 0;
       for (int i=0; i < nread; i++) readerror |= EB[i];
@@ -721,10 +764,10 @@ void loop() {
       }
     }
     Serial.println();
-#endif /* SERIALDATAOUT */
+#endif /* MONITORSERIAL */
 #endif /* MONITOR */
-#ifdef JSON
-    if (!(EB[nread - 1] & ERROR_CRC)) process_for_mqtt_json(RB, nread - 1);
-#endif /* JSON */
+#if defined JSON || defined MQTTTOPICS
+    if (!(EB[nread - 1] & ERROR_CRC)) process_packet(RB, nread - 1);
+#endif /* JSON || MQTTTOPICS */
   }
 }

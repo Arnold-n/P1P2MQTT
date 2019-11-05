@@ -1,6 +1,6 @@
-# EHYHB(H/X)-AV3 and EHV(H/X)-CB protocol data format
+# EHYHB(H/X)-AV3 and EHV(H/X)-C(A/B) protocol data format
 
-Protocol data format for Daikin Altherma hybrid heat pump for the EHYHBX08AAV3 (perhaps all EHYHB(H/X)-AV3 models) and (at least partially for the) Daikin Altherma LT heat pump EHV(H/X)-CB
+Protocol data format for Daikin Altherma hybrid heat pump for the EHYHBX08AAV3 (perhaps all EHYHB(H/X)-AV3 models) and (at least partially for the) Daikin Altherma LT heat pump EHV(H/X)-CA/CB
 
 Please read the README.md first.
 
@@ -611,10 +611,12 @@ Format is the same for supported and non-supported field settings
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 00                            | packet subtype 00 | u8
-|  4-9          | 00                            | two 3-byte numbers? | u24
-| 10-12         | 00 XX XX                      | ??   | u24
-| 13-18         | 00                            | two 3-byte numbers? | u24
-| 19-21         | 00 XX XX                      | electric energy consumed | u24
+|   4-6         | XX XX XX                      | energy consumed for heating (backup heater?) | u24
+|   7-9         | XX XX XX                      | energy consumed for DHW (backup heater?) | u24
+| 10-12         | 00 XX XX                      | energy consumed for heating (compressor?)   | u24
+| 13-15         | XX XX XX                      | energy consumed for cooling  | u24
+| 16-18         | XX XX XX                      | energy consumed for DHW (compressor?) | u24
+| 19-21         | XX XX XX                      | energy consumed (total) | u24
 |    22         | XX                            | CRC checksum | u8
 
 
@@ -630,16 +632,17 @@ Format is the same for supported and non-supported field settings
 
 #### 004. Packet "4000B801.."
 
-| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
-|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 40                            | Response                | u8
-|     1         | 00                            | slave address: heat pump | u8
-|     2         | B8                            | packet type B8 | u8
-|     3         | 01                            | packet subtype 01 | u8
-|  4-6          | XX XX XX                      | heat produced | u24
-|  7-12         | 00                            | 4 3-byte numbers?   | u24,u24,u24,u24
-| 13-15         | XX XX XX                      | heat produced (duplicate?)| u24
-|    16         | XX                            | CRC checksum | u8
+| Byte nr       | Hex value observed            | Description                 | Data type     | Bit: description |
+|---------------|:------------------------------|:----------------------------|:--------------|:-----------------|
+|     0         | 40                            | Response                    | u8
+|     1         | 00                            | slave address: heat pump    | u8
+|     2         | B8                            | packet type B8              | u8
+|     3         | 01                            | packet subtype 01           | u8
+|   4-6         | XX XX XX                      | energy produced for heating | u24
+|   7-9         | XX XX XX                      | energy produced for cooling | u24
+| 10-12         | XX XX XX                      | energy produced for DHW     | u24
+| 13-15         | XX XX XX                      | energy produced total       | u24
+|    16         | XX                            | CRC checksum                | u8
 
 
 #### 005. Packet "0000B802.."
@@ -660,9 +663,10 @@ Format is the same for supported and non-supported field settings
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 02                            | packet subtype 02 | u8
-|  4-6          | XX XX XX                      | number of pump hours | u24
-|  7-9          | XX XX XX                      | number of compressor hours | u24
-| 10-15         | XX XX XX                      | 2 3-byte numbers? (cooling hours?) | u24,u24
+|   4-6         | XX XX XX                      | number of pump hours | u24
+|   7-9         | XX XX XX                      | number of compressor hours heating | u24
+| 10-12         | XX XX XX                      | number of compressor hours cooling | u24
+| 13-15         | XX XX XX                      | number of compressor hours DHW     | u24
 |    16         | XX                            | CRC checksum | u8
 
 
@@ -684,7 +688,12 @@ Format is the same for supported and non-supported field settings
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
 |     3         | 03                            | packet subtype 03 | u8
-|  4-21         | 00                            | ? | u8
+|   4-6         | XX XX XX                      | backup heater1 hours for heating?  | u24
+|   7-9         | XX XX XX                      | backup heater1 hours for dhw?      | u24
+| 10-12         | XX XX XX                      | backup heater2 hours for heating?? | u24
+| 13-15         | XX XX XX                      | backup heater2 hours for DHW??     | u24
+| 16-18         | XX XX XX                      | ??                                 | u24
+| 20-21         | XX XX XX                      | ??                                 | u24
 |    22         | XX                            | CRC checksum | u8
 
 
@@ -700,15 +709,17 @@ Format is the same for supported and non-supported field settings
 
 #### 010. Packet "4000B804.."
 
-| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
-|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 40                            | Response                | u8
+| Byte nr       | Hex value observed            | Description              | Data type     | Bit: description |
+|---------------|:------------------------------|:-------------------------|:--------------|:-----------------|
+|     0         | 40                            | Response                 | u8
 |     1         | 00                            | slave address: heat pump | u8
-|     2         | B8                            | packet type B8 | u8
-|     3         | 04                            | packet subtype 04 | u8
-|  4-12         | 00                            | ? | u8
-| 13-15         | XX XX XX                      | number of start attempts | u24
-|    16         | XX                            | CRC checksum | u8
+|     2         | B8                            | packet type B8           | u8
+|     3         | 04                            | packet subtype 04        | u8
+|   4-6         | XX XX XX                      | ??                       | u24
+|   7-9         | XX XX XX                      | ??                       | u24
+| 10-12         | XX XX XX                      | ??                       | u24
+| 13-15         | XX XX XX                      | number of compressor starts? heating? | u24
+|    16         | XX                            | CRC checksum             | u8
 
 
 #### 011. Packet "0000B805.."
@@ -731,11 +742,11 @@ Format is the same for supported and non-supported field settings
 |     3         | 05                            | packet subtype 05 | u8
 |  4-6          | XX XX XX                      | number of boiler hours heating | u24
 |  7-9          | XX XX XX                      | number of boiler hours DHW | u24
-| 10-15         | 00 00 00                      | 2 3-byte numbers? | u24,u24
-| 16-18         | XX XX XX                      | 1 3-byte number (tbd)? | u24
-| 19-21         | 00 00 00                      | 1 3-byte number? | u24
+| 10-12         | XX XX XX                      | ?? | u24,u24
+| 13-15         | XX XX XX                      | ?? | u24,u24
+| 16-18         | XX XX XX                      | number of total?? hours | u24
+| 19-21         | XX XX XX                      | ?? | u24
 |    22         | XX                            | CRC checksum | u8
-
 
 ## 21 for tbd
 
