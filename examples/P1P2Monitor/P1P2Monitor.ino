@@ -521,7 +521,7 @@ void loop() {
           case 'c': // set counterrequest cycle
           case 'C': if (CONTROL_ID) {
                       counterrequest = 1;
-                      Serial.print(F("* Counter-request cycle initiated")); 
+                      Serial.println(F("* Counter-request cycle initiated")); 
                     } else {
                       Serial.println(F("* Counter-request cycle refused because controller function is off"));
                     }
