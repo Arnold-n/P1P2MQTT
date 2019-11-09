@@ -25,6 +25,7 @@
 
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work for the Daikin hybrid
 #define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is present or added
+#define MONITORSERIAL   // outputs raw hex data packets on serial
 
 #include <P1P2Serial.h>
 #include "P1P2-Daikin-LCD-EHYHB.h"
@@ -35,7 +36,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) ; // wait for Arduino Serial Monitor to open
   Serial.println(F("*"));
-  Serial.println(F("*P1P2LCD v0.9.4"));
+  Serial.println(F("*P1P2LCD v0.9.10"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
   init_LCD();
@@ -48,7 +49,48 @@ static byte EB[RB_SIZE];
 void loop() {
   if (P1P2Serial.available()) {
     uint16_t delta;
-    int n = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, CRC_GEN, CRC_FEED);
-    process_for_LCD(RB, (n - 1));
+    int nread = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, CRC_GEN, CRC_FEED);
+    process_for_LCD(RB, (nread - 1));
+#ifdef MONITORSERIAL
+    bool readerror = 0;
+    for (int i=0; i < nread; i++) readerror |= EB[i];
+    if (readerror) {
+      Serial.print(F("*"));
+    } else {
+      Serial.print(F("R"));
+    }
+    if (delta < 10000) Serial.print(F(" "));
+    if (delta < 1000) Serial.print(F("0")); else { Serial.print(delta / 1000); delta %= 1000; };
+    Serial.print(F("."));
+    if (delta < 100) Serial.print(F("0"));
+    if (delta < 10) Serial.print(F("0"));
+    Serial.print(delta);
+    Serial.print(F(": "));
+    for (int i = 0; i < nread; i++) {
+      if ((EB[i] & ERROR_READBACK)) {
+        // collision suspicion due to verification error in reading back written data
+        Serial.print(F("-XX:"));
+      }
+      if ((EB[i] & ERROR_PE)) {
+        // parity error detected
+        Serial.print(F("-PE:"));
+      }
+      byte c = RB[i];
+      if (CRC_GEN && (i == nread - 1)) {
+        Serial.print(F(" CRC="));
+      }
+      if (c < 0x10) Serial.print(F("0"));
+      Serial.print(c, HEX);
+      if ((EB[i] & ERROR_OVERRUN)) {
+        // buffer overrun detected (overrun is after, not before, the read byte)
+        Serial.print(F(":OR-"));
+      }
+      if ((EB[i] & ERROR_CRC)) {
+        // CRC error detected in readpacket
+        Serial.print(F(" CRC error"));
+      }
+    }
+    Serial.println();
+#endif
   }
 }

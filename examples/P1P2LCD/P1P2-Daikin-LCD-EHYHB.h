@@ -4,7 +4,8 @@
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
- * 20190915 v0.9.4 separted from P1P2Monitor
+ * 20191109 v0.9.10 solved misalignment in data interpretation
+ * 20190915 v0.9.4 separated from P1P2Monitor
  *
  */
 
@@ -32,7 +33,7 @@ void init_LCD(void) {
   row=2; col=2;  LCD_char('.');
   row=2; col=7;  LCD_char('.');
   row=2; col=12; LCD_char('.');
-  row=3; col=0;  u8x8.drawString(col,row,"flow Trm  Tout");
+  row=3; col=0;  u8x8.drawString(col,row,"Flow Trm  Tout");
   row=4; col=2;  LCD_char('.'); // flow
   row=4; col=7;  LCD_char('.'); // Troom
   row=4; col=12; LCD_char('.'); // Toutside
@@ -54,48 +55,48 @@ void process_for_LCD(byte *rb, uint8_t n) {
       case 0x10 :  switch (linesrc) {
         case 0x00 : row=6; col=15; LCD_hex1(packetcntmod12); 
                     row=4; col=15; LCD_hex1(packetcntmod13); switch (i) {
-          case  4 : row=7; col=8;  LCD_hex2(c);                    break; // heating on/off?
-          case  5 : row=7; col=10; LCD_hex2(c);                   break; // 0x01/0x81?
-          case 11 : /* row=X; col=X; LCD_int2(c); */              break; // target room temp
-          case 13 : row=7; col=12; LCD_hex2(c);                   break; // flags 5/6?
-          case 14 : row=7; col=14; LCD_hex2(c);                   break; // quiet mode
+          case  3 : row=7; col=8;  LCD_hex2(c);                   break; // heating on/off?
+          case  4 : row=7; col=10; LCD_hex2(c);                   break; // 0x01/0x81?
+          case 10 : /* row=X; col=X; LCD_int2(c); */              break; // target room temp
+          case 12 : row=7; col=12; LCD_hex2(c);                   break; // flags 5/6?
+          case 13 : row=7; col=14; LCD_hex2(c);                   break; // quiet mode
         } break;
         case 0x40 : switch (i) {
-          case  4 : /* row=X; col=X; LCD_hex2(c); */              break; // heating on/off copy ?
-          case  7 : row=7; col=4;  LCD_hex2(c);                    break; // 0:DHW on/off 4: SHC/tank 3-way valve?
-          case 12 : row=7; col=0;  LCD_int2(c);                    break; // Troom target
-          case 22 : row=7; col=2;  LCD_hex2(c);                    break; // 0:compressor 3:pump
+          case  3 : /* row=X; col=X; LCD_hex2(c); */              break; // heating on/off copy ?
+          case  6 : row=7; col=4;  LCD_hex2(c);                   break; // 0:DHW on/off 4: SHC/tank 3-way valve?
+          case 11 : row=7; col=0;  LCD_int2(c);                   break; // Troom target
+          case 21 : row=7; col=2;  LCD_hex2(c);                   break; // 0:compressor 3:pump
         } break;
       } break;
       case 0x11 : switch (linesrc) {
         case 0x00 : switch (i) {
-          case  4 : row=4; col=5;  LCD_int2(c);                    break; // Troom
-          case  5 : row=4; col=8;  LCD_char('0'+(c*5)/128);        break; // Troom
+          case  3 : row=4; col=5;  LCD_int2(c);                   break; // Troom
+          case  4 : row=4; col=8;  LCD_char('0'+(c*5)/128);       break; // Troom
         } break;
         case 0x40 : switch (i) {
-          case  4 : row=2; col=10; LCD_int2(c);                   break; // LWT
-          case  5 : row=2; col=13; LCD_char('0'+(c*5)/128);       break; // LWT
-          case  8 : row=4; col=10; LCD_int2(c);                   break; // Toutside
-          case  9 : row=4; col=13; LCD_char('0'+(c*5)/128);       break; // Toutside
-          case 10 : row=2; col=0;  LCD_int2(c);                    break; // RWT
-          case 11 : row=2; col=3;  LCD_char('0'+(c*5)/128);        break; // RWT
-          case 12 : row=2; col=5;  LCD_int2(c);                    break; // MWT
-          case 13 : row=2; col=8;  LCD_char('0'+(c*5)/128);        break; // MWT
-          case 14 : row=6; col=5;  LCD_int2(c);                    break; // Trefr1 ?
-          case 15 : row=6; col=8;  LCD_char('0'+(c*5)/128);        break; // Trefr1 ?
+          case  3 : row=2; col=10; LCD_int2(c);                   break; // LWT
+          case  4 : row=2; col=13; LCD_char('0'+(c*5)/128);       break; // LWT
+          case  7 : row=4; col=10; LCD_int2(c);                   break; // Toutside
+          case  8 : row=4; col=13; LCD_char('0'+(c*5)/128);       break; // Toutside
+          case  9 : row=2; col=0;  LCD_int2(c);                   break; // RWT
+          case 10 : row=2; col=3;  LCD_char('0'+(c*5)/128);       break; // RWT
+          case 11 : row=2; col=5;  LCD_int2(c);                   break; // MWT
+          case 12 : row=2; col=8;  LCD_char('0'+(c*5)/128);       break; // MWT
+          case 13 : row=6; col=5;  LCD_int2(c);                   break; // Trefr1
+          case 14 : row=6; col=8;  LCD_char('0'+(c*5)/128);       break; // Trefr1
         } break;
       } break;
       case 0x12 : switch (linesrc) {
         case 0x00 : switch (i) {
-          case  5 : row=0; col=15; LCD_int1(c);                   break; // DayOfWeek
-          case  6 : row=0; col=9;  LCD_int2(c);                    break; // Hours
-          case  7 : row=0; col=12; LCD_int2(c);                   break; // Minutes
-          case  8 : row=0; col=2;  LCD_int2(c);                    break; // year
-          case  9 : row=0; col=4;  LCD_int2(c);                    break; // month
-          case 10 : row=0; col=6;  LCD_int2(c);                    break; // day
+          case  4 : row=0; col=15; LCD_int1(c);                   break; // DayOfWeek
+          case  5 : row=0; col=9;  LCD_int2(c);                   break; // Hours
+          case  6 : row=0; col=12; LCD_int2(c);                   break; // Minutes
+          case  7 : row=0; col=2;  LCD_int2(c);                   break; // year
+          case  8 : row=0; col=4;  LCD_int2(c);                   break; // month
+          case  9 : row=0; col=6;  LCD_int2(c);                   break; // day
         } break;
         case 0x40 : switch (i) {
-          case 16 : row=7; col=6; LCD_hex2(c);                    break; // 0:heat pump 6:? 7:DHW
+          case 15 : row=7; col=6; LCD_hex2(c);                    break; // 0:heat pump 6:? 7:DHW
         } break;
       } break;
       case 0x13 : switch (linesrc) {
@@ -103,31 +104,31 @@ void process_for_LCD(byte *rb, uint8_t n) {
           default : break;
         } break;
         case 0x40 : switch (i) {
-          case  4 : /* row=X; col=X; LCD_int2(c); */              break; // DHW
-          case 13 : row=4; col=0; LCD_int2(c/10);
+          case  3 : /* row=X; col=X; LCD_int2(c); */              break; // DHW
+          case 12 : row=4; col=0; LCD_int2(c/10);
                     col=3; LCD_int1(c%10);                        break; // Flow
         } break;
       } break;
       case 0x14 : switch (linesrc) {
         case 0x00 : switch (i) {
-          case 12 : /* row=X; col=X; LCD_int2(c); */              break; // Tdelta
-          case 13 : /* row=X; col=X; LCD_hex2(c); */              break; // Op?
+          case 11 : /* row=X; col=X; LCD_int2(c); */              break; // Tdelta
+          case 12 : /* row=X; col=X; LCD_hex2(c); */              break; // Op?
         } break;
         case 0x40 : switch (i) {
-          case 13 : /* row=X; col=X; LCD_hex2(c); */              break; // Op?
-          case 19 : row=6; col=0; LCD_int2(c);                    break; // T setpoint1
-          case 20 : row=6; col=3; LCD_char('0'+(c*5)/128);        break; // T setpoint1
-          case 21 : /* row=X; col=X; LCD_int2(c); */              break; // T setpoint2
-          case 22 : /* row=X; col=X; LCD_char('0'+(c*5)/128); */  break; // T setpoint2
+          case 12 : /* row=X; col=X; LCD_hex2(c); */              break; // Op?
+          case 18 : row=6; col=0; LCD_int2(c);                    break; // T setpoint1
+          case 19 : row=6; col=3; LCD_char('0'+(c*5)/128);        break; // T setpoint1
+          case 20 : /* row=X; col=X; LCD_int2(c); */              break; // T setpoint2
+          case 21 : /* row=X; col=X; LCD_char('0'+(c*5)/128); */  break; // T setpoint2
         } break;
       } break;
       case 0x15 : switch (linesrc) {
         case 0x40 : switch (i) {
-          case  6 : row=6; col=10; LCD_int2(c);                   break; // Refr2 ?
-          case  7 : row=6; col=13; LCD_char('0'+(c*5)/128);       break; // Refr2 ?
+          case  5 : row=6; col=10; LCD_int2(c);                   break; // Refr2
+          case  6 : row=6; col=13; LCD_char('0'+(c*5)/128);       break; // Refr2
         } break;
       } break;
-      case 0x30 : break;
+      default : break;
     }
   }
 }
