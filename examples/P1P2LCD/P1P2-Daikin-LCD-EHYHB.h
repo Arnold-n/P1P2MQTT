@@ -16,11 +16,46 @@ U8X8_SSD1306_128X64_NONAME_4W_SW_SPI u8x8(/* clock=*/ 2, /* data=*/ 3, /* cs=*/ 
 static int packetcntmod12=0; // packetcntmod12 increments upon each package of 13 packets;
 static int packetcntmod13=0; // packetcntmod13 as shown on LCD remains constant except (thus signals) additional packets and/or communication errors
 
+static uint8_t row,col;
+
 #define LCD_char(i)  { u8x8.drawGlyph(col,row,i); }
 #define LCD_int1(i)  { LCD_char('0'+(i)%10); }
-#define LCD_int2(i)  { LCD_char('0'+((i)%100)/10); col++; LCD_char('0'+(i)%10); }
+#define LCD_int2(i)  { LCD_char( (i > 9) ? ('0'+((i)%100)/10) : ' '); col++; LCD_char('0'+(i)%10); }
 #define LCD_hex1(i)  { if ((i)<10) LCD_char(('0'+(i))) else LCD_char('A'+((i)-10)); }
 #define LCD_hex2(i)  { LCD_hex1(i>>4); col++; LCD_hex1(i&0x0f); }
+
+void LCD_8f8(byte i, byte j) {
+  bool negtemp = 0;
+  if (i & 0x80) {
+    // negative temperature
+    negtemp = 1;
+    j = (0xFF ^ j) + 1;
+    i = (0xFF ^ i);
+    if (j==0) i++;
+  }
+  if (i > 99) {
+    i = 99;
+    j = 0xFF;
+  }
+  LCD_char('0' + (j * 5) / 128);
+  col -= 2;
+  LCD_char('0' + (i % 10));
+  col--;
+  i = i / 10;
+  if (negtemp) {
+    switch (i) {
+      case 0 : LCD_char('-'); break;
+      case 1 : LCD_char('/'); break;
+      case 2 : LCD_char('|'); break;
+      default: LCD_char('\\'); break;
+    }
+  } else {
+    switch (i) {
+      case 0 : LCD_char(' '); break;
+      default : LCD_char('0' + i); break;
+    }
+  }
+}
 
 void init_LCD(void) {
   u8x8.begin();
@@ -44,16 +79,16 @@ void init_LCD(void) {
 }
 
 void process_for_LCD(byte *rb, uint8_t n) {
-  uint8_t row,col;
   packetcntmod12++; if (packetcntmod12 == 12) packetcntmod12 = 0;
   packetcntmod13++; if (packetcntmod13 == 13) packetcntmod13 = 0;
+  byte cprev = 0;
   for (byte i = 3; i < n; i++) {
     byte linesrc = rb[0];
     byte linetype = rb[2];
     byte c = rb[i];
     switch (linetype) {
       case 0x10 :  switch (linesrc) {
-        case 0x00 : row=6; col=15; LCD_hex1(packetcntmod12); 
+        case 0x00 : row=6; col=15; LCD_hex1(packetcntmod12);
                     row=4; col=15; LCD_hex1(packetcntmod13); switch (i) {
           case  3 : row=7; col=8;  LCD_hex2(c);                   break; // heating on/off?
           case  4 : row=7; col=10; LCD_hex2(c);                   break; // 0x01/0x81?
@@ -70,20 +105,14 @@ void process_for_LCD(byte *rb, uint8_t n) {
       } break;
       case 0x11 : switch (linesrc) {
         case 0x00 : switch (i) {
-          case  3 : row=4; col=5;  LCD_int2(c);                   break; // Troom
-          case  4 : row=4; col=8;  LCD_char('0'+(c*5)/128);       break; // Troom
+          case  4 : row=4; col=8;  LCD_8f8(cprev, c);             break; // Troom
         } break;
         case 0x40 : switch (i) {
-          case  3 : row=2; col=10; LCD_int2(c);                   break; // LWT
-          case  4 : row=2; col=13; LCD_char('0'+(c*5)/128);       break; // LWT
-          case  7 : row=4; col=10; LCD_int2(c);                   break; // Toutside
-          case  8 : row=4; col=13; LCD_char('0'+(c*5)/128);       break; // Toutside
-          case  9 : row=2; col=0;  LCD_int2(c);                   break; // RWT
-          case 10 : row=2; col=3;  LCD_char('0'+(c*5)/128);       break; // RWT
-          case 11 : row=2; col=5;  LCD_int2(c);                   break; // MWT
-          case 12 : row=2; col=8;  LCD_char('0'+(c*5)/128);       break; // MWT
-          case 13 : row=6; col=5;  LCD_int2(c);                   break; // Trefr1
-          case 14 : row=6; col=8;  LCD_char('0'+(c*5)/128);       break; // Trefr1
+          case  4 : row=2; col=13; LCD_8f8(cprev, c);             break; // LWT
+          case  8 : row=4; col=13; LCD_8f8(cprev, c);             break; // Toutside
+          case 10 : row=2; col=3;  LCD_8f8(cprev, c);             break; // RWT
+          case 12 : row=2; col=8;  LCD_8f8(cprev, c);             break; // MWT
+          case 14 : row=6; col=8;  LCD_8f8(cprev, c);             break; // Trefr1
         } break;
       } break;
       case 0x12 : switch (linesrc) {
@@ -116,19 +145,17 @@ void process_for_LCD(byte *rb, uint8_t n) {
         } break;
         case 0x40 : switch (i) {
           case 12 : /* row=X; col=X; LCD_hex2(c); */              break; // Op?
-          case 18 : row=6; col=0; LCD_int2(c);                    break; // T setpoint1
-          case 19 : row=6; col=3; LCD_char('0'+(c*5)/128);        break; // T setpoint1
-          case 20 : /* row=X; col=X; LCD_int2(c); */              break; // T setpoint2
-          case 21 : /* row=X; col=X; LCD_char('0'+(c*5)/128); */  break; // T setpoint2
+          case 19 : row=6; col=3; LCD_8f8(cprev, c);              break; // T setpoint1
+          case 21 : /* row=X; col=X; LCD_8f8(cprev, c); */        break; // T setpoint2
         } break;
       } break;
       case 0x15 : switch (linesrc) {
         case 0x40 : switch (i) {
-          case  5 : row=6; col=10; LCD_int2(c);                   break; // Refr2
-          case  6 : row=6; col=13; LCD_char('0'+(c*5)/128);       break; // Refr2
+          case  6 : row=6; col=13; LCD_8f8(cprev, c);             break; // Refr2
         } break;
       } break;
       default : break;
     }
+    cprev = c;
   }
 }
