@@ -97,9 +97,9 @@ P1P2Serial P1P2Serial;
 
 #if defined JSON || defined MQTTTOPICS
 // choices needed to be made before including header file:
-static bool outputunknown = 0; // whether json parameters include parameters even if functionality is unknown
-static bool changeonly =  1;   // whether json parameters are included only if changed
-                               //   (only for parameters for which savehistory() is active,
+static bool outputunknown = OUTPUTUNKNOWN; // whether json parameters include parameters even if functionality is unknown
+static bool changeonly =  CHANGEONLY;      // whether json parameters are included only if changed
+                                           //   (only for parameters for which savehistory() is active)
 #include "P1P2_Daikin_ParameterConversion_EHYHB.h"
 
 #ifdef OUTPUTUDP
@@ -514,7 +514,7 @@ void loop() {
                     }
                     Serial.println(coolingheatingstatus);
                     break;
-#ifdef JSON
+#if defined JSON || defined MQTTTOPICS
           case 'u':
           case 'U': if (verbose) Serial.print(F("* OutputUnknown "));
                     if (scanint(&RS[1], temp) == 1) {
@@ -535,7 +535,7 @@ void loop() {
                     }
                     Serial.println(changeonly);
                     break;
-#endif
+#endif /* JSON || MQTTTOPICS */
           default:  Serial.print(F("* Command not understood: "));
                     Serial.println(RS);
                     break;

@@ -27,8 +27,11 @@
 //      0x3E works on EHVX08S26CA9W
 #define PARAM_DHW_ONOFF 0x40 
                          
-#define CONTROL_ID_NONE 0xF0
+#define CONTROL_ID_NONE 0x00  
 #define CONTROL_ID_0 0xF0     // first external controller
 #define CONTROL_ID_1 0xF1     // second external controller
-#define CONTROL_ID_DEFAULT   CONTROL_ID_NONE
+#define CONTROL_ID_DEFAULT   CONTROL_ID_NONE   // note that absence-check of other secondary controller cannot be done if CONTROL_ID_DEFAULT is set to CONTROL_ID_0 or CONTROL_ID_1
 
+#define OUTPUTUNKNOWN 0 // whether mqtt/json parameters include parameters even if functionality is unknown (can be changed run-time using 'U'/'u' command)
+#define CHANGEONLY 1    // whether mqtt/json parameters are included only if changed (can be changed run-time using 'S'/'s' command)
+                                           //   (both work only for parameters for which savehistory() is active)
