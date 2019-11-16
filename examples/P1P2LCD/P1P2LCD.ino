@@ -24,10 +24,7 @@
  * Sanguino          13        14         12
  */
 
-#define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work for the Daikin hybrid
-#define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is present or added
-#define MONITORSERIAL   // outputs raw hex data packets on serial
-
+#include "P1P2Config.h"
 #include <P1P2Serial.h>
 #include "P1P2-Daikin-LCD-EHYHB.h"
 
@@ -37,7 +34,11 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) ; // wait for Arduino Serial Monitor to open
   Serial.println(F("*"));
-  Serial.println(F("*P1P2LCD v0.9.10"));
+  Serial.print(F("*P1P2LCD"));
+#ifdef MONITORSERIAL
+  Serial.print(F("+serial"));
+#endif /* MONITORCONTROL */
+  Serial.println(F(" v0.9.10"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
   init_LCD();
