@@ -45,7 +45,7 @@
  * S  Display changed-only mode (if JSON is defined)
  *
  * W<hex data> Write packet (max 32 bytes) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
- * C  counterrequest triggers single cycle of 6 B8 packets to request counters from heat pump; temporarily blocks controller function
+ * Cx counterrequest triggers (x=1:) single cycle or (x=2:) repetitive cycles of 6 B8 packets to request counters from heat pump; temporarily blocks controller function
  * Vx Sets reading mode verbose off/on
  * Tx sets new delay value, to be used for future packets (default 0)
  * Ox sets new delay timeout value, used immediately (default 2500)
@@ -151,7 +151,10 @@ void setup() {
   Serial.print(F("*P1P2"));
 #ifdef MONITOR
   Serial.print(F("Monitor"));
-#ifdef MONITORCONTROL
+#ifdef MONITORSERIAL
+  Serial.print(F("+serial"));
+#endif /* MONITORCONTROL */
+#ifdef MONITORSERIAL
   Serial.print(F("+control"));
 #endif /* MONITORCONTROL */
 #endif /* MONITOR */
@@ -182,12 +185,6 @@ void setup() {
 #endif /* JSON */
 }
 
-#define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work for the Daikin hybrid
-#define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is present or added
-                        // These values can be changed via serial port
-#define F030DELAY 100   // Time delay for external controller simulation, should be larger than any response of other external controllers (which is typically 25-80 ms)
-#define F03XDELAY  30   // Time delay for external controller simulation, should preferably be a bit larger than any regular response from external controllers (which is typically 25 ms)
-#define F0THRESHOLD 5   // Number of 00Fx30 messages to be unanswered before we feel safe to act as this controller
 int8_t FxAbsentCnt[2]={-1, -1}; // FxAbsentCnt[x] counts number of unanswered 00Fx30 messages; 
                         // if -1 than no Fx request or response seen (relevant to detect whether F1 controller is supported or not)
 byte setParam = PARAM_HC_ONOFF;
@@ -322,13 +319,18 @@ int scanhex(char* s, int &b) {
 
 byte CONTROL_ID = CONTROL_ID_DEFAULT;
 
-byte setDHW = 0;
+byte setDHWrequest = 0;
 byte setDHWstatus = 0;
 byte DHWstatus = 0;
-byte setcoolingheating = 0;
+byte setcoolingheatingrequest = 0;
 byte setcoolingheatingstatus = 0;
 byte coolingheatingstatus = 0;
 byte counterrequest = 0;
+byte counterrepeatingrequest = COUNTERREPEATINGREQUEST;
+byte Tmin = 61;
+byte Tminprev = 61;
+byte Thour = 26;
+byte TDoW = 9;
 
 void loop() {
   static byte crc_gen = CRC_GEN;
@@ -474,7 +476,7 @@ void loop() {
           case 'y': // set DHW on/off
           case 'Y': if (verbose) Serial.print(F("* DHW ")); 
                     if (scanint(&RS[1], temp) == 1) {
-                      setDHW = 1;
+                      setDHWrequest = 1;
                       setDHWstatus = temp;
                       if (!verbose) break;
                       Serial.print(F("set to ")); 
@@ -494,18 +496,23 @@ void loop() {
                     if (setParam <= 0x0F) Serial.print(F("0")); 
                     Serial.println(setParam, HEX);
                     break;
-          case 'c': // set counterrequest cycle
-          case 'C': if (CONTROL_ID) {
-                      counterrequest = 1;
-                      Serial.println(F("* Counter-request cycle initiated")); 
+          case 'c': // set counterrequest cycle (once or repetitive)
+          case 'C': if (scanint(&RS[1], temp) == 2) {
+                      counterrepeatingrequest = 1;
+                      Serial.println(F("* Repetitive requesting of counter values initiated")); 
+                    } else if (scanint(&RS[1], temp) == 1) {
+                      if (!counterrequest) counterrequest = 1;
+                      Serial.println(F("* Single counter request cycle initiated")); 
                     } else {
-                      Serial.println(F("* Counter-request cycle refused because controller function is off"));
+                      counterrepeatingrequest = 0;
+                      counterrequest = 0;
+                      Serial.println(F("* Counter-requests stopped"));
                     }
                     break;
           case 'z': // set heating/cooling mode on/off
           case 'Z': if (verbose) Serial.print(F("* Cooling/heating ")); 
                     if (scanint(&RS[1], temp) == 1) {
-                      setcoolingheating = 1;
+                      setcoolingheatingrequest = 1;
                       setcoolingheatingstatus = temp;
                       if (!verbose) break;
                       Serial.print(F("set to ")); 
@@ -550,8 +557,31 @@ void loop() {
 #ifdef MONITOR
 #ifdef MONITORCONTROL
     if (!(EB[nread - 1] & ERROR_CRC)) {
+      // message received, no error detected
       byte w;
-      if (CONTROL_ID && (counterrequest) && (nread > 4) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30)) {
+      if ((nread > 9) && (RB[0] == 0x00) && (RB[1] == 0x00) && (RB[2] == 0x12)) {
+        // obtain day-of-week, hour, minute
+        Tmin = RB[6];
+        Thour = RB[5];
+        TDoW = RB[4];
+        if (Tmin != Tminprev) {
+          if (counterrepeatingrequest && !counterrequest) counterrequest = 1;
+          Tminprev = Tmin;
+/* draft code to switch heat pump on/off 
+          if ((Tmin == T_MIN_ON) && (Thour == T_HOUR_ON)) {
+            setcoolingheatingrequest = 1;
+            setcoolingheatingstatus = 1;
+          }
+          if ((Tmin == T_MIN_OFF) && (Thour == T_HOUR_OFF)) {
+            setcoolingheatingrequest = 1;
+            setcoolingheatingstatus = 0;
+          }
+*/
+        }
+      }
+      if ((FxAbsentCnt[0] == F0THRESHOLD) && counterrequest && (nread > 4) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30)) {
+        // 00F030 request message received; counterrequest > 0 so hijack this time slot to request counters
+        // but only if external F0 controller has not been detected (so check on FxAbsentCnt[0])
         WB[0] = 0x00;
         WB[1] = 0x00;
         WB[2] = 0xB8;
@@ -563,7 +593,7 @@ void loop() {
         }
         if (++counterrequest == 7) counterrequest = 0;
       } else if ((nread > 4) && (RB[0] == 0x40) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
-        // external controller reply - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < F03XDELAY (- margin)
+        // 40Fx30 external controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < F03XDELAY (- margin)
         if (delta < F03XDELAY - 2) {
           FxAbsentCnt[RB[1] & 0x01] = 0;
           if (RB[1] == CONTROL_ID) {
@@ -576,6 +606,7 @@ void loop() {
           }
         }
       } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
+        // 00Fx30 request message received
         if ((RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x01] < F0THRESHOLD)) {
           FxAbsentCnt[RB[1] & 0x01]++;
           if (FxAbsentCnt[RB[1] & 0x01] == F0THRESHOLD) {
@@ -600,8 +631,8 @@ void loop() {
           switch (RB[2]) {
             case 0x30 : // in: 17 byte; out: 17 byte; out pattern WB[7] should contain a 01 if we want to communicate a new setting
                         for (w = 3; w < n; w++) WB[w] = 0x00;
-                        // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcoolingheating/setDHW needs to be changed to request a F035 message
-                        if (setDHW || setcoolingheating) WB[7] = 0x01;
+                        // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcoolingheatingrequest/setDHWrequest needs to be changed to request a F035 message
+                        if (setDHWrequest || setcoolingheatingrequest) WB[7] = 0x01;
                         d = F030DELAY;
                         wr = 1;
                         break;
@@ -626,14 +657,14 @@ void loop() {
                         // parameters in the 00F035 message may indicate status changes in the heat pump
                         // for now we only check for the following parameters: 
                         // DHW parameter setParamDHW
-                        // EHVX08S26CB9W DHWbooster parameter 0x48
-                        // coolingheating parameter 0x31 or 0x2F (as defined in setParam)
+                        // EHVX08S26CB9W DHWbooster parameter 0x48 (EHVX08S26CB9W)
+                        // coolingheating parameter SetParam
                         // parameters 0144- or 0162- ASCII name of device
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         // change bytes for triggering coolingheating on/off
                         w = 3;
-                        if (setDHW) { WB[w++] = setParamDHW; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHW = 0; }
-                        if (setcoolingheating) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheating = 0; }
+                        if (setDHWrequest) { WB[w++] = setParamDHW; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHWrequest = 0; }
+                        if (setcoolingheatingrequest) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheatingrequest = 0; }
                         for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
                         for (w = 3; w < n; w++) if ((RB[w] == setParamDHW) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
                         wr = 1;
