@@ -153,8 +153,8 @@ void setup() {
   Serial.print(F("Monitor"));
 #ifdef MONITORSERIAL
   Serial.print(F("+serial"));
-#endif /* MONITORCONTROL */
-#ifdef MONITORSERIAL
+#endif /* MONITORSERIAL */
+#ifdef MONITORCONTROL
   Serial.print(F("+control"));
 #endif /* MONITORCONTROL */
 #endif /* MONITOR */
