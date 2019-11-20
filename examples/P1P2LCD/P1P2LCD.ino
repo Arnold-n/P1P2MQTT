@@ -38,7 +38,7 @@ void setup() {
 #ifdef MONITORSERIAL
   Serial.print(F("+serial"));
 #endif /* MONITORCONTROL */
-  Serial.println(F(" v0.9.10"));
+  Serial.println(F(" v0.9.10 20191120"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
   init_LCD();

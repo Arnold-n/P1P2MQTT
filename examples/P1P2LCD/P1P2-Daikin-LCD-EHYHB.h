@@ -21,6 +21,7 @@ static uint8_t row,col;
 #define LCD_char(i)  { u8x8.drawGlyph(col,row,i); }
 #define LCD_int1(i)  { LCD_char('0'+(i)%10); }
 #define LCD_int2(i)  { LCD_char( (i > 9) ? ('0'+((i)%100)/10) : ' '); col++; LCD_char('0'+(i)%10); }
+#define LCD_int2p(i) { LCD_char( '0'+((i)%100)/10); col++; LCD_char('0'+(i)%10); }
 #define LCD_hex1(i)  { if ((i)<10) LCD_char(('0'+(i))) else LCD_char('A'+((i)-10)); }
 #define LCD_hex2(i)  { LCD_hex1(i>>4); col++; LCD_hex1(i&0x0f); }
 
@@ -43,16 +44,32 @@ void LCD_8f8(byte i, byte j) {
   col--;
   i = i / 10;
   if (negtemp) {
-    switch (i) {
-      case 0 : LCD_char('-'); break;
-      case 1 : LCD_char('/'); break;
-      case 2 : LCD_char('|'); break;
-      default: LCD_char('\\'); break;
+    if (col) {
+      if (i > 0) {
+        LCD_char('0' + i);
+        col--;
+        LCD_char('-');
+      } else {
+        LCD_char('-');
+        col--;
+        LCD_char(' ');
+      }
+    } else {
+      switch (i) {
+        case 0 : LCD_char('-'); break;
+        case 1 : LCD_char('/'); break;
+        case 2 : LCD_char('|'); break;
+        default: LCD_char('\\'); break;
+      }
     }
   } else {
     switch (i) {
       case 0 : LCD_char(' '); break;
       default : LCD_char('0' + i); break;
+    }
+    if (col) {
+      col--;
+      LCD_char(' ');
     }
   }
 }
@@ -119,10 +136,10 @@ void process_for_LCD(byte *rb, uint8_t n) {
         case 0x00 : switch (i) {
           case  4 : row=0; col=15; LCD_int1(c);                   break; // DayOfWeek
           case  5 : row=0; col=9;  LCD_int2(c);                   break; // Hours
-          case  6 : row=0; col=12; LCD_int2(c);                   break; // Minutes
-          case  7 : row=0; col=2;  LCD_int2(c);                   break; // year
-          case  8 : row=0; col=4;  LCD_int2(c);                   break; // month
-          case  9 : row=0; col=6;  LCD_int2(c);                   break; // day
+          case  6 : row=0; col=12; LCD_int2p(c);                  break; // Minutes
+          case  7 : row=0; col=2;  LCD_int2p(c);                  break; // year
+          case  8 : row=0; col=4;  LCD_int2p(c);                  break; // month
+          case  9 : row=0; col=6;  LCD_int2p(c);                  break; // day
         } break;
         case 0x40 : switch (i) {
           case 15 : row=7; col=6; LCD_hex2(c);                    break; // 0:heat pump 6:? 7:DHW
