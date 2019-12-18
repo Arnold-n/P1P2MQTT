@@ -1,4 +1,4 @@
-/* PP1P2_Daikin_ParameterConversion.h product-ndependent code
+/* P1P2_Daikin_ParameterConversion.h product-independent code
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
@@ -56,18 +56,18 @@ void savehistory(byte *rb, int n) {
       if (!savehistorylen[shi]) {
         if (savehistoryend + (n - shign) <= RBHLEN) {
           savehistoryp[shi] = savehistoryend;
-  #ifdef RPI
+#ifdef RPI
           printf("* Savehistory allocating %i - ",savehistoryend);
-  #else /* RPI */
+#else /* RPI */
           //Serial.print(F("* Savehistory allocating "));
           //Serial.print(savehistoryend);
           //Serial.print("-");
-  #endif /* RPI */
+#endif /* RPI */
           savehistorylen[shi] = n - shign;
           savehistoryend += (n - shign);
-  #ifdef RPI
+#ifdef RPI
           printf("%i for 0x%X%X-0x%X%X\n",savehistoryend, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
-  #else /* RPI */
+#else /* RPI */
           //Serial.print(savehistoryend);
           //Serial.print(F(" for "));
           //if (rb[0] < 0x10) Serial.print("0");
@@ -75,15 +75,15 @@ void savehistory(byte *rb, int n) {
           //Serial.print(" ");
           //if (rb[2] < 0x10) Serial.print("0");
           //Serial.println(rb[2],HEX);
-  #endif /* RPI */
+#endif /* RPI */
         } else if (savehistoryend < RBHLEN) {
           // not enough space available, store what we can
           savehistoryp[shi] = savehistoryend;
           savehistorylen[shi] = (RBHLEN - savehistoryend);
           savehistoryend += RBHLEN;
-  #ifdef RPI
+#ifdef RPI
           printf("* Not enough memory, shortage %i for %X%X-%X%X\n", (n-shign) + savehistoryend - RBHLEN, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
-  #else /* RPI */
+#else /* RPI */
           //Serial.print(F("* Not enough memory, shortage "));
           //Serial.print((n - shign) + savehistoryend - RBHLEN);
           //Serial.print(F(" for "));
@@ -92,12 +92,12 @@ void savehistory(byte *rb, int n) {
           //Serial.print(" ");
           //if (rb[2] < 0x10) Serial.print("0");
           //Serial.println(rb[2],HEX);
-  #endif /* RPI */
+#endif /* RPI */
         } else {
           // no space left
-  #ifdef RPI
+#ifdef RPI
           printf("* Warning: memory shortage %i for %X%X-%X%X\n", (n-shign), rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
-  #else /* RPI */
+#else /* RPI */
           //Serial.print("* Warning: memory shortage ");
           //Serial.print((n - shign));
           //Serial.print(F(" for "));
@@ -106,7 +106,7 @@ void savehistory(byte *rb, int n) {
           //Serial.print(" ");
           //if (rb[2] < 0x10) Serial.print("0");
           //Serial.println(rb[2],HEX);
-  #endif /* RPI */
+#endif /* RPI */
         }
       } else {
         // Serial.print("* savehistorylen[shi] "); Serial.println(savehistorylen[shi]);
