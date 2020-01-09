@@ -72,6 +72,11 @@ char jsonstring[10000]={};
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+#define RB 200     // max size of readbuf (serial input from Arduino)
+#define HB 32      // max size of hexbuf, same as P1P2Monitor
+char readbuf[RB];
+byte readhex[HB];
+
 void setup() {
   Serial.begin(115200);
   while (!Serial);      // wait for Arduino Serial Monitor to open
@@ -281,11 +286,6 @@ void process_for_mqtt_json(byte* rb, int n) {
   savehistory(rb,n);
 }
 
-#define RB 200     // max size of readbuf (serial input from Arduino)
-#define HB 32      // max size of hexbuf, same as P1P2Monitor
-char readbuf[RB];
-byte readhex[HB];
-  
 void loop() {
   ArduinoOTA.handle();
   client.loop(); 
