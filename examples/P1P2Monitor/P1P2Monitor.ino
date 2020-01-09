@@ -4,9 +4,10 @@
  *           If to many options are selected (SAVEHISTORY, JSON, MQTTTOPICS, OUTPUTUDP, OUTPUTSERIAL, MONITOR, MONITORCONTROL, MONITORSERIAL) this program
  *           will not fit in an Arduino Uno, but it will fit in an Arduino Mega.
  *
- * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2020 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20200109 v0.9.11 Added option to insert counter request after 000012 packet (for KLIC-DA)
  * 20191018 v0.9.10 Added MQTT topic like output over serial/udp, and parameter support for EHVX08S26CA9W (both thanks to jarosolanic)
  * 20190914 v0.9.9 Controller/write safety related improvements; automatic controller ID detection
  * 20190908 v0.9.8 Minor improvements: error handling, hysteresis, improved output (a.o. x0Fx36)
@@ -148,7 +149,7 @@ void setup() {
   while (!Serial);      // wait for Arduino Serial Monitor to open
   // Serial.setTimeout(5); // hardcoded in timedRead above
   Serial.println(F("*"));
-  Serial.print(F("*P1P2"));
+  Serial.print(F("* P1P2"));
 #ifdef MONITOR
   Serial.print(F("Monitor"));
 #ifdef MONITORSERIAL
@@ -173,7 +174,31 @@ void setup() {
 #ifdef SAVEHISTORY
   Serial.print(F("+savehist"));
 #endif
-  Serial.println(F(" v0.9.10"));
+#ifdef KLICDA
+  Serial.print(F("+klicda"));
+#endif /* KLICDA */
+  Serial.println();
+  Serial.println("*");
+  // Initial parameters
+  Serial.print(F("* outputunknown="));
+  Serial.println(OUTPUTUNKNOWN);
+  Serial.print(F("* changeonly="));
+  Serial.println(CHANGEONLY);
+  Serial.print(F("* counterrepeatingrequest="));
+  Serial.println(COUNTERREPEATINGREQUEST);
+#ifdef KLICDA
+#ifdef KLICDA_delay
+  Serial.print(F("* klicda_delay="));
+  Serial.println(KLICDA_delay);
+#endif /* KLICDA_delay */
+#endif /* KLICDA */
+  Serial.print(F("* CONTROL_ID_DEFAULT=0x"));
+  Serial.println(CONTROL_ID_DEFAULT, HEX);
+  Serial.print(F("* F030DELAY="));
+  Serial.println(F030DELAY);
+  Serial.print(F("* F03XDELAY="));
+  Serial.println(F03XDELAY);
+  Serial.println(F("* v0.9.11 20200108"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
 #ifdef JSON
@@ -455,12 +480,10 @@ void loop() {
                           Serial.println(F("* Control_ID 0xF1 supported, no external controller found for 0xF1, switching control functionality on 0xF1 on"));
                           CONTROL_ID = 0xF1;
                         } else {
-                          Serial.println(F("* No free slave address for controller found. Control functionality not enabled. You may with to re-try later (and perhaps switch external controllers off)"));
-                          counterrequest = 0;
+                          Serial.println(F("* No free slave address for controller found. Control functionality not enabled. You may wish to re-try later (and perhaps switch external controllers off)"));
                           CONTROL_ID = 0x00;
                         }
                       } else {
-                        counterrequest = 0;
                         CONTROL_ID = 0x00;
                       }
                       if (!verbose) break;
@@ -579,9 +602,33 @@ void loop() {
 */
         }
       }
+#ifdef KLICDA
+      if ((nread > 4) && (RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x12)) {
+        if (counterrequest) {
+          // request one counter per cycle
+          WB[0] = 0x00;
+          WB[1] = 0x00;
+          WB[2] = 0xB8;
+          WB[3] = (counterrequest - 1);
+          if (P1P2Serial.writeready()) {
+            // write KLICDA_delay ms after 400012 message
+            // pause after 400012 is around 47 ms for some systems which is long enough for a 0000B8*/4000B8* counter request/response pair
+            // in exceptional cases (1 in 300 in my system) the pause after 400012 is only 27ms, 
+            //      in which case the 4000B* reply arrives after the 000013* request
+            //      (and in thoses cases the 000013* request is ignored)
+            //      (NOTE!: if KLICDA_delay is chosen incorrectly, such as 5 ms in some example systems, this results in incidental bus collisions)
+            P1P2Serial.writepacket(WB, 4, KLICDA_delay, crc_gen, crc_feed); 
+          } else {
+            Serial.println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
+          }
+          if (++counterrequest == 7) counterrequest = 0; // wait until next new minute; change 0 to 1 to continuously request counters for increased resolution
+        }
+      }
+#else /* KLICDA */
       if ((FxAbsentCnt[0] == F0THRESHOLD) && counterrequest && (nread > 4) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30)) {
         // 00F030 request message received; counterrequest > 0 so hijack this time slot to request counters
         // but only if external F0 controller has not been detected (so check on FxAbsentCnt[0])
+        // TODO extend to 00F130 ?
         WB[0] = 0x00;
         WB[1] = 0x00;
         WB[2] = 0xB8;
@@ -592,21 +639,24 @@ void loop() {
           Serial.println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
         }
         if (++counterrequest == 7) counterrequest = 0;
-      } else if ((nread > 4) && (RB[0] == 0x40) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
-        // 40Fx30 external controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < F03XDELAY (- margin)
-        if (delta < F03XDELAY - 2) {
+      } else 
+#endif /* KLICDA */
+             if ((nread > 4) && (RB[0] == 0x40) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
+        // 40Fx30 external controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < min(F03XDELAY, F030DELAY) (- margin)
+        if ((delta < F03XDELAY - 2) && (delta < F030DELAY - 2)) {
           FxAbsentCnt[RB[1] & 0x01] = 0;
           if (RB[1] == CONTROL_ID) {
-            // this should only happen if an external controller is connected after CONTROL_ID is set
-            Serial.print(F("* (New?!) external controller answering to address 0x"));
+            // this should only happen if an external controller is connected if/after CONTROL_ID is set (either because
+            //    -CONTROL_ID_DEFAULT conflicts with external controller, or
+            //    -because an external controller has been connected after CONTROL_ID has been manually set
+            Serial.print(F("* Warning: external controller answering to address 0x"));
             Serial.print(RB[1], HEX);
-            Serial.println(F(" detected, switching control functionality off"));
-            counterrequest = 0;
-            CONTROL_ID = 0x00;
+            Serial.println(F(" detected"));
           }
         }
       } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
-        // 00Fx30 request message received
+        // 00Fx30 request message received, and we did not use this slot to request counters
+        // check if there is no other external controller
         if ((RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x01] < F0THRESHOLD)) {
           FxAbsentCnt[RB[1] & 0x01]++;
           if (FxAbsentCnt[RB[1] & 0x01] == F0THRESHOLD) {
@@ -615,7 +665,8 @@ void loop() {
             Serial.println(F(" detected, switching control functionality can be switched on (using L1)"));
           }
         }
-        if (CONTROL_ID && (RB[1] == CONTROL_ID)) {
+        // act as external controller
+        if (CONTROL_ID && (FxAbsentCnt[CONTROL_ID & 0x01] == F0THRESHOLD) && (RB[1] == CONTROL_ID)) {
           WB[0] = 0x40;
           WB[1] = RB[1];
           WB[2] = RB[2];

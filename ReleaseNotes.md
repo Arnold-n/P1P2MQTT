@@ -1,5 +1,10 @@
 **Release notes**
 
+v0.9.11
+
+- P1P2Serial library: suppress end-of-block detection in case of short pauses between bytes in a package (for Zennio's KLIC-DA)
+- P1P2Monitor: extended counter request functionality for KLIC-DA
+
 v0.9.10
 
 - P1P2Serial library: upon bus collision detection, write buffer is emptied

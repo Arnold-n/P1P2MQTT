@@ -1,8 +1,9 @@
 /* P1P2Serial: Library for reading/writing Daikin/Rotex P1P2 protocol
  *
- * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2020 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20200109 v0.9.11 allow short pauses between bytes within a packet (for KLIC-DA device, to avoid detecting each byte as individual packet)
  * 20190914 v0.9.10 upon bus collision detection, write buffer is emptied
  * 20190914 v0.9.9 Added writeready()
  * 20190908 v0.9.8 Removed EOB signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
@@ -579,7 +580,7 @@ ISR(COMPARE_B_INTERRUPT)
   digitalWrite(LED_BUILTIN, rx_paritycheck ? HIGH : LOW);
   rx_state = 99;       // state=99: wait for next start bit's falling edge
   // rx_target = target;      // not used any more
-  SET_COMPARE_B(target + ticks_per_bit);
+  SET_COMPARE_B(target + ticks_per_bit * (1 + ALLOW_PAUSE_BETWEEN_BYTES));
 }
 
 uint16_t P1P2Serial::read_delta(void)

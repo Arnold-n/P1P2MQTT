@@ -1,8 +1,9 @@
 /* P1P2Serial: Library for reading/writing Daikin/Rotex P1P2 protocol
  *
- * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2020 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20200109 v0.9.11 allow short pauses between bytes within a packet (for KLIC-DA device, to avoid detecting each byte as individual packet)
  * 20190914 v0.9.10 upon bus collision detection, write buffer is emptied
  * 20190914 v0.9.9 Added writeready()
  * 20190908 v0.9.8 Removed EOB signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
@@ -63,7 +64,15 @@
 
 #define ALTSS_BASE_FREQ F_CPU
 
-// Changed signalling of error/EOB messages in v0.9.4:
+#define ALLOW_PAUSE_BETWEEN_BYTES 0 // If there is a pause between bytes on the bus which is longer than a 1/4 bit time, 
+                                    //   P1P2Serial signals en end-of-block.
+                                    // Daikin devices do not add a pause between bytes, but some other controllers do, like the KLIC-DA from Zennios.
+                                    // To avoid end-of-bus detection due to such a inter-byte pause, ALLOW_PAUSE_BETWEEN_BYTES can be increased
+                                    //   to a value between 1 and 11 (but not more than 11 to avoid overflow)
+                                    // For KLICDA devices a value of 9 seems to work.
+
+// Signalling of error conditions and end-of-block:
+// (changed signalling of error/EOB messages in v0.9.4)
 // Use 16 bits for timing information
 // Use 8 bits for error code
  

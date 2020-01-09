@@ -1,14 +1,15 @@
-**tl;dr**
+**Summary**
 
-P1P2Serial reads and writes raw data packets on Daikin P1/P2 two-wire interface, and similar interfaces, using an Arduino Uno and a P1P2Serial shield. Preliminary support for parameter interpretation, json, mqtt, WiFi using an additional ESP8266. Preliminary support to switch basic functions (DHW, heating/cooling) on/off is confirmed to work on 3 specific models. 
+The P1P2Monitor program and the P1P2Serial library read and write raw data packets on Daikin P1/P2 two-wire interface, and similar interfaces, using an Arduino Uno and a P1P2Serial shield. There is preliminary support for some Daikin P1/P2 based devices for parameter interpretation, json, and mqtt. WiFi can be added using an additional ESP8266. Preliminary support to switch basic functions (DHW, heating/cooling) on/off is confirmed to work on 3 specific models. Automatic counter requests (for electricity consumed) is supported.
 
 **No liability, no warranty**
 
 Any use is at your own risk (GPL sections 11 and 12 apply).
 
-**New in v0.9.6-v0.9.10**
+**New in v0.9.6-v0.9.11**
 
 (See also release notes)
+- 0.9.11 Allow pause between bytes in a package, for Zennio's KLIC-DA device, to avoid detecting each byte as individual packet
 - 0.9.10 Upon bus collision detection, write buffer is emptied
 - 0.9.9 Improved write behaviour and reduced bus collision situations, added auto-detection of controller address, added writeready() function
 - 0.9.8 Added hysteresis functionality in temperature reporting
@@ -126,11 +127,11 @@ If you want to power the bus (which is only needed if you want to communicate to
 
 **What does the data on the P1/P2 bus look like, at the physical level?**
 
-The P1/P2 bus uses the Home Bus System protocol, which is a serial protocol. It is a variation of bipolar encoding (alternate mark inversion, https://en.wikipedia.org/wiki/Bipolar_encoding), but the pulses only take half of the bit time. So every falling edge in the signal represents a 0, and every "missing" falling edge represents a 1. Every byte is coded as a start bit (0), 8 data bits (LSB first), 1 parity bit (even), and 1 stop bit (1). Oscilloscope pictures are available on http://www.grix.it/forum/forum_thread.php?ftpage=2&id_forum=1&id_thread=519140. As it is a two-wire interface, devices should not write on the bus if any other device is writing. The HBS standard has an advanced collision detection and priority mechanism. In a 2-device set up of a Daikin heat pump and a thermostat, the devices seem to simply alternate turns in writing to the bus.
+The P1/P2 bus uses the Home Bus System protocol, which is a serial protocol. It is a variation of bipolar encoding (alternate mark inversion, https://en.wikipedia.org/wiki/Bipolar_encoding), but the pulses only take half of the bit time. So every falling edge in the signal represents a 0, and every "missing" falling edge represents a 1. Every byte is coded as a start bit (0), 8 data bits (LSB first), 1 parity bit (even), and 1 stop bit (1). The Daikin devices have no pause between the stop bit and the next start bit, but Zennio's KLIC-DA has a short pause in between the individual bytes of a packet. Oscilloscope pictures are available on http://www.grix.it/forum/forum_thread.php?ftpage=2&id_forum=1&id_thread=519140. As it is a two-wire interface, devices should not write on the bus if any other device is writing. The HBS standard has an advanced collision detection and priority mechanism. In a 2-device set up of a Daikin heat pump and a thermostat, the devices seem to simply alternate turns in writing to the bus, and Daikin does not seem to support bus usage detection and collission avoidance, so take care when writing to the bus to avoid bus collisions.
 
 **What does the data on the P1/P2 bus look like, at the logical level?**
 
-The data does not follow the HBS packet format or HBS timing specification. Instead, the data is transmitted in short packets of 4-24 bytes each, with alternating packets sent by the thermostat and by the heat pump. The Daikin hybrid uses a protocol where a set of 13, sometimes more, packets are communicated in sequence. We will call this set of packets a package. The thermostat sends the first packet and the last packet in each package. Further exceptions apply. The first few bytes of each packet may indicate source, desination, and/or packet type number. After that the payload follows, followed by a CRC byte. The CRC algorithm for the Daikin hybrid is a simple 8-bit LFSR with a feed of 0x00 and a generator value of 0xD9. It may be different for other products.
+The Daikin protocol does not follow the HBS packet format or HBS timing specification. Instead, the data is transmitted in short packets of 4-24 bytes each. Each cycle has a number of request packets sent by the thermostat and answered by the heat pump; additionally, a number of request packets are sent by the thermostat and answered by an external auxiliary controller (if available); some systems support only one auxiliary controller, others support two. The Daikin hybrid system uses a protocol where a set of 13, sometimes more, packets are communicated in sequence. We will call this set of packets a package. The thermostat sends the first packet and the last packet in each package. Further exceptions apply. The first few bytes of each packet may indicate source, desination, and/or packet type number. After that the payload follows, followed by a CRC byte. The CRC algorithm for the Daikin hybrid is a simple 8-bit LFSR with a feed of 0x00 and a generator value of 0xD9. It may be different for other products.
 
 **What does the payload look like?**
 
@@ -151,8 +152,6 @@ The simple answer is: write when others don't. In practice communication seems t
 - examples/P1P2-bridge-esp8266: (GPL-licensed) program to convert P1P2Monitor's serial output to mqtt and json format, and preliminary support to write packets to the P1P2 bus from a mqtt channel,
 - examples/P1P2Convert: (GPL-licensed) host-based (Linux Ubuntu / Raspberry Pi) program to (post-)process P1P2Monitor's serial output (directly from USB or from recorded logs), outputs parameters to stdout, making reverse-engineering protocol data easier,
 - examples/P1P2HardwareTest: (GPL-licensed) program to stand P1P2Serial adapter shield in stand-alone mode,
-- (to be outphased:) examples/P1P2json: (GPL-licensed) program to convert bus to json-formatted output on serial output. No writing to the bus is supported by this program,
-- (to be outphased:) examples/P1P2json-mega: (GPL-licensed) program to convert bus to json-formatted output on serial output and UDP. No writing to the bus is supported by this program,
 - examples/P1P2LCD: (GPL-licensed) program to show P1P2 data on a an additional SPI 128x64 display connected directly to the Arduino Uno pins. This works for the Daikin hybrid model, it may work (partially) for other models. This program requires that the u8g2 library is installed,
 - Daikin specific but product independent header file P1P2_Daikin_json.h supporting conversion to json format (this is included by the product-dependent header file(s)),
 - Daikin specific but product dependent header file P1P2_Daikin_json_EHYHB.h supporting conversion to json format, this file is included by the P1P2json example program,
