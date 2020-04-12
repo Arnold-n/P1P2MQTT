@@ -345,6 +345,9 @@ void loop() {
 void recvSerial()
 {
   while (Serial.available() > 0 && newRS == false) {
+    if (rxIndex == 0) {
+      memset(RS, 0, RS_SIZE);
+    }
     if (rxIndex < RS_SIZE - 1) {
       RS[rxIndex] = Serial.read();
       rxIndex++;
