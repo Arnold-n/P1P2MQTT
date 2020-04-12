@@ -333,7 +333,7 @@ bool newRS = false;
 byte rs = 0;
 byte rxIndex = 0;
 unsigned long startMillis;
-#define SERIAL_TIMEOUT 5000
+#define SERIAL_TIMEOUT 5
 #define SERIAL_TERMINATOR '\n'
 
 void loop() {
