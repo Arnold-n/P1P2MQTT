@@ -2,7 +2,7 @@
 
 Protocol data format for Daikin Altherma hybrid heat pump for the EHYHBX08AAV3 (perhaps all EHYHB(H/X)-AV3 models) and (at least partially for the) Daikin Altherma LT heat pump EHV(H/X)-CA/CB
 
-Please read the README.md first.
+Please read the https://github.com/Arnold-n/P1P2Serial/blob/master/doc/README.md first for general description of Daikin Protocol and the structure of each packet.
 
 The following data packets were observed on these particular units:
 EHYHBX08AAV3: air-to-water heat pump with gas condensing technology, functioning in weather-dependent LWT mode
@@ -37,32 +37,28 @@ This timing corresponds to the description found in a design guide from Daikin w
 
 #### 1. Packet "000010..."
 
-| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
+| Data byte     | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 00                            | Request               | u8
-|     1         | 00                            | slave address: heat pump | u8
-|     2         | 10                            | packet type 10        | u8
-|     3         | 00/01                         | Heating               | flag8 | 0: power (off/on)
-|     4         | 01/81                         | Operating mode?       | flag8 | 7: gas?
-|     5         | 00/01                         | DHW tank              | flag8 | 0: power (off/on)
+|     0         | 00/01                         | Heating               | flag8 | 0: power (off/on)
+|     1         | 01/81                         | Operating mode?       | flag8 | 7: gas?
+|     2         | 00/01                         | DHW tank              | flag8 | 0: power (off/on)
+|     3         | 00                            | ?                     |
+|     4         | 00                            | ?                     |
+|     5         | 00                            | ?                     |
 |     6         | 00                            | ?                     |
-|     7         | 00                            | ?                     |
+|     7         | 14                            |Target room temperature| u8 / f8.8?
 |     8         | 00                            | ?                     |
-|     9         | 00                            | ?                     |
-|    10         | 14                            |Target room temperature| u8 / f8.8?
+|     9         | 00/20/40/60                   | ?                     | flag8 | 5: ? <br> 6: ?
+|    10         | 00/04                         | Quiet mode            | flag8 | 2: quiet mode (off/on)
 |    11         | 00                            | ?                     |
-|    12         | 00/20/40/60                   | ?                     | flag8 | 5: ? <br> 6: ?
-|    13         | 00/04                         | Quiet mode            | flag8 | 2: quiet mode (off/on)
+|    12         | 08                            | ?                     |flag8 ?| 3: ?
+|    13         | 00                            | ?                     |
 |    14         | 00                            | ?                     |
-|    15         | 08                            | ?                     |flag8 ?| 3: ?
+|    15         | 0F                            | ?                     |flag8 ?| 0: ? <br> 1: ? <br> 2: ? <br> 3: ?
 |    16         | 00                            | ?                     |
-|    17         | 00                            | ?                     |
-|    18         | 0F                            | ?                     |flag8 ?| 0: ? <br> 1: ? <br> 2: ? <br> 3: ?
-|    19         | 00                            | ?                     |
-|    20         | 00/40/42                      | DHW tank mode         | flag8 | 1: booster (off/on) <br> 6: operation (off/on)
-|    21         | 3C                            |DHW target temperature | u8 / f8.8?
-|    22         | 00                            | fractional part?      |
-|    23         | XX                            | CRC checksum          | u8
+|    17         | 00/40/42                      | DHW tank mode         | flag8 | 1: booster (off/on) <br> 6: operation (off/on)
+|    18         | 3C                            |DHW target temperature | u8 / f8.8?
+|    19         | 00                            | fractional part?      |
 
 #### 2. Packet "400010..."
 
