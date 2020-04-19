@@ -17,8 +17,8 @@ If the user of the thermostat requests certain information in the menu items, su
 **Packet type**
 
 Each packet has a packet type (and in certain cases a subtype) to identify the payload function. Packet type numbers observed so far are:
-- 10..15 for regular data packets between main controller and heat pump
-- 30..39 for communication between the main controller and external controllers (not documented yet, but used in v0.9.6 to switch DHW and cooling/heating on/off)
+- 10..16 for regular data packets between main controller (master) and heat pump (slave address 00)
+- 30..39 for communication between the main controller (master) and external controllers (slave address Fx)
 - 60..8F for field setting read/write operations (during operation and upon restart)
 - 90..9F,A1,B1 for data communication upon restart; packets 90, 92-98, 9A-9C are empty/not used; packet 91, 99, 9D, 9E, A1 are TBD; packet 9F contains information similar to packet 20 (tbd), packet B1 contains the ASCII name of the heat pump ("EHYHBX08AAV3\0\0\0\0\0")
 - B8 (+subtype) for incidental requests of consumption usage and count of operating hours
@@ -27,15 +27,17 @@ Each packet has a packet type (and in certain cases a subtype) to identify the p
 
 **Timing between packets**
 
-- approximately 25ms between communication thermostat and communication heat pump
+- approximately 25ms between communication main controller and communication heat pump
 - approximately 30-50ms (42/37/47/31/29/36) between communication heat pump and communication thermostat
 - approximately 140 or 160 ms between last packet of a package and the first packet of a new package
 
 This timing corresponds to the description found in a design guide from Daikin which specifies that a response must follow a request after 25ms, and a new request must not follow a response before another 25ms silence.
 
-# Main package
+# Packet type 10
 
-#### 1. Packet "000010..."
+### Packet type 10: request
+
+Header: 000010
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -64,7 +66,9 @@ This timing corresponds to the description found in a design guide from Daikin w
 |    22         | 00                            | fractional part?      |
 |    23         | XX                            | CRC checksum          | u8
 
-#### 2. Packet "400010..."
+### Packet type 10: response
+
+Header: 400010
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -88,7 +92,11 @@ This timing corresponds to the description found in a design guide from Daikin w
 |    22         | 00/02                         | DHW active            | flag8         | 1: DHW active1 (off/on) <br> 0: mode?? |
 |    23         | XX                            | CRC checksum          | u8
 
-#### 3. Packet "000011..."
+# Packet type 11
+
+### Packet type 11: request
+
+Header: 000011
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -104,7 +112,9 @@ This timing corresponds to the description found in a design guide from Daikin w
 |    10         | 00                            | ?
 |    11         | XX                            | CRC checksum          | u8
 
-#### 4. Packet "400011..."
+### Packet type 11: response
+
+Header: 400011
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -122,7 +132,11 @@ This timing corresponds to the description found in a design guide from Daikin w
 |  19-22        | 00                            | ? |
 |    23         | XX                            | CRC checksum          | u8
 
-#### 5. Packet "000012.."
+# Packet type 12
+
+### Packet type 12: request
+
+Header: 000012
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -142,7 +156,9 @@ This timing corresponds to the description found in a design guide from Daikin w
 |    17         | 00                            | ?
 |    18         | XX                            | CRC checksum          | u8
 
-#### 6. Packet "400012.."
+### Packet type 12: response
+
+Header: 400012
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -159,7 +175,12 @@ This timing corresponds to the description found in a design guide from Daikin w
 |    17-22      | 00                            | ?
 |    23         | XX                            | CRC checksum          | u8
 
-#### 7. Packet "000013.."
+
+# Packet type 13
+
+### Packet type 13: request
+
+Header: 000013
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -170,7 +191,9 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     5         | 00/D0                         | first package 0x00 instead of 0xD0 | flag8 ?
 |     6         | XX                            | CRC checksum          | u8
 
-#### 8. Packet "400013.."
+### Packet type 13: response
+
+Header: 400013
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -190,7 +213,11 @@ This timing corresponds to the description found in a design guide from Daikin w
 | EHY:    17        | XX                            | CRC checksum          | u8
 | EHY:    19        | XX                            | CRC checksum          | u8
 
-#### 9. Packet "000014.."
+# Packet type 14
+
+### Packet type 14: request
+
+Header: 000014
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -212,7 +239,9 @@ This timing corresponds to the description found in a design guide from Daikin w
 |   16-17       | 00                            | ? |
 |     18        | XX                            | CRC checksum          | u8
 
-#### 10. Packet "400014.."
+### Packet type 14: response
+
+Header: 400014
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -234,7 +263,11 @@ This timing corresponds to the description found in a design guide from Daikin w
 |   20-21       | 1C-24 00-09                   | Target temperature LWT add zone  in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8
 |     22        | XX                            | CRC checksum          | u8
 
-#### 11. Packet "000015.."
+# Packet type 15
+
+### Packet type 15: request
+
+Header: 000015
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -248,7 +281,9 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     8         | 20                            | ??
 |     9         | XX                            | CRC checksum          | u8
 
-#### 12. Packet "400015.."
+### Packet type 15: response
+
+Header: 400015
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -277,7 +312,14 @@ This timing corresponds to the description found in a design guide from Daikin w
 |EHV: 19        | 01                            |  0.1                  | u8div10
 |EHV: others    | 00                            | ??                    | u8
 
-#### 13. Packet "000016.." (EHV only)
+
+# Packet type 16
+
+only observed on EHV* heat pumps
+
+### Packet type 16: request
+
+Header: 000016
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -291,7 +333,9 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     11        | E6                            | ??                    | u8
 |     12        | XX                            | CRC checksum          | u8
 
-#### 14. Packet "400016.." (EHV only)
+### Packet type 16: response
+
+Header: 400016
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -302,7 +346,11 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     11        | E6                            | ??                    | u8
 |     12        | XX                            | CRC checksum          | u8
 
-#### 15. Packet "00F030.."
+# Packet type 30
+
+### Packet type 30: request
+
+Header: 00F030
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -312,11 +360,13 @@ This timing corresponds to the description found in a design guide from Daikin w
 |     3-16      | 00-03                         | indicate whether additional packets "00F03x" will be sent | u8
 |     17        | XX                            | CRC checksum          | u8
 
-Packet 00F030 requests a response from an external controller (slave with identity F0). Bytes 4-17 indicate whether additional packets (requests) are present for the external controller. If the external controller is available, it will respond with a packet "40F030". The response packet may indicate that the external controller would like to receive a certain request packet - this mechanism is used when a setting in the external controller is changed and should be communicated to the main controller and then to the heat pump. The additional packets 00F03x - and the reply 40F03x following it - are used to communicate status changes between main controller and external controller.
+The main controller (master) regularly polls the bus for external controllers (slaves address Fx) with packet type 30. Packet 00F030 requests a response from first external controller (slave with identity F0). Some Daikin products allow multiple external devices - if slave address F0 has already been assigned, master will poll for next external controller with packet 00F130. Bytes 4-17 indicate that master would like to send additional requests (for packets type 35..3E) to the external controller. 
 
-F1 has been observed as 2nd external controller in some devices.
+### Packet type 30: response
 
-#### 14. Packet "40F030.." by external controller
+Header: 40F030
+
+If the external controller is available, it will respond with a packet "40F030". The response packet may indicate that the external controller would like to receive a certain request packet - this mechanism is used when a setting in the external controller is changed and should be communicated to the main controller and then to the heat pump. The additional packets 00F03x - and the reply 40F03x following it - are used to communicate status changes between main controller and external controller.
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -327,9 +377,9 @@ F1 has been observed as 2nd external controller in some devices.
 |     17        | XX                            | CRC checksum          | u8
 
 
-# Other packets
+# Packet type 31
 
-#### Packet "00F031.." (and "40F031")
+Headers: 00F031 and 40F031
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -348,11 +398,9 @@ F1 has been observed as 2nd external controller in some devices.
 |     14        | 00-3B                         | time - seconds        | u8
 |     15        | XX                            | CRC checksum          | u8
 
+# Packet type 35
 
-
-
-
-#### Packet "00F035.." and "40F035.."
+Headers: 00F035 and 40F035
 
 A few hundred parameters can be exchanged via packet type 35. Some are fixed (a range of parameters is used to communicate the device ID), others are relating to operating settings. Unfortunately temperating settings are not visible here.
 
@@ -417,9 +465,13 @@ The parameter range for the is 0x0000-0x144.
 |   13A..145    | 45 48 59 48 42 58 30 38 41 41 56 33 | "EHYHBX08AAV3"  | ASCII         |
 |   others      | 00                            | ?                     |               |
 
-## Packet types 60..8F for communicating field settings
+# Packet types 36..3E
 
-A packet of type 60..8F communicates 5 field settings (using a payload of 20 bytes, or 4 bytes per field setting). This occurs after a restart (all field settings are sent by heat pump upon requests by the thermostat), or when a field setting is manually changed at the thermostat.
+Contains a number of parameters, just like packet type 35
+
+# Packet types 60..8F
+
+A packet of type 60..8F communicates 5 field settings (using a payload of 20 bytes, or 4 bytes per field setting). This occurs after a restart (all field settings are sent by heat pump upon requests by the thermostat), or when a field setting is manually changed at the main controller.
 For some reason, 4 000086/000087 packets will be inserted at certain moments even though these do not communicate any usable field settings.
 
 The packet type corresponds to the field settings according to the following table:
@@ -446,8 +498,13 @@ The packet type corresponds to the field settings according to the following tab
 |     7B        | 0F-05 .. 0F-09 |
 |     6B        | 0F-0A .. 0F-0E |
 
+### Packet type 60..8F: request
 
-#### Packet "0000XX.." Field setting information request by thermostat upon restart
+Header: 000060..00008F
+
+Field setting information request by main controller. 
+
+#### Request upon restart:
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -457,9 +514,30 @@ The packet type corresponds to the field settings according to the following tab
 |  3-22         | 00                            | All fields empty
 |    23         | XX                            | CRC checksum          | u8
 
-#### Packet "4000XX.." Field setting reply by heat pump during restart process
+#### Request during operation (after manual change of field setting):
 
-For supported field settings:
+| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
+|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
+|     0         | 00                            | Request                 | u8
+|     1         | 00                            | slave address: heat pump | u8
+|     2         | XX                            | packet type (60..8F) | u8
+|  3            | XX                            | 1st field, old value (no 0xC0 added), or new value (0x40 added) | u8
+|  4            | XX                            | maximum field value  | u8
+|  5            | XX                            | offset for field value  | u8
+|  6            | 00/08/0A/28/2A/8A/92/AA       | field setting info  | flag8 | see above
+|  7-10         | 00                            | 2nd field value, see bytes 3-6           | u8,u8,u8,flag8
+| 11-14         | 00                            | 3rd field value, see bytes 3-6           | u8,u8,u8,flag8
+| 15-18         | 00                            | 4th field value, see bytes 3-6           | u8,u8,u8,flag8
+| 19-22         | 00                            | 5th field value, see bytes 3-6           | u8,u8,u8,flag8
+|    23         | XX                            | CRC checksum          | u8
+
+### Packet type 60..8F: response
+
+Header: 400060..40008F
+
+#### Response upon restart:
+
+Supported field settings:
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -485,24 +563,8 @@ For non-supported field settings:
 |     2         | FF                            | FF as packet type answer if request is for packet type (63,66-67,6F,76-77,86,87) | u8
 |     3         | XX                            | CRC checksum          | u8
 
-#### Packet "0000XX.." Field setting change by thermostat during operation
 
-| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
-|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 00                            | Request                 | u8
-|     1         | 00                            | slave address: heat pump | u8
-|     2         | XX                            | packet type (60..8F) | u8
-|  3            | XX                            | 1st field, old value (no 0xC0 added), or new value (0x40 added) | u8
-|  4            | XX                            | maximum field value  | u8
-|  5            | XX                            | offset for field value  | u8
-|  6            | 00/08/0A/28/2A/8A/92/AA       | field setting info  | flag8 | see above
-|  7-10         | 00                            | 2nd field value, see bytes 3-6           | u8,u8,u8,flag8
-| 11-14         | 00                            | 3rd field value, see bytes 3-6           | u8,u8,u8,flag8
-| 15-18         | 00                            | 4th field value, see bytes 3-6           | u8,u8,u8,flag8
-| 19-22         | 00                            | 5th field value, see bytes 3-6           | u8,u8,u8,flag8
-|    23         | XX                            | CRC checksum          | u8
-
-#### Packet "4000XX.." Field setting reply by heat pump during restart process
+#### Response during operation (after manual change of field setting):
 
 Format is the same for supported and non-supported field settings
 
@@ -521,9 +583,11 @@ Format is the same for supported and non-supported field settings
 | 19-22         | 00                            | 5th field value, see bytes 3-6           | u8,u8,u8,flag8
 |    23         | XX                            | CRC checksum          | u8
 
-## A1/20 for motors and operation mode
+# Packet type A1
 
-#### 001. Packet "0000A100.."
+### Packet type A1: request
+
+Header: 0000A1
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -535,7 +599,9 @@ Format is the same for supported and non-supported field settings
 | 18-20         | 00                            | ?
 |    21         | XX                            | CRC checksum          | u8
 
-#### 002. Packet "4000A100.."
+### Packet type A1: response
+
+Header: 4000A1
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -547,7 +613,11 @@ Format is the same for supported and non-supported field settings
 | 18-20         | 00                            | ?
 |    21         | XX                            | CRC checksum          | u8
 
-#### 001. Packet "0000B100.."
+# Packet type B1
+
+### Packet type B1: request
+
+Header: 0000B1
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -559,7 +629,9 @@ Format is the same for supported and non-supported field settings
 | 19-20         | 00                            | ?
 |    21         | XX                            | CRC checksum          | u8
 
-#### 002. Packet "4000B100.."
+### Packet type B1: response
+
+Header: 4000B1
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -571,7 +643,11 @@ Format is the same for supported and non-supported field settings
 | 16-20         | 00                            | ?
 |    21         | XX                            | CRC checksum          | u8
 
-#### 003. Packet "00002000.."
+# Packet type 20
+
+### Packet type 20: request
+
+Header: 000020
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -581,7 +657,9 @@ Format is the same for supported and non-supported field settings
 |     3         | 00                            | ?
 |     4         | XX                            | CRC checksum          | u8
 
-#### 004. Packet "40002000.."
+### Packet type 20: response
+
+Header: 400020
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
@@ -591,26 +669,34 @@ Format is the same for supported and non-supported field settings
 |    3-22       | XX                            | various values??, tbd |
 |    23         | XX                            | CRC checksum | u8
 
-## B8 for request of energy consumed and count of operating hours
+# Packet type B8
 
-#### 001. Packet "0000B800.."
+Energy consumed and count of operating hours. Communication in packet type B8 is specific. In request, master specifies data type it would like to recieve. Slave (heat pump) responds with the requested data type.
+
+### Packet type B8: request
+
+Header: 0000B8
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 00                            | Request                 | u8
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
-|     3         | 00                            | packet subtype 00 | u8
+|     3         | XX                            | data type <br> 00: energy consumed <br> 01: energy produced <br> 02: pump and compressor hours <br> 03: backup heater hours <br> 04: compressor starts? <br> 05: boiler hours? | u8
 |     4         | XX                            | CRC checksum | u8
 
-#### 002. Packet "4000B800.."
+### Packet type B8: response
+
+Header: 4000B8
+
+#### Data type 00
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
-|     3         | 00                            | packet subtype 00 | u8
+|     3         | 00                            | data type 00 | u8
 |   4-6         | XX XX XX                      | energy consumed for heating (backup heater?) | u24
 |   7-9         | XX XX XX                      | energy consumed for DHW (backup heater?) | u24
 | 10-12         | 00 XX XX                      | energy consumed for heating (compressor?)   | u24
@@ -619,75 +705,42 @@ Format is the same for supported and non-supported field settings
 | 19-21         | XX XX XX                      | energy consumed (total) | u24
 |    22         | XX                            | CRC checksum | u8
 
-
-#### 003. Packet "0000B801.."
-
-| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
-|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 00                            | Request                 | u8
-|     1         | 00                            | slave address: heat pump | u8
-|     2         | B8                            | packet type B8 | u8
-|     3         | 01                            | packet subtype 00 | u8
-|     4         | XX                            | CRC checksum | u8
-
-#### 004. Packet "4000B801.."
+#### Data type 01
 
 | Byte nr       | Hex value observed            | Description                 | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                    | u8
 |     1         | 00                            | slave address: heat pump    | u8
 |     2         | B8                            | packet type B8              | u8
-|     3         | 01                            | packet subtype 01           | u8
+|     3         | 01                            | data type 01                | u8
 |   4-6         | XX XX XX                      | energy produced for heating | u24
 |   7-9         | XX XX XX                      | energy produced for cooling | u24
 | 10-12         | XX XX XX                      | energy produced for DHW     | u24
 | 13-15         | XX XX XX                      | energy produced total       | u24
 |    16         | XX                            | CRC checksum                | u8
 
-
-#### 005. Packet "0000B802.."
-
-| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
-|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 00                            | Request                 | u8
-|     1         | 00                            | slave address: heat pump | u8
-|     2         | B8                            | packet type B8 | u8
-|     3         | 02                            | packet subtype 02 | u8
-|     4         | XX                            | CRC checksum | u8
-
-#### 006. Packet "4000B802.."
+#### Data type 02
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
-|     3         | 02                            | packet subtype 02 | u8
+|     3         | 02                            | data type 02 | u8
 |   4-6         | XX XX XX                      | number of pump hours | u24
 |   7-9         | XX XX XX                      | number of compressor hours heating | u24
 | 10-12         | XX XX XX                      | number of compressor hours cooling | u24
 | 13-15         | XX XX XX                      | number of compressor hours DHW     | u24
 |    16         | XX                            | CRC checksum | u8
 
-
-#### 007. Packet "0000B803.."
-
-| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
-|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 00                            | Request                 | u8
-|     1         | 00                            | slave address: heat pump | u8
-|     2         | B8                            | packet type B8 | u8
-|     3         | 03                            | packet subtype 03 | u8
-|     4         | XX                            | CRC checksum | u8
-
-#### 008. Packet "4000B803.."
+#### Data type 03
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
-|     3         | 03                            | packet subtype 03 | u8
+|     3         | 03                            | data type 03 | u8
 |   4-6         | XX XX XX                      | backup heater1 hours for heating?  | u24
 |   7-9         | XX XX XX                      | backup heater1 hours for dhw?      | u24
 | 10-12         | XX XX XX                      | backup heater2 hours for heating?? | u24
@@ -696,50 +749,28 @@ Format is the same for supported and non-supported field settings
 | 20-21         | XX XX XX                      | ??                                 | u24
 |    22         | XX                            | CRC checksum | u8
 
-
-#### 009. Packet "0000B804.."
-
-| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
-|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 00                            | Request                 | u8
-|     1         | 00                            | slave address: heat pump | u8
-|     2         | B8                            | packet type B8 | u8
-|     3         | 04                            | packet subtype 04 | u8
-|     4         | XX                            | CRC checksum | u8
-
-#### 010. Packet "4000B804.."
+#### Data type 04
 
 | Byte nr       | Hex value observed            | Description              | Data type     | Bit: description |
 |---------------|:------------------------------|:-------------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                 | u8
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8           | u8
-|     3         | 04                            | packet subtype 04        | u8
+|     3         | 04                            | data type 04        | u8
 |   4-6         | XX XX XX                      | ??                       | u24
 |   7-9         | XX XX XX                      | ??                       | u24
 | 10-12         | XX XX XX                      | ??                       | u24
 | 13-15         | XX XX XX                      | number of compressor starts? heating? | u24
 |    16         | XX                            | CRC checksum             | u8
 
-
-#### 011. Packet "0000B805.."
-
-| Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
-|---------------|:------------------------------|:----------------------|:--------------|:-----------------|
-|     0         | 00                            | Request                 | u8
-|     1         | 00                            | slave address: heat pump | u8
-|     2         | B8                            | packet type B8 | u8
-|     3         | 05                            | packet subtype 05 | u8
-|     4         | XX                            | CRC checksum | u8
-
-#### 012. Packet "4000B805.."
+#### Data type 05
 
 | Byte nr       | Hex value observed            | Description           | Data type     | Bit: description |
 |---------------|:------------------------------|:----------------------|:--------------|:-----------------|
 |     0         | 40                            | Response                | u8
 |     1         | 00                            | slave address: heat pump | u8
 |     2         | B8                            | packet type B8 | u8
-|     3         | 05                            | packet subtype 05 | u8
+|     3         | 05                            | data type 05 | u8
 |  4-6          | XX XX XX                      | number of boiler hours heating | u24
 |  7-9          | XX XX XX                      | number of boiler hours DHW | u24
 | 10-12         | XX XX XX                      | ?? | u24,u24
