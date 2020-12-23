@@ -16,7 +16,11 @@ Other example programs translate the data packets to parameter format in json an
 
 The https://github.com/budulinek/Daikin-P1P2---UDP-Gateway repo provides additional documentation and code to enable direct communication between the P1P2 heat pump interface and home automation/monitoring systems (such as Loxone) over ethernet/UDP. It enables Loxone to write parameters directly to the P1P2 bus and set the leaving water temperature remotely (packet type 0x36). It also includes a very nice summary of the P1P2 protocol and payload description for packet types 0x10 - 0x16 and 0xB8 (for reading data) and 0x35, 0x36 and 0x3A (for writing data).
 
-**New in v0.9.6-v0.9.11**
+**Alternative approach using serial connector X10A on Daikin mainboard**
+
+An alternative approach to monitor the Daikin heat pump uses serial connector X10A on the Daikin mainboard in the heat pump. Using only an ESP the heat pump can be monitored over MQTT (using Home Assistant). Using a relay the heat pump can also be switched on and off. This very interesting project based on reverse engineering the X10A serial protocol is located at https://github.com/raomin/ESPAltherma.
+
+**P1P2Serial, new in v0.9.6-v0.9.11**
 
 (See also release notes)
 - 0.9.11 Allow pause between bytes in a package, for Zennio's KLIC-DA device, to avoid detecting each byte as individual packet
