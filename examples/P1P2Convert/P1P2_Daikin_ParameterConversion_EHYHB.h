@@ -1,4 +1,4 @@
-/* PP1P2_Daikin_ParameterConversion_EHYHB.h product-dependent code for EHYHBX08AAV3 and perhaps other EHYHB models
+/* P1P2_Daikin_ParameterConversion_EHYHB.h product-dependent code for EHYHBX08AAV3 and perhaps other EHYHB models
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
@@ -27,11 +27,10 @@
 
 #include "P1P2_Daikin_ParameterConversion.h" // for Daikin product-independent code
 
-#ifdef RPI
 char TimeString[17]="2000-00-00 00:00";
 char TimeString2[20]="2000-00-00 00:00:00";
 byte SelectTimeString2=0;
-#endif /* RPI */
+
 
 // device dependent code starts here:
 // ----------------------------------
@@ -343,32 +342,38 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case  3 :           return 0;
           case  4 :           return 0;
           case  5 :           return 0;
-          case  6 :           KEY("Counter1q");                 MEASUREMENT; VALUE_u24;
+          case  6 :           KEY("ConsElecHeatBackup");        MEASUREMENT; VALUE_u24; // electricity used for room heating, backup heater
           case  7 :           return 0;
           case  8 :           return 0;
-          case  9 :           KEY("Counter2q");                 MEASUREMENT; VALUE_u24;
+          case  9 :           KEY("ConsElecDHWBackup");         MEASUREMENT; VALUE_u24; // electricity used for DHW, backup heater
           case 10 :           return 0;
           case 11 :           return 0;
-          case 12 :           KEY("ConsElecHeating");           MEASUREMENT; VALUE_u24; // or only kWh meter input?
+          case 12 :           KEY("ConsElecHeatCompr");         MEASUREMENT; VALUE_u24; // electricity used for room heating, compressor
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("ConsElec");                  MEASUREMENT; VALUE_u24; // reports 0?
+          case 15 :           KEY("ConsElecCoolCompr");         MEASUREMENT; VALUE_u24; // electricity used for cooling, compressor
+          case 16 :           return 0;
+          case 17 :           return 0;
+          case 18 :           KEY("ConsElecDHWCompr");          MEASUREMENT; VALUE_u24; // eletricity used for DHW, compressor
+          case 19 :           return 0;
+          case 20 :           return 0;
+          case 21 :           KEY("ConsElecTotal");             MEASUREMENT; VALUE_u24; // electricity used, total
           default :           UNKNOWNBYTE;
         }
         case 0x01 : switch (i) {                                // packet B8 subtype 01
           case  3 :           return 0;
           case  4 :           return 0;
           case  5 :           return 0;
-          case  6 :           KEY("HeatProduced1");             MEASUREMENT; VALUE_u24;
+          case  6 :           KEY("EnergyProdHeat");           MEASUREMENT; VALUE_u24; // energy produced for room heating
           case  7 :           return 0;
           case  8 :           return 0;
-          case  9 :           KEY("Counter4q");                 MEASUREMENT; VALUE_u24;
+          case  9 :           KEY("EnergyProdCool");           MEASUREMENT; VALUE_u24; // energy produced when cooling
           case 10 :           return 0;
           case 11 :           return 0;
-          case 12 :           KEY("Counter5q");                 MEASUREMENT; VALUE_u24;
+          case 12 :           KEY("EnergyProdDHW");            MEASUREMENT; VALUE_u24; // energy produced for DHW
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("Heatproduced2");             MEASUREMENT; VALUE_u24;
+          case 15 :           KEY("EnergyProdTotal");          MEASUREMENT; VALUE_u24; // energy produced total
           default :           UNKNOWNBYTE;
         }
         case 0x02 : switch (i) {                                // packet B8 subtype 02
@@ -378,24 +383,51 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case  6 :           KEY("PumpHours");                 MEASUREMENT; VALUE_u24;
           case  7 :           return 0;
           case  8 :           return 0;
-          case  9 :           KEY("CompressorHours");           MEASUREMENT; VALUE_u24;
+          case  9 :           KEY("CompressorHoursHeat");       MEASUREMENT; VALUE_u24;
           case 10 :           return 0;
           case 11 :           return 0;
-          case 12 :           KEY("Counter6q");                 MEASUREMENT; VALUE_u24;
+          case 12 :           KEY("CompressorHoursCool");       MEASUREMENT; VALUE_u24;
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("Counter7q");                 MEASUREMENT; VALUE_u24;
+          case 15 :           KEY("CompressorHoursDHW");        MEASUREMENT; VALUE_u24;
           default :           UNKNOWNBYTE;
         }
         case 0x03 : switch (i) {                                // packet B8 subtype 03
           case  3 :           return 0;
+          case  4 :           return 0;
+          case  5 :           return 0;
+          case  6 :           KEY("HoursHeatBackup1");          MEASUREMENT; VALUE_u24;
+          case  7 :           return 0;
+          case  8 :           return 0;
+          case  9 :           KEY("HoursDHWBackup1");           MEASUREMENT; VALUE_u24;
+          case 10 :           return 0;
+          case 11 :           return 0;
+          case 12 :           KEY("HoursHeatBackup2");          MEASUREMENT; VALUE_u24;
+          case 13 :           return 0;
+          case 14 :           return 0;
+          case 15 :           KEY("HoursDHWBackup2");           MEASUREMENT; VALUE_u24;
+          case 16 :           return 0;
+          case 17 :           return 0;
+          case 18 :           KEY("Hours0q");                   MEASUREMENT; VALUE_u24; // ?
+          case 19 :           return 0;
+          case 20 :           return 0;
+          case 21 :           KEY("Hours1q");                   MEASUREMENT; VALUE_u24; // reports 0?
           default :           UNKNOWNBYTE;
         }
         case 0x04 : switch (i) {                                // packet B8 subtype 04
           case  3 :           return 0;
+          case  4 :           return 0;
+          case  5 :           return 0;
+          case  6 :           KEY("Counter40q");                MEASUREMENT; VALUE_u24;
+          case  7 :           return 0;
+          case  8 :           return 0;
+          case  9 :           KEY("Counter41q");                MEASUREMENT; VALUE_u24;
+          case 10 :           return 0;
+          case 11 :           return 0;
+          case 12 :           KEY("Counter42q");                MEASUREMENT; VALUE_u24;
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("NrStartAttempts");           MEASUREMENT; VALUE_u24;
+          case 15 :           KEY("CompressorStarts");          MEASUREMENT; VALUE_u24;
           default :           UNKNOWNBYTE;
         }
         case 0x05 : switch (i) {                                // packet B8 subtype 05
@@ -408,16 +440,16 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
           case  9 :           KEY("BoilerHoursDHW");            MEASUREMENT; VALUE_u24;
           case 10 :           return 0;
           case 11 :           return 0;
-          case 12 :           KEY("Counter8q");                 MEASUREMENT; VALUE_u24;
+          case 12 :           KEY("Counter8q");                 MEASUREMENT; VALUE_u24; // reports 0?
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("Counter9q");                 MEASUREMENT; VALUE_u24;
+          case 15 :           KEY("Counter9q");                 MEASUREMENT; VALUE_u24; // reports 0?
           case 16 :           return 0;
           case 17 :           return 0;
-          case 18 :           KEY("BoilerNrStartsDHW");         MEASUREMENT; VALUE_u24;
+          case 18 :           KEY("BoilerStarts");              MEASUREMENT; VALUE_u24; // ?
           case 19 :           return 0;
           case 20 :           return 0;
-          case 21 :           KEY("Counter11q");                MEASUREMENT; VALUE_u24;
+          case 21 :           KEY("Counter11q");                MEASUREMENT; VALUE_u24; // reports 0?
           default :           UNKNOWNBYTE;
         }
         default :             UNKNOWNBYTE;

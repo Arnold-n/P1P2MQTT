@@ -1,4 +1,4 @@
-/* PP1P2_Daikin_ParameterConversion.h product-ndependent code
+/* P1P2_Daikin_ParameterConversion.h product-independent code
  *
  * Copyright (c) 2019 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
@@ -9,8 +9,8 @@
 
 // these conversion functions look at the current and often also one or more past byte(s) in the byte array
 bool FN_flag8(uint8_t b, uint8_t n)  { return (b >> n) & 0x01; }
-uint32_t FN_u24(uint8_t *b)          { return ((b[-2] << 16) | ((b[-1]) << 8) | (b[0]));}
-uint16_t FN_u16(uint8_t *b)          { return (                ((b[-1]) << 8) | (b[0]));}
+uint32_t FN_u24(uint8_t *b)          { return (((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
+uint16_t FN_u16(uint8_t *b)          { return (                (((uint32_t) b[-1]) << 8) | (b[0]));}
 int8_t FN_u8delta(uint8_t *b)        { int c=b[0]; if (c & 0x10) return -(c & 0x0F); else return (c & 0x0F); }
 float FN_u8div10(uint8_t *b)         { if (b[-1] == 0xFF) return 0; else return b[0] * 0.1;}
 float FN_f8_8(uint8_t *b)            { return (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
@@ -56,18 +56,18 @@ void savehistory(byte *rb, int n) {
       if (!savehistorylen[shi]) {
         if (savehistoryend + (n - shign) <= RBHLEN) {
           savehistoryp[shi] = savehistoryend;
-  #ifdef RPI
+#ifdef RPI
           printf("* Savehistory allocating %i - ",savehistoryend);
-  #else /* RPI */
+#else /* RPI */
           //Serial.print(F("* Savehistory allocating "));
           //Serial.print(savehistoryend);
           //Serial.print("-");
-  #endif /* RPI */
+#endif /* RPI */
           savehistorylen[shi] = n - shign;
           savehistoryend += (n - shign);
-  #ifdef RPI
+#ifdef RPI
           printf("%i for 0x%X%X-0x%X%X\n",savehistoryend, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
-  #else /* RPI */
+#else /* RPI */
           //Serial.print(savehistoryend);
           //Serial.print(F(" for "));
           //if (rb[0] < 0x10) Serial.print("0");
@@ -75,15 +75,15 @@ void savehistory(byte *rb, int n) {
           //Serial.print(" ");
           //if (rb[2] < 0x10) Serial.print("0");
           //Serial.println(rb[2],HEX);
-  #endif /* RPI */
+#endif /* RPI */
         } else if (savehistoryend < RBHLEN) {
           // not enough space available, store what we can
           savehistoryp[shi] = savehistoryend;
           savehistorylen[shi] = (RBHLEN - savehistoryend);
           savehistoryend += RBHLEN;
-  #ifdef RPI
+#ifdef RPI
           printf("* Not enough memory, shortage %i for %X%X-%X%X\n", (n-shign) + savehistoryend - RBHLEN, rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
-  #else /* RPI */
+#else /* RPI */
           //Serial.print(F("* Not enough memory, shortage "));
           //Serial.print((n - shign) + savehistoryend - RBHLEN);
           //Serial.print(F(" for "));
@@ -92,12 +92,12 @@ void savehistory(byte *rb, int n) {
           //Serial.print(" ");
           //if (rb[2] < 0x10) Serial.print("0");
           //Serial.println(rb[2],HEX);
-  #endif /* RPI */
+#endif /* RPI */
         } else {
           // no space left
-  #ifdef RPI
+#ifdef RPI
           printf("* Warning: memory shortage %i for %X%X-%X%X\n", (n-shign), rb[0] >> 4, rb[0] & 0x0F, rb[2] >> 4, rb[2] & 0x0F);
-  #else /* RPI */
+#else /* RPI */
           //Serial.print("* Warning: memory shortage ");
           //Serial.print((n - shign));
           //Serial.print(F(" for "));
@@ -106,7 +106,7 @@ void savehistory(byte *rb, int n) {
           //Serial.print(" ");
           //if (rb[2] < 0x10) Serial.print("0");
           //Serial.println(rb[2],HEX);
-  #endif /* RPI */
+#endif /* RPI */
         }
       } else {
         // Serial.print("* savehistorylen[shi] "); Serial.println(savehistorylen[shi]);
