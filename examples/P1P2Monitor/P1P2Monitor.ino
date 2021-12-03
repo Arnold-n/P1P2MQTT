@@ -1,7 +1,7 @@
 /* P1P2Monitor: Monitor for reading Daikin/Rotex P1/P2 bus using P1P2Serial library, output in json format, over UDP,
  *           and limited control (DHW on/off, cooling/heating on/off) for some models.
  *           Control has only been tested on EHYHBX08AAV3 and EHVX08S23D6V
- *           If to many options are selected (SAVEHISTORY, JSON, MQTTTOPICS, OUTPUTUDP, OUTPUTSERIAL, MONITOR, MONITORCONTROL, MONITORSERIAL) this program
+ *           If too many options are selected (SAVEHISTORY, JSON, MQTTTOPICS, OUTPUTUDP, OUTPUTSERIAL, MONITOR, MONITORCONTROL, MONITORSERIAL) this program
  *           will not fit in an Arduino Uno, but it will fit in an Arduino Mega.
  *
  * Copyright (c) 2019-2020 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
@@ -97,7 +97,7 @@
 P1P2Serial P1P2Serial;
 
 #if defined JSON || defined MQTTTOPICS
-// choices needed to be made before including header file:
+// these variables need to be set before including header file:
 static bool outputunknown = OUTPUTUNKNOWN; // whether json parameters include parameters even if functionality is unknown
 static bool changeonly =  CHANGEONLY;      // whether json parameters are included only if changed
                                            //   (only for parameters for which savehistory() is active)
