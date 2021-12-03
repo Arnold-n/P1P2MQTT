@@ -201,13 +201,13 @@ void setup() {
   Serial.println(F("* v0.9.11 20200108"));
   Serial.println(F("*"));
   P1P2Serial.begin(9600);
-#ifdef JSON
+#if defined JSON || defined MQTTTOPICS
 #ifdef OUTPUTUDP
   Ethernet.begin(mac, ip);
 //  udpRecv.begin(listenPort);                                      // for future functionality...
   udpSend.begin(sendPort);
 #endif /* OUTPUTUDP */
-#endif /* JSON */
+#endif /* JSON || MQTTTOPICS */
 }
 
 int8_t FxAbsentCnt[2]={-1, -1}; // FxAbsentCnt[x] counts number of unanswered 00Fx30 messages; 
@@ -268,13 +268,13 @@ void process_packet(byte* rb, int n) {
           Serial.print(F(":"));
           Serial.println(value);
 #endif /* OUTPUTSERIAL */
-#ifdef MQTTTOPICSUDP
+#ifdef OUTPUTUDP
           udpSend.beginPacket(sendIpAddress, remPort);
           udpSend.print(key);
           udpSend.print(F(":"));
           udpSend.print(value);
           udpSend.endPacket();
-#endif /* MQTTTOPICSUDP */
+#endif /* OUTPUTUDP */
 #endif /* MQTTTOPICS */
 #ifdef JSON
           if (jsonterm) {
