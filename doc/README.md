@@ -4,25 +4,31 @@ The information is this directory is based on reserse engineering and assumption
 
 Below is a generic description, more detail per product can be found in the individual files here.
 
-It seems the primary controller functions as a master, and the heat pump and (if available) the external controllers operate as a slave.
+Communication consists of requests and responses between master device and slave devices. Requests are only issued by master, responses by slaves. Master waits for response (or timeout) before issuing new request. 
+
+*Master*
+
+There can only be one master on the bus: the main controller (user interface). For example, on Daikin Altherma the user interface is called EKRUCBL (https://www.daikin.eu/en_us/products/EKRUCBL.html)
+
+*Slaves*
+
+There is always at least one slave on bus: the heat pump itself (slave address 00). External controllers can be connected as additional slaves (slave address Fx, starting with F0), maximum number of external controllers is product-dependent. Various Daikin or 3rd party devices can be connected as external controllers (slaves), for example Daikin LAN adapters (BRP069A61, BRP069A62), Zennio KNX adapters (KLIC-DA), Realtime Modbus adapters (RTD-LT/CA) and other.
+The P1/P2 adapter developed here sniffs communication between the main controller and other slaves (mainly heat pump - slave 00). We will also try to control the heat pump by acting as just another external controller (slave address Fx).
 
 As of v0.9.6 the documentation format has been changed: byte nr starts now at 0 to match the C++ code.
 
 **High-level packet description**
 
-The following data packet format was observed on various units (detailed info in the product-dependent files):
+Each packet consists of header (3 bytes), payload data (between 0 and 20 bytes) and CRC checksum (1 byte):
 
 
-| Byte nr       | Hex value observed            |                |
+| Byte position       |             | Hex value observed         |
 |---------------|:------------------------------|:---------------|
-|  0            | 00 or 40 or 80                | 00 = request from main controller to a slave device<br>  40 = response from slave device<br> 80 = other communication (during boot)
-|  1            | 00 or FX                      | Slave address:<br> 00 = heat pump<br>FX = external controller
-|  2            |  XX                           | packet type, typically:<br>
-|               |                               |  1x used for regular with heat pump
-|               |                               |  3x used for communication with external controller
-|               |                               |  2x,6x,7x,8x,9x,Ax,Bx used for parameter/status communication and setting (also during boot sequence)
-|  3..(N-2)     |  XX                           | payload data
-|  (N-1)        |  XX                           | CRC checksum
+|  0            | direction                | 00 = request from main controller to a slave device<br>  40 = response from slave device<br> 80 = other communication (during boot)
+|  1            | slave address                 | 00 = heat pump<br>Fx = external controller 
+|  2            | packet type                   | 1x = regular communication with heat pump (slave address 00)  <br> 3x = communication with external controller (slave address Fx)  <br> 2x,6x,7x,8x,9x,Ax,Bx = parameter/status communication and setting (also during boot sequence)
+|  3..(N-2)     | payload data                           | see detailed info in the product-dependent files
+|  (N-1)        | CRC checksum                           | 
 
 
 **Cycle description**
