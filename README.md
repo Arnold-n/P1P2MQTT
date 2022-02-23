@@ -59,7 +59,7 @@ In order to program this board, the following steps are needed:
 - enter your mqtt server details in P1P2-bridge-esp8266.ino
 - program P1P2Monitor via USB on Arduino ATMega processor (set dip switches 3 and 4 on, others off)
 - program P1P2-bridge-esp8266 via USB on ESP8266 (install ESP8266 in Arduino environment, select "Generic ESP8266 Module" as board, select 4MB as available memory) (set dip switches 5, 6, and 7 on, others off)
-- connect Atmega and ESP8266 via serial interface: dip switches 1 and 2 on, others off. Optionally, also set dip switch 3 or  5 (or both) on to eavesdrop on the serial communication (in one direction only) via USB
+- connect Atmega and ESP8266 via serial interface: dip switches 1 and 2 on, others off. Optionally, also set dip switch 3 or 5 to on to eavesdrop on the serial communication (in one direction only) via USB
 - connect to the ESP WiFi AP on 192.168.4.1
 - select your local wifi network, enter password, and have ESP8266 connect to your WiFi
 - now, and upon each reboot, the ESP8266 connects to the MQTT server
