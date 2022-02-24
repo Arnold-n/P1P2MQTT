@@ -192,7 +192,7 @@ void setup() {
 
 void callback(char* topic, byte* payload, unsigned int length) {
 // any message received on P1P2/W will be copied directly to P1P2Monitor via serial out
-// unless the message starts with a 'U' or 'Y', in which case we decode the message on the ESP
+// unless the message starts with a 'U' or 'S', in which case we decode the message on the ESP
   int temp;
   char value[98];
 

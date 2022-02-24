@@ -212,8 +212,9 @@ void setup() {
 
 int8_t FxAbsentCnt[2]={-1, -1}; // FxAbsentCnt[x] counts number of unanswered 00Fx30 messages; 
                         // if -1 than no Fx request or response seen (relevant to detect whether F1 controller is supported or not)
-byte setParam = PARAM_HC_ONOFF;
-byte setParamDHW = PARAM_DHW_ONOFF; 
+uint16_t setParamDHW = PARAM_DHW_ONOFF; 
+uint16_t setParam35 = PARAM_HC_ONOFF;
+uint16_t setParam36 = 0x0006; // for EWYA011DV3P temperature setting
 
 #define RS_SIZE 99      // buffer to store data read from serial port, max line length on serial input is 99 (3 characters per byte, plus 'W" and '\r\n')
 static char RS[RS_SIZE];
@@ -338,8 +339,8 @@ int scanint(char* s, int &b) {
   return sscanf(s,"%d",&b);
 }
 
-int scanhex(char* s, int &b) {
-  return sscanf(s,"%2x",&b);
+int scanhex(char* s, uint16_t &b) {
+  return sscanf(s,"%4x",&b);
 }
 
 byte CONTROL_ID = CONTROL_ID_DEFAULT;
@@ -350,6 +351,9 @@ byte DHWstatus = 0;
 byte setcoolingheatingrequest = 0;
 byte setcoolingheatingstatus = 0;
 byte coolingheatingstatus = 0;
+byte set36request = 0;
+uint16_t setValue36 = 0;
+uint16_t Value36 = 0;
 byte counterrequest = 0;
 byte counterrepeatingrequest = COUNTERREPEATINGREQUEST;
 byte Tmin = 61;
@@ -361,6 +365,7 @@ void loop() {
   static byte crc_gen = CRC_GEN;
   static byte crc_feed = CRC_FEED;
   int temp;
+  uint16_t temphex;
   int wb = 0; int wbp = 1; int n; int wbtemp;
   static byte ignoreremainder = 1; // 1 is more robust to avoid misreading a partial message upon reboot, but be aware the first line received will be ignored.
 #ifdef MONITOR
@@ -387,8 +392,8 @@ void loop() {
                     break;
           case 'g':
           case 'G': if (verbose) Serial.print(F("* Crc_gen "));
-                    if (scanhex(&RS[1], temp) == 1) { 
-                      crc_gen = temp; 
+                    if (scanhex(&RS[1], temphex) == 1) { 
+                      crc_gen = temphex; 
                       if (!verbose) break; 
                       Serial.print(F("set to "));
                     }
@@ -398,8 +403,8 @@ void loop() {
                     break;
           case 'h':
           case 'H': if (verbose) Serial.print(F("* Crc_feed "));
-                    if (scanhex(&RS[1], temp) == 1) { 
-                      crc_feed = temp; 
+                    if (scanhex(&RS[1], temphex) == 1) { 
+                      crc_feed = temphex; 
                       if (!verbose) break; 
                       Serial.print(F("set to ")); 
                     }
@@ -508,24 +513,57 @@ void loop() {
                     }
                     Serial.println(DHWstatus);
                     break;
-          case 'p': // select parameter to write in z step below
+          case 'p': // select 35-parameter to write in z step below
           case 'P': if (verbose) Serial.print(F("* Param2Write ")); 
-                    if (scanhex(&RS[1], temp) == 1) {
-                      setParam = temp;
+                    if (scanhex(&RS[1], temphex) == 1) {
+                      setParam35 = temphex;
                       if (!verbose) break;
                       Serial.print(F("set to ")); 
                     }
                     Serial.print(F("0x")); 
-                    if (setParam <= 0x0F) Serial.print(F("0")); 
-                    Serial.println(setParam, HEX);
+                    if (setParam35 <= 0x000F) Serial.print(F("0")); 
+                    if (setParam35 <= 0x00FF) Serial.print(F("0")); 
+                    if (setParam35 <= 0x0FFF) Serial.print(F("0")); 
+                    Serial.println(setParam35, HEX);
+                    break;
+          case 'q': // select 36-type parameter to write in r step below
+          case 'Q': if (verbose) Serial.print(F("* Param36-2Write ")); 
+                    if (scanhex(&RS[1], temphex) == 1) {
+                      setParam36 = temphex;
+                      if (!verbose) break;
+                      Serial.print(F("set to ")); 
+                    }
+                    Serial.print(F("0x")); 
+                    if (setParam36 <= 0x000F) Serial.print(F("0")); 
+                    if (setParam36 <= 0x00FF) Serial.print(F("0")); 
+                    if (setParam36 <= 0x0FFF) Serial.print(F("0")); 
+                    Serial.println(setParam36, HEX);
+                    break;
+          case 'r': // set heating/cooling mode on/off
+          case 'R': if (verbose) Serial.print(F("* Param36 ")); 
+                    if (scanint(&RS[1], temp) == 1) {
+                      set36request = 1;
+                      setValue36 = temp;
+                      if (!verbose) break;
+                      Serial.print(F("will be set to ")); 
+                      Serial.println(setValue36);
+                      break;
+                    }
+                    Serial.println(Value36);
                     break;
           case 'c': // set counterrequest cycle (once or repetitive)
-          case 'C': if (scanint(&RS[1], temp) == 2) {
-                      counterrepeatingrequest = 1;
-                      Serial.println(F("* Repetitive requesting of counter values initiated")); 
-                    } else if (scanint(&RS[1], temp) == 1) {
-                      if (!counterrequest) counterrequest = 1;
-                      Serial.println(F("* Single counter request cycle initiated")); 
+          case 'C': if (scanint(&RS[1], temp) == 1) {
+                      if (temp > 1) {
+                        counterrepeatingrequest = 1;
+                        Serial.println(F("* Repetitive requesting of counter values initiated")); 
+                      } else if (temp == 1) {
+                        if (!counterrequest) counterrequest = 1;
+                        Serial.println(F("* Single counter request cycle initiated")); 
+                      } else {
+                      counterrepeatingrequest = 0;
+                      counterrequest = 0;
+                      Serial.println(F("* Counter-requests stopped"));
+                      }
                     } else {
                       counterrepeatingrequest = 0;
                       counterrequest = 0;
@@ -538,7 +576,7 @@ void loop() {
                       setcoolingheatingrequest = 1;
                       setcoolingheatingstatus = temp;
                       if (!verbose) break;
-                      Serial.print(F("set to ")); 
+                      Serial.print(F("will be set to ")); 
                       Serial.println(setcoolingheatingstatus);
                       break;
                     }
@@ -646,7 +684,7 @@ void loop() {
         if ((delta < F03XDELAY - 2) && (delta < F030DELAY - 2)) {
           FxAbsentCnt[RB[1] & 0x01] = 0;
           if (RB[1] == CONTROL_ID) {
-            // this should only happen if an external controller is connected if/after CONTROL_ID is set (either because
+            // this should only happen if an external controller is connected if/after CONTROL_ID is set, either because
             //    -CONTROL_ID_DEFAULT conflicts with external controller, or
             //    -because an external controller has been connected after CONTROL_ID has been manually set
             Serial.print(F("* Warning: external controller answering to address 0x"));
@@ -715,14 +753,21 @@ void loop() {
                         // change bytes for triggering coolingheating on/off
                         w = 3;
                         if (setDHWrequest) { WB[w++] = setParamDHW; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHWrequest = 0; }
-                        if (setcoolingheatingrequest) { WB[w++] = setParam; WB[w++] = 0x00; WB[w++] = setcoolingheatingstatus; setcoolingheatingrequest = 0; }
-                        for (w = 3; w < n; w++) if ((RB[w] == setParam) && (RB[w+1] == 0x00)) coolingheatingstatus = RB[w+2];
-                        for (w = 3; w < n; w++) if ((RB[w] == setParamDHW) && (RB[w+1] == 0x00)) DHWstatus = RB[w+2];
+                        if (setcoolingheatingrequest) { WB[w++] = setParam35 & 0xff; WB[w++] = setParam35 >> 8; WB[w++] = setcoolingheatingstatus; setcoolingheatingrequest = 0; }
+                        for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == setParam35) coolingheatingstatus = RB[w+2];
+                        for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == setParamDHW) DHWstatus = RB[w+2];
                         wr = 1;
                         break;
             case 0x36 : // in: 23 byte; out 23 byte; 4-byte parameters; reply with FF
                         // A parameter consists of 4 bytes: 2 bytes for param nr, and 2 bytes for value
-                        // fallthrough
+                        for (w = 3; w < n; w++) WB[w] = 0xFF;
+                        // write bytes for parameter setParam36 to value set36status if set36request 
+                        w = 3;
+                        if (set36request) { WB[w++] = setParam36 & 0xff; WB[w++] = (setParam36 >> 8) & 0xff; WB[w++] = setValue36 & 0xff; WB[w++] = (setValue36 >> 8) & 0xff; set36request = 0; }
+                        // check if set36status has been changed by main controller
+                        for (w = 3; w < n; w+=4) if (((RB[w] << 8) | RB[w+1]) == setParam36) Value36 = RB[w+2] | (RB[w+3] << 8);
+                        wr = 1;
+                        break;
             case 0x37 : // in: 23 byte; out 23 byte; 5-byte parameters; reply with FF
                         // not seen in EHVX08S23D6V
                         // seen in EHVX08S26CB9W (value: 00001001010100001001)
