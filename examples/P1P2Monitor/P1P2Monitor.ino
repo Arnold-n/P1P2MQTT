@@ -752,7 +752,7 @@ void loop() {
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         // change bytes for triggering coolingheating on/off
                         w = 3;
-                        if (setDHWrequest) { WB[w++] = setParamDHW; WB[w++] = 0x00; WB[w++] = setDHWstatus; setDHWrequest = 0; }
+                        if (setDHWrequest) { WB[w++] = setParamDHW & 0xff; WB[w++] = setParamDHW >> 8; WB[w++] = setDHWstatus; setDHWrequest = 0; }
                         if (setcoolingheatingrequest) { WB[w++] = setParam35 & 0xff; WB[w++] = setParam35 >> 8; WB[w++] = setcoolingheatingstatus; setcoolingheatingrequest = 0; }
                         for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == setParam35) coolingheatingstatus = RB[w+2];
                         for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == setParamDHW) DHWstatus = RB[w+2];
@@ -765,7 +765,7 @@ void loop() {
                         w = 3;
                         if (set36request) { WB[w++] = setParam36 & 0xff; WB[w++] = (setParam36 >> 8) & 0xff; WB[w++] = setValue36 & 0xff; WB[w++] = (setValue36 >> 8) & 0xff; set36request = 0; }
                         // check if set36status has been changed by main controller
-                        for (w = 3; w < n; w+=4) if (((RB[w] << 8) | RB[w+1]) == setParam36) Value36 = RB[w+2] | (RB[w+3] << 8);
+                        for (w = 3; w < n; w+=4) if (((RB[w+1] << 8) | RB[w]) == setParam36) Value36 = RB[w+2] | (RB[w+3] << 8);
                         wr = 1;
                         break;
             case 0x37 : // in: 23 byte; out 23 byte; 5-byte parameters; reply with FF
