@@ -720,8 +720,10 @@ void loop() {
           switch (RB[2]) {
             case 0x30 : // in: 17 byte; out: 17 byte; out pattern WB[7] should contain a 01 if we want to communicate a new setting
                         for (w = 3; w < n; w++) WB[w] = 0x00;
-                        // set byte WB[7] to 0x01 for triggering F035 to 0x01 if setcoolingheatingrequest/setDHWrequest needs to be changed to request a F035 message
+                        // set byte WB[7] to 0x01 to request a F035 message to set coolingheatingstatus and/or DHWstatus
                         if (setDHWrequest || setcoolingheatingrequest) WB[7] = 0x01;
+                        // set byte WB[8] to 0x01 to request a F036 message to set setParam36 to Value36
+                        if (set36request) WB[8] = 0x01;
                         d = F030DELAY;
                         wr = 1;
                         break;
