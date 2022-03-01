@@ -13,6 +13,7 @@ uint32_t FN_u24(uint8_t *b)          { return (((uint32_t) b[-2] << 16) | (((uin
 uint16_t FN_u16(uint8_t *b)          { return (                (((uint32_t) b[-1]) << 8) | (b[0]));}
 int8_t FN_u8delta(uint8_t *b)        { int c=b[0]; if (c & 0x10) return -(c & 0x0F); else return (c & 0x0F); }
 float FN_u8div10(uint8_t *b)         { if (b[-1] == 0xFF) return 0; else return b[0] * 0.1;}
+float FN_u16div10(uint8_t *b)        { if (b[-1] == 0xFF) return 0; else return (b[0] * 0.1 + b[-1] * 25.6);}
 float FN_f8_8(uint8_t *b)            { return (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
 
 
@@ -326,12 +327,14 @@ uint8_t value_flag8(byte* rb, uint8_t i, uint8_t j, char* value) {
 #define VALUE_f8_8(cnt, hyst1, hyst2)    { if (!newmeasuredval(FN_f8_8(&rb[i]),    cnt, hyst1, hyst2)) return 0; snprintf(value, KEYLEN, "%1.1f", FN_f8_8(&rb[i]));    return 1; }
 #define VALUE_f8s8(cnt, hyst1, hyst2)    { if (!newmeasuredval(FN_f8s8(&rb[i]),    cnt, hyst1, hyst2)) return 0; snprintf(value, KEYLEN, "%1.1f", FN_f8s8(&rb[i]));    return 1; }
 #define VALUE_u8div10(cnt, hyst1, hyst2) { if (!newmeasuredval(FN_u8div10(&rb[i]), cnt, hyst1, hyst2)) return 0; snprintf(value, KEYLEN, "%1.1f", FN_u8div10(&rb[i])); return 1; }
+#define VALUE_u16div10(cnt, hyst1, hyst2){ if (!newmeasuredval(FN_u16div10(&rb[i]),cnt, hyst1, hyst2)) return 0; snprintf(value, KEYLEN, "%1.1f", FN_u16div10(&rb[i]));return 1; }
 #define VALUE_F(v, cnt, hyst1, hyst2)    { if (changeonly && !newmeasuredval(v,    cnt, hyst1, hyst2)) return 0; snprintf(value, KEYLEN, "%1.1f", v);                  return 1; }
 #else /* RPI */
 // note that snprintf(.. , "%f", ..) is not supported on Arduino/Atmega so use dtostrf instead
 #define VALUE_f8_8(cnt, hyst1, hyst2)    { if (!newmeasuredval(FN_f8_8(&rb[i]),    cnt, hyst1, hyst2)) return 0; dtostrf(FN_f8_8(&rb[i]), 1, 2, value);               return 1; }
 #define VALUE_f8s8(cnt, hyst1, hyst2)    { if (!newmeasuredval(FN_f8s8(&rb[i]),    cnt, hyst1, hyst2)) return 0; dtostrf(FN_f8s8(&rb[i]), 1, 1, value);               return 1; }
 #define VALUE_u8div10(cnt, hyst1, hyst2) { if (!newmeasuredval(FN_u8div10(&rb[i]), cnt, hyst1, hyst2)) return 0; dtostrf(FN_u8div10(&rb[i]), 1, 1, value);            return 1; }
+#define VALUE_u16div10(cnt, hyst1, hyst2){ if (!newmeasuredval(FN_u16div10(&rb[i]),cnt, hyst1, hyst2)) return 0; dtostrf(FN_u16div10(&rb[i]), 1, 1, value);           return 1; }
 #define VALUE_F(v, cnt, hyst1, hyst2)    { if (changeonly && !newmeasuredval(v,    cnt, hyst1, hyst2)) return 0; dtostrf(v, 1, 1, value);                             return 1; }
 #endif /* RPI */
 #define VALUE_H4         { if (!newbytesval(rb, i, 4)) return 0; snprintf(value, KEYLEN, "%X%X%X%X%X%X%X%X", rb[i-3] >> 4, rb[i-3] & 0x0F, rb[i-2] >> 4, rb[i-2] & 0x0F, rb[i-1] >> 4, rb[i-1] & 0x0F, rb[i] >> 4, rb[i] & 0x0F); return 1; }

@@ -50,6 +50,8 @@ The following data-types were observed in the payload data:
 | f8.8          | signed fixed point value : 1 sign bit, 7 integer bit, 8 fractional bits (two’s compliment, see explanation below)
 | f8/8          | Daikin-style fixed point value: 1st byte is value before comma, and 2nd byte is first digit after comma (see explanation below)
 | s-abs4        | Daikin-style temperature deviation: bit 4 is sign bit, bits 0-3 is absolute value of deviation
+| u8div10       | unsigned 8-bit integer 0..255, to be divided by 10
+| u16div10      | unsigned 16-bit integer 0..65535, to be divided by 10
 
 Explanation of f8.8 format: a temperature of 21.5°C in f8.8 format is represented by the 2-byte value in 1/256th of a unit as 1580 hex (1580hex = 5504dec, dividing by 256 gives 21.5). A temperature of -5.25°C in f8.8 format is represented by the 2-byte value FAC0 hex (FAC0hex = - (10000hex-FACOhex) = - 0540hex = - 1344dec, dividing by 256 gives -5.25).
 

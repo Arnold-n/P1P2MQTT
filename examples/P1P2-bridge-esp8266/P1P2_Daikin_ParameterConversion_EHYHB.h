@@ -107,7 +107,8 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
 // VALUE_u8delta:       for 1-byte value -10..10 where bit 4 is sign and bit 0..3 is value
 // VALUE_f8_8           for 2-byte float in f8_8 format (see protocol description)
 // VALUE_f8s8           for 2-byte float in f8s8 format (see protocol description)
-// VALUE_u8div10        for 1-byte integer to be divided by 10 (used for flow in 0.1m/s)
+// VALUE_u8div10        for 1-byte integer to be divided by 10
+// VALUE_u16div10       for 2-byte integer to be divided by 10 (used for flow in 0.1m/s)
 // VALUE_F(value, ch)   for self-calculated float parameter value, uses additional parameter ch to signal change
 // VALUE_H4             for 4-byte hex value (used for sw version)
 // TERMINATEJSON        returns 9 to signal end of package, signal for json string termination
@@ -285,7 +286,7 @@ byte bytes2keyvalue(byte* rb, byte i, byte j, char* key, char* value, byte &cat)
         case  3 :             KEY("TargetDHW");                 SETTING;     VALUE_u8;
         case 11 :             return 0;                                                          // 0xFF = No flow
         case 12 :             KEY("Flow");
-                              Flow = FN_u8div10(&rb[i]);        TEMPFLOWP;   VALUE_u8div10(9, 0.09, 0.15);
+                              Flow = FN_u16div10(&rb[i]);       TEMPFLOWP;   VALUE_u16div10(9, 0.09, 0.15);
         case 13 :             // fallthrough
         case 14 :             // fallthrough
         case 15 :             return 0;

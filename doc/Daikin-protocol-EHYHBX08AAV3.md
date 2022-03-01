@@ -204,8 +204,8 @@ Header: 400013
 |     4         | 00                            | ? |
 |     5         | 01                            | ?? |
 |     6         | D0                            | ?? |
-|   7-11        | 00                            | ? |
-|    12         | 00-E0                         | flow (in 0.1 l/min) | u8
+|   7-10        | 00                            | ? |
+|   11-12       | 0000-010E                     | flow (in 0.1 l/min) | u16div10
 |    13-14      | xxxx                          | software version inner unit | u16
 |    15-16      | xxxx                          | software version outer unit | u16
 | EHV only:    17        | 00                            | ??                    | u8
