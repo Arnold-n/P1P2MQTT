@@ -149,7 +149,7 @@ bool newmeasuredval(float f, byte i, float hyst1, float hyst2) {
   saveavgvalue[i] = avg;
   // check if value changed more than hyst2 (high threshold) compared to historic (non-averaged) value
   if ((f > savehistoryvalue[i] + hyst2) || (f < savehistoryvalue[i] - hyst2)) {
-    savehistoryvalue[i] = f;
+    savehistoryvalue[i] = saveavgvalue[i] = f;
     return 1;
   }
   // check if averaged value changed more than hyst1 (low threshold) compared to historic (non-averaged) value
