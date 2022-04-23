@@ -5,12 +5,12 @@ Daikin (hybrid) heat pump systems are usually controlled by a room thermostat (o
 **New design**
 
 A new PCB is under development, which is based on the MAX22088, an ATmega328P, and an ESP8266, which provides all necessary functionality (no Arduino needed any more). It aims:
--to monitor and allow control of the Daikin heat pump via the P1/P2 bus,
--to function as "auxiliary controller" to the main thermostat. Depending on your model it may be possible to switch the heat pump on or off or to set certain parameters. In my system I can switch the heat pump on/off, boiler on/of, or control the temperature settings,
--to communicate via MQTT over WiFi,
--to be OTA upgradable (or if that fails, via a connector),
--the electronics is powered entirely by the P1/P2 bus, no external power supply is needed, and
--it fits nicely in a small enclosure.
+- to monitor and allow control of the Daikin heat pump via the P1/P2 bus,
+- to function as "auxiliary controller" to the main thermostat. Depending on your model it may be possible to switch the heat pump on or off or to set certain parameters. In my system I can switch the heat pump on/off, boiler on/of, or control the temperature settings,
+- to communicate via MQTT over WiFi,
+- to be OTA upgradable (or if that fails, via a connector),
+- the electronics is powered entirely by the P1/P2 bus, no external power supply is needed, and
+- it fits nicely in a small enclosure.
 A prototype version is currently being tested. If you are interested, please let me know so I know how much interest there might be.
 
 With communication over MQTT, integration with grafana, OpenHab, Home Assistant, and many other should be possible.
