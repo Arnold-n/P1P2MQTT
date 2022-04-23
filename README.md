@@ -1,10 +1,47 @@
 **Summary**
 
-The P1P2Monitor program and the P1P2Serial library read and write raw data packets on Daikin P1/P2 two-wire interface, and similar interfaces, using an Arduino Uno and a P1P2Serial shield. There is preliminary support for some Daikin P1/P2 based devices for parameter interpretation, json, and mqtt. WiFi can be added using an additional ESP8266. Preliminary support to switch basic functions (DHW, heating/cooling) on/off is confirmed to work on 3 specific models. Automatic counter requests (for monitoring electricity consumed) is supported.
+Daikin (hybrid) heat pump systems are usually controlled by a room thermostat (or other controller) over a 2-wire interface, called P1/2. This project provides a design and software to monitor (and, for some devices (see below), set certain parameters in the room thermostat of) the Daikin system (on/off, certain temperature settings, heating/cooling setting, silent mode on/off, etc). 
+
+**New design**
+
+A new PCB is under development, which is based on the MAX22088, an ATmega328P, and an ESP8266, which provides all necessary functionality (no Arduino needed any more). It aims:
+-to monitor and allow control of the Daikin heat pump via the P1/P2 bus,
+-to function as "auxiliary controller" to the main thermostat. Depending on your model it may be possible to switch the heat pump on or off or to set certain parameters. In my system I can switch the heat pump on/off, boiler on/of, or control the temperature settings,
+-to communicate via MQTT over WiFi,
+-to be OTA upgradable (or if that fails, via a connector),
+-the electronics is powered entirely by the P1/P2 bus, no external power supply is needed, and
+-it fits nicely in a small enclosure.
+A prototype version is currently being tested. If you are interested, please let me know so I know how much interest there might be.
+
+With communication over MQTT, integration with grafana, OpenHab, Home Assistant, and many other should be possible.
+
+**Which Daikin systems are supported?**
+
+There is a large variation in the P1/P2 logical protocol implementation of various Daikin systems. My system is a Daikin hybrid EHYHBX08AAV3 which is supported. Monitoring the P1/P2 bus on other systems should always be possible, but interpretation of the raw data may require further reverse engineering. It is currenly assumed that various Daikin Altherma Hybrid and Daikin Altherma LT models are reasonably similar that they may be supported by changing the parameters used to control certain functions and/or by changing the code which interprets the received data and encodes it into MQTT parameter values.
 
 **No liability, no warranty**
 
-Any use is at your own risk (GPL sections 11 and 12 apply).
+Any use is entirely at your own risk (GPL sections 11 and 12 apply).
+
+**Is it safe?**
+
+There is always a risk when you write to the bus based on reverse engineering and assumptions that unexpected things happen or break. Reading without writing should be safe though. My system has been running continuously in controller mode (writing and reading) for 3 years now. Still, use is entirely at your own risk.
+
+It is advised to connect/disconnect devices to the P1/P2 bus only if the power of all connected devices is switched off. Some Daikin manuals warn that device settings should not be changed too often, because of wear in the solid state memory in their devices - one of their manuals states a maximum of 7000 setting changes per year - without indicating the expected life time of their product. Don't change settings too often.
+
+**Programs in this repo**
+
+The P1P2Monitor program and the P1P2Serial library read and write raw data packets on Daikin P1/P2 two-wire interface, and similar (home bus system/Echonet)  interfaces from other manufacturers, using an Arduino Uno and a P1P2Serial shield. There is preliminary support for some Daikin P1/P2 based devices for parameter interpretation, json, and mqtt.  Preliminary support to switch basic functions (DHW, heating/cooling) on/off is confirmed to work on 3 specific models. 
+
+WiFi can be added using an additional ESP8266 running the P1P2-bridge-esp8266 program. 
+
+Data logged (always useful to log all raw data to check for bus collisions, or an issues) can be analysed using P1P2Convert on any Linux system, enabling further reverse engineering.
+
+**Daikin counters for energy consumption and production**
+
+The Daikin systems keep track of various counters for power consumption, energy production, and number of compressor starts and hours. Unfortunately these counters are not communicated over the bus unless explicitly asked for by the main room controller, which is done only if a user goes into the energy consumption menu. To ensure that these counters can be monitored, an option (COUNTERREPEATINGREQUEST) is implemented in P1P2Monitor to request these counters once per minute.
+
+If you happen to own a KLIC-DA device (a KNX-P1P2 interface), this also reports the Altherma energy counters but does not request counter updates. The P1P2Monitor program can be used to request these counters such that the KLIC-DA device is able to report the actual counters. Be careful though, the request of these counters is a violation of the protocol (the P1P2Monitor program "acts as" main controller which confuses the main controller - in my system this works fine, but carefully check the bus to see how your controller reacts).
 
 **P1P2Serial library and P1P2Monitor example application**
 
@@ -14,46 +51,35 @@ Other example programs translate the data packets to parameter format in json an
 
 **Home automation, UDP support**
 
-The https://github.com/budulinek/Daikin-P1P2---UDP-Gateway repo provides additional documentation and code to enable direct communication between the P1P2 heat pump interface and home automation/monitoring systems (such as Loxone) over ethernet/UDP. It enables Loxone to write parameters directly to the P1P2 bus and set the leaving water temperature remotely (packet type 0x36). It also includes a very nice summary of the P1P2 protocol and payload description for packet types 0x10 - 0x16 and 0xB8 (for reading data) and 0x35, 0x36 and 0x3A (for writing data).
+The https://github.com/budulinek/Daikin-P1P2---UDP-Gateway repo provides additional documentation and code to enable direct communication between the P1P2 heat pump interface and home automation/monitoring systems (such as Loxone) over ethernet/UDP. It enables Loxone to write parameters directly to the P1P2 bus and set the leaving water temperature remotely (packet type 0x36). It also includes a very nice summary of the P1P2 protocol and payload description for packet types 0x10 - 0x16 and 0xB8 (for reading data) and 0x35, 0x36 and 0x3A (indicating which parameters can be written: https://github.com/budulinek/Daikin-P1P2---UDP-Gateway/blob/main/Payload-data-write.md).
 
 **Alternative approach using serial connector X10A on Daikin mainboard**
 
 An alternative approach to monitor the Daikin heat pump uses serial connector X10A on the Daikin mainboard in the heat pump. Using only an ESP the heat pump can be monitored over MQTT (using Home Assistant). Using a relay the heat pump can also be switched on and off. This very interesting project based on reverse engineering the X10A serial protocol is located at https://github.com/raomin/ESPAltherma.
 
-**P1P2Serial, new in v0.9.6-v0.9.11**
+**Below various set-ups are provided**
 
-(See also release notes)
-- 0.9.11 Allow pause between bytes in a package, for Zennio's KLIC-DA device, to avoid detecting each byte as individual packet
-- 0.9.10 Upon bus collision detection, write buffer is emptied
-- 0.9.9 Improved write behaviour and reduced bus collision situations, added auto-detection of controller address, added writeready() function
-- 0.9.8 Added hysteresis functionality in temperature reporting
-- 0.9.8 Removed EOB from errorbuf as returned by readpacket; ignore packets with errors; ignore first serial line as it may be a partial line
-- 0.9.7 Improved reliability and fixed hang/hick-up bug (switch from TIMER0 to TIMER2, improved serial input handling, ignore packets with CRC error)
-- 0.9.7 Added counter request functionality to P1P2Monitor
-- 0.9.6 Control of DHW and heating/cooling: possibility to switch these functions on and off. Parameter reporting of the 35 packet type used to communicate between the main controller and auxiliary controllers.
- 
-**New in v0.9.4/v0.9.5/v0.9.5+controller**
+***MQTT or json over WiFi set-up using a P1P2Adapter shield, Arduino Uno and ESP8266***
 
-ESP8266 support to interface Arduino Uno serial output from/to mqtt/json over WiFi. This works nicely on an Arduino-Uno/ESP8266 combination. Removed raw data in/out support. Separated the previously all-in-one P1P2Monitor functionality (LCD, monitor, test) into different example programs. Added limited control function.
+    P1/P2 (2-wire interface)
 
-In v0.9.5 delay behaviour when writing has been changed, with a timeout function, to avoid bus collissions. Instead of writing a packet when a pause was *at least* a certain length, a packet is written when a pause took *exactly* a certain length, or alternatively, a timeout occured.
+|P1P2Adapter Shield (pin 8, 9)|
+|-
 
-**Set-up based on Arduino Uno/ESP8266/wifi**
+    (data via pin 8 and pin 9)
 
-P1/P2 2-wire interface
-      
-      P1P2Adapter Shield
-      (pin 8, 9)
-      Arduino Uno running P1P2Monitor (with JSON undefined)
+|Arduino Uno running P1P2Monitor (with JSON undefined)|
+|-
 
-Serial interface
+    Serial interface (RX,TX)
 
-      ESP8266 running P1P2-bridge-esp
-      with wifi-manager and OTA firmware upgrade capability
+|ESP8266 running P1P2-bridge-esp8266
+|-
 
-Serial/json/mqtt over WiFi
+    WiFi
 
-The above set-up works nicely on a combi-board such as available from https://robotdyn.com/catalog/arduino/boards/uno-wifi-r3-atmega328p-esp8266-32mb-flash-usb-ttl-ch340g-micro-usb.html.
+For this set-up, a nice Uno/ESP8266 combi-board used to be available from Robotdyn. Old stock or clone versions can still be found at certain resellers, for example from  https://www.vanallesenmeer.nl/Uno-WiFi-R3-ATmega328-ESP8266-8Mb-USB-TTL-CH340G-Development-Board.
+
 In order to program this board, the following steps are needed:
 
 - enter your mqtt server details in P1P2-bridge-esp8266.ino
@@ -65,45 +91,63 @@ In order to program this board, the following steps are needed:
 - now, and upon each reboot, the ESP8266 connects to the MQTT server
 - the ESP8266 should also become visible in the Arduino IDE as a network port, and can be reprogrammed OTA
 
-**Set-up based on Arduino Uno/Raspberry Pi/LAN, wifi**
+***MQTT or json over WiFI set-up using a P1P2-ESP device***
 
-P1/P2 2-wire interface
-      
-      P1P2Adapter Shield
-      (pin 8, 9)
-      Arduino Uno running P1P2Monitor (with JSON undefined)
+Not yet available, a bus-powered stand-alone P1/P2-WiFI interface is under development.
 
-Serial interface over USB
+    P1/P2 (2-wire interface)
 
-      Raspberry Pi running [ tbd ]
+|bus-powered P1P2-ESP device
+|-
 
-mqtt/.. over WiFi or LAN
+    WiFi
 
-The above set-up works nicely on an original Arduino Uno, and has the advantage that the Arduino can be flashed without dip switch settings.
+***Raspberry Pi development set-up using a P1P2Adapter shield and Arduino Uno***
 
-**Set-up based on Arduino Mega/W5500**
+    P1/P2 (2-wire interface)
 
-P1/P2 2-wire interface
-      
-      P1P2Adapter Shield
-      (pin 48, 46 (not: 8, 9))
-      Arduino Mega running P1P2Monitor with JSON and JSONUDP defined
+|P1P2Adapter Shield (pin 8, 9)|
+|-
 
-      W5500 ethernet shield
+    (data via pin 8 and pin 9)
 
-json over UDP via LAN
+|Arduino Uno running P1P2Monitor (with JSON undefined)|
+|-
+
+    Serial over USB
+
+|Raspberry Pi serial terminal program or logger
+|-
+
+    WiFi / LAN
+
+This set-up provides flexibity as the Uno can directly be programmed from the Raspberry Pi, and the logged data can be inspected with P1P2Convert.
+
+***json over UDP/LAN set-up using a P1P2Adapter shield, Arduino Mega and W5500***
+
+
+    P1/P2 (2-wire interface)
+
+|P1P2Adapter Shield|
+|-
+
+    (data via pin 48 and pin 46, using a few wires)
+
+|Arduino Mega running P1P2Monitor (with JSON and JSONUDP defined) (*)
+|-
+
+    SPI interface
+
+|W5500 ethernet interface
+|-
+
+    LAN
+
+(*) Instead of runnning P1P2Monitor in this set-up, the code at https://github.com/budulinek/Daikin-P1P2---UDP-Gateway may better be suited.
 
 **How is the software licensed?**
 
 The software is licensed under GPL V2.0. Please comply with the license conditions. If you improve or add, I would be interested to hear from you.
-
-**What can I do with the P1/P2 adapter?**
-
-For now, you can only read and write raw (byte) data on the P1/P2 bus. Write support includes basic bus collision detection, which operates on a byte basis (and not on a bit basis - even if a collission is detected, writing the current byte will continue). You can use this library to view and study the data on the bus, and to monitor various temperatures, flow data, energy consumption.  This would for example enable the calculation of COP values (if you know the electric power consumption). So far I have not detected the power consumption information in the P1/P2 bus data. A separate signal from an electricity meter (P1 signal or blinking LED) may be needed to calculate the COP values.
-
-The data observed on the bus is output to the serial over USB connection, and optionally to an OLED display connected to the Arduino Uno (this requires the u8g2 library to be installed). Support for conversion to json/emoncms format for upload into emoncms (openenergymonitor.org) is in preparation.
-
-In principle code can be added to send messages to the heat pump and/or to the controller. For example one could send a message to request certain parameters that are normally not requested by the controller and thus normally not provided by the heat pump, such as energy consumption. In principle one could try to control the heat pump also by writing to the bus, but if the controller is also connected it may overrule such control in its communications. Taking full control of the heat pump is not supported and will be a real challenge. One option would be to disconnect the controller once the P1P2 adapter takes over control. Another approach would be to have a man-in-the-middle approach with two adapters.
 
 **Why did you build this?**
 
@@ -111,15 +155,11 @@ My heat pump is a 2014 model Daikin hybrid heat pump/natural gas boiler combinat
 
 **What is the Daikin P1/P2 bus?**
 
-Daikin (or Rotex) uses various communication standards between thermostats and heat pumps. The P1/P2 standard is one of them (others are F1/F2, Modbus, BACnet, which are not supported here). The P1/P2 protocol is a proprietary standard. At the lowest level it is a two-wire 9600 baud serial-like interface based on the Japanese Home Bus System (ET-2101). Some technical details of this standard can be found in chapter 4 of the https://echonet.jp/wp/wp-content/uploads/pdf/General/Standard/Echonet/Version_2_11_en/spec_v211e_3.pdf.
+Daikin (or Rotex) uses various communication standards between thermostats and heat pumps. The P1/P2 standard is one of them (others are F1/F2, Modbus, BACnet, which are not supported here, even though F1/F2 is electrically the same as P1/P2). The P1/P2 protocol is a proprietary standard. At the lowest level it is a two-wire 9600 baud serial-like interface based on the Japanese Home Bus System (ET-2101). Some technical details of this standard can be found in chapter 4 of the https://echonet.jp/wp/wp-content/uploads/pdf/General/Standard/Echonet/Version_2_11_en/spec_v211e_3.pdf.
 
 **Which interface is supported?**
 
 This project was started for the Daikin P1/P2 bus. However the underlying electrical HBS format is used by many heat pump / air conditioning manufacturers, so far we have indications that the following buses are based on the HBS format: Daikin P1/P2, Daikin F1/F2 (DIII-Net), Mitsubishi M-NET, Toshiba TCC-Link, Hitachi H-link, Panasonic/Sanyo SIII-Net, perhaps also products from Haier and York. The logical format will likely differ. For example, Len Shustek made an impressive OPAMP-based reading circuit for the Mitsubishi M-NET and documented his protocol observations on https://github.com/LenShustek/M-NET-Sniffer. The logical format is clearly different from the Daikin format, but the P1P2Serial library and adapter will likely work for reading and writing M-NET too as the physical format is the same or similar.
-
-**Is it safe?**
-
-Use is entirely at your own risk. No guarantees. It is advised to connect/disconnect devices to the P1/P2 bus only if the power of all connected devices is switched off. Some Daikin manuals warn that device settings should not be changed too often, because of wear in the solid state memory in their devices - one of their manuals states a maximum of 7000 setting changes per year - without indicating the expected life time of their product. Don't change settings too often.
 
 **How do I build a P1/P2 adapter circuit?**
 
@@ -195,3 +235,17 @@ Many thanks to the following persons:
 - designer2k2 for sharing his EWYQ005ADVP protocol data and analysis, and
 - Nicholas Roth for testing and making available a MAX22088 schematic and PCB design, and providing his log data
 - Paul Stoffregen for publishing the AltSoftSerial library, on which the P1P2Serial library is heavily based.
+
+**P1P2Serial release note summary**
+
+(See also release notes)
+- 0.9.11 Allow pause between bytes in a package, for Zennio's KLIC-DA device, to avoid detecting each byte as individual packet
+- 0.9.10 Upon bus collision detection, write buffer is emptied
+- 0.9.9 Improved write behaviour and reduced bus collision situations, added auto-detection of controller address, added writeready() function
+- 0.9.8 Added hysteresis functionality in temperature reporting
+- 0.9.8 Removed EOB from errorbuf as returned by readpacket; ignore packets with errors; ignore first serial line as it may be a partial line
+- 0.9.7 Improved reliability and fixed hang/hick-up bug (switch from TIMER0 to TIMER2, improved serial input handling, ignore packets with CRC error)
+- 0.9.7 Added counter request functionality to P1P2Monitor
+- 0.9.6 Control of DHW and heating/cooling: possibility to switch these functions on and off. Parameter reporting of the 35 packet type used to communicate between the main controller and auxiliary controllers.
+- 0.9.5 and older: ESP8266 support to interface Arduino Uno serial output from/to mqtt/json over WiFi. This works nicely on an Arduino-Uno/ESP8266 combination. Removed raw data in/out support. Separated the previously all-in-one P1P2Monitor functionality (LCD, monitor, test) into different example programs. Added limited control function. In v0.9.5 delay behaviour when writing has been changed, with a timeout function, to avoid bus collissions. Instead of writing a packet when a pause was *at least* a certain length, a packet is written when a pause took *exactly* a certain length, or alternatively, a timeout occured.
+
