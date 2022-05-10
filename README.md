@@ -15,7 +15,10 @@ Pictured is the new "P1P2-ESP-interface", a complete single-PCB bus-powered P1P2
 - powered entirely by the P1/P2 bus, no external power supply is needed, consumes only 30-40mA from the P1/P2 bus,
 - 4 LEDS for power (white), reading (green), writing (blue), or to signal an error (red), and
 - fits nicely in a small semi-transparant enclosure (50mm x 35mm x 20mm).
+
 With communication over MQTT, integration with grafana, OpenHab, Home Assistant, and many others is possible.
+
+![Grafana electricity usage](images/grafana-electricity-usage.png)
 
 **Old design: P1P2-adapter**
 
@@ -32,6 +35,8 @@ Build P1P2-adapter (MM1192/XL1192): schematics and pictures for the MM1192/XL119
 Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. Be warned that it is difficult to solder: it's only available as a 4x4mm 0.5mm pitch TQFN-24 package. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power Daikin's P1/P2 bus may provide) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a MAX22088-based design are made available by Nicholas Roth at https://github.com/rothn/P1P2Adapter. His design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
 
 **What is the P1P2-adapter (old design)?**
+
+![P1P2-adapter PCB](circuits/P1P2adapter_topside.png)
 
 The P1P2-adapter circuit is a 0.5" x 2" PCB for the Arduino Uno, and connects to GND, 5V, and to digital pins 8 (RX) and 9 (TX). The schematic is based on the XL1192S IC as shown in circuits/Daikin_P1P2_Uno_version2.pdf. It is a single-sided PCB with SMD components (0805 components, MM1192/XL1192 SOP-16, SI8621 SOIC-8, and a Murata SMD-mounted 5V/5V converter). It provides galvanic isolation to the P1/P2 bus, but it does not support being powered from the P1/P2 bus: you still need a 5V source to power the Arduino Uno, and to power the XL1192 over the DC/DC conveter. Images of the board can be found in the circuits directory.
 
