@@ -19,18 +19,23 @@
  *      
  *              That is all!
  *
- *              If you know the parameter number for a certain function (see Writable_Parameters.md), you can set that parameter by:
+ *              If you know the parameter number for a certain function 
+ *              (see https://github.com/budulinek/Daikin-P1P2---UDP-Gateway/blob/main/Payload-data-write.md),
+ *              you can set that parameter by:
  *
  *              Q03         < select writing to parameter 0x03 in F036 block, used for DHW temperature setting >
- *              Z0208       < set parameter 0x0003 to 0x0208, which is 520, which means 52.0 degrees Celcius >
+ *              R0208       < set parameter 0x0003 to 0x0208, which is 520, which means 52.0 degrees Celcius >
  *
- *              P40         < select writing to parameter 0x403 in F035 block, used for DHW on/off setting >
- *              R01         < set parameter 0x0040 to 0x01, status on >
+ *              P40         < select writing to parameter 0x40 in F035 block, used for DHW on/off setting >
+ *              Z01         < set parameter 0x0040 to 0x01, DHW status on >
+ *              P2F         < select writing back to parameter 0x2F in F035 block, used for heating(/cooloing) on/off >
+ *              Z01         < set parameter 0x002F to 0x01, heating status on >
  *
  *              Support for parameter setting in P1P2Monitor is rather simple. There is no buffering, so enough time (a few seconds)
  *              is needed in between commands. For a better interface, either connect via serial to an ESP
  *              running https://github.com/Arnold-n/P1P2Serial/tree/master/examples/P1P2-bridge-esp8266 for an improved
  *              interface from/to MQTT over Wifi, or use UDP using https://github.com/budulinek/Daikin-P1P2---UDP-Gateway.
+ *              A future command structure will be a one-line command
  *
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
