@@ -3,10 +3,11 @@
  * Copyright (c) 2019-2020 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20220511 v0.9.12 various minor bug fixes
  * 20200109 v0.9.11 allow short pauses between bytes within a packet (for KLIC-DA device, to avoid detecting each byte as individual packet)
  * 20190914 v0.9.10 upon bus collision detection, write buffer is emptied
  * 20190914 v0.9.9 Added writeready()
- * 20190908 v0.9.8 Removed EOB signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
+ * 20190908 v0.9.8 Removed EOP signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
  * 20190831 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
  * 20190824 v0.9.6 Added packetavailable()
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
@@ -64,27 +65,28 @@
 
 #define ALTSS_BASE_FREQ F_CPU
 
-#define ALLOW_PAUSE_BETWEEN_BYTES 0 // If there is a pause between bytes on the bus which is longer than a 1/4 bit time, 
-                                    //   P1P2Serial signals en end-of-block.
+#define ALLOW_PAUSE_BETWEEN_BYTES 9 // If there is a pause between bytes on the bus which is longer than a 1/4 bit time,
+                                    //   P1P2Serial signals an end-of-packet.
                                     // Daikin devices do not add a pause between bytes, but some other controllers do, like the KLIC-DA from Zennios.
-                                    // To avoid end-of-bus detection due to such a inter-byte pause, ALLOW_PAUSE_BETWEEN_BYTES can be increased
-                                    //   to a value between 1 and 11 (but not more than 11 to avoid overflow)
-                                    // For KLICDA devices a value of 9 seems to work.
+                                    // To avoid end-of-packet detection due to such an inter-byte pause, a pause between bytes of at most
+                                    // ALLOW_PAUSE_BETWEEN_BYTES bit lengths is accepted; ALLOW_PAUSE_BETWEEN_BYTES should be less the
+                                    //  (65536 / Rticks_per_bit) - 2; for 16MHz at most ~37
+                                    // For KLICDA devices a value of 9 bit lengths seems to work.
 
-// Signalling of error conditions and end-of-block:
-// (changed signalling of error/EOB messages in v0.9.4)
+// Signalling of error conditions and end-of-packet:
+// (changed signalling of error/EOP messages in v0.9.4)
 // Use 16 bits for timing information
 // Use 8 bits for error code
  
-#define ERROR_PE        0x01 // parity error
-#define ERROR_OVERRUN   0x02 // read buffer overrun
-#define ERROR_READBACK  0x04 // read-back error, likely bus collission
-#define ERROR_CRC       0x08 // CRC error
-#define ERROR_FLAGS     0x0F // Mask used to avoid that SIGNAL_EOB ends up in errorbuf results of readpacket
-#define SIGNAL_EOB      0x10 // signaling end of block
+#define ERROR_PE       0x01 // parity error
+#define ERROR_OVERRUN  0x02 // read buffer overrun
+#define ERROR_READBACK 0x04 // data read-back error, likely bus collission
+#define ERROR_CRC      0x08 // CRC error
+#define ERROR_FLAGS    0x0F // Mask used to avoid that SIGNAL_EOP ends up in errorbuf results of readpacket
+#define SIGNAL_EOP     0x10 // signaling end of packet, this is not an error flag
 
 #define RX_BUFFER_SIZE 50  // read buffer overruns may occur if this is too low
-#define TX_BUFFER_SIZE 33  // write buffer size
+#define TX_BUFFER_SIZE 33  // write buffer size (max 32+CRC)
 
 class P1P2Serial
 {
@@ -94,7 +96,7 @@ public:
 	static void begin(uint32_t baud);
 	static void end();
 	uint8_t read();      // returns next byte in read buffer
-        uint8_t read_error(); // returns error code or EOB signal for next byte in read buffer, to be called before read()
+        uint8_t read_error(); // returns error code or EOP signal for next byte in read buffer, to be called before read()
 	uint16_t read_delta(); // returns time difference between next byte in read buffer and previously read byte, to be called before read()
 	bool available();
 	bool packetavailable();

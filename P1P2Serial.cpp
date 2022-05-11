@@ -1,12 +1,13 @@
 /* P1P2Serial: Library for reading/writing Daikin/Rotex P1P2 protocol
  *
- * Copyright (c) 2019-2020 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20220511 v0.9.12 various minor bug fixes
  * 20200109 v0.9.11 allow short pauses between bytes within a packet (for KLIC-DA device, to avoid detecting each byte as individual packet)
  * 20190914 v0.9.10 upon bus collision detection, write buffer is emptied
  * 20190914 v0.9.9 Added writeready()
- * 20190908 v0.9.8 Removed EOB signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
+ * 20190908 v0.9.8 Removed EOP signal in errorbuf results returned by readpacket(); as of now errorbuf contains only real error flags
  * 20190831 v0.9.7 Switch from TIMER0 to TIMER2 to avoid interference with millis() and readBytesUntil(), reduced RX_BUFFER_SIZE to 50
  * 20190824 v0.9.6 Added packetavailable()
  * 20190820 v0.9.5 Changed delay behaviour, timeout added
@@ -53,6 +54,12 @@
 #include "P1P2Serial.h"
 #include "config/AltSoftSerial_Boards.h"
 #include "config/AltSoftSerial_Timers.h"
+
+#if F_CPU == 16000000L
+// 16 MHz OK
+#else
+#error F_CPU not supported
+#endif
 
 /****************************************/
 /**          Initialization            **/
@@ -135,18 +142,26 @@ void P1P2Serial::begin(uint32_t baud)
   time_msec = 0;
   tx_wait = 0;
 
+  // force initial value of COMPARE_A output pin to 1
+  TCCR1A = TCCR1A | ((1<<COM1A1) | (1<<COM1A0));
+  TCCR1C|=(1<<FOC1A);
+
   CONFIG_CAPTURE_FALLING_EDGE();
   ENABLE_INT_INPUT_CAPTURE();
 
   // set up millisecond timer - code works currently only on 16MHz CPUs (and tested only on Uno/Mega)
-  // Used to work om TIMER0, which is also used for millis and readBytesUntil, so now user TIMER2 to avoid interference
-  TIMSK2 = (1<<OCIE2A); // was: TIMSK0 = (1<<OCIE0A); was: s/2/0/g
+  // Use TIMER2 to avoid interference with Arduino IDE's use of TIMER0
+  TIFR2 = (1<<OCF2A);
   TCCR2A = 2;  // CTC mode (WGM02:0=2); no signal on OC2A/OC2B pins; was: s/2/0/g
   TCCR2B = 4;  // timer2 prescaler is 64 (CS02:0=4) ( was: TCCR0B = 3;  // timer0 prescaler is 64 (CS02:0=3))
   OCR2A = 249; // timer2 counts until 249 and wraps; 16 MHz/(64*250) = 1 kHz
+  GTCCR = 2; // reset prescaler of timer2 to improve timing accuracy of msec-timer
+  TCNT2 = 0;
+  time_msec = 0; // set msec counter back to 0
+  TIMSK2 = (1<<OCIE2A); // was: TIMSK0 = (1<<OCIE0A); was: s/2/0/g
   prescaler_ratio_timer2_timer1 = 64/scale;
 
-  // set up pin for LED to show parity errors
+  // set up pin for LED to show parity and other errors
   pinMode(LED_BUILTIN, OUTPUT);
 }
 
@@ -157,6 +172,7 @@ void P1P2Serial::end(void)
   flushInput();
   flushOutput();
   DISABLE_INT_COMPARE_A();
+  CONFIG_MATCH_NORMAL();
   TIMSK2 = 0;
 }
 
@@ -170,7 +186,7 @@ ISR(TIMER2_COMPA_vect)
 {
 // time_msec counts time in ms from the last start pulse (counting from the leading falling edge of the start pulse)
 // max count is 65535 ms (uint16_t)
-  if (time_msec < 0xFFFF) time_msec++; 
+  if (time_msec < 0xFFFF) time_msec++;
   // if tx_state =99, a write is scheduled, so check if pause is long enough to start writing
   if ((tx_state == 99) && ((time_msec == tx_wait) || ((time_msec >= tx_wait) && (time_msec >= tx_setdelaytimeout)))) {
     // start writing:
@@ -182,8 +198,8 @@ ISR(TIMER2_COMPA_vect)
     tx_state = 1;
     uint16_t t_delta = scheduledelay;
     if (time_msec == 1) t_delta = ticks_per_byte_minus_ms;
-    CONFIG_MATCH_CLEAR();
     SET_COMPARE_A(GET_TIMER_COUNT() + t_delta);
+    CONFIG_MATCH_CLEAR();
     ENABLE_INT_COMPARE_A();
   }
 }
@@ -197,7 +213,7 @@ static uint16_t tx_setdelay = 0;
 void P1P2Serial::setDelay(uint16_t t)
 // Input parameter: 0 <= t <= 65535
 // This sets delay for next byte (and next byte only) when it is added to the transmission buffer.
-// The writing of the next byte to be added to the queue will be delayed until (<= v0.9.4: at least; >= v0.9.5: exactly) t milliseconds silence 
+// The writing of the next byte to be added to the queue will be delayed until (<= v0.9.4: at least; >= v0.9.5: exactly) t milliseconds silence
 //                since last falling edge of start bit has been detected. (v0.9.5:) In addition, writing will follow in case of a timeout situation.
 // This means that a delay is introduced since the byte last read, or,
 // as we also read back sent data (also for the purpose of verification), since the byte last written.
@@ -221,7 +237,7 @@ void P1P2Serial::setDelay(uint16_t t)
 //                Note that SetDelay is not (yet) suited for proper HBS timing, as HBS timing measures pauses from the end of the stop bit
 //                Timing on the P1P2 bus is not so critical and SetDelay works fine for the P1P2 bus.
 // If setDelay (t) is called with 2 <= t <= 65535, a delay of t ms is set.
-// It is recommended to NOT use setDelay(0) or setDelay(1), unless really needed, because of the the risk of bus collision.
+// It is recommended to NOT use setDelay(0) or setDelay(1), unless really needed, because of the risk of bus collision.
 {
   tx_setdelay = t;
 }
@@ -246,7 +262,7 @@ void P1P2Serial::write(uint8_t b)
   if (head >= TX_BUFFER_SIZE) head = 0;
   while (tx_buffer_tail == head) ; // wait until space in write buffer
   intr_state = SREG;
-  cli(); 
+  cli();
   // cli() is needed here to avoid a race condition w.r.t. tx_state, which can change in ISR()
   if (tx_state) {
     // if already writing, add byte to write buffer
@@ -273,16 +289,16 @@ void P1P2Serial::write(uint8_t b)
       // time_msec > 1: asap (after scheduledelay ticks)
       tx_state = 1;
       uint16_t t_delta = scheduledelay;
-      CONFIG_MATCH_CLEAR();
       if (time_msec == 1) {
         // determine if we still have to wait for the end of currently received byte?
         uint16_t ticks_wait = ticks_per_byte_minus_ms - TCNT2 * prescaler_ratio_timer2_timer1;
         if (ticks_wait > scheduledelay) {
           // and if so, start writing immediately after that
-          t_delta = ticks_wait; 
+          t_delta = ticks_wait;
         }
       }
       SET_COMPARE_A(GET_TIMER_COUNT() + t_delta);
+      CONFIG_MATCH_CLEAR();
       // in scheduledelay ticks (or perhaps more if time_msec=1), start bit will follow.
       // this will trigger an interrupt for next action to be set up
       // state=1 indicates that (upon start of the interrupt routine) this start bit has just started
@@ -363,11 +379,10 @@ ISR(COMPARE_A_INTERRUPT)
     } else {
       // if in state==23 and buffer still empty, quit transmission mode
       tx_state = 0;
-      // CONFIG_MATCH_NORMAL(); // not sure this is needed in between transmissions
       DISABLE_INT_COMPARE_A();
     }
   } else {
-    // there are more bytes to send; 
+    // there are more bytes to send;
     if (++tail >= TX_BUFFER_SIZE) tail = 0;
     tx_buffer_tail = tail;
     tx_byte = tx_buffer[tail];
@@ -380,18 +395,17 @@ ISR(COMPARE_A_INTERRUPT)
       // this relies on the fact that xx has just been reset, by reading back falling start bit edge of byte just sent
       tx_state = 99;
       tx_wait = delay;
-      CONFIG_MATCH_NORMAL(); // not sure whether we should need to do this in between transmissions
       DISABLE_INT_COMPARE_A();
     } else {
       if (state == 21) {
         // as we are in (silent, high) stop bit time, we set target time at end of stop bit (= next start bit)
-        CONFIG_MATCH_CLEAR();
         SET_COMPARE_A(target+ticks_per_bit);
+        CONFIG_MATCH_CLEAR();
       } else {
         // state==23: we are beyond stop bit and just received a new byte to be sent but too late to remain in sync
         // we need to re-schedule new transmission
-        CONFIG_MATCH_CLEAR();
         SET_COMPARE_A(GET_TIMER_COUNT() + scheduledelay);
+        CONFIG_MATCH_CLEAR();
       }
       tx_state = 1;
     }
@@ -407,10 +421,11 @@ void P1P2Serial::flushOutput(void)
 /**            Reception               **/
 /****************************************/
 
-//#define SUPPRESS_OSCILLATION
-//#define SUPPRESS_PERIOD 20
-//Use this to ignore edges that are very near previous edges to avoid detection of oscillating edges
-//Does not seem necessary
+#define SUPPRESS_OSCILLATION
+#define SUPPRESS_PERIOD 20
+// Use this to ignore edges that are very near previous edges to avoid detection of oscillating edges
+// Use this if you experience issues that may be related to signal quality
+// SUPPRESS_PERIOD is measured in timer1 ticks, so in CPU cycles
 
 static uint8_t Echo = 1;
 
@@ -433,7 +448,7 @@ ISR(CAPTURE_INTERRUPT)
 // called upon each falling edge detected
 // state = 99: at falling edge of start pulse shortly after previous byte (so: store and verify previously received byte)
 // state = 0: at falling edge of start pulse, after pause
-// state = 1..9: first possible data bit that this edge could belong to
+// state = 1..9: first possible data or parity bit that this edge could belong to
   uint8_t state, head;
   uint16_t capture, target;
   uint16_t offset_overflow;
@@ -449,7 +464,7 @@ ISR(CAPTURE_INTERRUPT)
     // this is first falling edge, it must be start pulse
     startbit_delta_prev = startbit_delta;
     startbit_delta = time_msec;
-    GTCCR = 1; // reset prescaler to improve timing accuracy of msec-timer
+    GTCCR = 2; // reset prescaler of timer2 to improve timing accuracy of msec-timer
     TCNT2 = 0; // start new milli-second timer measurement on falling edge of start bit
     time_msec = 0; // set msec counter back to 0
                    // For HBS conformant timing, we could consider to change this to
@@ -478,8 +493,8 @@ ISR(CAPTURE_INTERRUPT)
             // If in transmission mode/verification mode,
             // check if received byte matches sent byte
             // If not, this is likely caused by a bus collision
-            if (rx_byte_verify != rx_byte) { 
-              error_buffer[head] |= ERROR_READBACK; 
+            if (rx_byte_verify != rx_byte) {
+              error_buffer[head] |= ERROR_READBACK;
               digitalWrite(LED_BUILTIN, HIGH);
               // As of version 0.9.10: if a bus collision is suspected, stop further collissions by emptying write buffer
               tx_buffer_tail = tx_buffer_head;
@@ -488,7 +503,7 @@ ISR(CAPTURE_INTERRUPT)
           rx_buffer_head = head;
         } else {
           // signal buffer overrun for *previous* byte
-          error_buffer[rx_buffer_head] |= ERROR_OVERRUN; 
+          error_buffer[rx_buffer_head] |= ERROR_OVERRUN;
           digitalWrite(LED_BUILTIN, HIGH);
         }
       }
@@ -498,7 +513,7 @@ ISR(CAPTURE_INTERRUPT)
     // state =1..9, we just received a falling edge for a data bit or parity bit
     // check how many high/silent data bits we "missed"
     target = rx_target;
-    offset_overflow = 65535 - ticks_per_bit;
+    offset_overflow = 65535 - 2 * ticks_per_bit; // 2* instead of 1* to ensure we don't overshoot loop
     while ( (capture - target) < offset_overflow) {
       rx_byte = (rx_byte >> 1) + 0x80;
       rx_paritycheck = rx_paritycheck ^ 0x80;
@@ -524,7 +539,7 @@ ISR(CAPTURE_INTERRUPT)
 ISR(COMPARE_B_INTERRUPT)
 // The COMPARE_B_INTERRUPT routine is always called during the stop bit (with state=2..10)
 // It is also called during the potential location of the next start bit (with state==99), but only if no start bit has been detected,
-// this allows detection of an end of communication block.
+// this allows detection of an end of packet.
 {
   uint8_t head, state;
   uint16_t target;
@@ -542,14 +557,14 @@ ISR(COMPARE_B_INTERRUPT)
       if (head != rx_buffer_tail) {
         rx_buffer[head] = rx_byte;
         delta_buffer[head] = startbit_delta; // time from previous byte
-        error_buffer[head] = SIGNAL_EOB;
+        error_buffer[head] = SIGNAL_EOP;
         if (rx_paritycheck) error_buffer[head] |= ERROR_PE; // signals parity error
         if (rx_do_verify) {
           // If in transmission mode/verification mode,
           // check if received byte matches sent byte
           // If not, this is likely caused by a bus collision
-          if (rx_byte_verify != rx_byte) { 
-            error_buffer[head] |= ERROR_READBACK; 
+          if (rx_byte_verify != rx_byte) {
+            error_buffer[head] |= ERROR_READBACK;
             digitalWrite(LED_BUILTIN, HIGH);
             // As of version 0.9.10: if a bus collision is suspected, stop further collissions by emptying write buffer
             tx_buffer_tail = tx_buffer_head;
@@ -558,7 +573,7 @@ ISR(COMPARE_B_INTERRUPT)
         rx_buffer_head = head;
       } else {
         // signal buffer overrun for *previous* byte
-        error_buffer[rx_buffer_head] |= ERROR_OVERRUN; 
+        error_buffer[rx_buffer_head] |= ERROR_OVERRUN;
         digitalWrite(LED_BUILTIN, HIGH);
       }
     }
@@ -644,7 +659,7 @@ bool P1P2Serial::packetavailable(void)
   while (1) {
     if (head == tail) return 0;
     if (++tail >= RX_BUFFER_SIZE) tail = 0;
-    if (error_buffer[tail] & SIGNAL_EOB) return 1;
+    if (error_buffer[tail] & SIGNAL_EOP) return 1;
   }
 }
 
@@ -664,18 +679,18 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* erro
 // stores maximum of maxlen bytes of error codes into errorbuf (unless errorbuf = NULL),
 // returns timing information (pause on bus before this package) in parameter delta
 // If crc_gen is not zero, verifies last byte as CRC byte; CRC byte is also stored and is counted in return value
-  uint8_t EOB = 0;
+  uint8_t EOP = 0;
   uint8_t bytecnt = 0;
   uint8_t crc = crc_feed;
 
-  while (!EOB) {
+  while (!EOP) {
     if (available()) {
       uint8_t error = read_error();
-      EOB = (error & SIGNAL_EOB);
+      EOP = (error & SIGNAL_EOP);
       if (errorbuf) errorbuf[bytecnt] = (error & ERROR_FLAGS);
       if (!bytecnt) delta = read_delta();
       uint8_t c = read();
-      if ((EOB == 0) || (crc_gen == 0)) {
+      if ((EOP == 0) || (crc_gen == 0)) {
         if (bytecnt < maxlen) {
           readbuf[bytecnt] = c;
         }
@@ -687,7 +702,10 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* erro
         // check crc
         if (bytecnt < maxlen) {
           readbuf[bytecnt] = c;
-          if (c != crc) { errorbuf[bytecnt] |= ERROR_CRC; digitalWrite(LED_BUILTIN, HIGH); }
+          if (c != crc) {
+            errorbuf[bytecnt] |= ERROR_CRC;
+            digitalWrite(LED_BUILTIN, HIGH);
+          }
         }
       }
       bytecnt++;
@@ -698,9 +716,9 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* erro
 
 void P1P2Serial::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen, uint8_t crc_feed)
 {
-// Writes one packet of l bytes, t ms after last bus action; 
+// Writes one packet of l bytes, t ms after last bus action;
 // If crc_gen is not zero, adds CRC byte to packet
-// Note that t=0 or t=1 increases risk of bus collisions, don't use it if not needed.
+// Note that t=0 or t=1 increases risk of bus collisions, don't use it if not needed (t<2 will be changed to t=2 in new library).
   setDelay(t);
   uint8_t crc=crc_feed;
   for (uint8_t i = 0; i < l; i++) {
