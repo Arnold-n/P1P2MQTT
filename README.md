@@ -8,15 +8,17 @@ It functions as "auxiliary controller" to the main thermostat, requesting the ma
 
 ![P1P2-ESP-interface PCB](circuits/P1P2-ESP-interface1.png)
 
-Pictured is the new "P1P2-ESP-interface", a complete single-PCB bus-powered P1P2-interface to MQTT over wifi based on the MAX22088 HBS adapter, an ATmega328P, and an ESP8266. No Arduino or power supply is needed any more. This prototype is running succesfully. Connect it to P1/P2, enter your wifi and mqtt credentials via its built-in AP, and the system runs. Functionality:
+Pictured is the new "P1P2-ESP-interface", a complete single-PCB bus-powered P1P2-interface to MQTT over wifi based on the MAX22088 HBS adapter, an ATmega328P, and an ESP8266. The SMD comonents are mounted on the lower side of the PCB. No Arduino or power supply is needed any more. This prototype is running succesfully. Connect it to P1/P2 near your main controller or near your Daikin system, enter your wifi and mqtt credentials via its built-in AP, and the system runs. Functionality:
 - monitor and (for some models) control the Daikin heat pump via the P1/P2 bus,
 - communicate via MQTT over WiFi,
 - OTA upgradable (both ESP and ATmega) (and if that would fail, via a connector),
-- powered entirely by the P1/P2 bus, no external power supply is needed, consumes only 30-40mA from the P1/P2 bus,
+- powered entirely by the P1/P2 bus, no external power supply is needed, consumes only 30-40mA (0.5W) from the P1/P2 bus,
 - 4 LEDS for power (white), reading (green), writing (blue), or to signal an error (red), and
 - fits nicely in a small semi-transparant enclosure (50mm x 35mm x 20mm).
 
 With communication over MQTT, integration with grafana, OpenHab, Home Assistant, and many others is possible.
+
+The P1P2Serial library has been rewritten for this board (see below).
 
 ![Grafana electricity usage](images/grafana-electricity-usage.png)
 
@@ -32,7 +34,7 @@ Buy P1P2-adapter: I still sell the original MM1192/XL1192-based 0.5"x2" P1P2-ada
 
 Build P1P2-adapter (MM1192/XL1192): schematics and pictures for the MM1192/XL1192-based P1P2-adapter (for use with the Arduino Uno) are available in https://github.com/Arnold-n/P1P2Serial/tree/master/circuits. The MM1192 is available in traditional DIP format so you can build it on a breadboard. 
 
-Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. Be warned that it is difficult to solder: it's only available as a 4x4mm 0.5mm pitch TQFN-24 package. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power Daikin's P1/P2 bus may provide) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a MAX22088-based design are made available by Nicholas Roth at https://github.com/rothn/P1P2Adapter. His design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
+Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. Be warned that it is difficult to solder: it's only available as a 4x4mm 0.5mm pitch TQFN-24 package. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power Daikin's P1/P2 bus may provide, perhaps max 60mA) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a MAX22088-based design are made available by Nicholas Roth at https://github.com/rothn/P1P2Adapter. His design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
 
 **What is the P1P2-adapter (old design)?**
 
@@ -40,13 +42,13 @@ Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on t
 
 The P1P2-adapter circuit is a 0.5" x 2" PCB for the Arduino Uno, and connects to GND, 5V, and to digital pins 8 (RX) and 9 (TX). The schematic is based on the XL1192S IC as shown in circuits/Daikin_P1P2_Uno_version2.pdf. It is a single-sided PCB with SMD components (0805 components, MM1192/XL1192 SOP-16, SI8621 SOIC-8, and a Murata SMD-mounted 5V/5V converter). It provides galvanic isolation to the P1/P2 bus, but it does not support being powered from the P1/P2 bus: you still need a 5V source to power the Arduino Uno, and to power the XL1192 over the DC/DC conveter. Images of the board can be found in the circuits directory.
 
-*Warning: please note that the MM1192/XL1192 circuit may be a burden to the bus if the adapter is not powered (by the Arduino). In that case it is better to disconnect it.*
+*Warning: please note that the XL1192-based circuit may be a burden to the bus if the adapter is not powered (by the Arduino). In that case it is better to disconnect it. This warning does not apply to MM1192 or MAX22088 based circuits.* 
 
 The newer MAX22088-based adapter is a very similar 0.5"x2" PCB. Instead of the 5V/5V converter, the adapter receives its power from the MAX22088 (thus from the P1/P2 bus). For safety reasons the adapter still has a Si8621 galvanic isolator, and this adapter does not power the Arduino Uno. Because the adapter is bus-powered, it is not a problem if the Arduino is not powered.
 
 **Which Daikin systems are supported?**
 
-There is a large variation in the P1/P2 logical protocol implementation of various Daikin systems. My system is a Daikin hybrid EHYHBX08AAV3 which is supported: many parameters (power consumption, #hours, #compressor-start, temperatures, etc) can be monitored and various system settings can be controlled. Monitoring the P1/P2 bus on other systems should always be possible, but interpretation of the raw data may require further reverse engineering. It is currenly assumed that various Daikin Altherma Hybrid and Daikin Altherma LT models are reasonably similar that they may be supported by changing the parameters used to control certain functions and/or by changing the code which interprets the received data and encodes it into MQTT parameter values.
+There is a large variation in the P1/P2 logical protocol implementation of various Daikin systems. My system is a Daikin hybrid EHYHBX08AAV3 which is supported: many parameters (power consumption, #hours, #compressor-start, temperatures, etc) can be monitored and various system settings can be controlled. Monitoring the P1/P2 bus on other systems should always be possible, but interpretation of the raw data may require further reverse engineering. It is currently assumed that various Daikin Altherma Hybrid and Daikin Altherma LT models are reasonably similar that they may be supported by changing the parameters used to control certain functions and/or by changing the code which interprets the received data and encodes it into MQTT parameter values.
 
 **No liability, no warranty**
 
@@ -57,6 +59,32 @@ Any use is entirely at your own risk (GPL sections 11 and 12 apply).
 There is always a risk when you write to the bus based on reverse engineering and assumptions that unexpected things happen or break. Reading without writing should be safe though. My system has been running continuously in controller mode (writing and reading) for 3 years now. Still, use is entirely at your own risk.
 
 It is advised to connect/disconnect devices to the P1/P2 bus only if the power of all connected devices is switched off. Some Daikin manuals warn that device settings should not be changed too often, because of wear in the solid state memory in their devices - one of their manuals states a maximum of 7000 setting changes per year - without indicating the expected life time of their product. Don't change settings too often.
+
+**How to get started / and is my system supported?**
+
+If your system has a P1/P2 connection to the main controller or room thermostat, you will almost certainly be able to monitor raw data from the P1/P2 bus. P1P2Monitor and P1P2-bridge-esp8266 will try to interpret the data, reported as parameters. This may be more or less succesful, hopefully the interpreted data makes sense. If not, you may look at the raw data patterns, and try to understand these and compare these with the examples in the doc folder.
+
+If, like many systems, your system communicates with a repeating pattern of packages made of request/response pairs of packet types 10-15/16, followed by a single request packet with header 00F030<payload with mostly 00s and some low nrs>, you may be lucky. If the 00F030 request is followed by a longer pause (100-200ms), and no answer 40F030<payload>, the P1P2Monitor might function as an auxiliary controller responding to that request. If you switch P1P2Monitor controller functionality on (by sending "\*" followed by "l1" to MQTT channel P1P2/W), it will start replying to each 00F030 packet with a 40F030<payload> response after which more 00F03x/40F04x packets are exchanged. These packets are likely similar to but different than the example system. Parameters for switching certain functions on/off may depend on the model and do depend on which control mode the system is operating in. It is useful to monitor the system for a while in this mode, and important to first check that there are no read errors or bus collissions.
+
+When an auxiliary controller starts to be active, the main controller will regularly communicate all parameters to the auxiliary controller. To communicate all parameters takes a few minutes. In addition, any parameter changed on the main controller will almost immediately be communicated. By default, P1P2-ESP filters any parameter of which the value has not changed. After a few minutes its output will get mostly silent. If the time (minute and perhaps second) is part of the data, you will see time progress. You will likely see some reports when temperature measurements vary. And if everything works well you should see any manual changes made on the main controller be reported. It is useful to record which parameters are 
+
+If you start monitoring and you find that there is already an answer 40F030<payload> in your system, this may be due to a Daikin LAN module or other auxiliary controller in your system. It may even be part of your main Daikin system itself. In that case it is useful to check if the main controller makes a packet type 40F130<payload with mostly 00s and some lower numbers> (so F1 instead of F0). This means the main controller is ready to interface to a second auxiliary controller. If you switch P1P2Monitor's control functionality on, it will detect that there is already a first active auxiliary controller in your system, it will check whether a second auxiliary controller is supported by your main controller, and if so, it will act as second auxiliary controller.
+
+The parameters sent by the main controller are useful to monitor. After each main package and 00F030/40F030 exchange additional 00F03x/40F04x packets will exchange many system parameters. These are likely similar to but different than the example system. Parameters for switching certain functions on/off may depend on the model and also depend on which control mode the system is operating in. It is useful to monitor the system for a while, make a few simple manual changes on the main controller (such as temperature deviation if you are using weather-dependent mode with deviation), to get comfortable with the communication patterns. This will cause the main controller to communicate the parameter changes to the auxiliary controller. If the reported parameter changes match the documentation here, you may try to set certain parameters and check if the main controller's settings are being updated.
+
+<this paragraph will change when command-instructions will change to a newer format> So far, P1P2Monitor only acted as an auxiliary controller, receiving parameters, and sending trivial acknowledgements, but P1P2Monitor did not do any control. Control requires explicitly asking P1P2Monitor to set a certain parameter. In the current version (0.9.13), you may try to switch heating off by sending "Z0" to MQTT channel P1P2/W. We found that the parameter used for switching heating on/off is 0x2D, 0x2F, or 0x31. This parameter number may be model-dependent and/or depending on which operating mode the system works in (based on room temperature, weather-dependent, ..). The default parameter is currently set in P1P2Config.h of P1P2Monitor, this will change in a newer release to P1P2Config of P1P2-ESP. You can also change the parameter used for "Z0" first by sending "P31" "Z0". In a newer release, parameter writes will be handles with a single command containing 3 values: packet type, parameter nr, and parameter value.
+
+It would be great if you could share your experiences, contribute code or logs, either here or by e-mailing me so we can document which models are supported and add support for more models.
+
+WARNING: do not change parameters settings too frequently. Daikin warns not to use more than 7000 setting changes/year (likely based on 100.000 writes to flash memory and 14 year expected lifetime). This means for example that you should not control the heat pump by setting the target temperature frequently based on measurements. In the next release, P1P2Monitor will throttle setting changes to a maximum of 1 parameter write per 2 hours (with an initial budget of 10 writes upon every restart of P1P2Monitor). These parameters can be changed only in the configuration header files. If you run out of write budget while experimenting, you may increment the write budget by another 10 writes by sending 'B' P1P2/W.
+
+**New P1P2Serial library**
+
+As of version 0.9.14 (to be released soon), the P1P2Serial library interrupt handling has been rewritten entirely, to ensure that interrupt handling is done as predictable and quickly as possible. This enables the ATmega328 to run at 8 or 4 MHz (instead of 16MHz on Arduino Uno), reducing its power consumption, and enabling 3.3V operation. Also, ATmega's noise canceler is more effective on 4MHz than on higher speeds.
+
+Please let me know if you encounter any issues with the new library. It is running reliably here. You can stil use the old library by defining #OLDP1P2LIB in P1P2Config.h.
+
+To compile for 8 or 4MHz, you may need to install MCUdude's MiniCore hardware package and then select ATmega328 and the correct frequency, and set the fuses accordingly for the lower speed.
 
 **Rotex, Hoval, and other Home Bus Systems**
 
@@ -74,9 +102,9 @@ Data logged (always useful to log all raw data to check for bus collisions, or a
 
 **Daikin counters for energy consumption and production**
 
-The Daikin systems keep track of various counters for power consumption, energy production, and number of compressor starts and hours. Unfortunately these counters are not communicated over the bus unless explicitly asked for by the main room controller, which is done only if a user goes into the energy consumption menu. To ensure that these counters can be monitored, an option (COUNTERREPEATINGREQUEST) is implemented in P1P2Monitor to request these counters once per minute.
+The Daikin systems keep track of various counters for power consumption, energy production, and number of compressor starts and hours. Unfortunately these counters are not communicated over the bus unless explicitly asked for by the main room controller, which is done only if a user goes into the energy consumption menu. To ensure that these counters can be monitored, an option (COUNTERREPEATINGREQUEST) is implemented in P1P2Monitor to request these counters once per minute. This request is inserted in the pause between blocks, where the auxiliary controller is supposed to respond to the 00F030 request. Instead, we "steal the bus", shortly play main controller and transmit one 0000B8 request directly which is then answered by the heat pump. My main controller is slightly confused and immediately starts a new block (with a 000010 packat) to show it is supposed to be the main controller.
 
-If you happen to own a KLIC-DA device (a KNX-P1P2 interface), this also reports the Altherma energy counters but does not request counter updates. The P1P2Monitor program can be used to request these counters such that the KLIC-DA device is able to report the actual counters. Be careful though, the request of these counters is a violation of the protocol (the P1P2Monitor program "acts as" main controller which confuses the main controller - in my system this works fine, but carefully check the bus to see how your controller reacts).
+If you happen to own a KLIC-DA device (a KNX-P1P2 interface), this also reports the Altherma energy counters but does not request counter updates. The P1P2Monitor program can be used to request these counters such that the KLIC-DA device is able to report the actual counters. If KLICDA is #defined in P1P2Config.h, this request is done in between the 400012 and 000013 message, which doesn't give a bus collission on my system if timed properly (see explanation in P1P2Config.h). Again: the request of these counters is a violation of the protocol (the P1P2Monitor program "acts as" main controller which confuses the main controller - in my system this works fine, so carefully check the bus operation and any error messages to see how your controller reacts if you use this option).
 
 **P1P2Serial library and P1P2Monitor example application**
 
@@ -94,9 +122,41 @@ An alternative approach to monitor the Daikin heat pump uses serial connector X1
 
 **How does ESPAltherma compare to P1P2Serial?**
 
-Both projects have a lot in common (powered by the system, mqtt/wifi, integration with Home Assistant, ..). In fact they are complementary: some of the monitored parameters of P1P2Serial are not available via ESPAltherma, and vice versa. The major advantages of P1P2Serial are that you can directly connect to the P1/P2 wires, and do not need to touch the Daikin electronics, that it updates data very frequently (every second), and that you can control you Daikin system (subject to the model). ESPAltherma has as major advantages that it requires only a cheap ESP32 circuit (with some simple level shift electronics), and that it supports many different Daikin models.
+Both projects have a lot in common (powered by the system, mqtt/wifi, integration with Home Assistant, ..). In fact they are complementary: some of the monitored parameters of P1P2Serial are not available via ESPAltherma, and vice versa. The major advantages of P1P2Serial are that you can directly connect to the P1/P2 wires, and do not need to touch the Daikin electronics of the main system, that it updates data very frequently (every second), and that you can control you Daikin system (subject to the model). ESPAltherma has as major advantages that it requires only a cheap ESP32 circuit (with some simple level shift electronics), and that it supports many different Daikin models.
 
-**Below various set-ups using the P1P2-adapter are provided**
+**How is the software licensed?**
+
+The software is licensed under GPL V2.0. Please comply with the license conditions. If you improve or add, I would be interested to hear from you.
+
+**Why did you build this?**
+
+My heat pump is a 2014 model Daikin hybrid heat pump/natural gas boiler combination. This is a very efficient combination: a heat pump is used in low power demand situations, whereas in high power demand situations a natural gas after-burner is also used in cascade operation (still allowing the heat pump to operate at low LWT temperature where its efficiency is higher). This reduces natural gas usage by approximately 75% and results in a heat pump achieving, in our case, a year average COP of 3.6. Unfortunately the software in this system is very basic, and it behaves oddly. It often defrosts when totally unneeded, and in other cases not at all when air flow is entirely blocked at the outside unit (the COP will then drop dramatically towards 1.0, the heat pump could detect this situation by internally measuring the COP, but it does not seem to notice at all). It often sets the heat pump at a power setting that leaves the natural gas boiler to operate below its minimum power capability, resulting in an error message on the gas boiler and a far too low LWT, resulting in insufficient heating. Unfortunately, Daikin did not respond to or resolve these complaints. Therefore I want to understand and improve the behaviour myself via the P1/P2 bus.
+
+**What is the Daikin P1/P2 bus?**
+
+Daikin (or Rotex) uses various communication standards between thermostats and heat pumps. The P1/P2 standard is one of them (others are F1/F2, Modbus, BACnet, which are not supported here, even though F1/F2 is electrically the same as P1/P2). The P1/P2 protocol is a proprietary standard. At the lowest level it is a two-wire 9600 baud serial-like interface based on the Japanese Home Bus System (ET-2101). Some technical details of this standard can be found in chapter 4 of the https://echonet.jp/wp/wp-content/uploads/pdf/General/Standard/Echonet/Version_2_11_en/spec_v211e_3.pdf.
+
+**Which other HBS interfaces are supported?**
+
+This project was started for the Daikin P1/P2 bus. However the underlying electrical HBS format is used by many heat pump / air conditioning manufacturers, so far we have indications that the following buses are based on the HBS format: Daikin P1/P2, Daikin F1/F2 (DIII-Net), Mitsubishi M-NET, Toshiba TCC-Link, Hitachi H-link, Panasonic/Sanyo SIII-Net, perhaps also products from Haier and York. The logical format will likely differ. For example, Len Shustek made an impressive OPAMP-based reading circuit for the Mitsubishi M-NET and documented his protocol observations on https://github.com/LenShustek/M-NET-Sniffer. The logical format is clearly different from the Daikin format, but the P1P2Serial library and adapter will likely work for reading and writing M-NET too as the physical format is the same or similar. For Hitachi H-link, code to read data from a Hitachi Yutaki S80 Combi heat pump is available on https://github.com/hankerspace/HLinkSniffer.
+
+**More details on the P1P2-adapter circuit**
+
+This project strated with a separate adapter for the P1/P2 bus using an Arduino Uno (or other ATmega board) together with a HBS transceiver such as the MM1192/XL1192 HBS-Compatible Driver and Receiver (http://pdf.datasheetcatalog.com/datasheet_pdf/mitsumi-electric/MM1192XD.pdf) or the MAX22088/MAX22288 (https://www.maximintegrated.com/en/products/interface/transceivers/MAX22088.html or https://www.maximintegrated.com/en/products/interface/transceivers/MAX22288.html). The P1P2Serial library only supports some ATmega boards; it was tested on Arduino Uno and Arduino Mega2560. The library itself does not run on ESP devices as it requires the "timer input capture mode" of the ATmega to read and write the low-level signals.
+
+The preferred circuit schematics (version 2) has galvanic isolation and an isolated DC-DC converter to power the MM1192/XL1192. A MAX22088 alternative is available, with galvanic isolation, without the DC-DC converter.
+
+The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noisy P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal in the initial version without galvanic isolation (likely due to capacitive leakage in the USB power supply for the Arduino). I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2. A further modification, the addition of a 470pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 100-200Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
+
+XLSemi produces the XL1192 which looks like a direct clone of the MM1192. The XL1192 data sheet suggests that the specifications are the same, but they are not. The XL1192 has a higher voltage threshold on its input and a slightly lower (20% lower) voltage swing on its output channel. Using 75kOhm resistors instead of 150kOhm resistors on the input side of the XL1192 works perfect in my situation.
+
+If you want to power the bus (which is only needed if you want to communicate to a stand-alone controller which is disconnected from and thus not powered from the heat pump) you can do so by providing 15V to the bus over a 20mH inductor with a reasonably low internal resistance (for example 2 RLB1314-103KL 100mH/12ohm/100mA inductors in series), or by using the MAX22088 which supports bus-powered operation (see below for a link to MAX22088 schematics).
+
+Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power the bus may provide) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a MAX22088-based design are made available by Nicholas Roth at https://github.com/rothn/P1P2Adapter. This design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
+
+The read part of the circuit can also be built using a few opamps as demonstrated by https://github.com/LenShustek/M-NET-Sniffer.
+
+**Below various set-ups using the Arduino-based P1P2-adapter are provided**
 
 (this section does not apply to the P1P2-ESP-interface, which has everything integrated on a single PCB)
 
@@ -186,37 +246,6 @@ This set-up provides flexibity as the Uno can directly be programmed from the Ra
 
 (*) Instead of runnning P1P2Monitor in this set-up, the code at https://github.com/budulinek/Daikin-P1P2---UDP-Gateway may better be suited.
 
-**How is the software licensed?**
-
-The software is licensed under GPL V2.0. Please comply with the license conditions. If you improve or add, I would be interested to hear from you.
-
-**Why did you build this?**
-
-My heat pump is a 2014 model Daikin hybrid heat pump/natural gas boiler combination. This is a very efficient combination: a heat pump is used in low power demand situations, whereas in high power demand situations a natural gas after-burner is also used in cascade operation (still allowing the heat pump to operate at low LWT temperature where its efficiency is higher). This reduces natural gas usage by approximately 75% and results in a heat pump achieving, in our case, a year average COP of 3.6. Unfortunately the software in this system is very basic, and it behaves oddly. It often defrosts when totally unneeded, and in other cases not at all when air flow is entirely blocked at the outside unit (the COP will then drop dramatically towards 1.0, the heat pump could detect this situation by internally measuring the COP, but it does not seem to notice at all). It often sets the heat pump at a power setting that leaves the natural gas boiler to operate below its minimum power capability, resulting in an error message on the gas boiler and a far too low LWT, resulting in insufficient heating. Unfortunately, Daikin did not respond to or resolve these complaints. Therefore I want to understand and improve the behaviour myself via the P1/P2 bus.
-
-**What is the Daikin P1/P2 bus?**
-
-Daikin (or Rotex) uses various communication standards between thermostats and heat pumps. The P1/P2 standard is one of them (others are F1/F2, Modbus, BACnet, which are not supported here, even though F1/F2 is electrically the same as P1/P2). The P1/P2 protocol is a proprietary standard. At the lowest level it is a two-wire 9600 baud serial-like interface based on the Japanese Home Bus System (ET-2101). Some technical details of this standard can be found in chapter 4 of the https://echonet.jp/wp/wp-content/uploads/pdf/General/Standard/Echonet/Version_2_11_en/spec_v211e_3.pdf.
-
-**Which interface is supported?**
-
-This project was started for the Daikin P1/P2 bus. However the underlying electrical HBS format is used by many heat pump / air conditioning manufacturers, so far we have indications that the following buses are based on the HBS format: Daikin P1/P2, Daikin F1/F2 (DIII-Net), Mitsubishi M-NET, Toshiba TCC-Link, Hitachi H-link, Panasonic/Sanyo SIII-Net, perhaps also products from Haier and York. The logical format will likely differ. For example, Len Shustek made an impressive OPAMP-based reading circuit for the Mitsubishi M-NET and documented his protocol observations on https://github.com/LenShustek/M-NET-Sniffer. The logical format is clearly different from the Daikin format, but the P1P2Serial library and adapter will likely work for reading and writing M-NET too as the physical format is the same or similar. For Hitachi H-link, code to read data from a Hitachi Yutaki S80 Combi heat pump is available on https://github.com/hankerspace/HLinkSniffer.
-
-**More details on the P1P2-adapter circuit**
-
-This project strated with a separate adapter for the P1/P2 bus using an Arduino Uno (or other ATmega board) together with a HBS transceiver such as the MM1192/XL1192 HBS-Compatible Driver and Receiver (http://pdf.datasheetcatalog.com/datasheet_pdf/mitsumi-electric/MM1192XD.pdf) or the MAX22088/MAX22288 (https://www.maximintegrated.com/en/products/interface/transceivers/MAX22088.html or https://www.maximintegrated.com/en/products/interface/transceivers/MAX22288.html). The P1P2Serial library only supports some ATmega boards; it was tested on Arduino Uno and Arduino Mega2560. The library itself does not run on ESP devices as it requires the "timer input capture mode" of the ATmega to read and write the low-level signals.
-
-The preferred circuit schematics (version 2) has galvanic isolation and an isolated DC-DC converter to power the MM1192/XL1192. A MAX22088 alternative is available, with galvanic isolation, without the DC-DC converter.
-
-The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noisy P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal in the initial version without galvanic isolation (likely due to capacitive leakage in the USB power supply for the Arduino). I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2. A further modification, the addition of a 470pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 100-200Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
-
-XLSemi produces the XL1192 which looks like a direct clone of the MM1192. The XL1192 data sheet suggests that the specifications are the same, but they are not. The XL1192 has a higher voltage threshold on its input and a slightly lower (20% lower) voltage swing on its output channel. Using 75kOhm resistors instead of 150kOhm resistors on the input side of the XL1192 works perfect in my situation.
-
-If you want to power the bus (which is only needed if you want to communicate to a stand-alone controller which is disconnected from and thus not powered from the heat pump) you can do so by providing 15V to the bus over a 20mH inductor with a reasonably low internal resistance (for example 2 RLB1314-103KL 100mH/12ohm/100mA inductors in series), or by using the MAX22088 which supports bus-powered operation (see below for a link to MAX22088 schematics).
-
-Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power the bus may provide) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a MAX22088-based design are made available by Nicholas Roth at https://github.com/rothn/P1P2Adapter. This design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
-
-The read part of the circuit can also be built using a few opamps as demonstrated by https://github.com/LenShustek/M-NET-Sniffer.
 
 **Where can I buy a MM1192 or XL1192 or MAX22x88?**
 
@@ -226,7 +255,7 @@ The MAX22088 and MAX22288 are available from regular distributors such as Mouser
 
 **What does the data on the P1/P2 bus look like, at the physical level?**
 
-The P1/P2 bus uses the Home Bus System protocol, which is a serial protocol. It is a variation of bipolar encoding (alternate mark inversion, https://en.wikipedia.org/wiki/Bipolar_encoding), but the pulses only take half of the bit time. So every falling edge in the signal represents a 0, and every "missing" falling edge represents a 1. Every byte is coded as a start bit (0), 8 data bits (LSB first), 1 parity bit (even), and 1 stop bit (1). The Daikin devices have no pause between the stop bit and the next start bit, but Zennio's KLIC-DA has a short pause in between the individual bytes of a packet. Oscilloscope pictures are available on http://www.grix.it/forum/forum_thread.php?ftpage=2&id_forum=1&id_thread=519140. As it is a two-wire interface, devices should not write on the bus if any other device is writing. The HBS standard has an advanced collision detection and priority mechanism. In a 2-device set up of a Daikin heat pump and a thermostat, the devices seem to simply alternate turns in writing to the bus, and Daikin does not seem to support bus usage detection and collission avoidance, so take care when writing to the bus to avoid bus collisions.
+The P1/P2 bus uses the Home Bus System protocol, which is a serial protocol. It is a variation of bipolar encoding (alternate mark inversion, https://en.wikipedia.org/wiki/Bipolar_encoding), but the pulses only take half of the bit time. So every falling edge in the signal represents a 0, and every "missing" falling edge represents a 1. Every byte is coded as a start bit (0), 8 data bits (LSB first), 1 parity bit (even), and 1 stop bit (1). The Daikin devices have no pause between the stop bit and the next start bit, but Zennio's KLIC-DA has a short pause in between the individual bytes of a packet. As it is a two-wire interface, devices should not write on the bus if any other device is writing. The HBS standard has an advanced collision detection and priority mechanism. In a 2-device set up of a Daikin heat pump and a thermostat, the devices seem to simply alternate turns in writing to the bus, and Daikin does not seem to support bus usage detection and collission avoidance, so take care when writing to the bus to avoid bus collisions.
 
 **What does the data on the P1/P2 bus look like, at the logical level?**
 
