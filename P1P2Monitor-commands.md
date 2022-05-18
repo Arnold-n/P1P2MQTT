@@ -1,15 +1,15 @@
-**P1P2Monitor commands and serial output format**
+**P1P2Monitor commands and output format**
 
 These commands and reporting structures may change in later versions, especially the command to change parameters on the main controller.
 
 The following commands can be given to P1P2Monitor via the mqtt channel P1P2/W (responses via P1P2/R) on the ESP8266 running P1P2-bridge-esp8266, or directly on the serial interface of the ATmega328P. Mqtt commands can be given by "mosquitto_pub -h <host> [-p <portnr>] -t P1P2/W -m <command>.
 
 The most relevant commands are:
--L1 start auxiliary controller
--C2 start requesting counters
--Z0 set heating(/cooling) off
--Z1 set heating(/cooling) on
--Z/R/N/P/Q/M commands to set other parameters - *parameter change command structure will be redesigned soon to make changes to parameter settings easier.*
+- L1 start auxiliary controller
+- C2 start requesting counters
+- Z0 set heating(/cooling) off
+- Z1 set heating(/cooling) on
+- Z/R/N/P/Q/M commands to set other parameters - *parameter change command structure will be redesigned soon to make changes to parameter settings easier.*
 
 P1P2Monitor commands are case-insensitive. The maximum command line length is 98 bytes, long lines will be ignored.
 
