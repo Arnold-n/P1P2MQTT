@@ -24,15 +24,15 @@ The P1P2Serial library has been rewritten for this board (see below).
 
 **Old design: P1P2-adapter**
 
-The previous design is the original P1P2-adapter (schema and pictures in https://github.com/Arnold-n/P1P2Serial/tree/master/circuits), a PCB ("HAT") for use on an Arduino Uno. It is based on the MM1192/XL1192 HBS adapter. A newer pin-compatible version based on the MAX22088 is also available (but not yet documented here).
+The previous design is the P1P2-adapter this project started with (schema and pictures in https://github.com/Arnold-n/P1P2Serial/tree/main/circuits), a PCB ("HAT") for use on an Arduino Uno. It is based on the MM1192/XL1192 HBS adapter chip. A newer pin-compatible HAT based on the MAX22088 is also available (but not yet documented here).
 
 **How can you build or buy one?**
 
-Buy P1P2-ESP-interface: I am accepting pre-orders for the new P1P2-ESP-interface (soldered and pre-programmed), so I know how many I should make. My e-mail address can be found on line 3 of https://github.com/Arnold-n/P1P2Serial/blob/master/P1P2Serial.cpp. At the moment I have only a limited number of the ATmega328P TQFP chips and they are sold out everywhere with long delivery times (1 year!). 
+Buy P1P2-ESP-interface: I am accepting pre-orders for the new P1P2-ESP-interface (soldered and pre-programmed), so I know how many I should make. My e-mail address can be found on line 3 of https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp. At the moment I have only a limited number of the ATmega328P TQFP chips and they are sold out everywhere with long delivery times (1 year!). 
 
 Buy P1P2-adapter: I still sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno, as well as a newer MAX22088-based P1P2-adapter which is slightly better.
 
-Build P1P2-adapter (MM1192/XL1192): schematics and pictures for the MM1192/XL1192-based P1P2-adapter (for use with the Arduino Uno) are available in https://github.com/Arnold-n/P1P2Serial/tree/master/circuits. The MM1192 is available in traditional DIP format so you can build it on a breadboard. 
+Build P1P2-adapter (MM1192/XL1192): schematics and pictures for the MM1192/XL1192-based P1P2-adapter (for use with the Arduino Uno) are available in https://github.com/Arnold-n/P1P2Serial/tree/main/circuits. The MM1192 is available in traditional DIP format so you can build it on a breadboard. 
 
 Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. Be warned that it is difficult to solder: it's only available as a 4x4mm 0.5mm pitch TQFN-24 package. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power Daikin's P1/P2 bus may provide, perhaps max 60mA) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a MAX22088-based design are made available by Nicholas Roth at https://github.com/rothn/P1P2Adapter. His design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
 
@@ -49,6 +49,9 @@ The newer MAX22088-based adapter is a very similar 0.5"x2" PCB. Instead of the 5
 **Which Daikin systems are supported?**
 
 There is a large variation in the P1/P2 logical protocol implementation of various Daikin systems. My system is a Daikin hybrid EHYHBX08AAV3 which is supported: many parameters (power consumption, #hours, #compressor-start, temperatures, etc) can be monitored and various system settings can be controlled. Monitoring the P1/P2 bus on other systems should always be possible, but interpretation of the raw data may require further reverse engineering. It is currently assumed that various Daikin Altherma Hybrid and Daikin Altherma LT models are reasonably similar that they may be supported by changing the parameters used to control certain functions and/or by changing the code which interprets the received data and encodes it into MQTT parameter values.
+
+As we have no access to Daikin's documentation, we do not know which systems are supported. Various users have reported success in basic control functions. In my system I can control almost all parameters.
+ It is logical to assume that devices supported by commercial auxiliary controllers (Daikin LAN adapter, Zennio KLIC-DA KNX interface, Coolmaster) could be supported by this project.
 
 **No liability, no warranty**
 
