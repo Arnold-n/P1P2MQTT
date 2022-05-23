@@ -674,11 +674,11 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* erro
 // To avoid blocking, only call this function if packetavailable()
 // stores maximum of maxlen bytes of read data into readbuf
 // returns total #bytes received (until v0.9.3: #bytes stored, as of v0.9.4: #bytes received, even if not stored),
-//    if (packet size/return value > maxlen) some received bytes were not stored, some error codes may have been missed
+//    if (packet size/return value > maxlen) some received bytes cannot be stored, and error codes are condensed into errorbuf[maxlen - 1]
 // reading continues in case of error
 // stores maximum of maxlen bytes of error codes into errorbuf (unless errorbuf = NULL),
 // returns timing information (pause on bus before this package) in parameter delta
-// If crc_gen is not zero, verifies last byte as CRC byte; CRC byte is also stored and is counted in return value
+// If crc_gen is not zero, verifies last byte as CRC byte; CRC byte is also stored and is counted in return value if space is available
   uint8_t EOP = 0;
   uint8_t bytecnt = 0;
   uint8_t crc = crc_feed;
@@ -687,7 +687,13 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* erro
     if (available()) {
       uint8_t error = read_error();
       EOP = (error & SIGNAL_EOP);
-      if (errorbuf) errorbuf[bytecnt] = (error & ERROR_FLAGS);
+      if (errorbuf) {
+        if (bytecnt < maxlen) {
+          errorbuf[bytecnt] = (error & ERROR_FLAGS);
+        } else {
+          errorbuf[maxlen - 1] |= (error & ERROR_FLAGS);
+        }
+      }
       if (!bytecnt) delta = read_delta();
       uint8_t c = read();
       if ((EOP == 0) || (crc_gen == 0)) {
@@ -699,11 +705,15 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* erro
           c >>= 1;
         }
       } else {
-        // check crc
+        // EOP, crc in use, check crc
         if (bytecnt < maxlen) {
           readbuf[bytecnt] = c;
           if (c != crc) {
-            errorbuf[bytecnt] |= ERROR_CRC;
+            if (bytecnt < maxlen) {
+              errorbuf[bytecnt] |= ERROR_CRC;
+            } else {
+              errorbuf[maxlen - 1] |= ERROR_CRC;
+            }
             digitalWrite(LED_BUILTIN, HIGH);
           }
         }
