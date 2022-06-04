@@ -1,55 +1,94 @@
-**P1P2Monitor commands and output format**
+# P1P2Monitor commands and serial communication format
 
-These commands and reporting structures may change in later versions, especially the command to change parameters on the main controller.
+This document describes the serial interface to the ATmega328P or Arduino Uno. It is only relevant if you interface directly to P1P2Monitor. If you use P1P2-bridge-esp8266 on the P1P2-ESP-interface, this information is not relevant for you, in that case please read the [MQTT protocol information](https://github.com/Arnold-n/P1P2Serial/blob/main/MqttProtocol.md).
 
-The following commands can be given to P1P2Monitor via the mqtt channel P1P2/W (responses via P1P2/R) on the ESP8266 running P1P2-bridge-esp8266, or directly on the serial interface of the ATmega328P. Mqtt commands can be given by "mosquitto_pub -h <host> [-p <portnr>] -t P1P2/W -m <command>.
+## Serial output
 
-The most relevant commands are:
-- L1 start auxiliary controller
-- C2 start requesting counters
-- Z0 set heating(/cooling) off
-- Z1 set heating(/cooling) on
-- Z/R/N/P/Q/M commands to set other parameters - *parameter change command structure will be redesigned soon to make changes to parameter settings easier.*
+Unless you set verbosity to 0, each P1P2Monitor serial output line always starts 
+- with "R " for errorfree raw data read directly from the P1/P2 bus, or 
+- with "\* " for any other (human-readable) output (including raw data with errors).
+The serial output is forwarded by P1P2-bridge-esp8266 via MQTTT topics P1P2/R and P1P2/S, respectively.  
 
-P1P2Monitor commands are case-insensitive. The maximum command line length is 98 bytes, long lines will be ignored.
+In addition, if JSON and OUTPUTSERIAL are defined in P1P2Monitor, json parameter blocks are output over serial on lines starting with "J ". If MQTTTOPICS and OUTPUTSERIAL are defined, mqtt-like parameters are output on lines starting with "P ". The ATmega328P is limited in capacity so json/mqtt functionality is limited. It is strongly advised to do the raw data interpretation to paramter values on a different device, such as an ESP running P1P2-bridge-esp8266.
 
-*Warning: The first command line received by P1P2Monitor after its reboot will - on purpose - be ignored for robustness reasons. A good habit is to send a dummy line "\*" as first command. In a future release P1P2-bridge-esp8266 will take care of this so this warning only applies to the current and older version.*
+If PSEUDO_PACKETS is defined, P1P2Monitor outputs additional information on its own status over the serial line in a format as if the data originates from the P1/P2 bus, using packet types 0x0A-0x0F. These messages do not originate from the P1/P2 bus, but P1P2-bridge-esp8266 will handle interpretation of this data like it interprets P1/P2 bus data.
 
-**Serial output format:**
+## Serial input
 
-P1P2Monitor output always starts with "R" for valid data read from the P1/P2 bus, or with a "\* " for any other output (including invalid data with read errors). On MQTT these are communicated over P1P2/R and P1P2/S topics. The P1P2/S is meant to be human-readable, the P1P2/R communication is mostly raw hex data, subject to verbosity setting prefixed by a relative time stamp and postfixed by a CRC byte.
+The serial input is used for providing commands to P1P2Monitor. P1P2Monitor commands are case-insensitive. The maximum command line length is 98 bytes, longer lines will be entirely ignored.
 
-In addition, if JSON and OUTPUTSERIAL are defined, json parameter blocks are output over serial on lines starting with "J ". If MQTTTOPICS and OUTPUTSERIAL are defined, mqtt-like parameters are output on lines starting with "P ". If P1P2-bridge-esp8266 is used, it converts raw hex data to json format via P1P2/J or in mqtt (topic=parameter, msg=value) form via P1P2/P.
+*Warning: The first command line received over serial by P1P2Monitor after its reboot will - on purpose - be ignored for robustness reasons. If you communicate directly over serial (not via MQTT), a good habit is to send a dummy line "\*" as first command. If you use P1P2-bridge-esp8266, this warning is not applicable as P1P2-bridge-esp8266 takes care of the extra line.*
 
-**Monitor commands:**
+If P1P2-bridge-esp8266 is used in combination with P1P2Monitor, these commands are forwarded from MQTT channel P1P2/W to the serial input of P1P2Monitor.
 
-- Ux Sets mode off/on (0/1) whether to include (in json format and on ESP also on mqtt) unknown bits and bytes (default off, configurable in P1P2Config.h)
-- U  Display display-unknown mode
-- Sx Sets mode off/on (0/1) whether to include (in json format and on ESP also on mqtt) parameters only if changed (default on, configurable in P1P2Config.h)
+The serial input is also used to communicate actual power consumption to P1P2Monitor, using the F command.
+
+### Basic commands
+
+The most useful commands:
+ - L1 to start P1P2Monitor acting as an auxiliary controller
+ - C2 to start requesting counters every minute
+ - E for parameter writing (not released yet)
+
+The 'E' parameter writing may take one of the following formats
+- E <packet_type> <param_nr> <new param_val>
+- E XX[ ]YYYY[ ]Z[..] where XX is a 2-digit hex encoding of the (1-byte) packettype, YYYY is a 4-digit hex encoding of the (2-byte) parameter number, and Z is the hex-encoding (1-8 hex digits) of the new parameter value to be written (1, 2, 3, or 4 bytes depending on the packet type: 35, 3A: 1-byte, 36, 3B: 2-byte, 37 and 3C: 3-byte, and 38, 39, and 3D: 4-byte).
+For example, to switch heating on (value 01) by writing parameter number 002F in packet type 35, you can issue
+- E 35 2F 1
+- E 35 002F 01
+- E 35002F01
+or
+- E 35002F1
+
+A few pre-defined parameter writing actions are still available from earlier P1P2Monitor versions, for example:
+- Z to write parameter <PARAM_HC_ONOFF> (defined in P1P2Config.h) in packet type 35:
+ - Z0 switches heating(/cooling) off
+ - Z1 switches heating(/cooling) on
+- R3C set DHW temperature to 0x3C = 60 degrees
+
+### Monitor commands:
+
+- V  Show verbosity mode (default 1)
+- Vx Sets verbosity mode (0 minimal, 1 traditional, 2 for P1P2-ESP-interface)
+- Ux Sets mode off/on (0/1) whether to include (in json format and on ESP also on mqtt) unknown bits and bytes (default off, configurable in P1P2Config.h) (to be replaced in newer version by J:)
+- U Display output-unknown mode
+- Jx (soon to be released:) Sets output mode, sum of
+  - 1 to output raw data (also requires DATASERIAL to be defined)
+  - 2 to have mqtt output its data (also requires MQTTTOPICS to be defined)
+  - 4 to have json output data (also requires JSON to be defined)
+  - 8 to have mqtt/json include parameters even if functionality is unknown, warning: easily overloads ATmega
+  - configurable in P1P2Config.h, default 0x01 on ATmega, default 0x0A on ESP
+- J  Display output mode
+
+#define OUTPUTMODE 0    // Sum of (can be changed run-time using 'U'/'u' command on ATmega (equivalent of 'J'/j' on ESP))
+
+- Sx Sets mode off/on (0/1) whether to report parameters only if changed (default on, configurable in P1P2Config.h, setting off may overload ATmega's CPU/bandwidth) (to be replaced in newer version by:)
+- Sx (to be released:) Set filter level
+  - 0 show and repeat all parameters, even if unchanged
+  - 1 show each parameter at least once, then only if changed
+  - 2 idem, but omit temperatures
+  - 3 idem, but also omit timestamps and uptime reports
 - S  Display changed-only mode
-- V  Show verbosity mode (default 1) (default 1 in P1P2Monitor.cpp) 
-- Vx Sets verbosity mode (more verbosity levels may be introduced in a later version)
+- S  (to be released:) Display filter mode
 - \* comment lines starting with an asterisk are ignored (and echoed in verbose mode)
 
-**Auxiliary controller commands:**
+## Auxiliary controller commands:
 
-- L1 sets auxiliary controller mode on (controller address (0xF0 or 0xF1) is auto-detected after check whether another auxiliary controller is present or not) (can also be set in P1P2Config.h)
+- L1 sets auxiliary controller mode on (controller address (0xF0 or 0xF1) is auto-detected after check whether another auxiliary controller is present or not) (can also be set in P1P2Config.h) (controller ID is saved in EEPROM, so this command remains effective after a restart)
 - L0 sets auxiliary controller mode off
 - L  displays current controller_id (0x00 = off; 0xF0/0xF1 is first/secondary auxiliary controller)
 - Zx sets heating(/cooling) on/off (1/0) (function can be changed using Px command below to set any 8-bit parameter in packet type 35)
-- Rx sets DHW temp (function can be changed using Qx command below to set any 16-bit parameter in packet type 36)
+- Rx sets DHW temperature (function can be changed using Qx command below to set any 16-bit parameter in packet type 36)
 - Nx sets 8-bit value of 8-bit parameter selected by Q command) in packet type 3A
 - Px sets (16-bit) parameter number in packet type 35 to use for Zx command (default PARAM_HC_ONOFF)
 - Qx sets (16-bit) parameter number in packet type 36 to use for Rx command (default PARAM_TEMP)
 - Mx sets (16-bit) parameter number in packet type 3A to use for Nx command (default PARAM_SYS)
 - C1 triggers single cycle of 6 B8 packets to request (energy/operation/starts) counters from heat pump
-- C2 like C1, but repeating every new minute (can be made default by setting COUNTERREPEATINGREQUEST to 1 in P1P2Config.h)
+- C2 like C1, but repeating every new minute
 - C0 Stop requesting counters
 - C  Show counterrepeatingrequest status
-- BX increment write budget by 10 (or other value as configured in header file, not yet released, planned for future release)
-- B  show write budget (planned for future release)
 
-**Raw data commands:**
+## Raw data commands:
 
 Commands for raw data writing to the bus (only for reverse engineering purposes), avoid these unless you know what you do:
 - W\<hex data\> Write packet (max 32 bytes (as defined by WB_SIZE)) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
@@ -58,9 +97,9 @@ Commands for raw data writing to the bus (only for reverse engineering purposes)
 - O  Display current delaytimeout value
 - Ox sets new delay timeout value in ms, to be used immediately (default 2500)
 
-**Miscellaneous**
+## Miscellaneous
 
-Still or to be supported but advised not to use, not really needed (some may be removed in a future version):
+Supported but advised not to use, not really needed (some may be removed in a future version):
 - G  Display current crc_gen value
 - Gx Sets crc_gen (default 0xD9) (we have not seen any other values so no need to change)
 - H  Display current crc_feed value
@@ -68,13 +107,12 @@ Still or to be supported but advised not to use, not really needed (some may be 
 - X  Display current echo status (determines whether bytes written will be echoed on the serial line, and also whether bus errors will be detected during writing)
 - Xx sets echo status on/off (recommended to keep on to detect bus errors)
 - Yx sets DHW on/off (use Px/Rx commands instead)
-- Y reports DHW status as reported by main controller
-- Z reports heating/cooling status as reported by main controller
 - P reports parameter number in packet type 35 used for cooling/heating on/off
-- K soft reset ATmega328P
+- P reports parameter number in packet type 35 used for cooling/heating on/off
+- P reports parameter number in packet type 35 used for cooling/heating on/off
 - A instruct ESP to reset ATmega328P via reset line (to be released soon)
-- D instruct ESP to reset itself (to be released soon)
-- E reserved
-- F reserved
+- D0 instruct ESP to reset itself (to be released soon)
+- D1 instruct ESP to restart itself (to be released soon)
+- K instruct ATmega328P to reset itself (to be released soon)
+- B reserved for ESP for MQTT network settings (to be released soon)
 - I reserved
-- J reserved
