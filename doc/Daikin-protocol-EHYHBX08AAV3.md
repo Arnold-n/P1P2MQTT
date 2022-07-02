@@ -8,7 +8,7 @@ Please read the common README.md first for the general format description.
 
 The following data packets were observed on these particular units:
 EHYHBX08AAV3: air-to-water heat pump with gas condensing technology, functioning in weather-dependent LWT mode
-EHVX08S26CB9W: air-to-water heat pump (with cooling), functioning in weather-dependent LWT mode (so far only "main package" packets were tested)
+EHVX08S26CB9W: air-to-water heat pump (with cooling), functioning in weather-dependent LWT mode (so far only "main package" packets were tested for this model)
 
 All values in this document are hex, except for the byte numbering in the payload and time (ms) references.
 
@@ -158,7 +158,7 @@ Header: 400011
 |  10-11  | XX YY              | Refrigerant temperature                               | f8.8
 |  12-13  | XX YY              | Actual room temperature                               | f8.8
 |  14-15  | XX YY              | External outside temperature sensor (if connected); otherwise Outside temperature 2 derived from external unit sensor, but stabilized; does not change during defrosts; perhaps averaged over time | f8.8
-|  19-22  | 00                 | ?
+|  16-19  | 00                 | ?
 
 ## Packet type 12 - Time, date and status flags
 
@@ -185,7 +185,7 @@ Header: 000012
 |    13:other| 0                             | ?                                | bit
 |    14      | 00                            | ?                                |
 
-Byte 12 has following patter upon restart: 1x 00; 1x 01; then 41. A single value of 61 triggers an immediate heat pump restart.
+Byte 12 has following pattern upon restart: 1x 00; 1x 01; then 41. A single value of 61 triggers an immediate heat pump restart.
 
 ### Packet type 12: response
 
@@ -217,7 +217,7 @@ Header: 000013
 | Byte(:bit) | Hex value observed | Description                        | Data type
 |:-----------|:-------------------|:-----------------------------------|:-
 |    0-1     | 00                 | ?
-|     2      | 00/C0/D0           | first package 0x00 instead of 0xD0 | flag8 ?
+|     2      | 00/40/C0/D0        | first package 0x00 instead of 0xD0 | flag8 ?
 
 ### Packet type 13: response
 
@@ -228,7 +228,7 @@ Header: 400013
 |     0      | 3C                 | DHW target temperature (one packet delayed/from/via boiler?/ 0 in first packet after restart) | u8 / f8.8 ?
 |     1      | 00                 |  +fractional part?
 |     2      | 01                 | ?
-|     3      | D0                 | ?
+|     3      | 40/D0              | ?
 |   4-7      | 00                 | ?
 |    8-9     | 0000-010E          | flow (in 0.1 l/min)         | u16div10
 |    10-11   | xxxx               | software version inner unit | u16
@@ -246,13 +246,13 @@ Header: 000014
 
 | Byte(:bit) | Hex value observed | Description                      | Data type
 |:-----------|:-------------------|:---------------------------------|:-
-|     0      | 2B                 | ?
+|     0      | 27/2B              | ?
 |     1      | 00                 | ?
 |     2      | 13                 | ?
 |     3      | 00                 | ?
 |     4      | 2D/37              | ? first package 37 instead of 2D | u8
 |     5      | 00                 | ?
-|     6      | 07/37              | ? first package 37 instead of 07 | u8
+|     6      | 07/16/37           | ? first package 37 instead of 07 | u8
 |     7      | 00                 | ?
 |     8      | 00-0A,10-1A        | Target delta main zone           | s-abs4
 |     9      | 00?/02/05          | ? changes based on schedules     | flag8
@@ -280,10 +280,10 @@ Header: 000015
 | Byte(:bit) | Hex value observed    | Description                     | Data type
 |:-----------|:----------------------|:--------------------------------|:-
 |     0      | 00                    | ?
-|     1-2    | 01/09/0A F4/C4/D6/F0  | schedule-induced operating mode | flag8,flag8?
+|     1-2    | 01/09/0A/0B 54/F4/C4/D6/F0 | schedule-induced operating mode? | flag8,flag8?
 |     3      | 00                    | ?
 |     4      | 03                    | ?
-|     5      | 20                    | ?
+|     5      | 20/52                 | ?
 
 ### Packet type 15: response
 
@@ -295,25 +295,25 @@ Header: 400015
 |    2-3     | FD-FF,00-08 00/80     | Refrigerant temperature (in 0.5C) | f8.8
 |    4-5     | 00                    | ?
 |EHV only: 6 | 00-19                 | parameter number                  | u8/u16
-|EHV only: 7 | 00                    | (part of parameter or value?)     | part of u16
-|EHV only: 8 | XX                    | ?                                 | u16/u8
+|EHV only: 7 | 00                    | (part of parameter or value?)     |
+|EHV only: 8 | XX                    | ?                                 | s16div10_LE?
 
 EHV is the only model for which we have seen use of the <parameter,value> mechanism in the basic packet types.
 The following parameters have been observed in this packet type on EHV model only:
 
-| Parameter number | Parameter Value               | Description           | Data type
-|:-----------------|:------------------------------|:----------------------|:-
-|EHV: 05           | 96                            | 15.0 degree  ?        | u8div1
-|EHV: 08           | 73,78,7D                      | 11.5, 12.0, 12.5 ?    | u8div10
-|EHV: 0A           | C3,C8                         | 19.5, 20.0            | u8div10
-|EHV: 0C           | 6E,73,78                      | 11.0, 11.5, 12.0      | u8div10
-|EHV: 0E           | B9,BE                         | 18.5, 19.0            | u8div10
-|EHV: 0F           | 68,6B                         | 10.4, 10.7            | u8div10
-|EHV: 10           | 05                            |  0.5                  | u8div10
-|EHV: 19           | 01                            |  0.1                  | u8div10
-|EHV: others       | 00                            | ?                     | u8
+| Parameter number | Parameter Value               | Description
+|:-----------------|:------------------------------|:-
+|EHV: 05           | 96                            | 15.0 degree?
+|EHV: 08           | 73,78,7D                      | 11.5, 12.0, 12.5 ?
+|EHV: 0A           | C3,C8                         | 19.5, 20.0
+|EHV: 0C           | 6E,73,78                      | 11.0, 11.5, 12.0
+|EHV: 0E           | B9,BE                         | 18.5, 19.0
+|EHV: 0F           | 68,6B                         | 10.4, 10.7
+|EHV: 10           | 05                            |  0.5
+|EHV: 19           | 01                            |  0.1
+|EHV: others       | 00                            | ?
 
-Perhaps these parameters are not u8div10 but u16div10, s8div10, or s16div10.
+These parameters are likely s16div10.
 
 ## Packet type 16 - temperatures
 
@@ -386,7 +386,7 @@ Packet types 30-3F are used for communication parameter settings between main an
 
 ## Packet type 30 - Auxiliary controller initial communication
 
-The main controller regularly polls the bus for external controllers (address Fx) with packet type 30. Packet 00F030 requests a response from the first external controller (identity F0). Some Daikin products allow two (or perhaps more) multiple external controllers - if controller F0 is in use, the main controller will poll for another external controller with packet 00F130. We have not observed more than two controllers. Payload bytes 0-13 indicate that the main controller would like to send additional requests (for packets type 31....3E) to the external controller. This happens later if the auxiliary controller is available, but not necessarily immediately.
+The main controller regularly polls the bus for external controllers (address Fx) using packet type 30. Packet 00F030 requests a response from the first external controller (identity F0). Some Daikin products allow two (or perhaps more) multiple external controllers - if controller F0 is in use, the main controller will poll for another external controller with packet 00F130. We have not observed more than two controllers. Payload bytes 0-13 indicate that the main controller would like to send additional requests (for packets type 31....3E) to the external controller. This happens later if the auxiliary controller is available, but not necessarily immediately.
 
 If an external controller is available, it will respond with a packet "40Fx30". The response packet may indicate that the external controller would like to receive a certain request packet - this mechanism is used when a setting in the external controller is changed and should be communicated to the main controller and then to the heat pump. The additional packets 00F03x - and the reply 40F03x following it - are used to communicate status changes between main controller and external controller.
 
@@ -440,7 +440,7 @@ A few hundred 8-bit parameters can be exchanged via packet type 35 and 3A. Some 
 
 ### Parameters for packet type 35
 
-The parameter range in this system is 0x0000-0x0144, can be different on other models.
+The parameter range in this system is 0x0000-0x0149, can be different on other models.
 
 Frequently we see 2 parameters related to the same function: one is used by the auxiliary controller to request a change to the main controller, and the other one is used by the main controller to the auxiliary controller to confirm the request, and/or is the result of the operation once the heat pump has taken over the new setting.
 
@@ -497,7 +497,7 @@ These 2 parameters frequently differ by 1 or by 4 positions in parameter number.
 |  011F         | 04                            | ?
 |  0121         | 07                            | ?
 |  0122         | 04                            | ?
-|  013A..0145   | 45 48 59 48 42 58 30 38 41 41 56 33 | "EHYHBX08AAV3"  | c8
+|  013A..0145   | 45 48 59 48 42 58 30 38 41 41 56 33 | "EHYHBX08AAV3" name inside unit | c8
 |  0146..0149   | 00                            | "\0" ?                | c8?
 |  FFFF         | FF                            | Padding pattern | u8
 
@@ -657,11 +657,50 @@ These parameters resemble the counters in packet type B8 but there are some diff
 
 ### Parameters for packet type 39
 
-The parameter range in this system is 0x0000-0x00EF, can be different on other models.
+Packet type 39 is used to communicate the field settings from the main to the auxiliary controller (and likely vice versa).
+
+The parameter range in this system is 0x0000-0x00EF, this can be different on other models.
+
+Observations from field setting changes from auxiliary controller to main controller (to change settings) are welcome - also on how the protocol triggers a system restart which is required after changing any of these settings.
+
+Surprisingly, some field settings ([A-00] .. [A-04] and [B-00] .. [B-04]) are sometimes transmitted as having a range of 0-7, perhaps when active on the main controller in installer's mode, and otherwise just as having a range of 0-0. These field settings A/B are unspecified anyway.
 
 | Param nr      | Description                        | Data type
 |:--------------|:-----------------------------------|:-
-| FFFF          | Padding pattern                    | u32
+| 0000          | Field setting [0-00]               | 4 byte field setting
+| 0001          | Field setting [0-01]               | 4 byte field setting
+| ..            |                                    |                     
+| 000E          | Field setting [0-0E]               | 4 byte field setting
+| 000F          | Field setting [1-00]               | 4 byte field setting
+| 0010          | Field setting [1-01]               | 4 byte field setting
+| ..            |                                    |                     
+| 001D          | Field setting [1-0E]               | 4 byte field setting
+| 001E          | Field setting [2-00]               | 4 byte field setting
+| 001F          | Field setting [2-01]               | 4 byte field setting
+| ..            |                                    |                     
+| 00EE          | Field setting [F-0D]               | 4 byte field setting
+| FFFF          | FF FF FF FF                        | u32
+
+| Byte nr       | Hex value observed            | Description                      | Data type
+|:--------------|:------------------------------|:---------------------------------|:-
+|  0:7-6        | bb                            | 00                               | u2
+|  0:5-0        |   bb bbbb                     | field value                      | u6
+|  1            | XX                            | field value maximum (in steps)   | u8
+|  2            | XX                            | field value offset               | u8
+|  3:7-1        | b0bb b0b                      | field value step size            | sfp7
+|  3:0          | b                             | always 1 for comm to auxiliary controller | bit
+
+Step value, 7-bit signed floating point sfp7, observed values:
+
+| Bit 6-3 mantissa | Bit 7 exponent sign | Bit (2?-)1 exponent | field value step size
+|:-----------------|:--------------------|:--------------------|:-
+| 0001             |  1                  |  01                 | 0.1
+| 0010             |  1                  |  01                 | 0.2
+| 0101             |  1                  |  01                 | 0.5
+| 0001             |  0                  |  00                 | 1.0
+| 0101             |  0                  |  00                 | 5.0
+| 0001             |  0                  |  01                 | 10 
+| 0101             |  0                  |  01                 | 50 
 
 ### Parameters for packet type 3D
 
@@ -721,7 +760,7 @@ Header: 40003E
 |     0   | 01                 | Data follows            | f8.8
 |   1-19  | FF                 |
 
-### Memory layout
+### Memory for weekly schedules
 
 Writes to memory locations 0x0250-0x070D have been observed.
 
@@ -814,86 +853,61 @@ Header: 000060..00008F
 
 Field setting information request by main controller.
 
-#### Request upon restart:
+#### Request during restart:
 
 | Byte nr       | Hex value observed            | Description           | Data type
 |:--------------|:------------------------------|:----------------------|:-
-|  0-19         | 00                            | All fields empty
+|  0-19         | 00                            | no information        | 
 
 #### Request during operation (after manual change of field setting on main controller):
 
-| Byte nr       | Hex value observed            | Description                 | Data type
-|:--------------|:------------------------------|:----------------------------|:-
-|  0            | XX                            | 1st field, old value (no 0xC0 added), or new value (0x40 added) | u8
-|  1            | XX                            | maximum field value         | u8
-|  2            | XX                            | offset for field value      | u8
-|  3:7          | 0/1                           | comma in use                | bit
-|  3:5          | 0/1                           | step size * 5 (see below)   | bit
-|  3:4          | 0/1                           | read-only (i.c.w. comma use)| bit
-|  3:3          | 0/1                           | field is being used         | bit
-|  3:1          | 0/1                           | step size * 0.1 (see below) | bit
-|  3:other      | 0                             | ?                           | bit
-|  4-7          | 00                            | 2nd field setting, see bytes 3-6 | u8,u8,u8,flag8
-|  8-11         | 00                            | 3rd field setting, see bytes 3-6 | u8,u8,u8,flag8
-| 12-15         | 00                            | 4th field setting, see bytes 3-6 | u8,u8,u8,flag8
-| 16-19         | 00                            | 5th field setting, see bytes 3-6 | u8,u8,u8,flag8
+| Byte nr       | Hex value observed            | Description                      | Data type
+|:--------------|:------------------------------|:---------------------------------|:-
+|  0:7-6        | bb                            | 01 for new value, 00 otherwise   | u2
+|  0:5-0        |   bb bbbb                     | (new/old) field value            | u6
+|  1            | XX                            | field value maximum (in steps)   | u8
+|  2            | XX                            | field value offset               | u8
+|  3:7-1        | b0bb b0b                      | field value step size            | sfp7
+|  3:0          | b                             | 0 for communication to heat pump | bit
+|  4-7          | XX XX XX XX                   | 2nd field setting, see bytes 3-6 | u8,u8,u8,sfp7+bit
+|  8-11         | XX XX XX XX                   | 3rd field setting, see bytes 3-6 | u8,u8,u8,sfp7+bit
+| 12-15         | XX XX XX XX                   | 4th field setting, see bytes 3-6 | u8,u8,u8,sfp7+bit
+| 16-19         | XX XX XX XX                   | 5th field setting, see bytes 3-6 | u8,u8,u8,sfp7+bit
 
-Parameter setting step size table for field setting info bytes 3,7,11,15,19:
+Step value, 7-bit signed floating point sfp7, observed values:
 
-| bit 5 | bit 1 | Step size
-|:----|:--------|:-
-| 0   | 0       | 1.0
-| 0   | 1       | 0.1
-| 1   | 0       | 5.0
-| 1   | 1       | 0.5
+| Bit 6-3 mantissa | Bit 7 exponent sign | Bit (2?-)1 exponent | field value step size
+|:-----------------|:--------------------|:--------------------|:-
+| 0001             |  1                  |  01                 | 0.1
+| 0010             |  1                  |  01                 | 0.2
+| 0101             |  1                  |  01                 | 0.5
+| 0001             |  0                  |  00                 | 1.0
+| 0101             |  0                  |  00                 | 5.0
+| 0001             |  0                  |  01                 | 10 
+| 0101             |  0                  |  01                 | 50 
 
 ### Packet type 60..8F and FF: response
 
 Header: 400060..40008F or 4000FF
 
-#### Response upon restart:
+#### Response:
 
-If some of the field setting are not supported, 0000000000 is used as padding pattern.
-
-If none of the field settings are supported, the response header is 4000FF and the payload is empty.
+If none of the field settings in a packet reply are supported, the response header is 4000FF and the payload is empty. Otherwise, if some of the field settings in a packet reply are not supported, 0000000000 is used as padding pattern.
 
 Payload for supported field settings:
 
-| Byte nr       | Hex value observed            | Description            | Data type
-|:--------------|:------------------------------|:-----------------------|:-
-|  0            | XX                            | 1st field value (usually 0xC0 is added to this value)  | u8
-|  1            | XX                            | maximum field value    | u8
-|  2            | XX                            | offset for field value | u8
-|  3:7          | 0/1                           | comma in use                | bit
-|  3:5          | 0/1                           | step size * 5 (see below)   | bit
-|  3:4          | 0/1                           | read-only (i.c.w. comma use)| bit
-|  3:3          | 0/1                           | field is being used         | bit
-|  3:1          | 0/1                           | step size * 0.1 (see below) | bit
-|  3:other      | 0                             | ?                           | bit
-|  4-7          | 00                            | 2nd field value, see bytes 4-7 | u8,u8,u8,flag8
-|  8-11         | 00                            | 3rd field value, see bytes 4-7 | u8,u8,u8,flag8
-| 12-15         | 00                            | 4th field value, see bytes 4-7 | u8,u8,u8,flag8
-| 16-19         | 00                            | 5th field value, see bytes 4-7 | u8,u8,u8,flag8
-
-#### Response for field setting change (after manual change of field setting on main controller) during operation
-
-During operation, the format is the same for supported and non-supported field settings.
-
-| Byte nr       | Hex value observed            | Description            | Data type
-|:--------------|:------------------------------|:-----------------------|:-
-|  0            | XX                            | 1st field, old value (nothing added), or new value (0x40 added) | u8
-|  1            | XX                            | maximum field value             | u8
-|  2            | XX                            | offset for field value          | u8
-|  3:7          | 0/1                           | comma in use                | bit
-|  3:5          | 0/1                           | step size * 5 (see below)   | bit
-|  3:4          | 0/1                           | read-only (i.c.w. comma use)| bit
-|  3:3          | 0/1                           | field is being used         | bit
-|  3:1          | 0/1                           | step size * 0.1 (see below) | bit
-|  3:other      | 0                             | ?                           | bit
-|  4-7          | 00                            | 2nd field value, see bytes 3-6  | u8,u8,u8,flag8
-|  8-11         | 00                            | 3rd field value, see bytes 3-6  | u8,u8,u8,flag8
-| 12-15         | 00                            | 4th field value, see bytes 3-6  | u8,u8,u8,flag8
-| 16-19         | 00                            | 5th field value, see bytes 3-6  | u8,u8,u8,flag8
+| Byte nr | Hex value observed | Description                    | Data type
+|:--------|:-------------------|:-------------------------------|:-
+|  0:7-6  | bb                 | (usually 11, but 10 or 00 for some unspecified/system-type field settings) | u2
+|  0:5-0  |   bb bbbb          | field value                    | u6
+|  1      | XX                 | field value maximum            | u8
+|  2      | XX                 | field value offset             | u8
+|  3:7-1  | b0bb b0b           | field value step value         | sfp7
+|  3:0    | 0                  | 0                              | bit
+|  4-7    | XX XX XX XX        | 2nd field value, see bytes 4-7 | u8,u8,u8,sfp7+bit
+|  8-11   | XX XX XX XX        | 3rd field value, see bytes 4-7 | u8,u8,u8,sfp7+bit
+| 12-15   | XX XX XX XX        | 4th field value, see bytes 4-7 | u8,u8,u8,sfp7+bit
+| 16-19   | XX XX XX XX        | 5th field value, see bytes 4-7 | u8,u8,u8,sfp7+bit
 
 # Packet types 90..9F (and FF) communicate unknown data
 
@@ -917,7 +931,7 @@ Header: 400090..40009F or 4000FF
 |:--------------|:------------------------------|:----------------------|:-
 |  0-19         | XX                            | Tbd
 
-# Packet types Aa and B1 communicate text data
+# Packet types A1 and B1 communicate text data
 
 ## Packet type A1
 
@@ -940,7 +954,8 @@ Header: 4000A1
 | Byte nr       | Hex value observed            | Description           | Data type
 |:--------------|:------------------------------|:----------------------|:-
 |     0         | 00                            | ?
-|  1-17         | 00                            | ASCII '\0'             | c8
+|  1-15         | 00                            | ASCII '\0' (missing) name outside unit | c8
+| 16-17         | 00                            | ASCII '\0'            | c8
 
 ## Packet type B1 - heat pump name
 
@@ -954,7 +969,7 @@ Header: 0000B1
 |:--------------|:------------------------------|:----------------------|:-
 |     0         | 00                            | ?
 |  1-15         | 30                            | ASCII '0'             | c8
-| 16-17         | 00                            | ?
+| 16-17         | 00                            | ASCII '\0'            | c8
 
 ### Packet type B1: response
 
@@ -963,8 +978,8 @@ Header: 4000B1
 | Byte nr       | Hex value observed            | Description           | Data type
 |:--------------|:------------------------------|:----------------------|:-
 |     0         | 00                            | ?
-|  1-12         | XX                            | ASCII "EHYHBH08AAV3"  | c8
-| 13-17         | 00                            | ASCII '\0'?           | c8
+|  1-12         | XX                            | ASCII "EHYHBH08AAV3" name inside unit | c8
+| 13-17         | 00                            | ASCII '\0'            | c8
 
 # Packet type B8 - counters, #hours, #starts, electricy used, energy produced
 
@@ -1056,65 +1071,87 @@ The restart process is initiated by setting byte 16 of packet "000012.." to 0x61
 
 During the initial sequence and test patterns, the main controller(or another entity taking over this role) uses address 0x80 instead of 0x40
 
-- Request header: 808000, payload empty, response header: 400000 payload empty
-- Request header: 808000, payload empty, response header: 400000 payload empty
-- Request header: 808000, payload empty, response header: 400000 payload empty
-- Request header: 808001, payload empty, no response
-- Request header: 808001, payload empty, no response
-- Request header: 808001, payload empty, no response
-- Request header: 808003, payload: 00FFFFFF, response header: 408003 payload empty
+- Request header: 808000, payload empty
+- Response header: 400000 payload empty
+- Request header: 808000, payload empty
+- Response header: 400000 payload empty
+- Request header: 808000, payload empty
+- Response header: 400000 payload empty
+- Request header: 808001, payload empty
+- No response
+- Request header: 808001, payload empty
+- No response
+- Request header: 808001, payload empty
+- No response
+- Request header: 808003, payload: 00FFFFFF
+- Response header: 408003 payload empty
 
 ### Test patterns
 
 23 request/response pairs for XX increasing from 01 to 17:
-- Request header: 080003, payload: XX YY YY YY where YY YY YY has bit pattern [1 (23-i)x1 (i-1)x0 1], no response
+- Request header: 080003, payload: XX YY YY YY where YY YY YY has bit pattern [1 (23-i)x1 (i-1)x0 1]
+- No response
 
-One time
-- Request header: 808004, payload: 00010000, response header: 400004, payload empty
+Followed by one time:
+- Request header: 808004, payload: 00010000
+- Response header: 400004, payload empty
 
-24 request/response pairs for XX increasing from 00 to 17:
-- Request header: 080003, payload: XX YY YY YY where YY YY YY has bit pattern [1 (23-i)x1 (i-1)x0 1], no response
+And followed by 24 request/response pairs for XX increasing from 00 to 17:
+- Request header: 080003, payload: XX YY YY YY where YY YY YY has bit pattern [1 (23-i)x1 (i-1)x0 1]
+- No response
 
 ### Start of main controller using 0x00 as identification
 
-- Request header: 000005, payload empty, response header: 400005, payload: 0100000100000100000100000100000100000100
+- Request header: 000005, payload empty
+- Response header: 400005, payload: 0100000100000100000100000100000100000100
 
-23 requests for XX increasing from 01 to 23
-- Request header: 00XX05, payload empty, no response
+Followed by 23 requests for XX increasing from 01 to 23:
+- Request header: 00XX05, payload empty
+- No response
 
 ### Packet type 20 communication
 
-- Request header: 000020, payload: 00, response header: 400020, payload: <20 bytes, function tbd>
+- Request header: 000020, payload: 00
+- Response header: 400020, payload: <20 bytes, function tbd>
 
 ### Communication of field settings
 
 The heat pump communicates all field settings (format and data value) to main controller, for packet types 60-8F as described above.
 
-48 requests for XX increasing from 60 to 8F
-- Request header: 0000XX, payload: <20 bytes 00>, response either header: 4000XX, payload: <4 5-byte field settings> or header: 4000FF, payload empty
+48 requests for XX increasing from 60 to 8F:
+- Request header: 0000XX, payload: <20 bytes 00>
+- Response either header: 4000XX, payload: <4 5-byte field settings> or header: 4000FF, payload empty
 
 ### Communication of unknown data
 
-48 requests for XX increasing from 90 to 9F
-- Request header: 0000XX, payload: <12 bytes 00>, response either header: 4000XX, payload: <20 bytes, function ?> or header: 4000FF, payload empty
+48 requests for XX increasing from 90 to 9F:
+- Request header: 0000XX, payload: <12 bytes 00>
+- Response either header: 4000XX, payload: <20 bytes, function ?> or header: 4000FF, payload empty
 
 ## Product names
 
-- Request header: 0000A1, payload: <00 15x30 00 00>, response header: 4000A1, payload: <18 bytes 00>
-- Request header: 0000B1, payload: <00 15x30 00 00>, response header: 4000B1, payload: <00 "EHYHBX08AAV3" 00 00 00 00 00>
+- Request header: 0000A1, payload: <00 15x30 00 00>
+- Response header: 4000A1, payload: <18 bytes 00>
+- Request header: 0000B1, payload: <00 15x30 00 00>
+- Response header: 4000B1, payload: <00 "EHYHBX08AAV3" 00 00 00 00 00>
 
 ## Packet type B8 - counters, #hours, #starts
 
-- Request header: 0000B8, payload: XX, response header: 4000B8, payload: <XX and 4 or 6 3-byte counters>
+- Request header: 0000B8, payload: XX
+- Response header: 4000B8, payload: <XX and 4 or 6 3-byte counters>
 
 ## Packet type 21 communication
 
-- Request header: 000020, payload: 00, response header: 400020, payload: <20 bytes, function tbd>
+- Request header: 000020, payload: 00
+- Response header: 400020, payload: <20 bytes, function tbd>
 
 ## Start of regular package communication
 
 Restart procedure finished, start of regular pattern:
-- Request header: 000010, payload, response header: 400010, payload
-- Request header: 000011, payload, response header: 400011, payload
-- Request header: 000012, payload, response header: 400012, payload
+- Request header: 000010, regular payload 
+- Response header: 400010, regular payload
+- Request header: 000011, regular payload
+- Response header: 400011, regular payload
+- Request header: 000012, regular payload
+- Response header: 400012, regular payload
 ...
