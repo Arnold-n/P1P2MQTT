@@ -64,11 +64,11 @@ Header: 000011
 
 Empty payload
 
-### Packet type 10:response
+### Packet type 11:response
 
-Header: 400010
+Header: 400011
 
-| Byte nr       | Hex value observed            | Description           | 
+| Byte nr       | Hex value observed            | Description           |  Data type
 |---------------|:------------------------------|:----------------------|:-
 |     0         | 07                            | ?                     | 
 |     1         | 09                            | ?                     |

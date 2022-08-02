@@ -128,6 +128,8 @@ Header: 400010
 |19:1      | 0/1                | DHW active1 (off/on)     | bit
 |19:other  | 0                  | ?                        | bit
 
+Error codes: tbd, HJ-11 is coded as 024D2C, 89-2 is coded as 08B908, 89-3 is coded as 08B90C.
+
 ## Packet type 11 - temperatures
 
 ### Packet type 11: request
@@ -598,6 +600,8 @@ The parameter range in this system is 0x0000-0x0001, can be different on other m
 
 | Param nr      | Description                        | Data type
 |:--------------|:-----------------------------------|:-
+| 0000          | Start of holiday                   | t24
+| 0001          | End of holiday                     | t24
 | FFFF          | Padding pattern                    | u24
 
 # Packet type 38, 39, and 3D - 32 bit parameters exchange
@@ -786,10 +790,12 @@ Writes to 0x0694-0x070D occur in data segment runs of 12, 15, 35, or 45 bytes. I
 |  05EC   | 0054 (84) | Weekly schedule, 6 moments/day
 |  0640   | 0054 (84) | Weekly schedule, 6 moments/day
 |  0694   | 000C (12) | ?
-|  06A0   | 000F (15) | ?
+|  06A0   | 000F (15) | Phone number customer service UI
 |  06AF   | 000F (15) | ?
-|  06BE   | 0023 (35) | ?
-|  06E1   | 002D (45) | ? (ends at location 070D)
+|  06BE   | 0023 (35) | Error history (format: 5x E1 E2 YY MM DD HH mm)
+|  06E1   | 002D (45) | Names of 3 heating schedules (15 characters each)
+
+Error codes: tbd, HJ-11 is coded as 4D0B, 89-3 is coded as B903 (different coding mechanism than in packet type 10).
 
 ### Memory contents (weekly schedules)
 
@@ -869,10 +875,10 @@ Field setting information request by main controller.
 |  2            | XX                            | field value offset               | u8
 |  3:7-1        | b0bb b0b                      | field value step size            | sfp7
 |  3:0          | b                             | 0 for communication to heat pump | bit
-|  4-7          | XX XX XX XX                   | 2nd field setting, see bytes 3-6 | u8,u8,u8,sfp7+bit
-|  8-11         | XX XX XX XX                   | 3rd field setting, see bytes 3-6 | u8,u8,u8,sfp7+bit
-| 12-15         | XX XX XX XX                   | 4th field setting, see bytes 3-6 | u8,u8,u8,sfp7+bit
-| 16-19         | XX XX XX XX                   | 5th field setting, see bytes 3-6 | u8,u8,u8,sfp7+bit
+|  4-7          | XX XX XX XX                   | 2nd field setting, see bytes 0-3 | u8,u8,u8,sfp7+bit
+|  8-11         | XX XX XX XX                   | 3rd field setting, see bytes 0-3 | u8,u8,u8,sfp7+bit
+| 12-15         | XX XX XX XX                   | 4th field setting, see bytes 0-3 | u8,u8,u8,sfp7+bit
+| 16-19         | XX XX XX XX                   | 5th field setting, see bytes 0-3 | u8,u8,u8,sfp7+bit
 
 Step value, 7-bit signed floating point sfp7, observed values:
 
@@ -904,10 +910,10 @@ Payload for supported field settings:
 |  2      | XX                 | field value offset             | u8
 |  3:7-1  | b0bb b0b           | field value step value         | sfp7
 |  3:0    | 0                  | 0                              | bit
-|  4-7    | XX XX XX XX        | 2nd field value, see bytes 4-7 | u8,u8,u8,sfp7+bit
-|  8-11   | XX XX XX XX        | 3rd field value, see bytes 4-7 | u8,u8,u8,sfp7+bit
-| 12-15   | XX XX XX XX        | 4th field value, see bytes 4-7 | u8,u8,u8,sfp7+bit
-| 16-19   | XX XX XX XX        | 5th field value, see bytes 4-7 | u8,u8,u8,sfp7+bit
+|  4-7    | XX XX XX XX        | 2nd field value, see bytes 0-3 | u8,u8,u8,sfp7+bit
+|  8-11   | XX XX XX XX        | 3rd field value, see bytes 0-3 | u8,u8,u8,sfp7+bit
+| 12-15   | XX XX XX XX        | 4th field value, see bytes 0-3 | u8,u8,u8,sfp7+bit
+| 16-19   | XX XX XX XX        | 5th field value, see bytes 0-3 | u8,u8,u8,sfp7+bit
 
 # Packet types 90..9F (and FF) communicate unknown data
 
