@@ -63,9 +63,11 @@
  *     to Luis Lamich Arocas for sharing logfiles and testing the new controlling functions for the EHVX08S23D6V,
  *     and to Paul Stoffregen for publishing the AltSoftSerial library which was the starting point for the P1P2Serial library.
  *
- * P1P2erial is written and tested for the Arduino Uno and Mega.
+ * P1P2erial is written and tested for the Arduino Uno and (in the past) Mega.
  * It may or may not work on other hardware using a 16MHz clok.
- * As of P1P2Serial library 0.9.14 (under test, soon to be released), it also runs on 8MHz ATmega328P using MCUdude's MiniCore.
+ * As of P1P2Serial library 0.9.14, it also runs on 8MHz ATmega328P using MCUdude's MiniCore.
+ * Information on MCUdude's MiniCore: 
+ * Install in Arduino IDE (File/preferences, additional board manager URL: https://mcudude.github.io/MiniCore/package_MCUdude_MiniCore_index.json.
  *
  * Board          Transmit  Receive   Unusable PWM pins
  * -----          --------  -------   ------------

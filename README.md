@@ -318,6 +318,8 @@ Version 0.9.14 uses Arduino IDE 1.8.19 and the following libraries:
 - ESPAsyncTCP 1.2.2 by Khoi Hoang obtained as ZIP from https://github.com/me-no-dev/ESPAsyncTCP/
 - ESP_Telnet 1.3.1 by Lennart Hennigs (installed using Arduino IDE)
 
+For 8MHz ATmega328P support, install [MCUdude's MiniCore](https://github.com/MCUdude/MiniCore) by adding board manager URL https://mcudude.github.io/MiniCore/package_MCUdude_MiniCore_index.json. under File/Preferences/Additional board manager URLs.
+
 **Acknowledgements**
 
 Many thanks to the following persons:
