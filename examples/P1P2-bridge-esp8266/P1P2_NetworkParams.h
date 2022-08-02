@@ -27,5 +27,6 @@ char MQTT_CLIENTNAME[9] = "P1P2_xxx"; // Must be unique, include 4th byte of IPv
 
 // OTA
 #define OTA_HOSTNAME "P1P2MQTT"
+//#define OTA_PASSWORD "P1P2MQTT"
 
 #endif /* P1P2_NetworkParams */
