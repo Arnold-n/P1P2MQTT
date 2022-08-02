@@ -1,8 +1,10 @@
 /* P1P2Serial: Library for reading/writing Daikin/Rotex P1P2 protocol
  *
- * Copyright (c) 2019-2020 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20220802 v0.9.14 major rewrite of send and receive method to spread CPU load over time and allow 8MHz ATmega operation
+ *                  old library version is still available as fall-back solution (#define OLDP1P2LIB in P1P2Serial.h)
  * 20220511 v0.9.12 various minor bug fixes
  * 20200109 v0.9.11 allow short pauses between bytes within a packet (for KLIC-DA device, to avoid detecting each byte as individual packet)
  * 20190914 v0.9.10 upon bus collision detection, write buffer is emptied
@@ -51,6 +53,8 @@
  *
  */
 
+//#define OLDP1P2LIB // use old library version (>=16MHz only)
+
 #ifndef P1P2Serial_h
 #define P1P2Serial_h
 
@@ -65,7 +69,7 @@
 
 #define ALTSS_BASE_FREQ F_CPU
 
-#define ALLOW_PAUSE_BETWEEN_BYTES 9 // If there is a pause between bytes on the bus which is longer than a 1/4 bit time,
+#define ALLOW_PAUSE_BETWEEN_BYTES 9 // If there is a pause between bytes on the bus which is longer than a 1/4 bit time, 
                                     //   P1P2Serial signals an end-of-packet.
                                     // Daikin devices do not add a pause between bytes, but some other controllers do, like the KLIC-DA from Zennios.
                                     // To avoid end-of-packet detection due to such an inter-byte pause, a pause between bytes of at most
@@ -78,15 +82,17 @@
 // Use 16 bits for timing information
 // Use 8 bits for error code
  
-#define ERROR_PE       0x01 // parity error
-#define ERROR_OVERRUN  0x02 // read buffer overrun
-#define ERROR_READBACK 0x04 // data read-back error, likely bus collission
-#define ERROR_CRC      0x08 // CRC error
-#define ERROR_FLAGS    0x0F // Mask used to avoid that SIGNAL_EOP ends up in errorbuf results of readpacket
-#define SIGNAL_EOP     0x10 // signaling end of packet, this is not an error flag
+#define ERROR_PE           0x01 // parity error
+#define ERROR_OVERRUN      0x02 // read buffer overrun
+#define ERROR_READBACK     0x04 // data read-back error, likely bus collission
+#define ERROR_BUSCOLLISION 0x20 // high bit half read-back error, likely bus collission
+#define ERROR_CRC          0x08 // CRC error
+#define ERROR_FLAGS        0x2F // Mask used to avoid that SIGNAL_EOP ends up in errorbuf results of readpacket
+#define SIGNAL_EOP         0x10 // signaling end of packet, this is not an error flag
 
-#define RX_BUFFER_SIZE 50  // read buffer overruns may occur if this is too low
 #define TX_BUFFER_SIZE 33  // write buffer size (max 32+CRC)
+#define RX_BUFFER_SIZE 50  // read buffer overruns may occur if this is too low; RX_BUFFER_SIZE should be <=254
+#define NO_HEAD2 0xFF
 
 class P1P2Serial
 {
@@ -109,5 +115,7 @@ public:
 	static void setEcho(uint8_t b);
 	uint16_t readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* errorbuf, uint8_t maxlen, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
 	void writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
+        uint32_t uptime_sec(void);
+        uint32_t uptime_millisec(void);
 };
 #endif
