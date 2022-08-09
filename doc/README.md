@@ -2,7 +2,7 @@
 
 ### Warning
 
-The information is this directory is based on reserse engineering and assumptions, so there may be mistakes and misunderstandings. If you find any errors or additions, please feel free to add or react.
+The information is this directory is based on reverse engineering and assumptions, so there may be mistakes and misunderstandings. If you find any errors or additions, please feel free to add or react.
 
 ### Introduction
 

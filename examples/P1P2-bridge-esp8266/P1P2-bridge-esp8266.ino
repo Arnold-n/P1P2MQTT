@@ -5,8 +5,6 @@
  *
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
- * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
- *
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Requires board support package:
@@ -19,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
  * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
  * 20190908 v0.9.8 Minor improvements: error handling, hysteresis, improved output (a.o. x0Fx36)
  * 20190831 v0.9.7 Error handling improved
@@ -100,7 +99,7 @@ void onTelnetConnect(String ip) {
   Serial_print(F("- Telnet: "));
   Serial_print(ip);
   Serial_println(F(" connected"));
-  telnet.print("\nWelcome " + telnet.getIP() + " to P1P2-bridge-esp8266 v0.9.14 compiled ");
+  telnet.print("\nWelcome " + telnet.getIP() + " to P1P2-bridge-esp8266 v0.9.15 compiled ");
   telnet.print(__DATE__);
   telnet.print(" ");
   telnet.println(__TIME__);
@@ -171,6 +170,7 @@ uint16_t Mqtt_msgSkipNotConnected = 0;
 uint16_t Mqtt_disconnects = 0;
 uint16_t Mqtt_disconnectSkippedPackets = 0;
 uint16_t Mqtt_disconnectTime = 0;
+uint16_t Mqtt_disconnectTimeTotal = 0;
 uint32_t Mqtt_acknowledged = 0; // does not increment in case of QOS=0
 uint32_t Mqtt_gap = 0;          // does not increment in case of QOS=0
 uint16_t prevpacketId = 0;
@@ -229,7 +229,7 @@ static byte throttle = 1;
 static byte throttleValue = THROTTLE_VALUE;
 
 void onMqttConnect(bool sessionPresent) {
-  Sprint_P(true, false, false, PSTR("* [ESP] Connected to MQTT server"));
+  Serial.println(F("* [ESP] Connected to MQTT server"));
   int result = client.subscribe(mqttCommands, MQTT_QOS);
   Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttCommands, result);
   result = client.subscribe(mqttCommandsNoIP, MQTT_QOS);
@@ -287,9 +287,9 @@ MQTTSettings MQTT_server;
 
 void ATmega_dummy_for_serial() {
   Sprint_P(true, true, true, PSTR("* [ESP] Two dummy lines to ATmega."));
-  Serial.print(SERIAL_MAGICSTRING);
+  Serial.print(F(SERIAL_MAGICSTRING));
   Serial.println(F("* Dummy line 1."));
-  Serial.print(SERIAL_MAGICSTRING);
+  Serial.print(F(SERIAL_MAGICSTRING));
   Serial.println(F("* Dummy line 2."));
 }
 
@@ -327,6 +327,7 @@ void handleCommand(const char* cmdString) {
               break;
     case 'b': // display or set MQTT settings
     case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %19s %39s", &MQTT_server.mqttServer, &MQTT_server.mqttPort, &MQTT_server.mqttUser, &MQTT_server.mqttPassword)) > 0) {
+                Sprint_P(true, true, true, PSTR("* [ESP] Writing new parameters to EEPROM"));
                 EEPROM.put(0, MQTT_server);
                 EEPROM.commit();
               }
@@ -366,6 +367,7 @@ void handleCommand(const char* cmdString) {
                 client.setServer(MQTT_server.mqttServer, MQTT_server.mqttPort);
                 client.setCredentials((MQTT_server.mqttUser == '\0') ? 0 : MQTT_server.mqttUser, (MQTT_server.mqttPassword == '\0') ? 0 : MQTT_server.mqttPassword);
                 Sprint_P(true, true, true, PSTR("* [ESP] MQTT Try to connect"));
+                Mqtt_disconnectTime = 0;
                 client.connect();
                 delay(500);
                 if (client.connected()) {
@@ -393,9 +395,9 @@ void handleCommand(const char* cmdString) {
     case 'J': if (sscanf((const char*) (cmdString + 1), "%x", &temp) == 1) {
                 if (temp > 0xFFF) temp = 0xFFF;
                 outputMode = temp;
-                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode set to 0x%02X"), outputMode);
+                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode set to 0x%04X"), outputMode);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode 0x%02X"), outputMode);
+                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode 0x%04X"), outputMode);
               }
               break;
     case 's': // OutputFilter
@@ -415,26 +417,44 @@ void handleCommand(const char* cmdString) {
               break;
     case '\0':break;
     case '*': break;
+    case 'v':
+    case 'V':
     case 'g':
-    case 'G': if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
-                crc_gen = temphex;
-                Sprint_P(true, true, true, PSTR("* [ESP] CRC_gen set to 0x%02X"), crc_gen);
-              } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] CRC_gen 0x%02X"), crc_gen);
-              }
-              // fallthrough
+    case 'G':
     case 'h':
-    case 'H': if ((cmdString[0] != 'g') && (cmdString[0] != 'G')) {
-                if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
-                  crc_feed = temphex;
-                  Sprint_P(true, true, true, PSTR("* [ESP] CRC_feed set to 0x%02X"), crc_feed);
-                } else {
-                  Sprint_P(true, true, true, PSTR("* [ESP] CRC_feed 0x%02X"), crc_feed);
-                }
+    case 'H': // commands v/g/h handled both by P1P2-bridge-esp8266 and P1P2Moniotr
+              switch (cmdString[0]) {
+                case 'v':
+                case 'V': Sprint_P(true, true, true, PSTR(WELCOMESTRING));
+                          Sprint_P(true, true, true, PSTR("* [ESP] Compiled %s %s"), __DATE__, __TIME__);
+                          if (sscanf((const char*) (cmdString + 1), "%2x", &temp) == 1) {
+                            if (temp < 1) {
+                              temp = 3;
+                              Sprint_P(true, true, true, PSTR("* [ESP] Verbose < 2 not supported by P1P2-bridge-esp8266, set to 3"));
+                            }
+                          }
+                          break;
+                case 'g':
+                case 'G': if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
+                            crc_gen = temphex;
+                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_gen set to 0x%02X"), crc_gen);
+                          } else {
+                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_gen 0x%02X"), crc_gen);
+                          }
+                          break;
+                case 'h':
+                case 'H': if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
+                            crc_feed = temphex;
+                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_feed set to 0x%02X"), crc_feed);
+                          } else {
+                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_feed 0x%02X"), crc_feed);
+                          }
+                          break;
+                default : break;
               }
-              // fallthrough
+              // fallthrough for v/g/h commands handled both by P1P2-bridge-esp8266 and P1P2Monitor
     default : Sprint_P(true, true, true, PSTR("* [ESP] To ATmega: ->%s<-"), cmdString);
-              Serial.print(SERIAL_MAGICSTRING);
+              Serial.print(F(SERIAL_MAGICSTRING));
               Serial.println((char *) cmdString);
               break;
   }
@@ -496,12 +516,12 @@ void setup() {
   Serial.setRxBufferSize(RX_BUFFER_SIZE); // default value is too low for ESP taking long pauses at random moments...
   Serial.begin(SERIALSPEED);
   while (!Serial);      // wait for Arduino Serial Monitor to open
-    Serial_println(F("*"));        // this line is copied back by ATmega as "first line ignored"
-    Serial_println(WELCOMESTRING);
-    Serial_print(F("* Compiled "));
-    Serial_print(__DATE__);
-    Serial_print(' ');
-    Serial_println(__TIME__);
+  Serial_println(F("*"));        // this line is copied back by ATmega as "first line ignored"
+  Serial_println(WELCOMESTRING);
+  Serial_print(F("* Compiled "));
+  Serial_print(__DATE__);
+  Serial_print(' ');
+  Serial_println(__TIME__);
 
 // WiFiManager setup
   // Local intialization. Once its business is done, there is no need to keep it around
@@ -511,6 +531,10 @@ void setup() {
   // Customize AP
   WiFiManagerParameter custom_text("<p>P1P2-ESP-Interface</p>");
   wifiManager.addParameter(&custom_text);
+  // Debug info?
+#ifdef DEBUG_OVER_SERIAL
+  wifiManager.setDebugOutput(true);
+#endif
   // add 4 MQTT settings to WiFiManager, with default settings preconfigured in NetworkParams.h
   WiFiManagerParameter WiFiManMqttServer("mqttserver", "MqttServer (IPv4, required)", MQTT_SERVER, 19);
   WiFiManagerParameter WiFiManMqttPort("mqttport", "MqttPort (optional, default 1883)", MQTT_PORT_STRING, 9);
@@ -624,19 +648,19 @@ void setup() {
   delay(500);
 
   if (client.connected()) {
-    Serial_println(F("* [ESP] MQTT client connected on first try"));
+    Serial.println(F("* [ESP] MQTT client connected on first try"));
   } else {
-    Serial_println(F("* [ESP] MQTT client connect failed"));
+    Serial.println(F("* [ESP] MQTT client connect failed"));
   }
 
   byte connectTimeout = 10; // 50s timeout
   while (!client.connected()) {
     client.connect();
     if (client.connected()) {
-      Serial_println(F("* [ESP] MQTT client connected"));
+      Serial.println(F("* [ESP] MQTT client connected"));
       break;
     } else {
-      Serial_println(F("* [ESP] MQTT client connect failed"));
+      Serial.println(F("* [ESP] MQTT client connect failed, retrying in setup() until time-out"));
       if (!--connectTimeout) break;
       delay(5000);
     }
@@ -666,6 +690,9 @@ void setup() {
   // port defaults to 8266
   // ArduinoOTA.setPort(8266);
   // Hostname defaults to esp8266-[ChipID]
+  OTA_HOSTNAME[OTA_HOSTNAME_PREFIXIP] = (local_ip[3] / 100) + '0';
+  OTA_HOSTNAME[OTA_HOSTNAME_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
+  OTA_HOSTNAME[OTA_HOSTNAME_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
   ArduinoOTA.setHostname(OTA_HOSTNAME);
   // No authentication by default
 #ifdef OTA_PASSWORD
@@ -846,7 +873,12 @@ void loop() {
   while (milliInc >= 1000) {
     milliInc -= 1000;
     espUptime += 1;
-    if (!client.connected()) Mqtt_disconnectTime++;
+    if (!client.connected()) {
+      Mqtt_disconnectTimeTotal++;
+      Mqtt_disconnectTime++;
+    } else {
+      Mqtt_disconnectTime = 0;
+    }
     if (milliInc < 1000) {
       if ((throttleValue > 1) && (espUptime > (THROTTLE_VALUE - throttleValue + 1) * THROTTLE_STEP)) throttleValue--;
       Sprint_P(true, true, false, PSTR("* [ESP] Uptime %li"), espUptime);
@@ -854,10 +886,16 @@ void loop() {
         espUptime_telnet = espUptime_telnet + 10;
         Sprint_P(false, false, true, PSTR("* [ESP] Uptime %li"), espUptime);
       }
-      if (!client.connected()) Sprint_P(true, false, true, PSTR("* [ESP] MQTT is disconnected (total %i s)"), Mqtt_disconnectTime);
+      if (!client.connected()) Sprint_P(true, false, true, PSTR("* [ESP] MQTT is disconnected (%i s total %i s)"), Mqtt_disconnectTime, Mqtt_disconnectTimeTotal);
       pseudo0D++;
       pseudo0E++;
       pseudo0F++;
+      if (Mqtt_disconnectTime > MQTT_DISCONNECT_RESTART) {
+        Sprint_P(true, true, true, PSTR("* [ESP] Restarting ESP to attempt to reconnect Mqtt")); 
+        delay(100);
+        ESP.restart(); 
+        delay(100);
+      }
     }
   }
 
@@ -891,12 +929,13 @@ void loop() {
       delay(500);
       if (client.connected()) {
         Sprint_P(true, false, true, PSTR("* [ESP] Mqtt reconnected"));
-        Sprint_P(true, false, true, PSTR(ESPWELCOMESTRING));
+        Sprint_P(true, false, true, PSTR(WELCOMESTRING));
       } else {
         Sprint_P(true, false, true, PSTR("* [ESP] Reconnect failed, retrying in 5 seconds"));
+        Serial.println(F("* [ESP] Reconnect to MQTT failed, see telnet for details"));
         reconnectTime = espUptime + 5;
       }
-    } 
+    }
     // else wait before trying reconnection
   }
 
@@ -976,12 +1015,12 @@ void loop() {
                 if ((outputMode & 0x800) && (mqttConnected)) client.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) readHex, rh + 1);
                 if (outputMode & 0x666) process_for_mqtt_json(readHex, rh);
 #ifdef PSEUDO_PACKETS
-                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0D)) pseudo0D = 5; // Insert pseudo packet 40000D in output serial after 00000D
-                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) pseudo0F = 5; // Insert pseudo packet 40000F in output serial after 00000F
+                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0D)) pseudo0D = 9; // Insert pseudo packet 40000D in output serial after 00000D
+                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) pseudo0F = 9; // Insert pseudo packet 40000F in output serial after 00000F
 #endif
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0E)) {
 #ifdef PSEUDO_PACKETS
-                  pseudo0E = 5; // Insert pseudo packet 40000E in output serial after 00000E
+                  pseudo0E = 9; // Insert pseudo packet 40000E in output serial after 00000E
 #endif
                   uint32_t ATmega_uptime = (readHex[3] << 24) || (readHex[4] << 16) || (readHex[5] << 8) || readHex[6];
                   if (ATmega_uptime < ATmega_uptime_prev) {
@@ -1025,7 +1064,7 @@ void loop() {
       // wait for more serial input, or just nothing to do
     }
 #ifdef PSEUDO_PACKETS
-    if (pseudo0D > 4) {
+    if (pseudo0D > 5) {
       pseudo0D = 0;
       readHex[0] = 0x40;
       readHex[1] = 0x00;
@@ -1037,10 +1076,12 @@ void loop() {
       readHex[7]  = (mqttPublished >> 16) & 0xFF;
       readHex[8]  = (mqttPublished >> 8) & 0xFF;
       readHex[9]  = mqttPublished & 0xFF;
-      for (int i = 10; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
+      readHex[10] = (Mqtt_disconnectTime >> 8) & 0xFF;
+      readHex[11] = Mqtt_disconnectTime & 0xFF;
+      for (int i = 12; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
       writePseudoPacket(readHex, 23, readBuffer);
     }
-    if (pseudo0E > 4) {
+    if (pseudo0E > 5) {
       pseudo0E = 0;
       readHex[0]  = 0x40;
       readHex[1]  = 0x00;
@@ -1067,7 +1108,7 @@ void loop() {
       readHex[22] = maxLoopTime & 0xFF;
       writePseudoPacket(readHex, 23, readBuffer);
     }
-    if (pseudo0F > 4) {
+    if (pseudo0F > 5) {
       pseudo0F = 0;
       readHex[0] = 0x40;
       readHex[1] = 0x00;
@@ -1077,8 +1118,8 @@ void loop() {
       uint16_t m1 = ESP.getMaxFreeBlockSize();
       readHex[5]  = (m1 >> 8) & 0xFF;
       readHex[6]  = m1 & 0xFF;
-      readHex[7]  = (Mqtt_disconnectTime >> 8) & 0xFF;
-      readHex[8]  = Mqtt_disconnectTime & 0xFF;
+      readHex[7]  = (Mqtt_disconnectTimeTotal >> 8) & 0xFF;
+      readHex[8]  = Mqtt_disconnectTimeTotal & 0xFF;
       readHex[9]  = (Sprint_buffer_overflow >> 8) & 0xFF;
       readHex[10] = Sprint_buffer_overflow & 0xFF;
       readHex[11] = ESP_serial_input_Errors_Data_Short;

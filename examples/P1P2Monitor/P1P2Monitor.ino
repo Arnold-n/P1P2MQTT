@@ -193,16 +193,16 @@ void setup() {
   Serial.begin(SERIALSPEED);
   while (!Serial);      // wait for Arduino Serial Monitor to open
   Serial.println(F("*"));
-  Serial.println(F("* P1P2Monitor-v0.9.14"));
+  Serial.println(F(WELCOMESTRING));
   Serial.print(F("* Compiled "));
   Serial.print(__DATE__);
   Serial.print(F(" "));
   Serial.print(__TIME__);
 #ifdef MONITORCONTROL
-  Serial.println(F(" +control"));
+  Serial.print(F(" +control"));
 #endif /* MONITORCONTROL */
 #ifdef KLICDA
-  Serial.println(F(" +klicda"));
+  Serial.print(F(" +klicda"));
 #endif /* KLICDA */
   Serial.println();
 #ifdef EEPROM_SUPPORT
@@ -445,10 +445,6 @@ void loop() {
                           Serial.print(F(" nr: 0x"));
                           Serial.print(wr_nr, HEX);
                         }
-                        if (n > 2) {
-                          Serial.print(F(" val: 0x"));
-                          Serial.print(wr_val, HEX);
-                        }
                         Serial.println();
                       }
                       break;
@@ -483,6 +479,11 @@ void loop() {
                         EEPROM_update(EEPROM_ADDRESS_VERBOSITY, verbose);
                       }
                       Serial.println(verbose);
+                      Serial.println(F(WELCOMESTRING));
+                      Serial.print(F("* Compiled "));
+                      Serial.print(__DATE__);
+                      Serial.print(F(" "));
+                      Serial.println(__TIME__);
                       break;
             case 't':
             case 'T': if (verbose) Serial.print(F("* Delay "));

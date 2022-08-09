@@ -2,9 +2,12 @@
  *
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
- * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
- *
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
+ *
+ * Version history
+ * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
+ * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
+ * ..
  *
  */
 
@@ -2259,6 +2262,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    0 : KEY("ESP_Compile_Options");                                                                                                  VALUE_u8hex;
         case    2 : KEY("MQTT_messages_skipped_not_connected");            HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
         case    6 : KEY("MQTT_messages_published");                        HACONFIG; HAEVENTS;                                                   VALUE_u32_LE;
+        case    8 : KEY("MQTT_disconnected_time");                         HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
         default   : return 0;
       }
       default   : return 0;
@@ -2314,7 +2318,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    0 : KEY("ESP_telnet_connected");                           HACONFIG;                                                             VALUE_u8;
         case    1 : KEY("ESP_Output_Filter");                                                                                                    VALUE_u8;
         case    3 : KEY("ESP_Mem_free");                                   HACONFIG; HABYTES;                                                    VALUE_u16_LE;
-        case    5 : KEY("MQTT_disconnected_time");                         HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
+        case    5 : KEY("MQTT_disconnected_time_total");                   HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
         case    7 : KEY("Sprint_buffer_overflow");                                                                                               VALUE_u16_LE;
         case    8 : KEY("ESP_serial_input_Errors_Data_Short");;            HACONFIG;                                                             VALUE_u8;
         case    9 : KEY("ESP_serial_input_Errors_CRC");                    HACONFIG;                                                             VALUE_u8;

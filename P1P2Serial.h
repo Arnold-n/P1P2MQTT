@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20220808 v0.9.15 LEDs on P1P2-ESP-Interface all on until first byte received on P1/P2 bus
  * 20220802 v0.9.14 major rewrite of send and receive method to spread CPU load over time and allow 8MHz ATmega operation
  *                  old library version is still available as fall-back solution (#define OLDP1P2LIB in P1P2Serial.h)
  * 20220511 v0.9.12 various minor bug fixes

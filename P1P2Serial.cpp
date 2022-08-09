@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20220808 v0.9.15 LEDs on P1P2-ESP-Interface all on until first byte received
  * 20220802 v0.9.14 major rewrite of send and receive methodology to spread CPU load over time and allow lower frequency ATmega operation
  *                  old library version is still available as fall-back solution (#define OLDP1P2LIB below)
  * 20220511 v0.9.12 various minor bug fixes
@@ -253,9 +254,9 @@ void P1P2Serial::begin(uint32_t baud)
   pinMode(LED_ERROR, OUTPUT);
 
   DIGITAL_SET_LED_POWER;
-  DIGITAL_RESET_LED_READ;
-  DIGITAL_RESET_LED_WRITE;
-  DIGITAL_RESET_LED_ERROR;
+  DIGITAL_SET_LED_READ;
+  DIGITAL_SET_LED_WRITE;
+  DIGITAL_SET_LED_ERROR;
 
   pinMode(INPUT_CAPTURE_PIN, INPUT_PULLUP);
   digitalWrite(OUTPUT_COMPARE_PIN, HIGH);
@@ -642,6 +643,7 @@ ISR(CAPTURE_INTERRUPT)
 
   capture = GET_INPUT_CAPTURE();
   state = rx_state;
+  DIGITAL_RESET_LED_WRITE;
   DIGITAL_SET_LED_READ;
 
   if (state < 2) {
@@ -1454,7 +1456,6 @@ uint32_t P1P2Serial::uptime_sec(void)
 // returns uptime in seconds; not supported for OLDLIB (returns 0); wraps in 131.6 years
   return time_sec;
 }
-
 
 uint32_t P1P2Serial::uptime_millisec(void)
 { 

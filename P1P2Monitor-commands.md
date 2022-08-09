@@ -67,7 +67,7 @@ A few pre-defined parameter writing actions are still available from earlier P1P
 
 ### Monitor commands:
 
-- V  Show verbosity mode (default 3 for interfacing to P1P2MQTT)
+- V  Show verbosity mode (default 3 for interfacing to P1P2MQTT), P1P2Monitor version and date/time of compilation
 - Vx Sets verbosity mode (0 minimal, 1 traditional, 2 for P1P2MQTT, 3 like 2 with timing info added, 4 for suppression of hex data)
 - \* comment lines starting with an asterisk are ignored (and echoed in verbosity modes 1 and 4)
 

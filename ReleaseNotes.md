@@ -1,5 +1,11 @@
 **Release notes**
 
+v0.9.15 (August 8, 2022)
+
+- P1P2Serial: all LEDs on until P1/P2 bus traffic
+- P1P2Monitor: extended verbosity command output with compile date/time
+- P1P2-bridge-esp8266 (still end-of-life): extended verbosity command output with compile date/time, OTA hostname unique, few minor fixes
+
 v0.9.14 (August 2, 2022)
 
 - P1P2Serial: major rewrite of library, send and receive methodology spreads CPU load better over time, allowing 8MHz operation on ATmega328P. Old library version still available as fall-back (#define OLDP1P2LIB),

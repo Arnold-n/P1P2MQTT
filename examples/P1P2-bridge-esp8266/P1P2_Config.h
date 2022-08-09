@@ -2,9 +2,12 @@
  *
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
- * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
- *
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
+ *
+ * Version history
+ * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
+ * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
+ * ..
  *
  */
 
@@ -15,8 +18,7 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability: don't #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "P1P2-bridge-esp8266 v0.9.14"
-#define ESPWELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.14"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.15"
 
 #define AVRISP // enables flashing ATmega by ESP
 
@@ -26,7 +28,8 @@
 //#define SERIALSPEED 115200
 #define SERIALSPEED 250000
 
-//#define DEBUG_OVER_SERIAL // sends lots of information over serial. Uncomment this to avoid P1P2Monitor receiving this information. Only for serial over USB debugging
+//#define DEBUG_OVER_SERIAL // sends lots of information over serial. Uncomment this to avoid P1P2Monitor receiving this information. 
+                          // Use only for serial over USB (or serial via 2nd ESP01) debugging
 
 #define TELNET // define to allow telnet access (no password protection!) for monitoring and control
                // the telnet library provides no authentication for telnet
@@ -35,15 +38,13 @@
 
 #define PSEUDO_PACKETS // define to have P1P2-bridge-esp8266 output additional P1P2-like packets with internal state information
 
-
-
 // home assistent discovery
 #define HA_PREFIX "homeassistant/sensor"      // homeassistant MQTT discovery prefix
 #define HA_DEVICE_NAME "P1P2"                 // becomes device name in HA
 #define HA_DEVICE_ID "P1P2ID12"               // uniq device_id. Currently all sensors in one device_ID
 #define HA_DEVICE_MODEL "P1P2_ESP_Interface"  // shows up as Device Info in HA
 #define HA_MF "NPC"
-#define HA_SW "0.9.14"
+#define HA_SW "0.9.15"
 #define HA_KEY_LEN 100
 #define HA_VALUE_LEN 300
 #define HA_POSTFIX "_12"
@@ -70,6 +71,7 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
 
 #define MQTT_DISCONNECT_CONTINUE 0 // 0 pauses processing packets if mqtt is disconnected (to avoid that changes are lost)
                                    // Set to 1 to continue (in case you have no mqtt of want to see changes via telnet or so)
+#define MQTT_DISCONNECT_RESTART 150 // Restart ESP if Mqtt disconnect time larger than this value in seconds (because after WiFi interruption, Mqtt may not reconnect reliably)
 
 #define MQTT_RETAIN true // all messages (ha and parameter values) retained
 //#define MQTT_RETAIN false // no messages (ha and parameter values) retained
