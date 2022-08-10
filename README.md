@@ -1,6 +1,6 @@
 **Monitor and control your Daikin system via the room controller (P1/P2) interface!**
 
-Daikin (hybrid) heat pump systems are usually controlled by a room thermostat (and/or other controller) over a 2-wire interface, called P1/P2. This project enables to monitor (and, for some systems, control) your Daikin system from e.g. Home Assistant over MQTT via the P1/P2 thermostat wires, using the hard- and software of this project. For monitoring it is only eavesdropping on the regular communication between the main controller and the heat pump. For control it may function as "auxiliary controller" to the main thermostat, requesting the main controller to set certain system parameters on the Daikin system. Depending on your model it may be possible to switch the heat pump or DHW boiler on or off, switch between heating or cooling, set target temperatures, etcetera.
+Daikin (hybrid) heat pump systems are usually controlled by a room thermostat (and/or other controller) over a 2-wire interface, called P1/P2. This project enables to monitor (and, for some systems, control) your Daikin system from e.g. Home Assistant over MQTT via the P1/P2 thermostat wires, using the hard- and software of this project. For monitoring it is only eavesdropping on the regular communication between the main controller and the heat pump. For some models it provides control by acting as an "auxiliary controller" to the main thermostat, requesting the main controller to set certain system parameters on the Daikin system. Depending on your model it may be possible to switch the heat pump or DHW boiler on or off, switch between heating or cooling, set target temperatures, etcetera.
 
 ![Home assistant](images/homeassistant300.png)
 
@@ -10,28 +10,31 @@ If this project is useful for you, or valuable (I hope it reduces your energy bi
 
 ![P1P2-ESP-interface PCB](circuits/P1P2-ESP-interface1.png)
 
-Pictured is the new "P1P2-ESP-interface", a complete single-PCB bus-powered wireless P1P2-MQTT bridge. It is based on an ESP8266 (running P1P2-ESP-MQTT), an ATmega328P (running P1P2Monitor), and the MAX22088 HBS adapter (mounted on the lower side of the PCB). No Arduino or power supply is needed any more. This prototype is running succesfully for a few weeks now. Connect it to P1/P2 near your main controller or near your Daikin system, enter your wifi and mqtt credentials via its built-in AP, and the system runs. Functionality:
+Pictured is the new "P1P2-ESP-interface", a complete single-PCB bus-powered wireless P1P2-MQTT bridge. It is based on an ESP8266 (running P1P2-ESP-MQTT), an ATmega328P (running P1P2Monitor), and the MAX22088 HBS adapter (mounted on the lower side of the PCB). No Arduino or power supply is needed any more. Power is supplied by a DC/DC converter to minimize bus load (30-40mA at 15V). Connect it to P1/P2 near your main controller or near your Daikin system, enter your wifi and mqtt credentials via its built-in AP, and the system runs. Functionality:
 - monitor and (for some models) control the Daikin heat pump via the P1/P2 bus from Home Assistant (automatic configuration, using MQTT discovery),
 - communicate via MQTT over WiFi,
 - accessible via telnet,
 - OTA upgradable (both ESP and ATmega) (and if that would fail, using an ESP01-programmer via an ESP01-compatible connector),
-- powered entirely by the P1/P2 bus, no external power supply is needed, consumes only 30-40mA (0.5W) from the P1/P2 bus,
-- 4 LEDS for power (white), reading (green), writing (blue), or to signal an error (red), and
+- powered entirely by the P1/P2 bus, no external power supply is needed, low power consumption (30-40mA/0.5W from the P1/P2 bus) thanks to a DC/DC converter,
+- 4 LEDS for power (white), reading (green), writing (blue), or to signal an error (red),
+- screw terminals for P1 and P2 wires, and
 - fits nicely in a small semi-transparant enclosure (50mm x 35mm x 20mm).
 
 With communication over MQTT, integration with Home Assistand will be automatic, and interfacing to other systems (grafana, OpenHab, EmonCMS) should not be too much work.
+
+By default, the interface only observes and attempts to interpret bus traffic. For some models, it may also act as auxiliary controller and control parameter settings over MQTT.
 
 ![Grafana electricity usage](images/grafana-electricity-usage.png)
 
 **How can you build or buy one?**
 
-Buy P1P2-ESP-interface (new design): I have ordered a small number of factory-assembled PCBs for people who showed interest (delivery 2nd half of June 2022), and there are still a few spare boards available, please let me know if you are interested in a finished, soldered, pre-programmed, and tested board: my e-mail address can be found on line 3 of https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp.
+Buy new complete stand-alone P1P2-ESP-interface): I made a small number of factory-assembled PCBs (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, documented and tested), (August 2022:) these are all sold or reserved. I plan to make more. Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
 
-Buy P1P2-adapter (older design below): I also sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno, as well as a newer MAX22088-based P1P2-adapter which is slightly better.
+Buy P1P2-adapter (older design below): I also sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno, as well as a newer MAX22088-based P1P2-adapter HAT which is slightly better.
 
-Build P1P2-adapter (MM1192/XL1192): schematics and pictures for the MM1192/XL1192-based P1P2-adapter (for use with the Arduino Uno) are available in https://github.com/Arnold-n/P1P2Serial/tree/main/circuits. The MM1192 is available in traditional DIP format so you can build it on a breadboard. 
+Build P1P2-adapter (MM1192/XL1192): schematics and pictures for the MM1192/XL1192-based P1P2-adapter (for use with the Arduino Uno) are [here](https://github.com/Arnold-n/P1P2Serial/tree/main/circuits). The MM1192 is available in traditional DIP format so you can build it on a breadboard. 
 
-Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. Be warned that it is difficult to solder: it's only available as a 4x4mm 0.5mm pitch TQFN-24 package. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power Daikin's P1/P2 bus may provide, perhaps max 60mA) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a MAX22088-based design are made available by Nicholas Roth at https://github.com/rothn/P1P2Adapter. His design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
+Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. Be warned that it is difficult to solder: it's only available as a 4x4mm 0.5mm pitch TQFN-24 package. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power Daikin's P1/P2 bus may provide, perhaps max 60mA) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a [MAX22088-based design](https://github.com/rothn/P1P2Adapter) are made available by Nicholas Roth. His design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
 
 **Older design: P1P2-adapter**
 
@@ -131,11 +134,21 @@ Please let me know if you encounter any issues with the new library. It is runni
 
 To compile for 8Mhz, you may need to install MCUdude's MiniCore hardware package and then select ATmega328 and the correct frequency, and set the fuses accordingly for the lower speed.
 
-**Rotex, Hoval, and other Home Bus Systems**
+**Which other HBS interfaces are supported?**
 
-In some countries, Daikin systems are known under the Rotex or Hoval brand name. However, not all Rotex systems use the P1/P2 bus.
+This project was started for the Daikin P1/P2 bus. However the underlying electrical Japanese Home Bus System is used by many heat pump / air conditioning manufacturers. We have indications that, in addition to Daikin's P1/P2, the following buses are also based on the HBS format:
+- Daikin F1/F2 (DIII-Net), 
+- Mitsubishi M-NET (Len Shustek made an OPAMP-based reading circuit and documented his [protocol observations](https://github.com/LenShustek/M-NET-Sniffer)),
+- Toshiba TCC-Link (used for indoor-outdoor, but not for the indoor-indoor and indoor-thermostaat AB-protocol (schematics and code [here](https://github.com/issalig/toshiba_air_cond) and [here](https://github.com/burrocargado/toshiba-aircon-mqtt-bridge) and [here](https://burro-hatenablog-com.translate.goog/entry/2022/07/18/230300?_x_tr_sl=auto&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=wapp)),
+- Hitachi H-link (code to read data from a Hitachi Yutaki S80 Combi heat pump is available [here](https://github.com/hankerspace/HLinkSniffer)).
+- Panasonic/Sanyo SIII-Net, and
+- perhaps also products from Haier and York.
 
-This project may also be useful for other Japanese Home Bus System based standards: Echonet, DIII-NET (F1/F2) bus, Mitsubishi M-Net bus, Toshiba TCC-Link, Hitachi H-link, Panasonic/Sanyo SIII-Net, Haier, York, and others.
+At least raw data should be observable using the electronics and P1P2Monitor from this project, but the logical format will of course be different.
+
+**Rotex, Hoval**
+
+In some countries, Daikin systems are known under the Rotex or Hoval brand name. However, not all Rotex systems use the P1/P2 bus, some are [CANbus based](https://github.com/zanac/pyHPSU).
 
 **Programs in this repo**
 
@@ -162,10 +175,6 @@ My heat pump is a 2014 model Daikin hybrid heat pump/natural gas boiler combinat
 **What is the Daikin P1/P2 bus?**
 
 Daikin (or Rotex) uses various communication standards between thermostats and heat pumps. The P1/P2 standard is one of them (others are F1/F2, Modbus, BACnet, which are not supported here, even though F1/F2 is electrically the same as P1/P2). The P1/P2 protocol is a proprietary standard. At the lowest level it is a two-wire 9600 baud serial-like interface based on the Japanese Home Bus System (ET-2101). Some technical details of this standard can be found in chapter 4 of the https://echonet.jp/wp/wp-content/uploads/pdf/General/Standard/Echonet/Version_2_11_en/spec_v211e_3.pdf.
-
-**Which other HBS interfaces are supported?**
-
-This project was started for the Daikin P1/P2 bus. However the underlying electrical HBS format is used by many heat pump / air conditioning manufacturers, so far we have indications that the following buses are based on the HBS format: Daikin P1/P2, Daikin F1/F2 (DIII-Net), Mitsubishi M-NET, Toshiba TCC-Link, Hitachi H-link, Panasonic/Sanyo SIII-Net, perhaps also products from Haier and York. The logical format will likely differ. For example, Len Shustek made an impressive OPAMP-based reading circuit for the Mitsubishi M-NET and documented his protocol observations on https://github.com/LenShustek/M-NET-Sniffer. The logical format is clearly different from the Daikin format, but the P1P2Serial library and adapter will likely work for reading and writing M-NET too as the physical format is the same or similar. For Hitachi H-link, code to read data from a Hitachi Yutaki S80 Combi heat pump is available on https://github.com/hankerspace/HLinkSniffer.
 
 **More details on the P1P2-adapter circuit**
 
