@@ -178,23 +178,23 @@ Daikin (or Rotex) uses various communication standards between thermostats and h
 
 **More details on the P1P2-adapter circuit**
 
-This project strated with a separate adapter for the P1/P2 bus using an Arduino Uno (or other ATmega board) together with a HBS transceiver such as the MM1192/XL1192 HBS-Compatible Driver and Receiver (http://pdf.datasheetcatalog.com/datasheet_pdf/mitsumi-electric/MM1192XD.pdf) or the MAX22088/MAX22288 (https://www.maximintegrated.com/en/products/interface/transceivers/MAX22088.html or https://www.maximintegrated.com/en/products/interface/transceivers/MAX22288.html). The P1P2Serial library only supports some ATmega boards; it was tested on Arduino Uno and Arduino Mega2560. The library itself does not run on ESP devices as it requires the "timer input capture mode" of the ATmega to read and write the low-level signals.
+This project started with a separate adapter for the P1/P2 bus using an Arduino Uno together with a [MM1192 HBS transceiver](http://pdf.datasheetcatalog.com/datasheet_pdf/mitsumi-electric/MM1192XD.pdf), and later the XL1192 and the [MAX22088](https://www.maximintegrated.com/en/products/interface/transceivers/MAX22088.html). The P1P2Serial library only supports some ATmega boards; it was tested on Arduino Uno and (in an early stage) Arduino Mega2560. The library itself does not run on ESP devices as it requires the "timer input capture mode" of the ATmega to accurately read and write the low-level signals.
 
-The preferred circuit schematics (version 2) has galvanic isolation and an isolated DC-DC converter to power the MM1192/XL1192. A MAX22088 alternative is available, with galvanic isolation, without the DC-DC converter.
+The preferred adapter circuit for the MM1192/XL1192 has galvanic isolation and an isolated DC-DC converter to power the MM1192/XL1192. A MAX22088 alternative adapter is available, with galvanic isolation, without the DC-DC converter.
 
-The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the MM1007 (https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the XL1192 (http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noisy P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal in the initial version without galvanic isolation (likely due to capacitive leakage in the USB power supply for the Arduino). I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2. A further modification, the addition of a 470pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 100-200Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
+The MM1192 data sheet does not provide information how to build a working circuit, but the data sheet for the [MM1007](https://www.digchip.com/datasheets/parts/datasheet/304/MM1007.php) and the [XL1192](http://www.xlsemi.com/datasheet/XL1192%20datasheet-English.pdf) show how to build it. Unfortunately, these schematics did not work for me as the MM1192 detected a lot of spurious edges in the noisy P1/P2 signal. This was due to the relatively high amplitude of signal and noise, and to the common-mode distortion of the signal in the initial version without galvanic isolation (likely due to capacitive leakage in the USB power supply for the Arduino). I had to make two modifications to resolve that: (1) both resistors between the MM1192 and the P1/P2 lines were changed from 33kOhm to 150kOhm; and (2) one 1.5 kOhm resistor was added between ground and P1, and one 1.5 kOhm resistor was added between ground and P2. A further modification, the addition of a 470pF capacitor between pin 15 and pin 16 of the MM1192, reduces the detection of spurious edges further. Line termination (a 10uF capacitor and a 100-200Ohm resistor in series between P1 and P2) may also improve the quality of the incoming signal. 
 
 XLSemi produces the XL1192 which looks like a direct clone of the MM1192. The XL1192 data sheet suggests that the specifications are the same, but they are not. The XL1192 has a higher voltage threshold on its input and a slightly lower (20% lower) voltage swing on its output channel. Using 75kOhm resistors instead of 150kOhm resistors on the input side of the XL1192 works perfect in my situation.
 
 If you want to power the bus (which is only needed if you want to communicate to a stand-alone controller which is disconnected from and thus not powered from the heat pump) you can do so by providing 15V to the bus over a 20mH inductor with a reasonably low internal resistance (for example 2 RLB1314-103KL 100mH/12ohm/100mA inductors in series), or by using the MAX22088 which supports bus-powered operation (see below for a link to MAX22088 schematics).
 
-Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power the bus may provide) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a MAX22088-based design are made available by Nicholas Roth at https://github.com/rothn/P1P2Adapter. This design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
+Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power the bus may provide) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a MAX22088-based design are made [available](https://github.com/rothn/P1P2Adapter) by Nicholas Roth. This design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
 
-The read part of the circuit can also be built using a few opamps as demonstrated by https://github.com/LenShustek/M-NET-Sniffer.
+The read part of the circuit can also be built using a few opamps as demonstrated by [Len Shustek](https://github.com/LenShustek/M-NET-Sniffer).
 
 **Below various set-ups using the Arduino-based P1P2-adapter are provided**
 
-(this section does not apply to the P1P2-ESP-interface, which has everything integrated on a single PCB)
+(this section describes DIY set-ups and does not apply to the P1P2-ESP-interface, which has everything integrated on a single PCB)
 
 ***MQTT or json over WiFi set-up using a P1P2Adapter shield, Arduino Uno and ESP8266***
 
@@ -215,7 +215,7 @@ The read part of the circuit can also be built using a few opamps as demonstrate
 
     WiFi
 
-For this set-up, a nice Uno/ESP8266 combi-board used to be available from Robotdyn. Old stock or clone versions can still be found at certain resellers, for example from  https://www.vanallesenmeer.nl/Uno-WiFi-R3-ATmega328-ESP8266-8Mb-USB-TTL-CH340G-Development-Board.
+For this set-up, a nice Uno/ESP8266 combi-board used to be available from Robotdyn. Old stock or clone versions can still be found at certain resellers, for example from [VanAllesEnMeer](https://www.vanallesenmeer.nl/Uno-WiFi-R3-ATmega328-ESP8266-8Mb-USB-TTL-CH340G-Development-Board).
 
 In order to program this board, the following steps are needed:
 
@@ -280,18 +280,18 @@ This set-up provides flexibity as the Uno can directly be programmed from the Ra
 
     LAN
 
-(*) Instead of runnning P1P2Monitor in this set-up, the code at https://github.com/budulinek/Daikin-P1P2---UDP-Gateway may better be suited.
+(*) Instead of runnning P1P2Monitor in this set-up, the code from [Budulinek](https://github.com/budulinek/Daikin-P1P2---UDP-Gateway) may better be suited.
 
 
 **Where can I buy a MM1192 or XL1192 or MAX22x88?**
 
-The MM1192 (DIP or SOIC) and XL1192S (SOIC) are available only from a few sellers on ebay and aliexpress. The XL1192S can also be purchased from https://lcsc.com.
+The MM1192 (DIP or SOIC) and XL1192S (SOIC) are available only from a few sellers on ebay and aliexpress. The XL1192S can also be purchased from [LCSC](https://lcsc.com).
 
 The MAX22088 and MAX22288 are available from regular distributors such as Mouser, Digikey, Farnell, and RS.
 
 **What does the data on the P1/P2 bus look like, at the physical level?**
 
-The P1/P2 bus uses the Home Bus System protocol, which is a serial protocol. It is a variation of bipolar encoding (alternate mark inversion, https://en.wikipedia.org/wiki/Bipolar_encoding), but the pulses only take half of the bit time. So every falling edge in the signal represents a 0, and every "missing" falling edge represents a 1. Every byte is coded as a start bit (0), 8 data bits (LSB first), 1 parity bit (even), and 1 stop bit (1). The Daikin devices have no pause between the stop bit and the next start bit, but Zennio's KLIC-DA has a short pause in between the individual bytes of a packet. As it is a two-wire interface, devices should not write on the bus if any other device is writing. The HBS standard has an advanced collision detection and priority mechanism. In a 2-device set up of a Daikin heat pump and a thermostat, the devices seem to simply alternate turns in writing to the bus, and Daikin does not seem to support bus usage detection and collission avoidance, so take care when writing to the bus to avoid bus collisions.
+The P1/P2 bus uses the Home Bus System protocol, which is a serial protocol. It is a variation of bipolar encoding ([alternate mark inversion](https://en.wikipedia.org/wiki/Bipolar_encoding)), but the pulses only take half of the bit time. So every falling edge in the signal represents a 0, and every "missing" falling edge represents a 1. Every byte is coded as a start bit (0), 8 data bits (LSB first), 1 parity bit (even), and 1 stop bit (1). The Daikin devices have no pause between the stop bit and the next start bit, but Zennio's KLIC-DA has a short pause in between the individual bytes of a packet. As it is a two-wire interface, devices should not write on the bus if any other device is writing. The HBS standard has an advanced collision detection and priority mechanism. In a 2-device set up of a Daikin heat pump and a thermostat, the devices seem to simply alternate turns in writing to the bus, and Daikin does not seem to support bus usage detection and collission avoidance, so take care when writing to the bus to avoid bus collisions.
 
 **What does the data on the P1/P2 bus look like, at the logical level?**
 
@@ -321,20 +321,20 @@ The simple answer is: write when others don't. In practice communication seems t
 
 **Software requirements**
 
-Version 0.9.14 uses Arduino IDE 1.8.19 and the following libraries:
+Version 0.9.15 uses Arduino IDE 1.8.19 and the following libraries:
 - WiFiManager 0.16.0 by tzapu (installed using Arduino IDE)
-- AsyncMqttClient 0.9.0 by Marvin Roger obtained as ZIP from https://github.com/marvinroger/async-mqtt-client
-- ESPAsyncTCP 1.2.2 by Khoi Hoang obtained as ZIP from https://github.com/me-no-dev/ESPAsyncTCP/
+- [AsyncMqttClient 0.9.0](https://github.com/marvinroger/async-mqtt-client) by Marvin Roger obtained as ZIP file and extracted in Arduino's library directory
+- [ESPAsyncTCP 1.2.2](https://github.com/me-no-dev/ESPAsyncTCP/) by Khoi Hoang obtained as ZIP file and extracted in Arduino's library directory
 - ESP_Telnet 1.3.1 by Lennart Hennigs (installed using Arduino IDE)
 
-For 8MHz ATmega328P support, install [MCUdude's MiniCore](https://github.com/MCUdude/MiniCore) by adding board manager URL https://mcudude.github.io/MiniCore/package_MCUdude_MiniCore_index.json. under File/Preferences/Additional board manager URLs.
+For 8MHz ATmega328P support, install [MCUdude's MiniCore](https://github.com/MCUdude/MiniCore) by adding [board manager URL](https://mcudude.github.io/MiniCore/package_MCUdude_MiniCore_index.json) under File/Preferences/Additional board manager URLs.
 
 **Acknowledgements**
 
 Many thanks to the following persons:
 - jarosolanic for adding parameter support for EHVX08S26CA9W and for adding initial MQTT topic output in P1P2Monitor (now moved to P1P2MQTT)
-- a user called "donato35" for discovering that the P1/P2 bus is using HBS adapters (http://www.grix.it/forum/forum_thread.php?ftpage=2&id_forum=1&id_thread=519140?id_forum=1),
-- a user called "Krakra" published a link to a description of the HBS protocol in the Echonet standard (https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms/2551/43) and shared thoughts and code on product-dependent header files,
+- a user called "donato35" for discovering that the [P1/P2 bus is using HBS adapters](http://www.grix.it/forum/forum_thread.php?ftpage=2&id_forum=1&id_thread=519140?id_forum=1),
+- a user called "Krakra" published a link to a description of the HBS protocol in the [Echonet standard](https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms/2551/43) and shared thoughts and code on product-dependent header files,
 - Luis Lamich Arocas for providing and analyzing his log files; thanks to his work v0.9.6 version we could add support for switching DHW on/off and cooling/heating on/off (currently only confirmed to work on EHVX08S23D6V and EHYHBX08AAV3),
 - Bart Ellast for sharing his P1/P2 protocol data and analysis,
 - designer2k2 for sharing his EWYQ005ADVP protocol data and analysis, and
