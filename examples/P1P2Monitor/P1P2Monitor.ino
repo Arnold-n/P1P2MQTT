@@ -37,6 +37,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20220811 v0.9.16 Improved uptime handling in case uptime_sec is not supported (S_TIMER  undefined, or OLDP1P2LIB)
  * 20220802 v0.9.14 New parameter-write method 'e' (param write packet type 35-3D), error and write throttling, verbosity mode 2, EEPROM state, MCUSR reporting,
  *                  pseudo-packets, error counters, ...
  *                  Simplified code by removing packet interpretation, json, MQTT, UDP (all off-loaded to P1P2MQTT)
@@ -162,9 +163,9 @@ uint32_t wr_val = 0;
 
 byte Tmin = 0;
 byte Tminprev = 61;
-uint32_t upt_prev_pseudo = 0;
-uint32_t upt_prev_write = 0;
-uint32_t upt_prev_error = 0;
+int32_t upt_prev_pseudo = 0;
+int32_t upt_prev_write = 0;
+int32_t upt_prev_error = 0;
 uint8_t writePermission = INIT_WRITE_PERMISSION;
 uint8_t errorsPermitted = INIT_ERRORS_PERMITTED;
 uint16_t parameterWritesDone = 0;
@@ -847,7 +848,7 @@ void loop() {
     RSp = RS;
     rs = 0;
   }
-  uint32_t upt = P1P2Serial.uptime_sec();
+  int32_t upt = P1P2Serial.uptime_sec();
   if (upt > upt_prev_pseudo) {
     pseudo0D++;
     pseudo0E++;
@@ -875,10 +876,10 @@ void loop() {
       if (errorsLargePacket < 0xFF) errorsLargePacket++;
     }
     for (int i = 0; i < nread; i++) readError |= EB[i];
-    if (readError && upt) { // ignore errors while upt == 0
-       if (readErrors < 0xFF) { 
-         readErrors++; 
-         readErrorLast = readError; 
+    if (readError && upt) { // don't count errors while upt == 0
+      if (readErrors < 0xFF) { 
+        readErrors++; 
+        readErrorLast = readError; 
       }
       if (errorsPermitted) {
         errorsPermitted--;

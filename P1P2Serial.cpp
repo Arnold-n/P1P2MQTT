@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20220811 v0.9.16 Added S_TIMER switch making TIMER0 use optional
  * 20220808 v0.9.15 LEDs on P1P2-ESP-Interface all on until first byte received
  * 20220802 v0.9.14 major rewrite of send and receive methodology to spread CPU load over time and allow lower frequency ATmega operation
  *                  old library version is still available as fall-back solution (#define OLDP1P2LIB below)
@@ -227,7 +228,7 @@ static volatile uint16_t tx_buffer_delay[TX_BUFFER_SIZE]; // records timing info
 static volatile uint16_t time_msec = 0;
 static volatile uint16_t tx_wait = 0;
 static volatile uint8_t  time_sec_cnt = 0;
-static volatile uint32_t time_sec = 0;
+static volatile int32_t time_sec = 0;
 static volatile uint32_t time_millisec = 0;
 
 #define scheduledelay Wticks_per_bit_and_semibit // should be more than 1.5 bits for writing
@@ -279,8 +280,10 @@ void P1P2Serial::begin(uint32_t baud)
   CONFIG_MS_TIMER();
   RESET_ENABLE_MS_TIMER();
 
+#ifdef S_TIMER
   CONFIG_S_TIMER();
   RESET_ENABLE_S_TIMER();
+#endif /* S_TIMER */
 
   CONFIG_RW_TIMER();
   CONFIG_CAPTURE_FALLING_EDGE();
@@ -295,7 +298,9 @@ void P1P2Serial::end(void)
   flushOutput();
   DISABLE_INT_COMPARE_W();
   DISABLE_MS_TIMER();
+#ifdef S_TIMER
   DISABLE_S_TIMER();
+#endif /* S_TIMER */
 }
 
 /****************************************/
@@ -305,6 +310,7 @@ void P1P2Serial::end(void)
 // As the ms counter (timer2) is frequently reset, it cannot be used for longer time measurements
 // Use timer0 for uptime 
 
+#ifdef S_TIMER
 ISR(S_TIMER_COMP_vect)
 {
 // called at 125Hz
@@ -314,6 +320,7 @@ ISR(S_TIMER_COMP_vect)
     time_sec++;
   }
 }
+#endif /* S_TIMER */
 
 /****************************************/
 /**       Millisecond counter          **/
@@ -801,7 +808,7 @@ static volatile uint8_t tx_buffer[TX_BUFFER_SIZE];
 static volatile uint16_t tx_buffer_delay[TX_BUFFER_SIZE]; // records timing info in ms (16 bits)
 static volatile uint16_t time_msec = 0;
 static volatile uint16_t tx_wait = 0;
-static uint32_t time_sec = 0;
+static int32_t time_sec = 0;
 static uint32_t time_millisec = 0;
 
 #define scheduledelay 16 // just enough to schedule timer reliably
@@ -1451,14 +1458,25 @@ void P1P2Serial::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t c
   if (crc_gen) write(crc);
 }
 
-uint32_t P1P2Serial::uptime_sec(void)
+int32_t P1P2Serial::uptime_sec(void)
 { 
-// returns uptime in seconds; not supported for OLDLIB (returns 0); wraps in 131.6 years
+// returns uptime in seconds if S_TIMER is defined and OLDP1P2LIB is not defined, otherwise returns -1; wraps in 65.8 years
+#ifdef OLDP1P2LIB
+  return -1;
+#elif defined S_TIMER
   return time_sec;
+#else
+  return -1;
+#endif
 }
 
 uint32_t P1P2Serial::uptime_millisec(void)
-{ 
-// returns uptime in milliseconds in 8ms resolution; not supported for OLDLIB (returns 0); wraps in 1.09 years
+{ // returns uptime in ms, wraps in 50 days
+#ifdef OLDP1P2LIB
+// returns milis() in OLDP1P2LIB returns millis()
+  return millis();
+#else
+// returns uptime in milliseconds in 8ms resolution in new library
   return time_millisec;
+#endif
 }

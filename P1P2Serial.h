@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
  *
  * Version history
+ * 20220811 v0.9.16 Added S_TIMER switch making TIMER0 use optional
  * 20220808 v0.9.15 LEDs on P1P2-ESP-Interface all on until first byte received on P1/P2 bus
  * 20220802 v0.9.14 major rewrite of send and receive method to spread CPU load over time and allow 8MHz ATmega operation
  *                  old library version is still available as fall-back solution (#define OLDP1P2LIB in P1P2Serial.h)
@@ -55,6 +56,8 @@
  */
 
 //#define OLDP1P2LIB // use old library version (>=16MHz only)
+#define S_TIMER // support for uptime_sec() in new library, but monopolizes TIMER0, so millis() cannot be used.
+                // if undefined, or OLDP1P2LIB is defined, TIMER0 is not used, and millis() can be used
 
 #ifndef P1P2Serial_h
 #define P1P2Serial_h
@@ -116,7 +119,7 @@ public:
 	static void setEcho(uint8_t b);
 	uint16_t readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* errorbuf, uint8_t maxlen, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
 	void writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
-        uint32_t uptime_sec(void);
+        int32_t uptime_sec(void);
         uint32_t uptime_millisec(void);
 };
 #endif
