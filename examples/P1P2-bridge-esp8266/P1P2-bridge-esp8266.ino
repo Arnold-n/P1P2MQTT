@@ -3,7 +3,7 @@
  *                          Includes wifimanager, OTA
  *                          For protocol description, see SerialProtocol.md and MqttProtocol.md
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20220817 v0.9.17 handling telnet welcomestring, error/scopemode time info via P1P2/R/#, v9=ignoreserial
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
  * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
  * 20190908 v0.9.8 Minor improvements: error handling, hysteresis, improved output (a.o. x0Fx36)
@@ -99,7 +100,9 @@ void onTelnetConnect(String ip) {
   Serial_print(F("- Telnet: "));
   Serial_print(ip);
   Serial_println(F(" connected"));
-  telnet.print("\nWelcome " + telnet.getIP() + " to P1P2-bridge-esp8266 v0.9.15 compiled ");
+  telnet.print("\nWelcome " + telnet.getIP() + " to ");
+  telnet.print(WELCOMESTRING_TELNET);
+  telnet.print(" compiled ");
   telnet.print(__DATE__);
   telnet.print(" ");
   telnet.println(__TIME__);
@@ -179,7 +182,7 @@ uint16_t prevpacketId = 0;
 
 
 uint32_t mqttPublished = 0;
-
+bool ignoreSerial = false;
 
 void client_publish_mqtt(char* key, char* value, bool retain = MQTT_RETAIN) {
   if (mqttConnected) {
@@ -365,7 +368,7 @@ void handleCommand(const char* cmdString) {
                   Sprint_P(true, true, true, PSTR("* [ESP] MQTT Client disconnected"));
                 }
                 client.setServer(MQTT_server.mqttServer, MQTT_server.mqttPort);
-                client.setCredentials((MQTT_server.mqttUser == '\0') ? 0 : MQTT_server.mqttUser, (MQTT_server.mqttPassword == '\0') ? 0 : MQTT_server.mqttPassword);
+                client.setCredentials((MQTT_server.mqttUser[0] == '\0') ? 0 : MQTT_server.mqttUser, (MQTT_server.mqttPassword[0] == '\0') ? 0 : MQTT_server.mqttPassword);
                 Sprint_P(true, true, true, PSTR("* [ESP] MQTT Try to connect"));
                 Mqtt_disconnectTime = 0;
                 client.connect();
@@ -393,7 +396,6 @@ void handleCommand(const char* cmdString) {
               break;
     case 'j': // OutputMode
     case 'J': if (sscanf((const char*) (cmdString + 1), "%x", &temp) == 1) {
-                if (temp > 0xFFF) temp = 0xFFF;
                 outputMode = temp;
                 Sprint_P(true, true, true, PSTR("* [ESP] Outputmode set to 0x%04X"), outputMode);
               } else {
@@ -428,10 +430,10 @@ void handleCommand(const char* cmdString) {
                 case 'V': Sprint_P(true, true, true, PSTR(WELCOMESTRING));
                           Sprint_P(true, true, true, PSTR("* [ESP] Compiled %s %s"), __DATE__, __TIME__);
                           if (sscanf((const char*) (cmdString + 1), "%2x", &temp) == 1) {
-                            if (temp < 1) {
-                              temp = 3;
-                              Sprint_P(true, true, true, PSTR("* [ESP] Verbose < 2 not supported by P1P2-bridge-esp8266, set to 3"));
+                            if (temp < 2) {
+                              Sprint_P(true, true, true, PSTR("* [ESP] Warning: verbose < 2 not supported by P1P2-bridge-esp8266"));
                             }
+                            ignoreSerial = (temp == 9); // TODO document or remove
                           }
                           break;
                 case 'g':
@@ -634,7 +636,7 @@ void setup() {
   MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP + 2] = (local_ip[3] % 10) + '0';
 
   client.setClientId(MQTT_CLIENTNAME);
-  client.setCredentials((MQTT_server.mqttUser == '\0') ? 0 : MQTT_server.mqttUser, (MQTT_server.mqttPassword == '\0') ? 0 : MQTT_server.mqttPassword);
+  client.setCredentials((MQTT_server.mqttUser[0] == '\0') ? 0 : MQTT_server.mqttUser, (MQTT_server.mqttPassword[0] == '\0') ? 0 : MQTT_server.mqttPassword);
   // client.setWill(MQTT_WILL_TOPIC, MQTT_WILL_QOS, MQTT_WILL_RETAIN, MQTT_WILL_PAYLOAD); // TODO
 
   Serial_print(F("* [ESP] Clientname ")); Serial_println(MQTT_CLIENTNAME);
@@ -960,7 +962,7 @@ void loop() {
       handleCommand(telnetCommandString);
       telnetCommandReceived = false;
     }
-    while (((c = Serial.read()) >= 0) && (c != '\n') && (rb < RB)) {
+    if (!ignoreSerial) while (((c = Serial.read()) >= 0) && (c != '\n') && (rb < RB)) {
       *rb_buffer++ = (char) c;
       rb++;
     }
@@ -1038,6 +1040,14 @@ void loop() {
               Sprint_P(true, true, true, PSTR("* [MON] Not enough readable data in R line: ->%s<-"), readBuffer + 1);
               if (ESP_serial_input_Errors_Data_Short < 0xFF) ESP_serial_input_Errors_Data_Short++;
             }
+          } else if ((readBuffer[0] == 'C') || (readBuffer[0] == 'c')) {
+            // timing info
+            if (outputMode & 0x1000) client_publish_mqtt(mqttHexdata, readBuffer);
+          } else if (readBuffer[0] == 'E') {
+            // data with errors
+            readBuffer[0] = '*'; // backwards output report compatibility
+            Sprint_P(true, true, true, PSTR("* [MON]%s"), readBuffer + 1);
+            if (outputMode & 0x2000) client_publish_mqtt(mqttHexdata, readBuffer);
           } else if (readBuffer[0] == '*') {
             Sprint_P(true, true, true, PSTR("* [MON]%s"), readBuffer + 1);
           } else {

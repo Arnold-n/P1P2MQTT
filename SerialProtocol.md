@@ -16,6 +16,8 @@ Verbosity level 0 is minimal: limited reporting, and only hex data, not prefixed
 
 In all other verbosity levels, each serial output line starts with
 - "R " for any error-free raw hex data read directly from the P1/P2 bus, or 
+- "C " for P1/P2 bus timing information of messages with read errors,
+- "c " for P1/P2 bus timing information of error-free messages, or
 - "\* " for any other (human-readable) output (including raw data with errors).
 
 Hex packet data is formatted as 2 characters per byte. The CRC byte is included. In verbosity level 1, the CRC byte is separated by " CRC=".

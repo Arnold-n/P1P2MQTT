@@ -1,7 +1,8 @@
 /* P1P2Config.h
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20220817 v0.9.17 minor changes, fixed 'W' command handling magic string prefix, SERIALSPEED/OLDP1P2LIB in P1P2Config.h now depends on F_CPU/COMBIBOARD selection
  * 20220808 v0.9.15 Added compile date/time to verbosity report
  * 20220802 v0.9.14 New parameter-write method 'e' (param write packet type 35-3D), error and write throttling, verbosity mode 2, EEPROM state, MCUSR reporting,
  *                  pseudo-packets, error counters, ...
@@ -25,11 +26,25 @@
 // Define serial speed
 // Use 115200 for Arduino Uno/Mega2560 (serial over USB)
 // Use 250000 for P1P2-ESP-interface, for direct serial connection between ATmega and ESP8266
+//
+#define COMBIBOARD // Uno+ESP combiboard, determines SERIALSPEED (250k instead of 115k2)
 
-//#define SERIALSPEED 115200
+#if F_CPU > 8000000L
+// Assume Arduino Uno (or Mega) hardware; use 115200 Baud for USB or 250000 Baud for combi-board
+#ifdef COMBIBOARD
 #define SERIALSPEED 250000
+#define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
+#else
+#define SERIALSPEED 115200
+// do not #define SERIAL_MAGICSTRING
+#endif
+#else /* F_CPU <= 8MHz */
+// Assume on P1P2-ESP-Interface hardware, 8MHz ATmega328P(B), use 250000 Baud and SERIAL_MAGICSTRING
+#define SERIALSPEED 250000
+#define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
+#endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.15"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.17"
 
 #define INIT_VERBOSE 3
 // Set verbosity level
@@ -53,7 +68,6 @@
                                   //   This value needs to be selected carefully to avoid bus collission between the 4000B8* response and the next 000013* request
 				  //   A value around 9ms works for my system; use with care, and check your logs for bus collissions or other errors
 
-#define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 
 // set CTRL adapter ID; if not used, installer mode becomes unavailable on main controller
 #define CTRL_ID_1 0xB4 // LAN adapter ID in 0x31 payload byte 7
@@ -110,6 +124,7 @@
 #define WR_CNT 1            // number of write repetitions for writing a paramter. 1 should work reliably, no real need for higher value
 
 #define INIT_ECHO 1         // defines whether written data is read back and verified against written data (advise to keep this 1)
+#define INIT_SCOPE 0        // defines whether scopemode, recording timing info, is on/off at start (advise to keep this 0)
 
 #define INIT_SD 50        // (uint16_t) delay setting in ms for each manually instructed packet write
 #define INIT_SDTO 2500    // (uint16_t) time-out delay in ms (applies both to manual instructed writes and controller writes)
@@ -122,10 +137,6 @@
 #define F030DELAY 100   // Time delay for in ms auxiliary controller simulation, should be larger than any response of other auxiliary controllers (which is typically 25-80 ms)
 #define F03XDELAY  30   // Time delay for in ms auxiliary controller simulation, should preferably be a bit larger than any regular response from auxiliary controllers (which is typically 25 ms)
 #define F0THRESHOLD 5   // Number of 00Fx30 messages to remain unanswered before we feel safe to act as auxiliary controller
-
-#define SPRINT_VALUE_LEN 800 // for informational and debugging output over P1P2/S TODO
-
-#define REVERSE_ENGINEER // adds extra info to mqtt_key fields TODO
 
 // New parameter writing mode 'E' is generic write method for all parameters in all packet types 0x35-0x3D
 //

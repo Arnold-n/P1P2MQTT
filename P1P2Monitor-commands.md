@@ -5,7 +5,9 @@ This document describes the serial interface to the ATmega328P or Arduino Uno. I
 ## Serial output
 
 Unless you set verbosity to 0, each P1P2Monitor serial output line starts with
-- "R " for errorfree raw data read directly from the P1/P2 bus, or 
+- "R " for error-free raw hex data read directly from the P1/P2 bus,
+- "C " for P1/P2 bus timing information of messages with read errors,
+- "c " for P1/P2 bus timing information of error-free messages, or
 - "\* " for any other (human-readable) output (including raw data with errors).
 The serial output is forwarded by P1P2MQTT via MQTTT topics P1P2/R and P1P2/S, respectively.  
 
@@ -69,6 +71,8 @@ A few pre-defined parameter writing actions are still available from earlier P1P
 
 - V  Show verbosity mode (default 3 for interfacing to P1P2MQTT), P1P2Monitor version and date/time of compilation
 - Vx Sets verbosity mode (0 minimal, 1 traditional, 2 for P1P2MQTT, 3 like 2 with timing info added, 4 for suppression of hex data)
+- U  Shows scope mode (default 0 off, 1 on)
+- Ux Sets scope mode (default 0 off, 1 on); adds timing info for the start of some of the packets read via serial output and R topic
 - \* comment lines starting with an asterisk are ignored (and echoed in verbosity modes 1 and 4)
 
 ## Auxiliary controller commands:

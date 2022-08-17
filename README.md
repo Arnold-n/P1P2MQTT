@@ -50,7 +50,7 @@ A variant of this board is based on the newer MAX22088 adapter. It is a very sim
 
 **New software, new name: P1P2MQTT**
 
-The program P1P2-bridge-esp8266 wil be revised and will be called P1P2MQTT as it describes its function better: to bridge bewteen P1/P2 2-wire interface and MQTT. The program to run on the ATmega will remain P1P2Monitor. Both are running on the P1P2-ESP-interface hardware.
+The program P1P2-bridge-esp8266 wil be revised and will be called P1P2MQTT as it describes its function better: to bridge between P1/P2 2-wire interface and MQTT. The program to run on the ATmega will remain P1P2Monitor. Both are running on the P1P2-ESP-interface hardware.
 
 This project started as a low-level reverse engineering project, and was inspired by AltSoftSerial, hence the name P1P2Serial. This name no longer covers the scope from P1/P2 to MQTT. The project may also be renamed to P1P2MQTT.
 
@@ -130,7 +130,9 @@ ESPAltherma can control your Daikin system via a relais connected to the main sy
 
 As of version 0.9.14, the P1P2Serial library interrupt handling has been rewritten entirely, to ensure that interrupt handling is done as predictable and quickly as possible. This enables the ATmega328 to run at 8 MHz (instead of 16MHz on Arduino Uno), reducing its power consumption, and enabling operation at 3.3V instead of 5V.
 
-Please let me know if you encounter any issues with the new library. It is running reliably here. You can stil use the old library by defining #OLDP1P2LIB in P1P2Config.h.
+For 16MHz operation (Arduino Uno) it is recommneded to use the old library by defining #OLDP1P2LIB, which is done automaticallyh in P1P2_Config.h. 
+
+Please let me know if you encounter any issues with the new library.
 
 To compile for 8Mhz, you may need to install MCUdude's MiniCore hardware package and then select ATmega328 and the correct frequency, and set the fuses accordingly for the lower speed.
 

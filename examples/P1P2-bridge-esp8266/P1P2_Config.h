@@ -1,10 +1,11 @@
 /* P1P2_Config.h
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20220817 v0.9.17 config file using COMBIBOARD, errors and scopemode-time info via P1P2/R/#
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
  * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
  * ..
@@ -14,19 +15,24 @@
 #ifndef P1P2_Config
 #define P1P2_Config
 
+#define COMBIBOARD // define this for Arduino/ESP8266 combi-board, undefine for P1P2-ESP-Interface
+
+#ifdef COMBIBOARD
+#define SERIALSPEED 250000
+#define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
+#else
+#define SERIALSPEED 115200
+// do not #define SERIAL_MAGICSTRING
+#endif
+
 #define SAVEPARAMS
 #define SAVEPACKETS
 // to save memory to avoid ESP instability: don't #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.15"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.17"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.17"
 
 #define AVRISP // enables flashing ATmega by ESP
-
-// Serial speed
-// 115200 Baud for Arduino Uno/Mega2560, using serial over USB
-// 250000 Baud for P1P2-ESP-interface, using direct serial connection between ATmega and ESP8266
-//#define SERIALSPEED 115200
-#define SERIALSPEED 250000
 
 //#define DEBUG_OVER_SERIAL // sends lots of information over serial. Uncomment this to avoid P1P2Monitor receiving this information. 
                           // Use only for serial over USB (or serial via 2nd ESP01) debugging
@@ -82,7 +88,7 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
                                // 2 only changed parameters except measurements (temperature, flow)
                                // 3 only changed parameters except measurements (temperature, flow) and except date/time
                                // first-time parameters are always reported
-#define INIT_OUTPUTMODE 0x0003 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
+#define INIT_OUTPUTMODE 0x3803 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
                                // outputmode is sum of:
                                // 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx
                                // 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/xxx/#
@@ -96,6 +102,8 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
                                // 0x0200 to output mqtt individual parameter data over serial
                                // 0x0400 to output json data over serial
                                // 0x0800 to output raw bin data over P1P2/X/xxx
+                               // 0x1000 to output timing data also over P1P2/R/xxx (prefix: C)
+                               // 0x2000 to output error data also over P1P2/R/xxx (prefix: *)
 
 // no need to change these:
 #define RESET_PIN 5 // GPIO_5 on ESP-12F pin 20 connected to ATmega328P's reset line
@@ -105,12 +113,12 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
 #define SERIAL_MAGICSTRING "1P2P" // Serial input of ATmega should start with SERIAL_MAGICSTRING, otherwise lines line is ignored by P1P2Monitor
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
 #define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is checked when reading or added when writing
-#define SPRINT_VALUE_LEN 200 // max message length for informational and debugging output over P1P2/S, telnet, or serial
+#define SPRINT_VALUE_LEN 400 // max message length for informational and debugging output over P1P2/S, telnet, or serial
 #define MQTT_KEY_LEN 100
 #ifdef SAVESCHEDULE
-#define MQTT_VALUE_LEN 630 // (max length: Program 6* (6+8)*6*7+3*7+2 = 611
+#define MQTT_VALUE_LEN 630 // max length: Program 6* (6+8)*6*7+3*7+2 = 611
 #else
-#define MQTT_VALUE_LEN 200
+#define MQTT_VALUE_LEN 400
 #endif
 
 #endif /* P1P2_Config */

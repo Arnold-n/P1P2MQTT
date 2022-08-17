@@ -34,10 +34,11 @@
  *              Support for parameter setting in P1P2Monitor is rather simple. There is no buffering, so enough time (a few seconds)
  *              is needed in between commands.
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
- * 20220811 v0.9.16 Improved uptime handling in case uptime_sec is not supported (S_TIMER  undefined, or OLDP1P2LIB)
+ * 20220817 v0.9.17 scopemode, fixed 'W' command handling magic string prefix, SERIALSPEED/OLDP1P2LIB in P1P2Config.h now depends on F_CPU/COMBIBOARD selection, ..
+ * 20220810 v0.9.15 Improved uptime handling
  * 20220802 v0.9.14 New parameter-write method 'e' (param write packet type 35-3D), error and write throttling, verbosity mode 2, EEPROM state, MCUSR reporting,
  *                  pseudo-packets, error counters, ...
  *                  Simplified code by removing packet interpretation, json, MQTT, UDP (all off-loaded to P1P2MQTT)
@@ -67,7 +68,7 @@
  * P1P2erial is written and tested for the Arduino Uno and (in the past) Mega.
  * It may or may not work on other hardware using a 16MHz clok.
  * As of P1P2Serial library 0.9.14, it also runs on 8MHz ATmega328P using MCUdude's MiniCore.
- * Information on MCUdude's MiniCore: 
+ * Information on MCUdude's MiniCore:
  * Install in Arduino IDE (File/preferences, additional board manager URL: https://mcudude.github.io/MiniCore/package_MCUdude_MiniCore_index.json.
  *
  * Board          Transmit  Receive   Unusable PWM pins
@@ -134,6 +135,7 @@ P1P2Serial P1P2Serial;
 static uint16_t sd = INIT_SD;           // delay setting for each packet written upon manual instruction (changed to 50ms which seems to be a bit safer than 0)
 static uint16_t sdto = INIT_SDTO;       // time-out delay (applies both to manual instructed writes and controller writes)
 static byte echo = INIT_ECHO;         // echo setting (whether written data is read back)
+static byte scope = INIT_SCOPE;        // scope setting (to log timing info)
 static uint8_t CONTROL_ID = CONTROL_ID_DEFAULT;
 static byte counterRequest = 0;
 static byte counterRepeatingRequest = 0;
@@ -243,8 +245,19 @@ void setup() {
     Serial.print(F("* F03XDELAY="));
     Serial.print(F03XDELAY);
     Serial.println();
+#ifdef OLDP1P2LIB
+    Serial.println(F("* OLDP1P2LIB"));
+#else
+    Serial.println(F("* NEWP1P2LIB"));
+#endif
   }
   P1P2Serial.begin(9600);
+  P1P2Serial.setEcho(echo);
+#ifdef SW_SCOPE
+  P1P2Serial.setScope(scope);
+#endif
+  P1P2Serial.setDelayTimeout(sdto);
+  Serial.println(F("* Ready setup"));
 }
 
 // scanint and scanhex are used to save dynamic memory usage in main loop
@@ -292,11 +305,12 @@ static byte pseudo0D = 0;
 static byte pseudo0E = 0;
 static byte pseudo0F = 0;
 
+uint16_t scope_budget = 170;
+
 void loop() {
   uint16_t temp;
   uint16_t temphex;
   int wb = 0;
-  int wbp = 7;
   int n;
   int wbtemp;
   int c;
@@ -356,7 +370,6 @@ void loop() {
 #ifdef SERIAL_MAGICSTRING
         RSp = RS + strlen(SERIAL_MAGICSTRING) + 1;
         if (!strncmp(RS, SERIAL_MAGICSTRING, strlen(SERIAL_MAGICSTRING))) {
-        
 #else
         RSp = RS + 1;
         {
@@ -485,6 +498,11 @@ void loop() {
                       Serial.print(__DATE__);
                       Serial.print(F(" "));
                       Serial.println(__TIME__);
+#ifdef OLDP1P2LIB
+                      Serial.println(F("* OLDP1P2LIB"));
+#else
+                      Serial.println(F("* NEWP1P2LIB"));
+#endif
                       break;
             case 't':
             case 'T': if (verbose) Serial.print(F("* Delay "));
@@ -507,6 +525,19 @@ void loop() {
                       }
                       Serial.println(sdto);
                       break;
+#ifdef SW_SCOPE
+            case 'u':
+            case 'U': if (verbose) Serial.print(F("* Software-scope "));
+                      if (scanint(RSp, temp) == 1) {
+                        scope = temp;
+                        P1P2Serial.setScope(scope);
+                        if (!verbose) break;
+                        Serial.print(F("set to "));
+                      }
+                      Serial.println(scope);
+                      scope_budget = 170;
+                      break;
+#endif
             case 'x':
             case 'X': if (verbose) Serial.print(F("* Echo "));
                       if (scanint(RSp, temp) == 1) {
@@ -524,9 +555,10 @@ void loop() {
                         break;
                       } // don't write while controller is on
                       if (verbose) Serial.print(F("* Writing: "));
-                      while ((wb < WB_SIZE) && (sscanf(&RS[wbp], (const char*) F("%2x%n"), &wbtemp, &n) == 1)) {
+                      wb = 0;
+                      while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) F("%2x%n"), &wbtemp, &n) == 1)) {
                         WB[wb++] = wbtemp;
-                        wbp += n;
+                        RSp += n;
                         if (verbose) {
                           if (wbtemp <= 0x0F) Serial.print("0");
                           Serial.print(wbtemp, HEX);
@@ -534,7 +566,11 @@ void loop() {
                       }
                       if (verbose) Serial.println();
                       if (P1P2Serial.writeready()) {
-                        P1P2Serial.writepacket(WB, wb, sd, crc_gen, crc_feed);
+                        if (wb) {
+                          P1P2Serial.writepacket(WB, wb, sd, crc_gen, crc_feed);
+                        } else {
+                          Serial.println(F("* Refusing to write empty packet"));
+                        }
                       } else {
                         Serial.println(F("* Refusing to write packet while previous packet wasn't finished"));
                         if (writeRefused < 0xFF) writeRefused++;
@@ -548,7 +584,7 @@ void loop() {
                         if (temp > 1) temp = 1;
                         if (temp) {
                           if (errorsPermitted < MIN_ERRORS_PERMITTED) {
-                            Serial.println(F("* Errorspermitted too low; control functinality not enabled."));
+                            Serial.println(F("* Errorspermitted too low; control functinality not enabled"));
                             break;
                           }
                           if (CONTROL_ID && temp) {
@@ -591,7 +627,7 @@ void loop() {
             case 'C': if (scanint(RSp, temp) == 1) {
                         if (temp > 1) {
                           if (errorsPermitted < MIN_ERRORS_PERMITTED) {
-                            Serial.println(F("* Errorspermitted too low; control functinality not enabled."));
+                            Serial.println(F("* Errorspermitted too low; control functinality not enabled"));
                             break;
                           }
                           if (counterRepeatingRequest) {
@@ -868,7 +904,6 @@ void loop() {
     byte readError = 0;
 
     int nread = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, crc_gen, crc_feed);
-
     if (nread > RB_SIZE) {
       Serial.println(F("* Received packet longer than RB_SIZE"));
       nread = RB_SIZE;
@@ -876,21 +911,91 @@ void loop() {
       if (errorsLargePacket < 0xFF) errorsLargePacket++;
     }
     for (int i = 0; i < nread; i++) readError |= EB[i];
+#ifdef SW_SCOPE
+
+#if F_CPU > 8000000L
+#define FREQ_DIV 4 // 16 MHz
+#else
+#define FREQ_DIV 3 // 8 MHz
+#endif
+    // try to get sws output out before next packet reception starts/ no buffering of sws_data
+    uint8_t sws_cnt2 = sws_cnt; sws_cnt = SWS_MAX;
+
+    if ((readError && (scope_budget > 5)) || (((RB[0] == 0x40) && (RB[1] == 0xF0)) && (scope_budget > 50)) || (scope_budget > 170)) {
+      // always keep scope write budget for 40F0 and expecially for readErrors
+      if (sws_cnt2) {
+        scope_budget -= 5;
+        if (readError) {
+          Serial.print('C');
+        } else {
+          Serial.print('c');
+        }
+        Serial.print(' ');
+        if (RB[0] < 0x10) Serial.print('0');
+        Serial.print(RB[0], HEX);
+        if (RB[1] < 0x10) Serial.print('0');
+        Serial.print(RB[1], HEX);
+        if (RB[2] < 0x10) Serial.print('0');
+        Serial.print(RB[2], HEX);
+        if (sws_overflow) {
+          sws_overflow = 0;
+          Serial.print(" OVF");
+        }
+        static uint16_t capture_prev;
+        for (int i = 0; i < sws_cnt2; i++) {
+          Serial.print(' ');
+          Serial.print(sws_event[i] & 0x1F);
+          if (sws_event[i] & 0x80) { // pause
+            Serial.print("- ");
+            uint16_t t_diff = (sws_capture[i] - capture_prev) >> FREQ_DIV;
+            if (t_diff < 10) Serial.print(' ');
+            if (t_diff < 100) Serial.print(' ');
+            if (t_diff < 1000) Serial.print(' ');
+            Serial.print(t_diff);
+          } else if (sws_event[i] & 0x40) {
+            Serial.print("x");
+          } else if (sws_event[i] & 0x20) {
+            Serial.print("H    0");
+          } else {
+            Serial.print("L ");
+            if (i) {
+              uint16_t t_diff = (sws_capture[i] - capture_prev) >> FREQ_DIV;
+              if (t_diff < 10) Serial.print(' ');
+              if (t_diff < 100) Serial.print(' ');
+              if (t_diff < 1000) Serial.print(' ');
+              Serial.print(t_diff);
+            } else Serial.print('0');
+            capture_prev = sws_capture[i];
+          }
+          uint16_t t_diff = (sws_count[i] - capture_prev) >> FREQ_DIV;
+          Serial.print(' ');
+          if (t_diff < 10) Serial.print(' ');
+          if (t_diff < 100) Serial.print(' ');
+          if (t_diff < 1000) Serial.print(' ');
+          Serial.print(t_diff);
+        }
+        Serial.println();
+      }
+    }
+    scope_budget++;
+    if (scope_budget > 200) scope_budget = 200;
+    sws_cnt = 0;
+#endif
     if (readError && upt) { // don't count errors while upt == 0
-      if (readErrors < 0xFF) { 
-        readErrors++; 
-        readErrorLast = readError; 
+      if (readErrors < 0xFF) {
+        readErrors++;
+        readErrorLast = readError;
       }
       if (errorsPermitted) {
         errorsPermitted--;
         if (!errorsPermitted) {
-          Serial.println(F("* WARNING: too many errors detected."));
-          if (counterRepeatingRequest) Serial.println(F("* Switching counter request function off."));
-          if (CONTROL_ID) Serial.println(F("* Switching control functionality off."));
+          Serial.println(F("* WARNING: too many read errors detected"));
+          if (counterRepeatingRequest) Serial.println(F("* Switching counter request function off"));
+          if (CONTROL_ID) Serial.println(F("* Switching control functionality off"));
           CONTROL_ID = CONTROL_ID_NONE;
           counterRepeatingRequest = 0;
           counterRequest = 0;
-          Serial.println(F("* Warning: Upon ATmega restart auxiliary controller functionality and counter request functionality will be disabled."));
+          Serial.println(F("* Warning: Upon ATmega restart auxiliary controller functionality and counter request functionality will remain switched off"));
           EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
           EEPROM_update(EEPROM_ADDRESS_COUNTER_STATUS, counterRepeatingRequest);
         }
@@ -1151,7 +1256,7 @@ void loop() {
           if (wr) {
             if (P1P2Serial.writeready()) {
               P1P2Serial.writepacket(WB, n, d, crc_gen, crc_feed);
-              parameterWritesDone += wr_req; 
+              parameterWritesDone += wr_req;
               wr_req = 0;
 // TODO wr_req seems unneeded, just increment parameterWritesDone when wr_cnt-- above ?
             } else {
@@ -1170,7 +1275,7 @@ void loop() {
     if ((RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x12)) pseudo0F = 5; // Insert one pseudo packet 00000F in output serial after 400012
 #endif /* PSEUDO_PACKETS */
     if (readError) {
-      Serial.print(F("* "));
+      Serial.print(F("E "));
     } else {
       if (verbose && (verbose < 4)) Serial.print(F("R "));
     }
@@ -1213,6 +1318,10 @@ void loop() {
           // CRC error detected in readpacket
           Serial.print(F(" CRC error"));
         }
+      }
+      if (readError) {
+        Serial.print(" readError=0x");
+        Serial.print(readError, HEX);
       }
       Serial.println();
     }

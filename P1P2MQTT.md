@@ -82,7 +82,7 @@ P1P2/P/122/C/1/Hours_Compressor_Heating 27843
 
 #### P1P2/R/# (hex packet data)
 
-Communicates raw hex packet data as it is read from the P1/P2 bus, in recommended verbose=3 mode prefixed by relative time stamp. Useful to verify operation of hardware and analyse data patterns if your model is not (fully) supported.
+Communicates raw hex packet data as it is read from the P1/P2 bus, in recommended verbose=3 mode prefixed by relative time stamp. Useful to verify operation of hardware and analyse data patterns if your model is not (fully) supported. In addition may contain timing information.
 
 Example output:
 ```
@@ -170,13 +170,14 @@ Commands to be executed by P1P2MQTT can be given over P1P2/W/\<xxx\> or via teln
   - 0x0200 to output mqtt individual parameter data over serial
   - 0x0400 to output json data over serial
   - 0x0800 to output raw binary data over P1P2/X/#
-  - 0x1000 (reserved)
-  - 0x2000 (reserved)
+  - 0x1000 output timing data (if scope mode is set to 1) via P1P2/R/xxx (with prefix C)
+  - 0x2000 output packets with errors also over P1P2/R/xxx (with prefix \*)
   - 0x4000 (reserved)
   - 0x8000 (reserved)
 - "V" Display verbosity (and displays software version + compile date/time of both P1P2MQTT and P1P2Monitor)
-- "Vx" Sets verbosity (and displays software version + compile date/time of both P1P2MQTT and P1P2Monitor)
-
+- "Vx" Sets verbosity (and displays software version + compile date/time of both P1P2MQTT and P1P2Monitor)  (for verbosity levels 0-4, see [P1P2Monitor-commands.md](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Monitor-commands.md); level 9: ESP8266 ignoring serial input (safe mode))
+- "U" Display scope mode (0 off, 1 on)
+- "Ux" Sets scope mode (0 off (default), 1 on)
 
 Further, supported but advised not to use, and not really needed (some may be removed in a future version); these commands are handled by both CPUs:
 - "G"  Display current crc_gen value

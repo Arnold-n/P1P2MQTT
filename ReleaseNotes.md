@@ -1,5 +1,17 @@
 **Release notes**
 
+v0.9.17 (August 17, 2022)
+
+- License change to Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International license [(CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/) 
+- P1P2Serial, P1P2Monitor, P1P2Serial: software-oscilloscope timing info ("U1"/"U0") added, available via R topic (outputmode 0x1000)
+- P1P2Serial: rare read error in spike suppression bug fixed (OLDP1P2LIB)
+- P1P2Serial: incorrect read-back-verification error report fixed (OLDP1P2LIB en NEWP1P2LIB/16MHz)
+
+v0.9.16 (August 11, 2022)
+
+- P1P2Serial: #define S_TIMER switch to make TIMER0 use (for uptime_sec) optional
+- P1P2Monitor: change upt\* from uint32_t to int32_t to catch uptime_sec returning -1
+
 v0.9.15 (August 8, 2022)
 
 - P1P2Serial: all LEDs on until P1/P2 bus traffic

@@ -1,8 +1,9 @@
 /* P1P2Serial: Library for reading/writing Daikin/Rotex P1P2 protocol
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen -at- gmail-dot-com  - licensed under GPL v2.0 (see LICENSE)
+ * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20220817 v0.9.17 read-back-verification bug fixes in new and old library, scopemode
  * 20220811 v0.9.16 Added S_TIMER switch making TIMER0 use optional
  * 20220808 v0.9.15 LEDs on P1P2-ESP-Interface all on until first byte received
  * 20220802 v0.9.14 major rewrite of send and receive methodology to spread CPU load over time and allow lower frequency ATmega operation
@@ -85,6 +86,7 @@
 #define ENABLE_INT_INPUT_CAPTURE()      (TIFR5 = (1 << ICF5), TIMSK5 |= (1 << ICIE5))
 #define DISABLE_INT_INPUT_CAPTURE()     (TIMSK5 &= ~(1 << ICIE5))
 #define GET_INPUT_CAPTURE()             (ICR5)
+#define GET_TIMER_R_COUNT()             (TCNT5)
 #define ENABLE_INT_COMPARE_R()          (TIFR5 = (1 << OCF5B), TIMSK5 |= (1 << OCIE5B))
 #define DISABLE_INT_COMPARE_R()         (TIMSK5 &= ~(1 << OCIE5B))
 #define CLEAR_COMPARE_R_FLAG()          (TIFR5 = (1 << OCF5B))
@@ -97,12 +99,17 @@
 #define CONFIG_MATCH_NORMAL()           (TCCR5A = TCCR5A & ~((1 << COM5A1) | (1 << COM5A0)))
 #define CONFIG_MATCH_CLEAR()            (TCCR5A = (TCCR5A | (1 << COM5A1)) & ~(1 << COM5A0))
 #define CONFIG_MATCH_SET()              (TCCR5A = TCCR5A | ((1 << COM5A1) | (1 << COM5A0)))
-#define ENABLE_INT_COMPARE_W()          (TIFR5 = (1 << OCF5A), TIMSK5 |= (1 << OCIE5A))
+#define ENABLE_INT_COMPARE_W()          (TIFR5 |= (1 << OCF5A), TIMSK5 |= (1 << OCIE5A))
+#define ENABLE_INT_COMPARE_WV()         (TIFR5 |= (1 << OCF5B), TIMSK5 |= (1 << OCIE5B))
 #define DISABLE_INT_COMPARE_W()         (TIMSK5 &= ~(1 << OCIE5A))
+#define DISABLE_INT_COMPARE_WV()        (TIMSK5 &= ~(1 << OCIE5B))
 #define GET_COMPARE_W()                 (OCR5A)
+#define GET_COMPARE_WV()                (OCR5B)
 #define GET_TIMER_W_COUNT()             (TCNT5)
 #define SET_COMPARE_W(val)              (OCR5A = (val))
+#define SET_COMPARE_WV(val)             SET_COMPARE_R(val)
 #define COMPARE_W_INTERRUPT             TIMER5_COMPA_vect
+#define COMPARE_WV_INTERRUPT            COMPARE_R_INTERRUPT
 
 // use LED_BUILTIN on PB7 on ATmega2560
 #define LED_ERROR                       LED_BUILTIN
@@ -121,6 +128,7 @@
 #define ENABLE_INT_INPUT_CAPTURE()      (TIFR1 = (1 << ICF1), TIMSK1 |= (1 << ICIE1))
 #define DISABLE_INT_INPUT_CAPTURE()     (TIMSK1 &= ~(1 << ICIE1))
 #define GET_INPUT_CAPTURE()             (ICR1)
+#define GET_TIMER_R_COUNT()             (TCNT1)
 #define ENABLE_INT_COMPARE_R()          (TIFR1 = (1 << OCF1B), TIMSK1 |= (1 << OCIE1B))
 #define DISABLE_INT_COMPARE_R()         (TIMSK1 &= ~(1 << OCIE1B))
 #define CLEAR_COMPARE_R_FLAG()          (TIFR1 = (1 << OCF1B))
@@ -133,16 +141,21 @@
 #define CONFIG_MATCH_NORMAL()           (TCCR1A = TCCR1A & ~((1 << COM1A1) | (1 << COM1A0)))
 #define CONFIG_MATCH_CLEAR()            (TCCR1A = (TCCR1A | (1 << COM1A1)) & ~(1 << COM1A0))
 #define CONFIG_MATCH_SET()              (TCCR1A = TCCR1A | ((1 << COM1A1) | (1 << COM1A0)))
-#define ENABLE_INT_COMPARE_W()          (TIFR1 = (1 << OCF1A), TIMSK1 |= (1 << OCIE1A))
+#define ENABLE_INT_COMPARE_W()          (TIFR1 |= (1 << OCF1A), TIMSK1 |= (1 << OCIE1A))
+#define ENABLE_INT_COMPARE_WV()         (TIFR1 |= (1 << OCF1B), TIMSK1 |= (1 << OCIE1B))
 #define DISABLE_INT_COMPARE_W()         (TIMSK1 &= ~(1 << OCIE1A))
+#define DISABLE_INT_COMPARE_WV()        (TIMSK1 &= ~(1 << OCIE1B))
 #define GET_COMPARE_W()                 (OCR1A)
+#define GET_COMPARE_WV()                (OCR1B)
 #define GET_TIMER_W_COUNT()             (TCNT1)
 #define SET_COMPARE_W(val)              (OCR1A = (val))
+#define SET_COMPARE_WV(val)             SET_COMPARE_R(val)
 #define COMPARE_W_INTERRUPT             TIMER1_COMPA_vect
+#define COMPARE_WV_INTERRUPT            COMPARE_R_INTERRUPT
 
-// use LED_BUILTIN on PB5 on Arduino Uno
+// use LED_BUILTIN (on PB5) on Arduino Uno
 #define LED_ERROR                       LED_BUILTIN
-#define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTB |= 0x20) : (PORTB &= 0xDF))
+#define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTB |= 0x20) : (PORTB &= 0xDF)) // assume PB5 on Arduino Uno
 #define DIGITAL_SET_LED_ERROR           (PORTB |= 0x20)
 #define DIGITAL_RESET_LED_ERROR         (PORTB &= 0xDF)
 
@@ -155,6 +168,7 @@
 #define LED_ERROR PD3
 #define DIGITAL_SET_LED_ERROR           (PORTD |= 0x08)
 #define DIGITAL_RESET_LED_ERROR         (PORTD &= 0xF7)
+#define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTD |= 0x08) : (PORTD &= 0xF7))
 #endif
 
 // 4 leds:        on   P1P2-ESP-interface   /   Arduino ATmega250     / Arduino Uno
@@ -171,7 +185,6 @@
 #define DIGITAL_RESET_LED_READ          (PORTD &= 0xBF)
 #define DIGITAL_SET_LED_WRITE           (PORTD |= 0x20)
 #define DIGITAL_RESET_LED_WRITE         (PORTD &= 0xDF)
-#define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTD |= 0x08) : (PORTD &= 0xF7))
 
 // timer2 for milliseconds, timer0 for seconds
 #if F_CPU == 16000000L
@@ -203,6 +216,7 @@ static uint16_t Rticks_per_semibit = 0;
 static uint16_t Rticks_per_bit_and_semibit = 0;
 static uint16_t Rticks_suppression = 0;
 static uint16_t Wticks_per_semibit = 0;
+static uint16_t Wticks_per_partial_semibit = 0;
 static uint16_t Wticks_per_bit_and_semibit = 0;
 
 static uint8_t rx_state;
@@ -217,9 +231,9 @@ static volatile uint8_t error_buffer[RX_BUFFER_SIZE]; // records error status
 static volatile uint16_t delta_buffer[RX_BUFFER_SIZE]; // records timing info in ms
 
 static volatile uint8_t tx_state;
+static volatile uint8_t tx_rx_state;
 static uint8_t tx_byte;
 static uint8_t tx_byte_verify;
-static uint8_t tx_bit;
 static uint8_t tx_paritybit;
 static volatile uint8_t tx_buffer_head;
 static volatile uint8_t tx_buffer_tail;
@@ -239,7 +253,7 @@ static volatile uint32_t time_millisec = 0;
 
 void P1P2Serial::begin(uint32_t baud)
 {
-  uint32_t cycles_per_bit = ((ALTSS_BASE_FREQ + baud / 2) / baud);
+  uint32_t cycles_per_bit = ((ALTSS_BASE_FREQ + baud / 2) / baud); // 833 cycles at 16MHz
 
   Rticks_per_bit = cycles_per_bit;
   Rticks_per_semibit = Rticks_per_bit / 2;
@@ -247,6 +261,7 @@ void P1P2Serial::begin(uint32_t baud)
   Rticks_suppression = Rticks_per_semibit + Rticks_per_semibit / 4; // to avoid early ISR capture (spike, bouncing rising edge) may lead to very long while loop behaviour and loss of sync.
 
   Wticks_per_semibit = cycles_per_bit / 2;
+  Wticks_per_partial_semibit = ((cycles_per_bit << 2) + cycles_per_bit) >> 4; // schedule at 62.5% of bit to compensate for write-readback delay in electronics (especially for MM1192/XL1192)
   Wticks_per_bit_and_semibit = 3 * Wticks_per_semibit;
 
   pinMode(LED_POWER, OUTPUT);
@@ -264,29 +279,27 @@ void P1P2Serial::begin(uint32_t baud)
   pinMode(OUTPUT_COMPARE_PIN, OUTPUT);
 
   time_msec = 0;
-
   rx_state = 0;
   rx_buffer_head = 0;
   rx_buffer_head2 = NO_HEAD2;
   rx_buffer_tail = 0;
   tx_state = 0;
+  tx_rx_state = 0;
   tx_buffer_head = 0;
   tx_buffer_tail = 0;
-
-  tx_state = 0;
   tx_wait = 0;
-
-  CONFIG_MATCH_INIT();
-  CONFIG_MS_TIMER();
-  RESET_ENABLE_MS_TIMER();
 
 #ifdef S_TIMER
   CONFIG_S_TIMER();
   RESET_ENABLE_S_TIMER();
 #endif /* S_TIMER */
 
+  CONFIG_MS_TIMER();
+  RESET_ENABLE_MS_TIMER();
+
   CONFIG_RW_TIMER();
   CONFIG_CAPTURE_FALLING_EDGE();
+  CONFIG_MATCH_INIT();
   ENABLE_INT_INPUT_CAPTURE();
 }
 
@@ -308,7 +321,7 @@ void P1P2Serial::end(void)
 /****************************************/
 
 // As the ms counter (timer2) is frequently reset, it cannot be used for longer time measurements
-// Use timer0 for uptime 
+// Use timer0 for (second-based) uptime
 
 #ifdef S_TIMER
 ISR(S_TIMER_COMP_vect)
@@ -332,16 +345,14 @@ ISR(MS_TIMER_COMP_vect)
 {
 // time_msec counts time in ms from the last start pulse (counting from the leading falling edge of the start pulse)
 // max count is 65535 ms (uint16_t)
-  if (time_msec < 0xFFFF) time_msec += 1;
+  if (time_msec < 0xFFFF) time_msec++;
   // if tx_state =99, a write is scheduled, so check if pause is long enough to start writing
   if (tx_state == 99) {
-      if ((time_msec == tx_wait) || ((time_msec >= tx_wait) && (time_msec >= tx_setdelaytimeout))) {
+    if ((time_msec == tx_wait) || ((time_msec >= tx_wait) && (time_msec >= tx_setdelaytimeout))) {
       // start writing:
-      // in scheduledelay ticks of timer2, falling edge of start bit  is scheduled
-      // (if time_msec = 1, (and thus tx_wait = 1): wait exactly 1 byte time
-      //                                            after last start bit falling edge).
+      // in scheduledelay ticks of timer1, falling edge of start bit  is scheduled
       // This will trigger an interrupt for next action to be set up.
-      // state=1 indicates that (upon start interrupt routine) the start bit has just begun.
+      // tx_state=1 indicates that (upon start interrupt routine) the start bit has just begun.
       tx_state = 1;
       uint16_t t_delta = scheduledelay;
 
@@ -386,7 +397,6 @@ void P1P2Serial::setDelay(uint16_t t)
 // If setDelay (t) is called with t < 2, a delay of 2 ms is set.
 {
   if (t < 2) t = 2;
-  if (t & 0x01) t++;
   tx_setdelay = t;
 }
 
@@ -422,39 +432,19 @@ void P1P2Serial::write(uint8_t b)
     tx_buffer_delay[head] = tx_setdelay; tx_setdelay = 0;
     tx_buffer_head = head;
   } else {
-    // if not already writing, start or schedule writing
+    // if not already writing, (previously: start or) schedule writing
     tx_byte = b;
     tx_byte_verify = b; // for read-back verification
-    tx_bit = 0;
     tx_paritybit = 0;
     tx_rx_byte = 0;
     tx_rx_paritycheck = 0;
     tx_rx_readbackerror = 0;
     // we could initiate start writing here, as we did <=v0.9.4, but we can better leave it to the ISR, which is simpler
-    // worst-case it adds some delay, but it makes the operation slightly more predictable
-    if ((tx_setdelay) && ((time_msec < tx_setdelay) || (time_msec < tx_setdelaytimeout))) {
-      // state 99: start transmission only (in msec ISR) when time_msec becomes == tx_setdelay or >= tx_setdelaytimeout
-      tx_state = 99;
-      tx_wait = tx_setdelay;
-    } else {
-      // if tx_setdelay is not set, or if it is set but we are beyond max(tx_setdelay,tx_setdelaytimeout), start writing
-      // set tx_state to 1: schedule next start bit falling edge
-      tx_state = 1;
-      uint16_t t_delta = scheduledelay;
-      // disable reading when writing
-      DISABLE_INT_INPUT_CAPTURE();
-      DISABLE_INT_COMPARE_R();
-      DISABLE_MS_TIMER();
-
-
-      SET_COMPARE_W(GET_TIMER_W_COUNT() + t_delta);
-      CONFIG_MATCH_CLEAR();
-      // in scheduledelay ticks (or perhaps more if time_msec=1), start bit will follow.
-      // this will trigger an interrupt for next action to be set up
-      // state=1 indicates that (upon start of the interrupt routine) this start bit has just started
-      ENABLE_INT_COMPARE_W();
-    }
-    // next byte will be written without delay
+    // it adds some delay (max 1 ms), but it makes operation and timing slightly more predictable
+    // set tx_state 99 to start transmission in msec ISR when time_msec becomes == tx_setdelay or >= tx_setdelaytimeout
+    tx_state = 99;
+    tx_wait = tx_setdelay;
+    // next byte after the scheduled one will be written without delay
     tx_setdelay = 0;
   }
   SREG = intr_state;
@@ -462,6 +452,7 @@ void P1P2Serial::write(uint8_t b)
 
 static uint16_t startbit_delta;
 static uint8_t Echo = 1;
+static bool readBackVerify = false;
 
 ISR(COMPARE_W_INTERRUPT)
 {
@@ -481,10 +472,11 @@ ISR(COMPARE_W_INTERRUPT)
   DIGITAL_SET_LED_WRITE;
 
   if (state < 20) {
+    SET_COMPARE_WV(GET_COMPARE_W() + Wticks_per_partial_semibit);
+    SET_COMPARE_W(GET_COMPARE_W() + Wticks_per_semibit);
     // calculate next (semi)bit value
     if (state & 1) {
       // state is odd, next semibit will be part 2 of databit (high)
-      bit = 1;
       CONFIG_MATCH_SET();
     } else if (state < 18) {
       // state is even, <18, next semibit will be data bit part 1, LSB first
@@ -505,37 +497,25 @@ ISR(COMPARE_W_INTERRUPT)
         CONFIG_MATCH_CLEAR();
       }
     }
-    SET_COMPARE_W(GET_COMPARE_W() + Wticks_per_semibit);
 
-    // and check current read-back signal on input wire
-    bit_input = INPUT_CAPTURE_PIN_VALUE;
-    if (state == 19) {
-      // state is odd, paritybit
-      if (bit_input) tx_rx_paritycheck ^= 0x80;
-      if (tx_rx_paritycheck) tx_rx_readbackerror |= ERROR_PE;
-      PRESET_ENABLE_MS_TIMER(); // start new milli-second timer measurement here, setting timer on 1msec given we are at paritybit.
-      DIGITAL_WRITE_LED_ERROR(tx_rx_paritycheck);
-    } else if (state == 1) {
-      // state is odd, start bit
+
+    if (state == 1) {
+      // state=1, start bit
       startbit_delta = time_msec;
       DISABLE_MS_TIMER();
       tx_rx_readbackerror = 0;
-    } else if (state & 1) {
-      // state is odd, next semibit will be part 2 of databit (high)
-      tx_rx_byte >>= 1;
-      if (bit_input) {
-        tx_rx_paritycheck ^= 0x80;
-        tx_rx_byte |= 0x80;
-      }
-    } else {
-      if (!bit_input) {
-        tx_rx_readbackerror |= ERROR_BUSCOLLISION;
-        DIGITAL_SET_LED_ERROR;
-      }
+    } else if (state == 19) {
+      // state=19, paritybit
+      PRESET_ENABLE_MS_TIMER(); // start new milli-second timer measurement here, setting timer on 1msec given we are at paritybit.
     }
+
+    // and schedule read-back-verification
+    tx_rx_state = state;
+    readBackVerify = true;
+    ENABLE_INT_COMPARE_WV();
+
     state++;
 
-    tx_bit = bit;
     tx_byte = byte;
     tx_state = state;
 
@@ -573,7 +553,7 @@ ISR(COMPARE_W_INTERRUPT)
   tail = tx_buffer_tail;
   if (head == tail) {
     // tx buffer empty, there are no more bytes to send...,
-    // we don'tneed to block transmission here until start bit part 1
+    // we don't need to block transmission here until start bit part 1
     // because schedule_delay >= Wticks_per_bit_and_semibit ensures this too
     DISABLE_INT_COMPARE_W();
     tx_state = 0; // very subtle race condition here if timings go wrong?
@@ -587,7 +567,6 @@ ISR(COMPARE_W_INTERRUPT)
     tx_byte = tx_buffer[tail];
     tx_byte_verify = tx_byte;
     delay = tx_buffer_delay[tail];
-    tx_bit = 0;
     tx_rx_paritycheck = 0;
     tx_rx_byte = 0;
     tx_paritybit = 0;
@@ -624,6 +603,24 @@ void P1P2Serial::flushOutput(void)
 //Use this to ignore edges that are very near previous edges to avoid detection of oscillating edges
 //Does not seem necessary
 
+#ifdef SW_SCOPE
+volatile uint8_t sws_event[SWS_MAX];
+volatile uint16_t sws_capture[SWS_MAX];
+volatile uint16_t sws_count[SWS_MAX];
+volatile uint8_t sws_cnt = 0;
+volatile uint8_t sws_overflow = 0;
+volatile uint16_t sws_count_temp;
+volatile bool sw_scope = 0;
+
+void P1P2Serial::setScope(bool b)
+// Set echo mode (verify and read back written data) on or off
+// off: no read-back, no verification or bus collission detection
+// on (default): each written byte will be read back and received, collission will be detected
+// calling Echo has immediate effect
+{
+  sw_scope = b;
+}
+#endif
 
 void P1P2Serial::setEcho(uint8_t b)
 // Set echo mode (verify and read back written data) on or off
@@ -634,9 +631,7 @@ void P1P2Serial::setEcho(uint8_t b)
   Echo = b;
 }
 
-//#ifdef SUPPRESS_OSCILLATION
 static uint16_t prev_edge_capture;  // previous capture of edge
-//#endif
 
 ISR(CAPTURE_INTERRUPT)
 {
@@ -649,10 +644,34 @@ ISR(CAPTURE_INTERRUPT)
   uint16_t offset_overflow;
 
   capture = GET_INPUT_CAPTURE();
+#ifdef SW_SCOPE
+  if (sw_scope) {
+    sws_count_temp = GET_TIMER_R_COUNT();
+  }
+#endif
+
   state = rx_state;
   DIGITAL_RESET_LED_WRITE;
   DIGITAL_SET_LED_READ;
 
+  if (state) {
+    // detect/suppress oscillations or spurious spikes (except when expecting new start pulse, where comparison may fail due to 16-bit limitation)
+    if (capture - prev_edge_capture < Rticks_suppression) {
+#ifdef SW_SCOPE
+      if (sw_scope) {
+        if (sws_cnt < SWS_MAX) {
+          sws_count[sws_cnt] = sws_count_temp;
+          sws_capture[sws_cnt] = capture;
+          sws_event[sws_cnt] = 0x40 | state;
+          sws_cnt++;
+        }
+      }
+#endif
+#ifdef SUPPRESS_OSCILLATION
+      return;
+#endif
+    }
+  }
   if (state < 2) {
     // this is first falling edge, it must be start pulse. First confirm received byte, if any (!NO_HEAD2), without SIGNAL_EOP
     if (rx_buffer_head2 != NO_HEAD2) {
@@ -660,6 +679,7 @@ ISR(CAPTURE_INTERRUPT)
       rx_buffer_head2 = NO_HEAD2;
     }
     startbit_delta = time_msec;
+    // time_msec = 0; // to prevent a write start to reduce bus collision risk, not needed as MS_TIMER is disabled anyway
     DISABLE_MS_TIMER();
     // rx_target set to middle of first data bit
     rx_target = capture + Rticks_per_bit_and_semibit;
@@ -667,14 +687,13 @@ ISR(CAPTURE_INTERRUPT)
     rx_paritycheck = 0;
     SET_COMPARE_R(rx_target);
     ENABLE_INT_COMPARE_R(); // only needed in state=0 but doesn't hurt to do it in state=1
-  } else {
-    // suppress oscillations or spurious spikes (except when expecting start pulse, where formula may fail due to 8-bit limitation)
-    if (capture - prev_edge_capture < Rticks_suppression) {
-#ifdef SUPPRESS_OSCILLATION
-//      DIGITAL_RESET_LED_READ;
-      return;
-#endif
+#ifdef SW_SCOPE
+    if (sw_scope && (state == 0) && sws_cnt) {
+      sws_overflow = 1;
+      sws_cnt = 0;
     }
+#endif
+  } else {
     // state=2..9: we received a data bit; perform a shift
     // state=10: parity bit
     // as (data or parity) bit is 0, no need to modify rx_paritycheck
@@ -693,70 +712,136 @@ ISR(CAPTURE_INTERRUPT)
       // state = 11: we received falling edge during stop bit before COMPARE_R_INTERRUPT ran. Should not happen.
     }
   }
+#ifdef SW_SCOPE
+  if (sw_scope) {
+    if (sws_cnt < SWS_MAX) {
+      sws_count[sws_cnt] = sws_count_temp;
+      sws_capture[sws_cnt] = capture;
+      sws_event[sws_cnt] = state;
+      sws_cnt++;
+    }
+  }
+#endif
   prev_edge_capture = capture;
-//  DIGITAL_RESET_LED_READ;
 }
 
-ISR(COMPARE_R_INTERRUPT)
+ISR(COMPARE_R_INTERRUPT) // or COMPARE_WV_INTERRUPT
 // The COMPARE_R_INTERRUPT routine is called during every data bit (state=2..9) or parity bit (state=10), unless there is a falling edge for that bit,
 // and also during stop bit (state=11)
 // It is also called during the latest potential location of the next start bit (with state==1, taking ALLOW_PAUSE_BETWEEN_BYTES into account),
 // but only if no start bit has been detected, otherwise this interrupt will be cancelled (could this result in a race condition? - seems rare if at all).
 // this allows detection of an end of communication block.
 {
-  uint8_t head;
-  uint8_t state;
-
-  state = rx_state;
-//  DIGITAL_SET_LED_READ;
-
-  if (state == 1) {
-    // no new start bit detected within expected time frame; thus pause in received data detected; register SIGNAL_EOP and quit rx mode
-    DISABLE_INT_COMPARE_R();
-    rx_state = 0;
-    if (rx_buffer_head2 != NO_HEAD2) {
-      rx_buffer_head = rx_buffer_head2;
-      error_buffer[rx_buffer_head] |= SIGNAL_EOP;
-      rx_buffer_head2 = NO_HEAD2;
-      DIGITAL_RESET_LED_READ;
-    }
-  } else if (state == 11) {
-    // state = 11: we are in stop bit; where W should not be hampered by our lengthy activity of finishing up
-    // we do most of the work here but have to leave some for the next start pulse routine (via rx_buffer_head2)
-    SET_COMPARE_R(rx_target + Rticks_per_bit * (1 + ALLOW_PAUSE_BETWEEN_BYTES));
-    rx_state = 1;
-    head = rx_buffer_head + 1;
-    if (head >= RX_BUFFER_SIZE) head = 0;
-    if (head != rx_buffer_tail) {
-      rx_buffer[head] = rx_byte;
-      delta_buffer[head] = startbit_delta; // time from previous byte
-      error_buffer[head] = 0;
-      if (rx_paritycheck) error_buffer[head] |= ERROR_PE; // signals parity error
-      DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
-      rx_buffer_head2 = head;
-    } else {
-      // signal buffer overrun for *previous* byte
-      error_buffer[rx_buffer_head] |= ERROR_OVERRUN;
-      DIGITAL_SET_LED_ERROR;
-      rx_buffer_head2 = rx_buffer_head; // so SIGNAL_EOP can be added
-    }
-    PRESET_ENABLE_MS_TIMER();
-  } else if (state == 10) {
-    // state = 10: we received a 1 parity bit
-    rx_paritycheck ^= 0x80;
-    rx_state = 11;
-    rx_target += Rticks_per_bit; // this could be reduced to +semibit if needed timingwise
-    SET_COMPARE_R(rx_target);
-    DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
-  } else /* if (state < 10) */ {
-    //state = 2..9: we received a 1 bit.
-    rx_byte = (rx_byte >> 1) | 0x80;
-    rx_paritycheck ^= 0x80;
-    rx_state = state + 1;
-    rx_target += Rticks_per_bit;
-    SET_COMPARE_R(rx_target);
+// COMPARE_R_INTERRUPT is also used for read-back-verify operation
+#ifdef SW_SCOPE
+  if (sw_scope) {
+    sws_count_temp = GET_TIMER_R_COUNT();
   }
-//  DIGITAL_RESET_LED_READ;
+#endif
+  if (readBackVerify) {
+    uint8_t state, bit_input;
+    state = tx_rx_state;
+    // state (1..19) indicates in which part of write data pattern we are when entering this ISR
+    // 1,2 startbit
+    // 3,4 .. 17,18 data bits
+    // 19 first half parity bit
+    // check current read-back signal on input wire
+    bit_input = INPUT_CAPTURE_PIN_VALUE;
+    if (state == 19) {
+      // state is odd, paritybit
+      if (bit_input) tx_rx_paritycheck ^= 0x80;
+      if (tx_rx_paritycheck) tx_rx_readbackerror |= ERROR_PE;
+      DIGITAL_WRITE_LED_ERROR(tx_rx_paritycheck);
+    } else if (state == 1) {
+      // state is odd, start bit
+    } else if (state & 1) {
+      // state is odd, next semibit will be part 2 of databit (high)
+      tx_rx_byte >>= 1;
+      if (bit_input) {
+        tx_rx_paritycheck ^= 0x80;
+        tx_rx_byte |= 0x80;
+      }
+    } else { // state even
+      if (!bit_input) {
+        tx_rx_readbackerror |= ERROR_BUSCOLLISION;
+        DIGITAL_SET_LED_ERROR;
+      }
+    }
+    DISABLE_INT_COMPARE_WV();
+    readBackVerify = false;
+//#ifdef SW_SCOPE
+//    if (sw_scope) {
+//      if (sws_cnt < SWS_MAX) {
+//        sws_count[sws_cnt] = sws_count_temp;
+//        sws_capture[sws_cnt] = 0;
+//        sws_event[sws_cnt] = 0x20 | state;
+//        sws_cnt++;
+//      }
+//    }
+//#endif
+  } else {
+    uint8_t head;
+    uint8_t state;
+
+    state = rx_state;
+
+    if (state == 1) {
+      // no new start bit detected within expected time frame; thus pause in received data detected; register SIGNAL_EOP and quit rx mode
+      DISABLE_INT_COMPARE_R();
+      rx_state = 0;
+      if (rx_buffer_head2 != NO_HEAD2) {
+        rx_buffer_head = rx_buffer_head2;
+        error_buffer[rx_buffer_head] |= SIGNAL_EOP;
+        rx_buffer_head2 = NO_HEAD2;
+        DIGITAL_RESET_LED_READ;
+      }
+    } else if (state == 11) {
+      // state = 11: we are in stop bit; where W should not be hampered by our lengthy activity of finishing up
+      // we do most of the work here but have to leave some for the next start pulse routine (via rx_buffer_head2)
+      SET_COMPARE_R(rx_target + Rticks_per_bit * (1 + ALLOW_PAUSE_BETWEEN_BYTES));
+      rx_state = 1;
+      head = rx_buffer_head + 1;
+      if (head >= RX_BUFFER_SIZE) head = 0;
+      if (head != rx_buffer_tail) {
+        rx_buffer[head] = rx_byte;
+        delta_buffer[head] = startbit_delta; // time from previous byte
+        error_buffer[head] = 0;
+        if (rx_paritycheck) error_buffer[head] |= ERROR_PE; // signals parity error
+        DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
+        rx_buffer_head2 = head;
+      } else {
+        // signal buffer overrun for *previous* byte
+        error_buffer[rx_buffer_head] |= ERROR_OVERRUN;
+        DIGITAL_SET_LED_ERROR;
+        rx_buffer_head2 = rx_buffer_head; // so SIGNAL_EOP can be added
+      }
+      PRESET_ENABLE_MS_TIMER();
+    } else if (state == 10) {
+      // state = 10: we received a 1 parity bit
+      rx_paritycheck ^= 0x80;
+      rx_state = 11;
+      rx_target += Rticks_per_bit; // this could be reduced to +semibit if needed timingwise
+      SET_COMPARE_R(rx_target);
+      DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
+    } else /* if (state < 10) */ {
+      // state = 2..9: we received a 1 data bit.
+      rx_byte = (rx_byte >> 1) | 0x80;
+      rx_paritycheck ^= 0x80;
+      rx_state = state + 1;
+      rx_target += Rticks_per_bit;
+      SET_COMPARE_R(rx_target);
+    }
+#ifdef SW_SCOPE
+    if (sw_scope) {
+      if (sws_cnt < SWS_MAX) {
+        sws_count[sws_cnt] = sws_count_temp;
+        sws_capture[sws_cnt] = 0;
+        sws_event[sws_cnt] = 0x20 | state;
+        sws_cnt++;
+      }
+    }
+#endif
+  }
 }
 
 #else /* OLDP1P2LIB */
@@ -811,7 +896,7 @@ static volatile uint16_t tx_wait = 0;
 static int32_t time_sec = 0;
 static uint32_t time_millisec = 0;
 
-#define scheduledelay 16 // just enough to schedule timer reliably
+#define scheduledelay 32 // should be enough to schedule timer reliably, 16 is not enough
 
 #ifndef INPUT_PULLUP
 #define INPUT_PULLUP INPUT
@@ -858,11 +943,6 @@ void P1P2Serial::begin(uint32_t baud)
   time_msec = 0;
   tx_wait = 0;
 
-  // force initial value of COMPARE_A output pin to 1
-  CONFIG_MATCH_SET();
-  TCCR1C |= (1 << FOC1A);
-  CONFIG_CAPTURE_FALLING_EDGE();
-  ENABLE_INT_INPUT_CAPTURE();
 
   // set up millisecond timer - code works currently only on 16MHz CPUs (and tested only on Uno/Mega)
   // Use TIMER2 to avoid interference with Arduino IDE's use of TIMER0
@@ -878,6 +958,12 @@ void P1P2Serial::begin(uint32_t baud)
 
   // set up pin for LED to show parity and other errors
   pinMode(LED_BUILTIN, OUTPUT);
+
+  // force initial value of COMPARE_A output pin to 1
+  CONFIG_MATCH_SET();
+  TCCR1C |= (1 << FOC1A);
+  CONFIG_CAPTURE_FALLING_EDGE();
+  ENABLE_INT_INPUT_CAPTURE();
 }
 
 void P1P2Serial::end(void)
@@ -1060,12 +1146,12 @@ ISR(COMPARE_A_INTERRUPT)
     target += ticks_per_semibit;
     state++;
     if (bit != tx_bit) {
+      SET_COMPARE_A(target);
       if (bit) {
         CONFIG_MATCH_SET();
       } else {
         CONFIG_MATCH_CLEAR();
       }
-      SET_COMPARE_A(target);
       tx_bit = bit;
       tx_byte = byte;
       tx_state = state;
@@ -1142,6 +1228,25 @@ void P1P2Serial::flushOutput(void)
 // Use this if you experience issues that may be related to signal quality
 // SUPPRESS_PERIOD is measured in timer1 ticks, so in CPU cycles
 
+#ifdef SW_SCOPE
+volatile uint8_t sws_event[SWS_MAX];
+volatile uint16_t sws_capture[SWS_MAX];
+volatile uint16_t sws_count[SWS_MAX];
+volatile uint8_t sws_cnt = 0;
+volatile uint8_t sws_overflow = 0;
+volatile uint16_t sws_count_temp;
+volatile bool sw_scope = 0;
+
+void P1P2Serial::setScope(bool b)
+// Set echo mode (verify and read back written data) on or off
+// off: no read-back, no verification or bus collission detection
+// on (default): each written byte will be read back and received, collission will be detected
+// calling Echo has immediate effect
+{
+  sw_scope = b;
+}
+#endif
+
 static uint8_t Echo = 1;
 
 void P1P2Serial::setEcho(uint8_t b)
@@ -1153,9 +1258,7 @@ void P1P2Serial::setEcho(uint8_t b)
   Echo = b;
 }
 
-#ifdef SUPPRESS_OSCILLATION
 static uint16_t prev_edge_capture;  // previous capture of edge
-#endif
 static uint16_t startbit_delta;
 
 ISR(CAPTURE_INTERRUPT)
@@ -1170,11 +1273,31 @@ ISR(CAPTURE_INTERRUPT)
   uint16_t startbit_delta_prev;
 
   capture = GET_INPUT_CAPTURE();
-#ifdef SUPPRESS_OSCILLATION
-  if (capture - prev_edge_capture < SUPPRESS_PERIOD) return; // to suppress oscillations
-  prev_edge_capture = capture;
+#ifdef SW_SCOPE
+  if (sw_scope) {
+    sws_count_temp = GET_TIMER_COUNT();
+  }
 #endif
+
   state = rx_state;
+  if (state) {
+    // detect/suppress oscillations or spurious spikes (except when expecting new start pulse, where comparison may fail due to 16-bit limitation)
+    if (capture - prev_edge_capture < SUPPRESS_PERIOD) {
+#ifdef SW_SCOPE
+      if (sw_scope) {
+        if (sws_cnt < SWS_MAX) {
+          sws_count[sws_cnt] = prev_edge_capture;
+          sws_capture[sws_cnt] = capture;
+          sws_event[sws_cnt] = 0x40 | (state == 99 ? 0x1D : state);
+          sws_cnt++;
+        }
+      }
+#endif
+#ifdef SUPPRESS_OSCILLATION
+      return; // to suppress oscillations
+#endif
+    }
+  }
   if ((state == 99) || (state == 0)) {
     // this is first falling edge, it must be start pulse
     startbit_delta_prev = startbit_delta;
@@ -1182,7 +1305,7 @@ ISR(CAPTURE_INTERRUPT)
     GTCCR = 2; // reset prescaler of timer2 to improve timing accuracy of msec-timer
     TCNT2 = 0; // start new milli-second timer measurement on falling edge of start bit
     time_msec = 0; // set msec counter back to 0
-                   // For HBS conformant timing, we could consider to change this to
+                   // For very precise HBS conformant timing of alternate writes, we could consider to change this to
                    // time_msec = -2; (change type to signed, change 0xFFFF in ISR to 0x7FFFF)
                    // TCNT2 = <value such that time_msec becomes 0 at end of stop bit>
                    // however for P1P2 the current code works fine
@@ -1224,16 +1347,40 @@ ISR(CAPTURE_INTERRUPT)
       }
       rx_do_verify = 0;
     }
+#ifdef SW_SCOPE
+    if (sw_scope) {
+      if (state == 0) {
+        if (sws_cnt) sws_overflow = 1;
+        sws_cnt = 0;
+      }
+      if (sws_cnt < SWS_MAX) {
+        sws_count[sws_cnt] = sws_count_temp;
+        sws_capture[sws_cnt] = capture;
+        sws_event[sws_cnt] = (state == 99 ? 0x1D : state);
+        sws_cnt++;
+      }
+    }
+#endif
   } else {
     // state =1..9, we just received a falling edge for a data bit or parity bit
     // check how many high/silent data bits we "missed"
     target = rx_target;
     offset_overflow = 65535 - 2 * ticks_per_bit; // 2* instead of 1* to ensure we don't overshoot loop
     while ( (capture - target) < offset_overflow) {
+      state++;
+#ifdef SW_SCOPE
+      if (sw_scope) {
+        if (sws_cnt < SWS_MAX) {
+          sws_count[sws_cnt] = sws_count_temp;
+          sws_capture[sws_cnt] = target;
+          sws_event[sws_cnt] = 0x80 | state;
+          sws_cnt++;
+        }
+      }
+#endif
       rx_byte = (rx_byte >> 1) + 0x80;
       rx_paritycheck = rx_paritycheck ^ 0x80;
       target += ticks_per_bit;    // increase target time by 1 bit time
-      state++;
     }
     // we received a (data or parity) bit 0, thus no need to modify rx_paritycheck
     // state=1..8: we received a data bit 0; perform a shift
@@ -1247,8 +1394,19 @@ ISR(CAPTURE_INTERRUPT)
     // to finish up as this allows us to determine whether we are still in reading mode, and to verify any read-back data.
     rx_target = target;
     rx_state = state;
+#ifdef SW_SCOPE
+    if (sw_scope) {
+      if (sws_cnt < SWS_MAX) {
+        sws_count[sws_cnt] = sws_count_temp;
+        sws_capture[sws_cnt] = capture;
+        sws_event[sws_cnt] = state;
+        sws_cnt++;
+      }
+    }
+#endif
   }
   // rx_state now corresponds to the number of (start+data+parity) bit (falling/missing) edges observed
+  prev_edge_capture = capture;
 }
 
 ISR(COMPARE_B_INTERRUPT)
@@ -1256,6 +1414,11 @@ ISR(COMPARE_B_INTERRUPT)
 // It is also called during the potential location of the next start bit (with state==99), but only if no start bit has been detected,
 // this allows detection of an end of packet.
 {
+#ifdef SW_SCOPE
+  if (sw_scope) {
+    sws_count_temp = GET_TIMER_COUNT();
+  }
+#endif
   uint8_t head, state;
   uint16_t target;
 
@@ -1293,24 +1456,64 @@ ISR(COMPARE_B_INTERRUPT)
       }
     }
     rx_do_verify = 0;
+#ifdef SW_SCOPE
+    if (sw_scope) {
+      if (sws_cnt < SWS_MAX) {
+        sws_count[sws_cnt] = sws_count_temp;
+        sws_capture[sws_cnt] = 0;
+        sws_event[sws_cnt] = 0x20 | 0x1D; // state = 99 -> 29
+        sws_cnt++;
+      }
+    }
+#endif
     return;
   }
   // if parity bit was 0, state will be 10, otherwise state will be lower and we need to process the 1s
   while (state < 9) {
     rx_byte = (rx_byte >> 1) | 0x80;
     rx_paritycheck = rx_paritycheck ^ 0x80;
-    target += ticks_per_bit;    // increase target time by 1 bit time
     state++;
+#ifdef SW_SCOPE
+      if (sw_scope) {
+        if (sws_cnt < SWS_MAX) {
+          sws_count[sws_cnt] = sws_count_temp;
+          sws_capture[sws_cnt] = target;
+          sws_event[sws_cnt] = 0x80 | state;
+          sws_cnt++;
+        }
+      }
+#endif
+    target += ticks_per_bit;    // increase target time by 1 bit time
   }
   if (state == 9) {
     rx_paritycheck = rx_paritycheck ^ 0x80;
     target += ticks_per_bit;    // increase target time by 1 bit time
-    //state++;     // state is not used any more
+    state++;
+#ifdef SW_SCOPE
+      if (sw_scope) {
+        if (sws_cnt < SWS_MAX) {
+          sws_count[sws_cnt] = sws_count_temp;
+          sws_capture[sws_cnt] = target;
+          sws_event[sws_cnt] = 0x80 | state;
+          sws_cnt++;
+        }
+      }
+#endif
   }
   digitalWrite(LED_BUILTIN, rx_paritycheck ? HIGH : LOW);
   rx_state = 99;       // state=99: wait for next start bit's falling edge
   // rx_target = target;      // not used any more
   SET_COMPARE_B(target + ticks_per_bit * (1 + ALLOW_PAUSE_BETWEEN_BYTES));
+#ifdef SW_SCOPE
+    if (sw_scope) {
+      if (sws_cnt < SWS_MAX) {
+        sws_count[sws_cnt] = sws_count_temp;
+        sws_capture[sws_cnt] = 0;
+        sws_event[sws_cnt] = 0x20 | state;
+        sws_cnt++;
+      }
+    }
+#endif
 }
 #endif /* OLDP1P2LIB */
 
