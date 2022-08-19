@@ -37,6 +37,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20220819 v0.9.17-fix1 fixed non-functioning 'E'/'n' write commands
  * 20220817 v0.9.17 scopemode, fixed 'W' command handling magic string prefix, SERIALSPEED/OLDP1P2LIB in P1P2Config.h now depends on F_CPU/COMBIBOARD selection, ..
  * 20220810 v0.9.15 Improved uptime handling
  * 20220802 v0.9.14 New parameter-write method 'e' (param write packet type 35-3D), error and write throttling, verbosity mode 2, EEPROM state, MCUSR reporting,
@@ -854,16 +855,16 @@ void loop() {
                           setStatusDHW = temp;
                           if (!verbose) break;
                           Serial.print(F(" will be set to 0x"));
-                          if (setValue3A <= 0x000F) Serial.print(F("0"));
+                          if (setStatusDHW <= 0x000F) Serial.print(F("0"));
                           Serial.println(setStatusDHW);
                           break;
                         } else {
                           Serial.println(F("* Currently no write budget left"));
                           break;
                         }
-                      } else if (setRequest3A) {
+                      } else if (setRequest35) {
                         Serial.println(F(": DHW-write-request to value 0x"));
-                        Serial.println(setValue3A, HEX);
+                        Serial.println(setValue35, HEX);
                         Serial.println(F(" still pending"));
                       } else {
                         Serial.println(F(": no DHW-write-request pending"));
@@ -1123,9 +1124,9 @@ void loop() {
                         // set byte WB[8] to 0x01 to request a F036 message to set setParam36 to Value36
                         if (setRequest36) WB[8] = 0x01;
                         // set byte WB[12] to 0x01 to request a F03A message to set setParam3A to Value3A
-                        if (setRequest3A) WB[8] = 0x01;
-                        // set byte WB[<wr_pt - 34>2] to 0x01 to request a F03x message to set wr_nr to wr_val
-                        if (wr_cnt) WB[wr_pt - 0x34] = 0x01;
+                        if (setRequest3A) WB[12] = 0x01;
+                        // set byte WB[<wr_pt - 0x2E>] to 0x01 to request a F03x message to set wr_nr to wr_val
+                        if (wr_cnt) WB[wr_pt - 0x2E] = 0x01;
                         d = F030DELAY;
                         wr = 1;
                         break;

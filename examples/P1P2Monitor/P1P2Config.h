@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20220819 v0.9.17-fix fixed non-functioning 'E'/'n' write commands
  * 20220817 v0.9.17 minor changes, fixed 'W' command handling magic string prefix, SERIALSPEED/OLDP1P2LIB in P1P2Config.h now depends on F_CPU/COMBIBOARD selection
  * 20220808 v0.9.15 Added compile date/time to verbosity report
  * 20220802 v0.9.14 New parameter-write method 'e' (param write packet type 35-3D), error and write throttling, verbosity mode 2, EEPROM state, MCUSR reporting,
@@ -44,7 +45,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.17"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.17-fix1"
 
 #define INIT_VERBOSE 3
 // Set verbosity level
