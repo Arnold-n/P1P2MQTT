@@ -66,6 +66,9 @@
 //#warning OLDP1P2LIB used for F_CPU > 8MHz
 #endif /* F_CPU > 8MHz */
 
+#define S_TIMER // support for uptime_sec() in new library, but monopolizes TIMER0, so millis() cannot be used.
+                // if undefined, or if OLDP1P2LIB is defined, TIMER0 is not used, and millis() can be used
+
 #include <inttypes.h>
 
 #if ARDUINO >= 100
