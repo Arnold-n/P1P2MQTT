@@ -82,7 +82,7 @@ ESPAltherma also reports energy consumption (or actually current and voltage) bu
 
 **No liability, no warranty**
 
-Any use is entirely at your own risk (GPL sections 11 and 12 apply).
+Any use is entirely at your own risk (CC BY-NC-ND 4.0 Section 5 applies, for earlier versions GPL sections 11 and 12 apply).
 
 **Is it safe?**
 
@@ -168,7 +168,7 @@ The https://github.com/budulinek/Daikin-P1P2---UDP-Gateway repo provides additio
 
 **How is the software licensed?**
 
-The software is licensed under GPL V2.0. Please comply with the license conditions. If you improve or add, I would be interested to hear from you.
+The software is licensed under the CC BY-NC-ND 4.0 with exceptions, see [LICENSE.md](https://www.github.com/Arnold-n/P1P2Serial/LICENSE.md). Please comply with the license conditions. If you improve or add, I would be interested to hear from you.
 
 **Why did you build this?**
 
@@ -309,13 +309,13 @@ The simple answer is: write when others don't. In practice communication seems t
 
 **Which files to start with?**
 
-- LICENSE: GPL-v2.0 license for P1P2Serial library and the P1P2\* example programs,
+- LICENSE.md: CC BY-NC-ND4.0 with exceptions for the P1P2Serial library and the P1P2\* example programs,
 - ReleaseNotes.md,
 - P1P2MQTT.md, describes MQTT channels and commands used by P1P2-bridge-esp8266
 - P1P2Monitor-commands.md, describes P1P2Monitor commands and serial protocol used by P1P2Monitor and P1P2MQTT 
-- examples/P1P2Monitor: (GPL-licensed) monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus on serial output, and enables writing data from serial input. Reading/writing packets of data and CRC-byte generation/verification is supported. Supports parameter writing as auxiliary controller, and counter requests
-- examples/P1P2MQTT: (GPL-licensed) program to convert P1P2Monitor's serial output to mqtt and json format
-- P1P2Serial.cpp and P1P2Serial.h: (GPL-licensed) P1P2Serial library, based on AltSoftSerial
+- examples/P1P2Monitor: monitor program on Arduino, uses P1P2Serial library. Shows data on P1/P2 bus on serial output, and enables writing data from serial input. Reading/writing packets of data and CRC-byte generation/verification is supported. Supports parameter writing as auxiliary controller, and counter requests
+- examples/P1P2MQTT: program to convert P1P2Monitor's serial output to mqtt and json format
+- P1P2Serial.cpp and P1P2Serial.h: P1P2Serial library used by P1P2Monitor
 - doc: documentation of reverse-engineered P1/P2 protocols (please contribute if you have more information)
 - circuits/\*: P1/P2 adapter schematic and pictures of adapter board,
 - examples/P1P2Monitor/usb2console.py: simple python program to copy USB serial output from Arduino to stdout on a Raspberry Pi or other host (for logging and/or processing by P1P2-bridge-ubuntu), and

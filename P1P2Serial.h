@@ -28,8 +28,8 @@
  *     to Bart Ellast for providing explanations and sample output from his heat pump, and
  *     to Paul Stoffregen for publishing the AltSoftSerial library.
  *
- * The GPL-licensed P1P2Serial library is based on the MIT-licensed AltSoftSerial,
- *      but please note that P1P2Serial itself is licensed under the GPL v2.0.
+ * The CC BY-NC-ND 4.0 licensed P1P2Serial library is based on the MIT-licensed AltSoftSerial,
+ *      but please note that P1P2Serial itself is licensed under the CC BY-NC-ND 4.0.
  *      The original license for AltSoftSerial is included below.
  *
  ** An Alternative Software Serial Library                                           **
