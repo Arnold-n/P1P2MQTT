@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20220821         more temp settings reported
  * 20220817 v0.9.17 license change
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
  * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
@@ -1184,7 +1185,7 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0016 : PARAM_KEY("Temperature_LWT");                                                 CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // TempLWT rounded DOWN (or different calculus than /256; perhaps /255?)
         case 0x0017 : PARAM_KEY("Temperature_Refrigerant_1");                                       CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // TempRefr1
         case 0x0018 : PARAM_KEY("Temperature_Refrigerant_2");                                       CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // TempRefr2
-        case 0x0027 : PARAM_KEY("Target_Temperature_DHW_2");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0 ??
+        case 0x0027 : PARAM_KEY("Target_Temperature_DHW_3");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0 ??
 // 0x13-0x40-[1-7] unknown;  = 0x0028-0x0029 ?
         case 0x002A : PARAM_KEY("Flow");                                                            CAT_MEASUREMENT;                             PARAM_VALUE_u16div10_LE; // Flow  0x13-0x40-9
         case 0x002B : PARAM_KEY("SW_Version_Outside_Unit");                                         CAT_SETTING;                                 PARAM_VALUE_u16hex_BE    ; // Flow // 943F (LSB versus MSB?)
@@ -1547,7 +1548,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case    6 : KEY("DHW_Related_Q");                                                                                                      VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
-        case   18 : KEY("DHW_Comfort_Request");                                                                                                  VALUE_u8;
+        case   19 : KEY("DHW_Setpoint_Request");                                                                                                 VALUE_f8s8;
         default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
@@ -1572,7 +1573,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case    4 : KEY("SHC_Tank");                                                                                                           VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
-        case    4 : KEY("DHW_Comfort_Status");                             HACONFIG; HATEMP;                                                     VALUE_u8;
+        case    5 : KEY("DHW_Setpoint_Response");                         HACONFIG; HATEMP;                                                     VALUE_f8s8;
         case    6 : BITBASIS_UNKNOWN;
         case    8 : KEY("Target_Temperature_Room");                                                                                              VALUE_u8;
         case   11 : switch (bitNr) {
@@ -1617,7 +1618,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    1 : KEY("Temperature_Leaving_Water");                      HACONFIG; HATEMP;
                     LWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(LWT_changed);
         case    2 : return 0;                         // Domestic hot water temperature (on some models)
-        case    3 : return 0; // KEY("Temperature_DHW");                                                                                         VALUE_f8_8;   // unconnected on EHYHBX08AAV3?, then reading -40
+        case    3 : KEY("Temperature_DHW_tank");                            HACONFIG; HATEMP; VALUE_f8_8;                                        VALUE_f8_8;   // DHW tank, unconnected on EHYHBX08AAV3?, then reading -40
         case    4 : return 0;                         // Outside air temperature (low res)
         case    5 : KEY("Temperature_Outside_1");                          HACONFIG; HATEMP;                                                     VALUE_f8_8;
         case    6 : return 0;
@@ -1630,9 +1631,13 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   10 : return 0;                         // Refrigerant temperature
         case   11 : KEY("Temperature_Refrigerant_1");                      HACONFIG;  HATEMP;                                                    VALUE_f8_8;
         case   12 : return 0;                         // Room temperature copied with minor delay by Daikin system
-        case   13 : KEY("Temperature_Room");                                                                                                     VALUE_f8_8;
+        case   13 : KEY("Temperature_Room");                               HACONFIG; HATEMP;                                                                                             VALUE_f8_8;
         case   14 : return 0;                         // Outside air temperature
         case   15 : KEY("Temperature_Outside_2");                          HACONFIG; HATEMP;                                                     VALUE_f8_8;
+        case   16 : return 0;                         // Unused ?
+        case   17 : KEY("Temperature_Unused_400011_16");                   HACONFIG; HATEMP;                                                     VALUE_f8_8;
+        case   18 : return 0;                         // Outside air temperature
+        case   19 : KEY("Temperature_Unused_400011_18");                   HACONFIG; HATEMP;                                                     VALUE_f8_8;
         default : UNKNOWN_BYTE;
       }
       default   : UNKNOWN_BYTE;
@@ -1724,7 +1729,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         default : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
-        case    0 : KEY("Target_Temperature_DHW");                         HACONFIG; HATEMP;                                                     VALUE_u8;
+        case    1 : KEY("Target_Temperature_DHW");                         HACONFIG; HATEMP;                                                     VALUE_f8s8;
         case    8 : return 0;
         case    9 : KEY("Flow");                                           HACONFIG; HAFLOW;
                     Flow = FN_u16div10_LE(payloadPointer);                 CAT_MEASUREMENT;                                                                                                                             VALUE_u16div10_LE_changed(Flow_changed); //(9, 0.09, 0.15);
@@ -1741,19 +1746,30 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                 switch (packetSrc) {
       case 0x00 :
                   switch (payloadIndex) {
+         case   1 : KEY("Target_Temperature_Heating_Zone_Main_request");             HACONFIG; HATEMP; VALUE_f8_8; // or f8s8?
+//       case   3 : KEY("Target_Temperature_Cooling_Zone_Main_request"); // guess
+//       case   5 : KEY("Target_Temperature_Heating_Zone_Add_request"); // guess
+//       case   7 : KEY("Target_Temperature_Cooling_Zone_Add_request"); // guess
+
+
+
         case    8 : KEY("Target_Temperature_Deviation_Zone_Main");                                                                               VALUE_s4abs1c;
         case   10 : KEY("Target_Temperature_Deviation_Zone_Add");                                                                                VALUE_s4abs1c;
         default :   UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
+        case    1 : KEY("Target_Temperature_Heating_Zone_Main_response");             HACONFIG; HATEMP; VALUE_f8_8; // or f8s8?
+//      case    3 : KEY("Target_Temperature_Cooling_Zone_Main_response"); // guess
+//      case    5 : KEY("Target_Temperature_Heating_Zone_Add_response"); // guess
+//      case    7 : KEY("Target_Temperature_Cooling_Zone_Add_response"); // guess
         case    8 : KEY("Target_Temperature_Deviation_Zone_Main");                                                                               VALUE_s4abs1c;
         case    9 : // 3 or 5 , delta?, caused by schedule ? (exactly 23:00)
                     return 0;
         case   10 : KEY("Target_Temperature_Deviation_Zone_Add");                                                                                VALUE_s4abs1c;
         case   15 : return 0;
-        case   16 : KEY("Target_Temperature_Zone_Main");                                                                                         VALUE_f8s8(10, 0.2, 0.6);
+        case   16 : KEY("Target_Temperature_Zone_Main");                  HACONFIG; HATEMP;                                                      VALUE_f8_8;
         case   17 : return 0;
-        case   18 : KEY("Target_Temperature_Zone_Add");                                                                                          VALUE_f8s8(11, 0.2, 0.6);
+        case   18 : KEY("Target_Temperature_Zone_Add");                                                                                          VALUE_f8_8;
         default :   UNKNOWN_BYTE;
       }
       default   :   UNKNOWN_BYTE;
@@ -1765,8 +1781,12 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         default : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
+        case    0 : return 0;
+        case    1 : KEY("Temperature_Unused_400015_0");          HACONFIG; HATEMP;                                                                                  VALUE_f8_8;
         case    2 : return 0;
-        case    3 : KEY("Temperature_Refrigerant_2");                                                                                            VALUE_f8_8;
+        case    3 : KEY("Temperature_Refrigerant_2");           HACONFIG; HATEMP;                                                                VALUE_f8_8;
+        case    4 : return 0;
+        case    5 : KEY("Temperature_Refrigerant_3_Q");           HACONFIG; HATEMP;                                                                VALUE_f8_8;
         default :             UNKNOWN_BYTE;
       }
       default :               UNKNOWN_BYTE;
