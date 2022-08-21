@@ -69,7 +69,6 @@
                                   //   This value needs to be selected carefully to avoid bus collission between the 4000B8* response and the next 000013* request
 				  //   A value around 9ms works for my system; use with care, and check your logs for bus collissions or other errors
 
-
 // set CTRL adapter ID; if not used, installer mode becomes unavailable on main controller
 #define CTRL_ID_1 0xB4 // LAN adapter ID in 0x31 payload byte 7
 #define CTRL_ID_2 0x10 // LAN adapter ID in 0x31 payload byte 8
@@ -81,12 +80,6 @@
 #define CONTROL_ID_DEFAULT CONTROL_ID_NONE   // by default, P1P2Monitor passively monitors.
                                              // If CONTROL_ID_DEFAULT is set to CONTROL_ID_0 (or _1) P1P2Monitor
                                              // will start to act as an auxiliary controller if no other controller is detected.
-
-//#define REBOOT_RETRIES_WRITING // when too many errors are observed by P1P2Monitor (read errors in monitor mode and/or errors detected while writing),
-                               // P1P2Monitor's control and counterrequesting functions are switched off
-                               // if REBOOT_RETRIES_WRITING is defined, control and/or counterrequesting are switched back on (if they were on) after a reboot
-                               // if REBOOT_RETRIES_WRITING is not defined, control and/or counterrequesting are not switched back on after a reboot (safest option,
-                               //               but requires manual intervention to switch functionality on)
 
 // EEPROM saves state of
 // -CONTROL_ID (whether P1P2Monitor acts as auxiliary controller, and which one)

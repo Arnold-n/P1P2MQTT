@@ -1,8 +1,9 @@
+<<<<<<< Updated upstream
 # Serial protocol description
 
 ## Serial input
 
-The serial interface is used to give commands to P1P2Monitor. Command description moved to P1P2Monitor-commands.md, but you may be more interested in P1P2MQTT's [MQTT usage description](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2MQTT.md).
+The serial interface is used to give commands to P1P2Monitor. P1P2Monitor's command description can be found in P1P2Monitor-commands.md, but you may be more interested in P1P2MQTT's [MQTT usage description](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2MQTT.md).
 
 To suppress serial input not intended for P1P2Monitor (such as output (debug/boot) messages from ESP8266), each serial line must start with SERIAL_MAGICSTRING (default "1P2P") if defined. Further, first line received after a reboot will be ignored (P1P2MQTT aims to flush this). Lines which are too long (> approximately 90 characters) will also be ignored.
 
@@ -72,6 +73,3 @@ R T  0.024: 400010000081013D000F0014001A000000000000000000E0
 P P         00000D0000000000000000000000000000000000000000C4
 R P         40000D0D00000001C63D0000000000000000000000000019
 ```
-
-
-
