@@ -144,6 +144,6 @@ public:
 	uint16_t readpacket(uint8_t* readbuf, uint16_t &delta, uint8_t* errorbuf, uint8_t maxlen, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
 	void writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
         int32_t uptime_sec(void);
-        uint32_t uptime_millisec(void);
+        int32_t uptime_millisec(void);
 };
 #endif
