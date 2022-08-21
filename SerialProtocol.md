@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 # Serial protocol description
 
 ## Serial input
