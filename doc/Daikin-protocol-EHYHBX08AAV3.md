@@ -1,6 +1,6 @@
 # EHYHB(H/X)-AV3 and EHV(H/X)-C(A/B) protocol data format
 
-Protocol data format for Daikin Altherma hybrid heat pump for the EHYHBX08AAV3 (perhaps all EHYHB(H/X)-AV3 models) and (at least partially for the) Daikin Altherma LT heat pump EHV(H/X)-CA/CB
+Protocol data format for Daikin Altherma hybrid heat pump for the EHYHBX08AAV3 (perhaps all EHYHB(H/X)-AV3 models) and (at least partially for the) Daikin Altherma LT heat pump EHV(H/X)-CA/CB. A lot of data is also valid for EHB\* models.
 
 If you have any information, please contribute to one of the data format files or create a new one so we can support more models.
 
@@ -153,7 +153,7 @@ Header: 400011
 | Byte nr | Hex value observed | Description                                           | Data type
 |:--------|:-------------------|:------------------------------------------------------|:-
 |   0-1   | XX YY              | LWT temperature                                       | f8.8
-|   2-3   | XX YY              | DHW temperature (if connected)                        | f8.8
+|   2-3   | XX YY              | DHW temperature tank (if present)                     | f8.8
 |   4-5   | XX YY              | Outside temperature (raw; in 0.5 degree resolution)   | f8.8
 |   6-7   | XX YY              | RWT                                                   | f8.8
 |   8-9   | XX YY              | Mid-way temperature heat pump - gas boiler            | f8.8
@@ -248,14 +248,10 @@ Header: 000014
 
 | Byte(:bit) | Hex value observed | Description                      | Data type
 |:-----------|:-------------------|:---------------------------------|:-
-|     0      | 27/2B              | ?
-|     1      | 00                 | ?
-|     2      | 13                 | ?
-|     3      | 00                 | ?
-|     4      | 2D/37              | ? first package 37 instead of 2D | u8
-|     5      | 00                 | ?
-|     6      | 07/16/37           | ? first package 37 instead of 07 | u8
-|     7      | 00                 | ?
+|   0-1      | 27 00              | Target temperature Heating Main Zone  | f8.8 or f8/8?
+|   2-3      | 27 00              | Cooling, perhaps target temperature main zone | f8.8 or f8/8?
+|   4-5      | 12 00              | Target temperature Heating, Additional Zone??  | f8.8 or f8/8?
+|   6-7      | 12 00              | Cooling, perhaps target temperature additional zone?? | f8.8 or f8/8?
 |     8      | 00-0A,10-1A        | Target delta main zone           | s-abs4
 |     9      | 00?/02/05          | ? changes based on schedules     | flag8
 |   10       | 00                 | Target delta addiitonal zone     | s-abs4
@@ -270,8 +266,8 @@ Header: 400014
 | Byte(:bit) | Hex value observed | Description               | Data type
 |:-----------|:-------------------|:--------------------------|:-
 |     0-14   | XX                 | echo of 000014-{00-14}    |
-|   15-16    | 1C-24 00-09        | Target temperature LWT main zone in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8
-|   17-18    | 1C-24 00-09        | Target temperature LWT add zone  in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8
+|   15-16    | 1C-24 00-09        | Target temperature LWT main zone in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8?
+|   17-18    | 1C-24 00-09        | Target temperature LWT add zone  in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8?
 
 ## Packet type 15 - temperatures, operating mode
 
@@ -293,9 +289,9 @@ Header: 400015
 
 | Byte(:bit) | Hex value observed    | Description                       | Data type
 |:-----------|:----------------------|:----------------------------------|:-
-|    0-1     | 00                    | ?
+|    0-1     | 00                    | Refrigerant temperature?          | f8.8?
 |    2-3     | FD-FF,00-08 00/80     | Refrigerant temperature (in 0.5C) | f8.8
-|    4-5     | 00                    | ?
+|    4-5     | 00                    | Refrigerant temperature?          | f8.8?
 |EHV only: 6 | 00-19                 | parameter number                  | u8/u16
 |EHV only: 7 | 00                    | (part of parameter or value?)     |
 |EHV only: 8 | XX                    | ?                                 | s16div10_LE?

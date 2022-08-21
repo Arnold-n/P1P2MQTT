@@ -73,8 +73,8 @@ The following data-types were observed or suspected in the payload data:
 | u16hex        | unsigned 16-bit integer output as hex 0x0000-0xFFFF    |
 | u24hex        | unsigned 24-bit integer          |
 | u32hex        | unsigned 32-bit integer          |      
-| f8.8          | signed fixed point value : 1 sign bit, 7 integer bit, 8 fractional bits (two’s compliment, see explanation below) |                     NEW f8d8 (/256)
-| f8/8          | Daikin-style fixed point value: 1st byte is value before comma, and 2nd byte is first digit after comma (see explanation below) |       NEW f8s8 (/10)
+| f8.8 (code: f8_8)  | signed fixed point value : 1 sign bit, 7 integer bit, 8 fractional bits (two’s compliment, see explanation below) |
+| f8/8 (code: f8s8)  | Daikin-style fixed point value: 1st byte is value before comma, and 2nd byte is first digit after comma (see explanation below) |
 | s-abs4        | Daikin-style temperature deviation: bit 4 is sign bit, bits 0-3 is absolute value of deviation |
 | sfp7          | signed floating point value: 1 sign bit, 4 mantissa bits, 2 exponent bits (used for field settings) |
 | u8div10       | unsigned 8-bit integer 0 .. 255, to be divided by 10    |
