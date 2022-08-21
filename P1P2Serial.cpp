@@ -243,7 +243,7 @@ static volatile uint16_t time_msec = 0;
 static volatile uint16_t tx_wait = 0;
 static volatile uint8_t  time_sec_cnt = 0;
 static volatile int32_t time_sec = 0;
-static volatile uint32_t time_millisec = 0;
+static volatile int32_t time_millisec = 0;
 
 #define scheduledelay Wticks_per_bit_and_semibit // should be more than 1.5 bits for writing
 
@@ -942,7 +942,6 @@ void P1P2Serial::begin(uint32_t baud)
   tx_state = 0;
   time_msec = 0;
   tx_wait = 0;
-
 
   // set up millisecond timer - code works currently only on 16MHz CPUs (and tested only on Uno/Mega)
   // Use TIMER2 to avoid interference with Arduino IDE's use of TIMER0
@@ -1673,13 +1672,15 @@ int32_t P1P2Serial::uptime_sec(void)
 #endif
 }
 
-uint32_t P1P2Serial::uptime_millisec(void)
-{ // returns uptime in ms, wraps in 50 days
+int32_t P1P2Serial::uptime_millisec(void)
+{ // returns uptime in ms, wraps in 24.8 days
 #ifdef OLDP1P2LIB
-// returns milis() in OLDP1P2LIB returns millis()
-  return millis();
+// returns milis() in OLDP1P2LIB
+  return (millis() & 0x7FFFFFFF);
+#elif defined S_TIMER
+// returns uptime in milliseconds in 8ms resolution in new library, wraps in 24.8 days
+  return (time_millisec & 0x7FFFFFFF);
 #else
-// returns uptime in milliseconds in 8ms resolution in new library
-  return time_millisec;
+  return -1;
 #endif
 }
