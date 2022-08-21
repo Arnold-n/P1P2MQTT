@@ -7,7 +7,7 @@ If you have any information, please contribute to one of the data format files o
 Please read the common README.md first for the general format description.
 
 The following data packets were observed on these particular units:
-EHYHBX08AAV3: air-to-water heat pump with gas condensing technology, functioning in weather-dependent LWT mode
+EHYHBX08AAV3: air-to-water heat pump in cascade with gas condensing technology, functioning in weather-dependent LWT mode
 EHVX08S26CB9W: air-to-water heat pump (with cooling), functioning in weather-dependent LWT mode (so far only "main package" packets were tested for this model)
 
 All values in this document are hex, except for the byte numbering in the payload and time (ms) references.
@@ -55,7 +55,7 @@ Header: 000010
 |:---------|:-------------------|:-------------------------|:-
 |0:0       | 0/1                | Heating power (off/on)   | bit
 |0:other   | 0                  | ?                        | bit
-|1:7       | 0/1                | Operating mode gas?      | bit
+|1:7       | 0/1                | Operating mode?          | bit
 |1:0       | 1                  | Operating mode gas?      | bit
 |1:other   | 0                  | Operating mode?          | bit
 |2:1       | 0/1                | DHW tank power (off/on)  | bit
@@ -252,9 +252,9 @@ Header: 000014
 |   2-3      | 27 00              | Cooling, perhaps target temperature main zone | f8.8 or f8/8?
 |   4-5      | 12 00              | Target temperature Heating, Additional Zone??  | f8.8 or f8/8?
 |   6-7      | 12 00              | Cooling, perhaps target temperature additional zone?? | f8.8 or f8/8?
-|     8      | 00-0A,10-1A        | Target delta main zone           | s-abs4
+|     8      | 00-0A,10-1A        | Target deviation/delta main zone           | s-abs4
 |     9      | 00?/02/05          | ? changes based on schedules     | flag8
-|   10       | 00                 | Target delta addiitonal zone     | s-abs4
+|   10       | 00                 | Target deviation/delta additional zone     | s-abs4
 |   11       | 00                 | ?
 |   12       | 00/37              | first package 37 instead of 00   | u8
 |   13-14    | 00                 | ?
@@ -539,27 +539,29 @@ A few hundred 16-bit parameters can be exchanged via packet type 36 and 3A.
 
 The parameter range in this system is 0x0000-0x002C, can be different on other models.
 
-| Param nr | Description                              | Data type
-|:---------|:-----------------------------------------|:-
-| 0000     | Room temperature setpoint                | u16
-| 0003     | DHW setpoint                             | u16
-| 0006     | LWT target Main Zone                     | u16div10
-| 0008     | LWT weather-dep mode deviation Main Zone | s16
+| Param nr | Description                              | HA? | MQTT/HA name                  | Data type
+|:---------|:-----------------------------------------|:----|:------------------------------|:-
+| 0000     | Room temperature setpoint                | no  | Target_Temperature_Room       | u16
+| 0001     | Temperature?                             | no  |                               | u16
+| 0002     | Room temperature setpoint                | no  |                               | u16
+| 0003     | DHW setpoint                             | no  |                               | u16
+| 0006     | LWT target Main Zone                     | no  |                               | u16div10
+| 0008     | LWT weather-dep mode deviation Main Zone | no  |                               | s16
 | 0009
-| 000B     | LWT target Add Zone                      | u16div10
-| 000D     | LWT weather-dep mode deviation Add Zone  | s16
-| 000F     | LWT weather-dep target Add Zone          | u16div10
-| 0002     | TempRoom1                                | u16div10
-| 0011     | Tempout1 (0.5C)                          | u16div10
-| 0012     | Tempout2 (0.1C)                          | u16div10
-| 0013     | TempRoom2                                | u16div10
-| 0014     | TempRWT                                  | u16div10
-| 0015     | TempMWT                                  | u16div10
-| 0016     | TempLWT                                  | u16div10
-| 0017     | TempRefr1                                | u16div10
-| 0018     | TempRefr2                                | u16div10
-| 002A     | Flow                                     | u16div10
-| FFFF     | Padding pattern                          | u16
+| 000B     | LWT target Add Zone                      | no  |                               | u16div10
+| 000D     | LWT weather-dep mode deviation Add Zone  | no  |                               | s16
+| 000F     | LWT weather-dep target Add Zone          | no  |                               | u16div10
+| 0002     | TempRoom1                                | no  |                               | u16div10
+| 0011     | Tempout1 (0.5C)                          | no  |                               | u16div10
+| 0012     | Tempout2 (0.1C)                          | no  |                               | u16div10
+| 0013     | TempRoom2                                | no  |                               | u16div10
+| 0014     | TempRWT                                  | no  |                               | u16div10
+| 0015     | TempMWT                                  | no  |                               | u16div10
+| 0016     | TempLWT                                  | no  |                               | u16div10
+| 0017     | TempRefr1                                | no  |                               | u16div10
+| 0018     | TempRefr2                                | no  |                               | u16div10
+| 002A     | Flow                                     | no  |                               | u16div10
+| FFFF     | Padding pattern                          | no  |                               | u16
 
 ### Parameters for packet type 3B
 

@@ -5,7 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
- * 20220821         more temp settings reported
+ * 20220821 v0.9.17-fix1 corrected negative deviation temperature reporting, more temp settings reported
  * 20220817 v0.9.17 license change
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
  * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
@@ -464,11 +464,11 @@ uint8_t value_u8_add2k(byte packetSrc, byte packetType, byte payloadIndex, byte*
   return 1;
 }
 
-int8_t FN_s4abs1c(uint8_t *b)        { int c = b[0]; if (c & 0x10) return -(c & 0x0F); else return (c & 0x0F); }
-
+int8_t FN_s4abs1c(uint8_t *b)        { int8_t c = b[0] & 0x0F; if (b[0] & 0x10) return -c; else return c; }
+ 
 uint8_t value_s4abs1c(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
   if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1)) return 0;
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%u", FN_s4abs1c(&payload[payloadIndex]));
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", FN_s4abs1c(&payload[payloadIndex]));
   return 1;
 }
 
@@ -613,7 +613,7 @@ uint8_t param_value_s_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, 
   }
 }
 
-// u16div10, s16div10, s8abs2cdiv10 BE
+// u16div10, s16div10 LE
 
 uint8_t param_value_u16div10_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
 // assuming paramValLength = 2
@@ -631,20 +631,6 @@ uint8_t param_value_s16div10_LE(byte paramSrc, byte paramPacketType, uint16_t pa
 // assuming paramValLength = 2
   if (!newParamVal(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, haConfig, paramValLength)) return 0;
   int16_t v = (payload[payloadIndex] << 8) | payload[payloadIndex - 1];
-#ifdef __AVR__
-  dtostrf(v * 0.1, 1, 1, mqtt_value);
-#else
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", v * 0.1);
-#endif
-  return 1;
-}
-
-int8_t FN_s8abs2c(uint8_t *b)     { return b[0] ? -(int8_t) (b[-1]+1) : (int8_t) b[-1]; }
-
-uint8_t param_value_s8abs2cdiv10(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
-// assuming paramValLength = 2
-  if (!newParamVal(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, haConfig, paramValLength)) return 0;
-  int8_t v = FN_s8abs2c(&payload[payloadIndex]);
 #ifdef __AVR__
   dtostrf(v * 0.1, 1, 1, mqtt_value);
 #else
@@ -1014,7 +1000,6 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define PARAM_VALUE_s32_BE     { return      param_value_s_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u16div10_LE { return param_value_u16div10_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_s16div10_LE { return param_value_s16div10_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
-#define PARAM_VALUE_s8abs2cdiv10 { return param_value_s8abs2cdiv10(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u8hex       { return      param_value_hex_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u16hex_LE   { return      param_value_hex_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u16hex_BE   { return      param_value_hex_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
@@ -1162,20 +1147,20 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
       case 0x40 :
                   switch (paramNr) {
         case 0x0000 : PARAM_KEY("Target_Temperature_Room");                                         CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 0x0000 = 0x10-0x_0-(7/8)
-        case 0x0001 : PARAM_KEY("Temperature_Unknown_Q1");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  15.0?
+        case 0x0001 : PARAM_KEY("Temperature_Unknown_Q1");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  15.0? (min/max heating?)
         case 0x0002 : PARAM_KEY("Temperature_Room_1");                                              CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // Temproom1 (reported by main controller)
         case 0x0003 : PARAM_KEY("Target_Temperature_DHW_1");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0
-        case 0x0004 : PARAM_KEY("Temperature_Unknown_Q4");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  56.0?
+        case 0x0004 : PARAM_KEY("Target_Temperature_DHW_2");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
         case 0x0005 : PARAM_KEY("Unknown_Pulse_Q");                                                 CAT_UNKNOWN;                                 PARAM_VALUE_u16div10_and_u16hex_LE;   // 0xFE69 pulse /0xFe68  regular value ??0 / B8 related ??
-        case 0x0006 : PARAM_KEY("Target_Temperature_LWT_Zone_Main_1");                              CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
-        case 0x0007 : PARAM_KEY("Temperature_Unknown_Q7");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  19.0?
-        case 0x0008 : PARAM_KEY("Temperature_LWT_Deviation_WD_Zone_Main");                          CAT_SETTING;                                 PARAM_VALUE_s8abs2cdiv10; // 0x14-0x00-8
-        case 0x0009 : PARAM_KEY("Temperature_Deviation_Unknown_Q9");                                CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  2.0?  related to 0x14-byte-9 2/5? // s16div10
-        case 0x000A : PARAM_KEY("Target_Temperature_LWT_Zone_Main_2");                              CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // (in 0.5 C)
+        case 0x0006 : PARAM_KEY("Target_Temperature_LWT_Zone_Main_Abs");                              CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
+        case 0x0007 : PARAM_KEY("Temperature_Unknown_Q7");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  19.0? (min/max cooling?)
+        case 0x0008 : PARAM_KEY("Temperature_LWT_Deviation_WD_Zone_Main");                          CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-8
+        case 0x0009 : PARAM_KEY("Temperature_LWT_Deviation_Unknown_Q9");                            CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 2.0?  related to 0x14-byte-9 2/5? // s16div10 , perhaps comfort deviation? (and 0x000E perhaps eco?)
+        case 0x000A : PARAM_KEY("Target_Temperature_LWT_Zone_Main");                              CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // (in 0.5 C)
         case 0x000B : PARAM_KEY("Target_Temperature_LWT_Zone_Add");                                 CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
         case 0x000C : PARAM_KEY("Target_Temperature_Q0C");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 22.0
-        case 0x000D : PARAM_KEY("Temperature_LWT_Deviation_WD_Zone_Add");                           CAT_SETTING;                                 PARAM_VALUE_s8abs2cdiv10; // 0x14-0x00-10
-        case 0x000F : PARAM_KEY("Target_Temperature_DHW_2");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0
+        case 0x000D : PARAM_KEY("Temperature_LWT_Deviation_WD_Zone_Add");                           CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-10
+        case 0x000F : PARAM_KEY("Target_Temperature_Q20");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0  (25.0?)
         case 0x0010 : PARAM_KEY("Target_Temperature_Q10");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 30.0
         case 0x0011 : PARAM_KEY("Temperature_Outside_1");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // Tempout1  in 0.5 C // ~ 0x11-0x40-5
         case 0x0012 : PARAM_KEY("Temperature_Outside_2");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // Tempout2 in 0.1 C
@@ -1746,10 +1731,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                 switch (packetSrc) {
       case 0x00 :
                   switch (payloadIndex) {
-         case   1 : KEY("Target_Temperature_Heating_Zone_Main_request");             HACONFIG; HATEMP; VALUE_f8_8; // or f8s8?
-//       case   3 : KEY("Target_Temperature_Cooling_Zone_Main_request"); // guess
-//       case   5 : KEY("Target_Temperature_Heating_Zone_Add_request"); // guess
-//       case   7 : KEY("Target_Temperature_Cooling_Zone_Add_request"); // guess
+         case   1 : KEY("Target_Temperature_Heating_Zone_Main_Abs");             HACONFIG; HATEMP; VALUE_f8_8; // or f8s8?
+//       case   3 : KEY("Target_Temperature_Cooling_Zone_Main_Abs"); // guess
+//       case   5 : KEY("Target_Temperature_Heating_Zone_Add_Abs");  // guess
+//       case   7 : KEY("Target_Temperature_Cooling_Zone_Add_Abs");  // guess
 
 
 
@@ -1758,10 +1743,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         default :   UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
-        case    1 : KEY("Target_Temperature_Heating_Zone_Main_response");             HACONFIG; HATEMP; VALUE_f8_8; // or f8s8?
-//      case    3 : KEY("Target_Temperature_Cooling_Zone_Main_response"); // guess
-//      case    5 : KEY("Target_Temperature_Heating_Zone_Add_response"); // guess
-//      case    7 : KEY("Target_Temperature_Cooling_Zone_Add_response"); // guess
+        case    1 : KEY("Target_Temperature_Heating_Zone_Main_Abs");             HACONFIG; HATEMP; VALUE_f8_8; // or f8s8?
+//      case    3 : KEY("Target_Temperature_Cooling_Zone_Main_Abs"); // guess
+//      case    5 : KEY("Target_Temperature_Heating_Zone_Add_Abs"); // guess
+//      case    7 : KEY("Target_Temperature_Cooling_Zone_Add_Abs"); // guess
         case    8 : KEY("Target_Temperature_Deviation_Zone_Main");                                                                               VALUE_s4abs1c;
         case    9 : // 3 or 5 , delta?, caused by schedule ? (exactly 23:00)
                     return 0;

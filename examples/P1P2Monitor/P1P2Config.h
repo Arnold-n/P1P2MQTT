@@ -28,7 +28,7 @@
 // Use 115200 for Arduino Uno/Mega2560 (serial over USB)
 // Use 250000 for P1P2-ESP-interface, for direct serial connection between ATmega and ESP8266
 //
-#define COMBIBOARD // Uno+ESP combiboard, determines SERIALSPEED (250k instead of 115k2)
+#define COMBIBOARD // define this for Uno+ESP combiboard, determines SERIALSPEED (250k instead of 115k2) and SERIAL_MAGICSTRING. Ignored if F_CPU=8MHz (as used in P1P2-ESP-Interface)
 
 #if F_CPU > 8000000L
 // Assume Arduino Uno (or Mega) hardware; use 115200 Baud for USB or 250000 Baud for combi-board

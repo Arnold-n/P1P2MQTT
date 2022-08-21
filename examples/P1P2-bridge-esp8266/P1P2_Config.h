@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20220821 v0.9.17-fix1 corrected negative deviation temperature reporting, more temp settings reported
  * 20220817 v0.9.17 config file using COMBIBOARD, errors and scopemode-time info via P1P2/R/#
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
  * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
@@ -15,7 +16,7 @@
 #ifndef P1P2_Config
 #define P1P2_Config
 
-#define COMBIBOARD // define this for Arduino/ESP8266 combi-board, undefine for P1P2-ESP-Interface
+#define COMBIBOARD // define this for Arduino/ESP8266 combi-board and for P1P2-ESP-Interface
 
 #ifdef COMBIBOARD
 #define SERIALSPEED 250000
@@ -29,8 +30,8 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability: don't #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.17"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.17"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.17-fix1"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.17-fix1"
 
 #define AVRISP // enables flashing ATmega by ESP
 
