@@ -196,7 +196,10 @@ The read part of the circuit can also be built using a few opamps as demonstrate
 
 **Below various set-ups using the Arduino-based P1P2-adapter are provided**
 
-(this section describes DIY set-ups and does not apply to the P1P2-ESP-interface, which has everything integrated on a single PCB)
+This section describes DIY set-ups and does not apply to the P1P2-ESP-interface, which has everything integrated on a single PCB. To build and flash firmware images on the P1P2-ESP-Interface, see
+[Arduino_IDE_setup_P1P2-ESP-Interface.md](https://www.github.com/Arnold-n/P1P2Serial/blob/main/howto/Arduino_IDE_setup_P1P2-ESP-Interface.md).
+
+
 
 ***MQTT or json over WiFi set-up using a P1P2Adapter shield, Arduino Uno and ESP8266***
 
@@ -219,15 +222,8 @@ The read part of the circuit can also be built using a few opamps as demonstrate
 
 For this set-up, a nice Uno/ESP8266 combi-board used to be available from Robotdyn. Old stock or clone versions can still be found at certain resellers, for example from [VanAllesEnMeer](https://www.vanallesenmeer.nl/Uno-WiFi-R3-ATmega328-ESP8266-8Mb-USB-TTL-CH340G-Development-Board).
 
-In order to program this board, the following steps are needed:
+In order to program this board, see [Arduino_IDE_setup_combiboard.md](https://www.github.com/Arnold-n/P1P2Serial/blob/main/howto/Arduino_IDE_setup_combiboard.md).
 
-- enter your mqtt server details
-- program P1P2Monitor via USB on Arduino ATMega processor (set dip switches 3 and 4 on, others off)
-- program P1P2MQTT via USB on ESP8266 (install ESP8266 in Arduino environment, select "Generic ESP8266 Module" as board, select 1MB as available memory (4MB may not work, is not needed)) (set dip switches 5, 6, and 7 on, others off)
-- connect Atmega and ESP8266 via serial interface: dip switches 1 and 2 on, others off. Optionally, also set dip switch 3 or 5 to on to eavesdrop on the serial communication (in one direction only) via USB
-- connect to the ESP WiFi AP on 192.168.4.1
-- select your local wifi network, enter password, and have ESP8266 connect to your WiFi
-- now, and upon each reboot, the ESP8266 connects to the MQTT server
 - the ESP8266 should also become visible in the Arduino IDE as a network port, and can be reprogrammed OTA
 
 ***MQTT or json over WiFI set-up using a P1P2-ESP device***
