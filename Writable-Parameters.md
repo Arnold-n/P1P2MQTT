@@ -13,6 +13,12 @@ For example, to switch heating off and on on EHYHBX08AAV3:
 - E 35 2F 0
 - E 35 2F 1
 
+Parameter in packet type 3A for switching between heating, cooling, and automatic mode
+- 0x4E works on EHYHBX08AAV3 (value 0=heating 1=cooling 2=auto):
+- E 3A 4E 0 = heating
+- E 3A 4E 1 = cooling
+- E 3A 4E 2 = auto
+
 Parameter in packet type 35 for switching DHW on/off
 - 0x40 works on EHVX08S23D6V and EHBH16CAV3
 - 0x3E works on EHVX08S26CA9W
@@ -31,8 +37,5 @@ Parameter in packet type 36 for setting additional zone heating temperature devi
 
 Parameter in packet type 36 for setting DHW setpoint
 - 0x03 works on EHYHBX08AAV3 and EHBH16CAV3
-
-switching DHWbooster on/off
-- 0x48 works on EHVX08S26CB9W
 
 More writable parameters can be found in Budulinek's [documentation](https://github.com/budulinek/Daikin-P1P2---UDP-Gateway/blob/main/Payload-data-write.md).

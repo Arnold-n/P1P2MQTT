@@ -53,9 +53,11 @@ Header: 000010
 
 |Byte(:bit)| Hex value observed | Description              | Data type
 |:---------|:-------------------|:-------------------------|:-
-|0:0       | 0/1                | Heating power (off/on)   | bit
+|0:0       | 0/1                | Heat pump (off/on)       | bit
 |0:other   | 0                  | ?                        | bit
-|1:7       | 0/1                | Operating mode?          | bit
+|1:7       | 0/1                | Heat pump (off/on)       | bit
+|1:0       | 0/1                | 1=Heating mode           | bit
+|1:1       | 0/1                | 1=Cooling mode           | bit
 |1:0       | 1                  | Operating mode gas?      | bit
 |1:other   | 0                  | Operating mode?          | bit
 |2:1       | 0/1                | DHW tank power (off/on)  | bit
@@ -68,7 +70,7 @@ Header: 000010
 |     7    | 14                 | Target room temperature  | u8 / f8.8?
 |     8    | 00                 | ?                        |
 | 9:6      | 0/1                | ?                        | bit
-| 9:5      | 0/1                | ?                        | bit
+| 9:5      | 0/1                | Heating/Cooling automatic mode | bit
 | 9:others | 0                  | ?                        | bit
 |10:2      | 0/1                | Quiet mode (off/on)      | bit
 |10:others | 0                  | ?                        | bit
@@ -411,8 +413,11 @@ Header: 00F031 or 40F031
 | Byte nr | Hex value observed | Description               | Data type
 |:--------|:-------------------|:--------------------------|:-
 |     0-2 | 00                 | ?                         | u8
-|     3   | 01,81              | auxiliary controller ID?  | u8
-|     4   | B4                 | auxiliary controller ID?  | u8
+|     3:0 | 1                  | operation realted?        | u8
+|     3:7 | 0/1                | operation related?        | u8
+| 3:other | 0                  | operation related?        | u8
+|     4   | 74, B4             | auxiliary controller ID?  | u8
+|     4:5 | 0/1                | operation related?        | u8
 |     5   | 11,15,51,55        | auxiliary controller ID?  | u8
 |     6   | 13 (example)       | date - year (0x13 = 2019) | u8
 |     7   | 01-0C              | date - month              | u8
@@ -448,23 +453,29 @@ These 2 parameters frequently differ by 1 or by 4 positions in parameter number.
 |:--------------|:------------------------------|:----------------------|:-
 |  0008
 |  000E         | 00/01                         | Circ.pump off/on
-|  000A
+|  000A         | 00/01
+|  000E         | 00/01
 |  0011         | 00/01                         | DHW active
 |  0013         | 01                            | ?
 |  0019         | 00/01                         | kWh preference input off/on
 |  0021         | 01                            | ?
 |  0022         | 01                            | ?
 |  0027         | 01                            | ?
-|  002E         | 00/01                         | Related to heating/cooling on/off
-|  002F         | 00/01                         | Related to heating/cooling on/off  (setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on)
+|  002D         | 00/01                         | heating/cooling off/on  (on some systems: setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on)
+|  002E         | 00/01                         | heating/cooling off/on
+|  002F         | 00/01                         | heating/cooling off/on  (on some systems: setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on)
+|  0030         | 00/01                         | heating/cooling off/on
+|  0031         | 00/01                         | heating/cooling off/on  (on some systems: setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on)
+|  0032         | 00/01                         | heating/cooling off/on
 |  0037         | 00/01/04                      | Related to heating/cooling and DHW on/off
-|  0039         | 01                            | ?
-|  003A         | 01                            | ?
-|  003C
-|  003F         | 00/01                         | Related to DHW on/off
-|  0040         | 00/01                         | Related to DHW on/off (setting this parameter in a 40Fx35 response to 0x00/0x01 switches DHW off/on)
-|  0048         | 00/01                         | Related to DHW booster on/off
-|  004E         | 01                            | ?
+|  0039         | 01/02                         | ?
+|  003A         | 01/02                         | ?
+|  003C         | 00/01
+|  003E         | 00/01                         | DHW off/on (setting this parameter in a 40Fx35 response to 0x00/0x01 switches DHW off/on on some systems)
+|  003F         | 00/01                         | DHW off/on
+|  0040         | 00/01                         | DHW off/on (setting this parameter in a 40Fx35 response to 0x00/0x01 switches DHW off/on on some systems)
+|  0048         | 00/01                         | DHW booster on/off (on some systems: writable)
+|  004E         | 00/01/02                      | 00=Heating/01=cooling/02=automatic mode
 |  004F         | 01                            | ?
 |  0050         | 00/01                         | DHW active
 |  0055         | 03                            | ?
@@ -476,7 +487,7 @@ These 2 parameters frequently differ by 1 or by 4 positions in parameter number.
 |  0098         | 01                            | indication manual setting?
 |  009A         | 4B                            | ?
 |  009D         | XX                            | counter, schedule related
-|  00A2         | XX                            | sequence counter?
+|  00A2         | XX                            | sequence counter/timer?
 |  00B4         | 01                            | ?
 |  00B6         | 01                            | ?
 |  00B7         | 01                            | ?
@@ -514,7 +525,7 @@ The parameter range in this system is 0x0000-0x006B, can be different on other m
 | 004B     | DST                            | u8
 | 004C     | Silent mode                    | u8
 | 004D     | Silent level                   | u8
-| 004E     | Operation heating/cooling mode | u8
+| 004E     | Operation heating/cooling mode (writable on some systems, 00=heating 01=cooling 02=auto) | u8
 | 005B     | Holiday                        | u8
 | 005E     | Heating schedule               | u8
 | 005F     | Cooling schedule               | u8
@@ -541,15 +552,16 @@ The parameter range in this system is 0x0000-0x002C, can be different on other m
 
 | Param nr | Description                              | HA? | MQTT/HA name                  | Data type
 |:---------|:-----------------------------------------|:----|:------------------------------|:-
-| 0000     | Room temperature setpoint                | no  | Target_Temperature_Room       | u16
-| 0001     | Temperature?                             | no  |                               | u16
-| 0002     | Room temperature setpoint                | no  |                               | u16
-| 0003     | DHW setpoint                             | no  |                               | u16
-| 0006     | LWT target Main Zone                     | no  |                               | u16div10
-| 0008     | LWT weather-dep mode deviation Main Zone | no  |                               | s16
+| 0000     | Room temperature setpoint                | no  | Target_Temperature_Room       | u16div10
+| 0001     | Temperature?                             | no  |                               | u16div10
+| 0002     | Room temperature?                        | no  |                               | u16div10
+| 0003     | DHW setpoint (writable on some systems)  | no  |                               | u16div10
+| 0004     | DHW setpoint                             | no  |                               | u16div10
+| 0006     | LWT target Main Zone (writable on some systems)                    | no  |                               | u16div10
+| 0008     | LWT weather-dep mode deviation Main Zone (writable on some systems) | no  |                               | s16
 | 0009
 | 000B     | LWT target Add Zone                      | no  |                               | u16div10
-| 000D     | LWT weather-dep mode deviation Add Zone  | no  |                               | s16
+| 000D     | LWT weather-dep mode deviation Add Zone (writable on some systems)  | no  |                               | s16
 | 000F     | LWT weather-dep target Add Zone          | no  |                               | u16div10
 | 0002     | TempRoom1                                | no  |                               | u16div10
 | 0011     | Tempout1 (0.5C)                          | no  |                               | u16div10
@@ -560,7 +572,10 @@ The parameter range in this system is 0x0000-0x002C, can be different on other m
 | 0016     | TempLWT                                  | no  |                               | u16div10
 | 0017     | TempRefr1                                | no  |                               | u16div10
 | 0018     | TempRefr2                                | no  |                               | u16div10
+| 0027     | Temp (55.0C)?                            | no  |                               | u16div10
 | 002A     | Flow                                     | no  |                               | u16div10
+| 002B     | software version outer unit              | no  |                               | u16hex_BE     
+| 002C     | software version inner unit              | no  |                               | u16hex_BE
 | FFFF     | Padding pattern                          | no  |                               | u16
 
 ### Parameters for packet type 3B
