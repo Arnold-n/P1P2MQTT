@@ -47,7 +47,7 @@
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
-#include <AsyncMqttClient.h>
+#include <AsyncMqttClient.h> // should be included after include P1P2_Config which defines MQTT_MIN_FREE_MEMORY
 
 AsyncMqttClient client;
 
