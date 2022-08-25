@@ -6,7 +6,7 @@
 - add libraries via Tools/Manage-libraries, filter on "wifi" and install WiFiManager by tablatronix version 0.16.0, ESP Telnet by Lennart Hennigs version 1.3.1,
 - find library folder (I think this is in libraries within the folder mentioned as Sketchblook location in File/Preferences)
 - close Arduino IDE
-- add two more libraries manually by either "cd ~/Arduino/libraries ; git clone https://github.com/marvinroger/async-mqtt-client; git clone https://github.com/me-no-dev/ESPAsyncTCP/" (or by downloading ZIP files from Github and unzipping these)
+- add two more libraries manually by either "cd ~/Arduino/libraries ; git clone https://github.com/marvinroger/async-mqtt-client; git clone https://github.com/philbowles/ESPAsyncTCP" (or by downloading ZIP files from Github and unzipping these)
 - add P1P2Serial code with examples by "cd ~/Arduino/libraries ; git clone https://github.com/Arnold-n/P1P2Serial" (or by downloading ZIP files from Github and unzipping these, but git clone is recommended as it enables git use to track changes)
 - open Arduino IDE
 

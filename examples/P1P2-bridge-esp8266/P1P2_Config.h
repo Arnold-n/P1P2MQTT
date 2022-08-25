@@ -16,7 +16,7 @@
 #ifndef P1P2_Config
 #define P1P2_Config
 
-#define COMBIBOARD // define this for Arduino/ESP8266 combi-board and for P1P2-ESP-Interface
+#define COMBIBOARD // define this for Arduino/ESP8266 combi-board and for P1P2-ESP-Interface, undefine for ESP-on-USB-debug
 
 #ifdef COMBIBOARD
 #define SERIALSPEED 250000

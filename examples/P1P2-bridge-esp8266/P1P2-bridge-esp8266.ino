@@ -12,8 +12,8 @@
  *
  * Requires libraries:
  * WiFiManager 0.16.0 by tzapu (installed using Arduino IDE)
- * AsyncMqttClient 0.9.0 by Marvin Roger obtained as ZIP from https://github.com/marvinroger/async-mqtt-client
- * ESPAsyncTCP 1.2.2 by Khoi Hoang obtained as ZIP from https://github.com/me-no-dev/ESPAsyncTCP/
+ * AsyncMqttClient 0.9.0 by Marvin Roger obtained with git clone or as ZIP from https://github.com/marvinroger/async-mqtt-client
+ * ESPAsyncTCP 2.0.1 by Phil Bowles obtained with git clone or as ZIP from https://github.com/philbowles/ESPAsyncTCP/
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history

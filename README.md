@@ -319,13 +319,15 @@ The simple answer is: write when others don't. In practice communication seems t
 
 **Software requirements**
 
-Version 0.9.15 uses Arduino IDE 1.8.19 and the following libraries:
+Version 0.9.17 uses Arduino IDE 1.8.19 and the following libraries:
 - WiFiManager 0.16.0 by tzapu (installed using Arduino IDE)
-- [AsyncMqttClient 0.9.0](https://github.com/marvinroger/async-mqtt-client) by Marvin Roger obtained as ZIP file and extracted in Arduino's library directory
-- [ESPAsyncTCP 1.2.2](https://github.com/me-no-dev/ESPAsyncTCP/) by Khoi Hoang obtained as ZIP file and extracted in Arduino's library directory
+- [AsyncMqttClient 0.9.0](https://github.com/marvinroger/async-mqtt-client) by Marvin Roger obtained with git clone or as ZIP file and extracted in Arduino's library directory
+- [ESPAsyncTCP 2.0.1](https://github.com/philbowles/ESPAsyncTCP/) by Phil Bowles obtained with git clone or as ZIP file and extracted in Arduino's library directory
 - ESP_Telnet 1.3.1 by Lennart Hennigs (installed using Arduino IDE)
 
 For 8MHz ATmega328P support, install [MCUdude's MiniCore](https://github.com/MCUdude/MiniCore) by adding [board manager URL](https://mcudude.github.io/MiniCore/package_MCUdude_MiniCore_index.json) under File/Preferences/Additional board manager URLs.
+
+For ESP8266 support, install the ESP8266 BSP by adding [board manager URL](http://arduino.esp8266.com/stable/package_esp8266com_index.json) under File/Preferences/Additional board manager URLs.
 
 **Acknowledgements**
 
