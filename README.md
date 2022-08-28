@@ -289,7 +289,7 @@ The MAX22088 and MAX22288 are available from regular distributors such as Mouser
 
 **What does the data on the P1/P2 bus look like, at the physical level?**
 
-The P1/P2 bus uses the Home Bus System protocol, which is a serial protocol. It is a variation of bipolar encoding ([alternate mark inversion](https://en.wikipedia.org/wiki/Bipolar_encoding)), but the pulses only take half of the bit time. So every falling edge in the signal represents a 0, and every "missing" falling edge represents a 1. Every byte is coded as a start bit (0), 8 data bits (LSB first), 1 parity bit (even), and 1 stop bit (1). The Daikin devices have no pause between the stop bit and the next start bit, but Zennio's KLIC-DA has a short pause in between the individual bytes of a packet. As it is a two-wire interface, devices should not write on the bus if any other device is writing. The HBS standard has an advanced collision detection and priority mechanism. In a 2-device set up of a Daikin heat pump and a thermostat, the devices seem to simply alternate turns in writing to the bus, and Daikin does not seem to support bus usage detection and collission avoidance, so take care when writing to the bus to avoid bus collisions.
+Please refer to the [P1/P2 pyhsical layer](doc/PhysicalLayer.md) documentation.
 
 **What does the data on the P1/P2 bus look like, at the logical level?**
 
