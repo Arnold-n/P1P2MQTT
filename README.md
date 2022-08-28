@@ -280,7 +280,6 @@ This set-up provides flexibity as the Uno can directly be programmed from the Ra
 
 (*) Instead of runnning P1P2Monitor in this set-up, the code from [Budulinek](https://github.com/budulinek/Daikin-P1P2---UDP-Gateway) may better be suited.
 
-
 **Where can I buy a MM1192 or XL1192 or MAX22x88?**
 
 The MM1192 (DIP or SOIC) and XL1192S (SOIC) are available only from a few sellers on ebay and aliexpress. The XL1192S can also be purchased from [LCSC](https://lcsc.com).
@@ -289,19 +288,13 @@ The MAX22088 and MAX22288 are available from regular distributors such as Mouser
 
 **What does the data on the P1/P2 bus look like, at the physical level?**
 
-Please refer to the [P1/P2 pyhsical layer](doc/PhysicalLayer.md) documentation.
+Please refer to the [P1/P2 physical layer](PhysicalLayer/README.md) documentation.
 
 **What does the data on the P1/P2 bus look like, at the logical level?**
 
-The Daikin protocol does not follow the HBS packet format or HBS timing specification. Instead, the data is transmitted in short packets of 4-24 bytes each. Each cycle has a number of request packets sent by the thermostat and answered by the heat pump; additionally, a number of request packets are sent by the thermostat and answered by an external auxiliary controller (if available); some systems support only one auxiliary controller, others support two. The Daikin hybrid system uses a protocol where a set of 13, sometimes more, packets are communicated in sequence. We will call this set of packets a package. The thermostat sends the first packet and the last packet in each package. Further exceptions apply. The first few bytes of each packet may indicate source, desination, and/or packet type number. After that the payload follows, followed by a CRC byte. The CRC algorithm for the Daikin hybrid is a simple 8-bit LFSR with a feed of 0x00 and a generator value of 0xD9. It may be different for other products.
+The P1/P2 data contains various data items, like temperatures, data flow, software serial number, operating mode, number of operating hours, energy consumed, schedules, field settings, etcetera.
 
-**What does the payload look like?**
-
-The payload contains various data items, like temperatures, data flow, software serial number, operating mode, number of operating hours, energy consumed, etcetera. Temperatures and flows can be coded as value\*10, so with an accuracy of one digit after the comma: a value of 0x01B6 (hex value for 438, means 43.8). Other values may be encoded as two bytes, one byte for the value before the comma, the other behind (for example a room temperature is encoded as 0x14 0x18, or 20 24, meaning 20 24/256 or 20.1 degrees).
-
-**How to avoid bus collissions when writing?**
-
-The simple answer is: write when others don't. In practice communication seems to be initiated by the thermostat(s), and parties alternate turns. The heat pump seems to answer each request after a fixed time (25ms in my situation). P1P2Serial implements a setDelay(t) function which ensures a write does not happen until exactly t milliseconds after the last start bit falling edge detected. Calling setDelay(2) before starting a (block)transmission is a safe way to start any block of communication. If imitating a heat pump, calling setDelay(25) would make the adapter answer 25ms after the last byte received. Use of setDelay(1) is discouraged: a byte transmission takes slightly longer than 1 ms. A setDelay(1) will set transmission to 1.146ms, the time it takes to transmit 1 byte (11 bits at 9600 baud), but this still creates a bus collision if the other party transmitting has not finished. This may be detected by a parity error or read-back verification error. Some simple bus collision avoidance mechanism is implemented but bus collissions are of course better avoided.
+Please refer to the [P1/P2 logical layer](LogicalLayer/README.md) documentation for more details.
 
 **Which files to start with?**
 

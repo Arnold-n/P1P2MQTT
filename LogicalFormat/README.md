@@ -8,35 +8,45 @@ The information is this directory is based on reverse engineering and assumption
 
 This is only a generic description, more detail per product can be found in the individual files here.
 
-Communication on the P1/P2 bus consists of requests/response packets between a main controller device (previously called master device) and one or more peripheral devices (previously called slave devices).
+The HBS standard has an advanced collision detection and priority mechanism. Daikin does not use this. Daikin does not seem to support this and does not seem to detect bus collisions. So take care when writing to the bus to avoid bus collisions. P1P2Serial attempts to detect bus collisions and stop writing upon detection.
 
-Requests are only issued by the main controller. Each request addresses a single peripheral. Responses by one of the (addressed) peripherals (heat pump or auxiliary controller). The main controller waits for a response (or timeout) before issuing a new request. 
+In a Daikin system, devices simply alternate turns in writing to the bus. Communication on the P1/P2 bus consists of requests/response packets between a main controller device (previously called master device) and one or more peripheral devices (previously called slave devices).
 
 #### Main controller
 
-There can only be one main controller, this is usually the wall-mounted user interface or main room thermostat. For example, on Daikin Altherma the user interface is called EKRUCBL (https://www.daikin.eu/en_us/products/EKRUCBL.html). Sometimes the main controller is located inside the heat pump system itself, especially if the system has a screen menu (example: EHVX08S23D6V).
+On Daikin Altherma the user interface may be called EKRUCBL (https://www.daikin.eu/en_us/products/EKRUCBL.html). Sometimes the main controller is located inside the heat pump system itself, especially if the system has a screen menu (example: EHVX08S23D6V). The main controller performs a request-response protocol with a main peripheral (the heat pump system) and optionally additional auxiliary controllers (such as a LAN adapter, or this project's P1P2Monitor running on the P1P2-ESP-interface). The main controller waits for a response (or timeout) before issuing a new request. 
 
 #### Peripherals
 
 There is always at least one peripheral on the P1/P2 bus: the heat pump itself (address 00). Depending on the main controller, one or more external controllers are allowed as additional peripherals (address 0xF0 and higher). An additional peripheral (such as a Daikin LAN adapter BRP069A61 or BRP069A62, a Zennio KLIC-DA KNX adapter, or Realtime Modbus RTD-LT/CA adapter) acts as an auxiliary (or external) controller. 
 
-#### P1P2Monitor interaction
+#### What does the data on the P1/P2 bus look like, at the logical level?**
+
+
+The payload contains various data items, like temperatures, data flow, software serial number, operating mode, number of operating hours, energy consumed, etcetera. Temperatures and flows can be coded as value\*10, so with an accuracy of one digit after the comma: a value of 0x01B6 (hex value for 438, means 43.8). Other values may be encoded as two bytes, one byte for the value before the comma, the other behind (for example a room temperature is encoded as 0x14 0x18, or 20 24, meaning 20 24/256 or 20.1 degrees).
+
+#### How to avoid bus collissions when writing?**
+
+The simple answer is: write when others don't. In practice communication seems to be initiated by the thermostat(s), and parties alternate turns. The heat pump seems to answer each request after a fixed time (usually 25ms in my situation). P1P2Serial implements a setDelay(t) function which ensures a write does not happen until exactly t milliseconds after the last start bit falling edge detected - or if this time has passed, after a longer timout). Calling setDelay(2) before starting a (block)transmission is a safe way to start any block of communication. If imitating a heat pump, calling setDelay(25) would make the adapter answer 25ms after the last byte received. Use of setDelay(1) is discouraged: a byte transmission takes slightly longer than 1 ms. A setDelay(1) will set transmission to 1.146ms, the time it takes to transmit 1 byte (11 bits at 9600 baud), but this still creates a bus collision if the other party transmitting has not finished. This may be detected by a parity error or read-back verification error.ter avoided.
+
+### P1P2Monitor interaction
 
 P1P2Monitor not only acts as an auxiliary controller (like some commercial products), it also monitors all communication between main controller and heat pump, and reports detected parameters and/or raw data. This reduces delay from measurement to observation of the data on MQTT. All communication is forwarded over MQTT/WiFi enabling integration in Home Assistant and other domotica solutions.
 
 Because we have no access to Daikin's documentation, we do not know which systems are supported. Various users have reported success in basic control functions. In my system I can control a lot of parameters. It is logical to assume that devices that are supported by other auxiliary controllers (Zennio KLIC-DA KNX interface, Daikin LAN adapter, are or could be supported.
 
-**High-level packet description**
+### High-level packet description**
 
-Each packet consists of a header (3 bytes), payload data (between 0 and 20 bytes) and a CRC checksum (1 byte):
+The Daikin protocol does not follow the HBS packet format specification. Instead, the data is transmitted in a cyclic protocol of short packets of 4-24 bytes each. Each cycle has a number of request packets sent by the thermostat and answered by the heat pump; additionally, a number of request packets are sent by the thermostat and answered by an external auxiliary controller (if available); some systems support only one auxiliary controller, others support two. The Daikin hybrid system uses a protocol where approximately each second a set of 6 request/responses are exchanged with the heat pump, followed by one request to an auxiliary controller. If answered by the auxiliary controller, additional request/response pairs are exchanged. The first few bytes of each packet may indicate source, desination, and/or packet type number. After that the payload follows, followed by a CRC byte. The CRC algorithm for the Daikin hybrid is a simple 8-bit LFSR with a feed of 0x00 and a generator value of 0xD9. It may be different for other products.
 
+Each packet consists of a header (3 bytes), payload data (minimum 0, maximum 20 bytes) and a CRC checksum (1 byte):
 
 | Byte position  |                     | Hex value observed         |
 |----------------|:--------------------|:----------------------------------------------------------------------------------------------------------|
 |  Header byte 0 | direction           | 00 = request from main controller to peripheral<br> 40 = response from peripheral <br> 80 = observed during boot
 |  Header byte 1 | peripheral address  | 00 = heat pump<br>Fx = external controller 
 |  Header byte 2 | packet type         | 1X = packets in basic communication with heat pump  <br> 3X = packets from/to auxiliary controller(s) <br> 0X, 2X, 60-BF = various parameter/status communication and settings
-|  0 ..          | payload data        | see detailed info in the product-dependent files
+|  0 - 19        | payload data        | see detailed info in the product-dependent files
 |  CRC byte      | CRC checksum        | 
 
 **Package cycle description**
