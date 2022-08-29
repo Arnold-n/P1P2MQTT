@@ -146,13 +146,15 @@ byte cntByte [36] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 char ha_mqttKey[HA_KEY_LEN];
 char ha_mqttValue[HA_VALUE_LEN];
 static byte uom = 0;
+static byte stateclass = 0;
 
 #define HA_KEY snprintf_P(ha_mqttKey, HA_KEY_LEN, PSTR("%s/%s/%c%c_%s/config"), HA_PREFIX, HA_DEVICE_ID, mqtt_key[-4], mqtt_key[-2], mqtt_key);
-#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",\"uniq_id\":\"%c%c_%s%s\",%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
+#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",\"state_class\":\"%s\",\"uniq_id\":\"%c%c_%s%s\",%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
   /* name */         mqtt_key[-4], mqtt_key[-2], mqtt_key, \
   /* stat_t */       mqtt_key - MQTT_KEY_PREFIXLEN,\
+  /* state_class */  ((stateclass == 2) ? "total_increasing" : ((stateclass == 1) ? "measurement" : "")),\
   /* uniq_id */      mqtt_key[-4], mqtt_key[-2], mqtt_key, HA_POSTFIX, \
-  /* dev_cla */      "",\
+  /* dev_cla */      ((stateclass == 2) ? "\"dev_cla\":\"energy\"," : ""),\
   /* unit_of_meas */ ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"ºC\"," : ""))))))))),\
   /* ic */ ((uom == 9) ? "\"ic\":\"mdi:counter\"," : ((uom == 8) ? "\"ic\":\"mdi:memory\"," : ((uom == 7) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 6) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 5) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 4) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 3) ? "\"ic\":\"mdi:water-boiler\"," : ((uom == 2) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 1) ? "\"ic\":\"mdi:coolant-temperature\"," : ""))))))))),\
   /* device */       \
@@ -1025,16 +1027,16 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 // BITBASIS returns 8 if at least one bit of a byte changed, or if at least one bit of a byte hasn't been seen before, otherwise 0
 // value of byte and of seen status should not be saved (yet) (saveSeen=0), this is done on bit basis
 
-#define HACONFIG { haConfig = 1; uom = 0;};
-#define HATEMP { uom = 1; };
-#define HAPOWER {uom = 2; };
-#define HAFLOW  {uom = 3; };
-#define HAKWH   {uom = 4; };
-#define HAHOURS {uom = 5; };
-#define HASECONDS {uom = 6; };
-#define HAMILLISECONDS {uom = 7; };
-#define HABYTES   {uom = 8; };
-#define HAEVENTS  {uom = 9; };
+#define HACONFIG { haConfig = 1; uom = 0; stateclass = 0;};
+#define HATEMP { uom = 1;  stateclass = 1;};
+#define HAPOWER {uom = 2;  stateclass = 1;};
+#define HAFLOW  {uom = 3;  stateclass = 0;};
+#define HAKWH   {uom = 4;  stateclass = 2;};
+#define HAHOURS {uom = 5;  stateclass = 0;};
+#define HASECONDS {uom = 6;  stateclass = 0;};
+#define HAMILLISECONDS {uom = 7;  stateclass = 0;};
+#define HABYTES   {uom = 8;  stateclass = 0;};
+#define HAEVENTS  {uom = 9;  stateclass = 0;};
 
 byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, /*char &cat,*/ byte paramValLength) {
 // similar to bytes2keyvalue but using indirect parameter references in payloads

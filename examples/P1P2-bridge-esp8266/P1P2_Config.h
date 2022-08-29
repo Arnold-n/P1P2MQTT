@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20220829 v0.9.18 state_class added in MQTT discovery enabling visibility in HA energy overview
  * 20220821 v0.9.17-fix1 corrected negative deviation temperature reporting, more temp settings reported
  * 20220817 v0.9.17 config file using COMBIBOARD, errors and scopemode-time info via P1P2/R/#
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
@@ -51,9 +52,9 @@
 #define HA_DEVICE_ID "P1P2ID12"               // uniq device_id. Currently all sensors in one device_ID
 #define HA_DEVICE_MODEL "P1P2_ESP_Interface"  // shows up as Device Info in HA
 #define HA_MF "NPC"
-#define HA_SW "0.9.15"
+#define HA_SW "0.9.18"
 #define HA_KEY_LEN 100
-#define HA_VALUE_LEN 300
+#define HA_VALUE_LEN 600
 #define HA_POSTFIX "_12"
 
 // MQTT topics
