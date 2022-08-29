@@ -575,6 +575,7 @@ uint8_t param_value_s_BE(byte paramSrc, byte paramPacketType, uint16_t paramNr, 
   } else {
     snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", v);
   }
+  return 1;
 }
 
 // Parameters, unsigned, LE
@@ -613,6 +614,7 @@ uint8_t param_value_s_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, 
   } else {
     snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", v);
   }
+  return 1;
 }
 
 // u16div10, s16div10 LE
