@@ -31,8 +31,8 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability: don't #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.17-fix1"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.17-fix1"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.18"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.18"
 
 #define AVRISP // enables flashing ATmega by ESP
 
