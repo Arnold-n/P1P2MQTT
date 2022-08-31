@@ -1158,12 +1158,13 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0005 : PARAM_KEY("Unknown_Pulse_Q");                                                 CAT_UNKNOWN;                                 PARAM_VALUE_u16div10_and_u16hex_LE;   // 0xFE69 pulse /0xFe68  regular value ??0 / B8 related ??
         case 0x0006 : PARAM_KEY("Target_Temperature_LWT_Zone_Main_Abs");                              CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
         case 0x0007 : PARAM_KEY("Temperature_Unknown_Q7");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  19.0? (min/max cooling?)
-        case 0x0008 : PARAM_KEY("Temperature_LWT_Deviation_WD_Zone_Main");                          CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-8
-        case 0x0009 : PARAM_KEY("Temperature_LWT_Deviation_Unknown_Q9");                            CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 2.0?  related to 0x14-byte-9 2/5? // s16div10 , perhaps comfort deviation? (and 0x000E perhaps eco?)
+        case 0x0008 : PARAM_KEY("Temperature_LWT_Deviation_Heating_WD_Zone_Main");                          CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-8
+        case 0x0009 : PARAM_KEY("Temperature_LWT_Deviation_Cooling_WD_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ;
         case 0x000A : PARAM_KEY("Target_Temperature_LWT_Zone_Main");                              CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // (in 0.5 C)
         case 0x000B : PARAM_KEY("Target_Temperature_LWT_Zone_Add");                                 CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
         case 0x000C : PARAM_KEY("Target_Temperature_Q0C");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 22.0
-        case 0x000D : PARAM_KEY("Temperature_LWT_Deviation_WD_Zone_Add");                           CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-10
+        case 0x000D : PARAM_KEY("Temperature_LWT_Deviation_Heating_WD_Zone_Add");                           CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-10
+        //? case 0x000E : PARAM_KEY("Temperature_LWT_Deviation_Cooling_WD_Zone_Add");                           CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-10
         case 0x000F : PARAM_KEY("Target_Temperature_Q20");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0  (25.0?)
         case 0x0010 : PARAM_KEY("Target_Temperature_Q10");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 30.0
         case 0x0011 : PARAM_KEY("Temperature_Outside_1");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // Tempout1  in 0.5 C // ~ 0x11-0x40-5

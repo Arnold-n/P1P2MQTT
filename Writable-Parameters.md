@@ -26,11 +26,14 @@ Parameter in packet type 35 for switching DHW on/off
 Parameter in packet type 35 for switching DHWbooster on/off
 - 0x48 works on EHVX08S26CB9W
 
-Parameter in packet type 36 for setting heating setpoint
+Parameter in packet type 36 for setting heating setpoint in ABS mode
 - 0x06 works on EHBH16CAV3
 
 Parameter in packet type 36 for setting main zone heating temperature deviation in WD mode
 - 0x08 works on EHYHBX08AAV3
+
+Parameter in packet type 36 for setting main zone cooling temperature deviation in WD mode
+- 0x09 works on EHYHBX08AAV3
 
 Parameter in packet type 36 for setting additional zone heating temperature deviation in WD mode
 - 0x0D works on EHYHBX08AAV3
