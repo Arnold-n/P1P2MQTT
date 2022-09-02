@@ -2274,6 +2274,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    2 : KEY("MQTT_messages_skipped_not_connected");            HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
         case    6 : KEY("MQTT_messages_published");                        HACONFIG; HAEVENTS;                                                   VALUE_u32_LE;
         case    8 : KEY("MQTT_disconnected_time");                         HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
+        case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8;
+        case   10 : KEY("WiFi_status");                                    HACONFIG;                                                             VALUE_u8;
         default   : return 0;
       }
       default   : return 0;

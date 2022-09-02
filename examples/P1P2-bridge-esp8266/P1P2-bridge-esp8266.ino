@@ -1089,7 +1089,9 @@ void loop() {
       readHex[9]  = mqttPublished & 0xFF;
       readHex[10] = (Mqtt_disconnectTime >> 8) & 0xFF;
       readHex[11] = Mqtt_disconnectTime & 0xFF;
-      for (int i = 12; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
+      readHex[12] = WiFi.RSSI() & 0xFF;
+      readHex[13] = WiFi.status() & 0xFF;
+      for (int i = 14; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
       writePseudoPacket(readHex, 23, readBuffer);
     }
     if (pseudo0E > 5) {
