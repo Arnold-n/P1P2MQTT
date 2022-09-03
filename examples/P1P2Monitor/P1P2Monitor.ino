@@ -37,6 +37,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20220903 v0.9.19 minor change in serial output
  * 20220830 v0.9.18 version alignment for firmware image release
  * 20220819 v0.9.17-fix1 fixed non-functioning 'E'/'n' write commands
  * 20220817 v0.9.17 scopemode, fixed 'W' command handling magic string prefix, SERIALSPEED/OLDP1P2LIB in P1P2Config.h now depends on F_CPU/COMBIBOARD selection, ..
@@ -877,7 +878,11 @@ void loop() {
           }
 #ifdef SERIAL_MAGICSTRING
         } else {
-          Serial.print(F("* Magic String mismatch: "));
+          if (!strncmp(RS, "* [ESP]", 7)) {
+            Serial.print(F("* Ignoring: "));
+          } else {
+            Serial.print(F("* Magic String mismatch: "));
+          }
           Serial.println(RS);
 #endif
         }
