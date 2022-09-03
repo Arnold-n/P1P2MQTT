@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20220003 v0.9.19 longer MQTT user/password, ESP reboot reason (define REBOOT_REASON) added in reporting
  * 20220829 v0.9.18 state_class added in MQTT discovery enabling visibility in HA energy overview
  * 20220821 v0.9.17-fix1 corrected negative deviation temperature reporting, more temp settings reported
  * 20220817 v0.9.17 config file using COMBIBOARD, errors and scopemode-time info via P1P2/R/#
@@ -31,13 +32,16 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability: don't #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.18"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.18"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.19"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.19"
 
 #define AVRISP // enables flashing ATmega by ESP
 
 //#define DEBUG_OVER_SERIAL // sends lots of information over serial. Uncomment this to avoid P1P2Monitor receiving this information. 
                           // Use only for serial over USB (or serial via 2nd ESP01) debugging
+//
+//#define REBOOT_REASON // stores reboot reason in flash upon 'D0', 'D1' command, MQTT reconnect failure, or wifimanager failure
+                      // only use this on stable systems or systems under test to avoid unnecessary flash writes
 
 #define TELNET // define to allow telnet access (no password protection!) for monitoring and control
                // the telnet library provides no authentication for telnet
@@ -123,4 +127,14 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
 #define MQTT_VALUE_LEN 400
 #endif
 
+#define REBOOT_REASON_NOTSTORED 0xFE
+#define REBOOT_REASON_NOTSUPPORTED 0xFF
+#define REBOOT_REASON_UNKNOWN 0x00          // could be power-down or crash
+#define REBOOT_REASON_WIFIMAN 0x01          // wifiMagaer time-out
+#define REBOOT_REASON_MQTT 0x02             // MQTT reconnect time-out
+#define REBOOT_REASON_OTA 0x03              // OTA restart
+#define REBOOT_REASON_D0 0xD0               // manual restart
+#define REBOOT_REASON_D1 0xD1               // manual reset
+
 #endif /* P1P2_Config */
+

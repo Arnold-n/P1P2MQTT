@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20220003 v0.9.19 longer MQTT user/password, ESP reboot reason (define REBOOT_REASON) added in reporting
  * 20220829 v0.9.18 state_class added in MQTT discovery enabling visibility in HA energy overview
  * 20220817 v0.9.17 handling telnet welcomestring, error/scopemode time info via P1P2/R/#, v9=ignoreserial
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
@@ -279,7 +280,7 @@ uint32_t prevMillis = 0; //millis();
 static uint32_t reconnectTime = 0;
 
 
-typedef struct MQTTSettings {
+typedef struct MQTTSettingsOld {
   char signature[10];
   char mqttUser[20];
   char mqttPassword[40];
@@ -287,7 +288,21 @@ typedef struct MQTTSettings {
   int  mqttPort;
 };
 
-MQTTSettings MQTT_server;
+typedef struct MQTTSettingsNew {
+  char signature[10];
+  char mqttUser[81];
+  char mqttPassword[81];
+  char mqttServer[20];
+  int  mqttPort;
+  byte rebootReason;
+};
+
+union MQTTSettingsUnion {
+  MQTTSettingsOld MQTTold;
+  MQTTSettingsNew MQTTnew;
+};
+
+MQTTSettingsUnion MQTT_server;
 
 void ATmega_dummy_for_serial() {
   Sprint_P(true, true, true, PSTR("* [ESP] Two dummy lines to ATmega."));
@@ -297,7 +312,7 @@ void ATmega_dummy_for_serial() {
   Serial.println(F("* Dummy line 2."));
 }
 
-#define MAX_COMMAND_LENGTH 102
+#define MAX_COMMAND_LENGTH 252 // B command can be long
 bool MQTT_commandReceived = false;
 char MQTT_commandString[MAX_COMMAND_LENGTH];
 bool telnetCommandReceived = false;
@@ -330,30 +345,30 @@ void handleCommand(const char* cmdString) {
               ATmega_uptime_prev = 0;
               break;
     case 'b': // display or set MQTT settings
-    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %19s %39s", &MQTT_server.mqttServer, &MQTT_server.mqttPort, &MQTT_server.mqttUser, &MQTT_server.mqttPassword)) > 0) {
-                Sprint_P(true, true, true, PSTR("* [ESP] Writing new parameters to EEPROM"));
+    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s", &MQTT_server.MQTTnew.mqttServer, &MQTT_server.MQTTnew.mqttPort, &MQTT_server.MQTTnew.mqttUser, &MQTT_server.MQTTnew.mqttPassword)) > 0) {
+                Sprint_P(true, true, true, PSTR("* [ESP] Writing new MQTT settings to EEPROM"));
                 EEPROM.put(0, MQTT_server);
                 EEPROM.commit();
-              }
+              } 
               if (n > 0) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server set to %s"), MQTT_server.mqttServer);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server set to %s"), MQTT_server.MQTTnew.mqttServer);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server %s"), MQTT_server.mqttServer);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server %s"), MQTT_server.MQTTnew.mqttServer);
               }
               if (n > 1) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port set to %i"), MQTT_server.mqttPort);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port set to %i"), MQTT_server.MQTTnew.mqttPort);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port %i"), MQTT_server.mqttPort);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port %i"), MQTT_server.MQTTnew.mqttPort);
               }
               if (n > 2) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user set to %s"), MQTT_server.mqttUser);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user set to %s"), MQTT_server.MQTTnew.mqttUser);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user %s"), MQTT_server.mqttUser);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user %s"), MQTT_server.MQTTnew.mqttUser);
               }
               if (n > 3) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password set to %s"), MQTT_server.mqttPassword);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password set to %s"), MQTT_server.MQTTnew.mqttPassword);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password %s"), MQTT_server.mqttPassword);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password %s"), MQTT_server.MQTTnew.mqttPassword);
               }
               Sprint_P(true, true, true, PSTR("* [ESP] Local IP address: %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
               if (n > 0) {
@@ -368,14 +383,14 @@ void handleCommand(const char* cmdString) {
                 } else {
                   Sprint_P(true, true, true, PSTR("* [ESP] MQTT Client disconnected"));
                 }
-                client.setServer(MQTT_server.mqttServer, MQTT_server.mqttPort);
-                client.setCredentials((MQTT_server.mqttUser[0] == '\0') ? 0 : MQTT_server.mqttUser, (MQTT_server.mqttPassword[0] == '\0') ? 0 : MQTT_server.mqttPassword);
+                client.setServer(MQTT_server.MQTTnew.mqttServer, MQTT_server.MQTTnew.mqttPort);
+                client.setCredentials((MQTT_server.MQTTnew.mqttUser[0] == '\0') ? 0 : MQTT_server.MQTTnew.mqttUser, (MQTT_server.MQTTnew.mqttPassword[0] == '\0') ? 0 : MQTT_server.MQTTnew.mqttPassword);
                 Sprint_P(true, true, true, PSTR("* [ESP] MQTT Try to connect"));
                 Mqtt_disconnectTime = 0;
                 client.connect();
                 delay(500);
                 if (client.connected()) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] MQTT client connected with new settings"));
+                  Sprint_P(true, true, true, PSTR("* [ESP] MQTT client connected with MQTTnew settings"));
                 } else {
                   Sprint_P(true, true, true, PSTR("* [ESP] MQTT connection failed, retrying in 5 seconds"));
                   reconnectTime = espUptime + 5;
@@ -386,8 +401,26 @@ void handleCommand(const char* cmdString) {
     case 'D': if (sscanf((const char*) (cmdString + 1), "%d", &temp) == 1) {
                 if (temp > 2) temp = 2;
                 switch (temp) {
-                  case 0 : Sprint_P(true, true, true, PSTR("* [ESP] Restarting ESP...")); ESP.restart(); delay(100); break;
-                  case 1 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting ESP...")); ESP.reset(); delay(100); break;
+                  case 0 : Sprint_P(true, true, true, PSTR("* [ESP] Restarting ESP...")); 
+#ifdef REBOOT_REASON
+                           MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_D0;
+                           EEPROM.put(0, MQTT_server);
+                           EEPROM.commit();
+#endif /* REBOOT_REASON */
+                           delay(100); 
+                           ESP.restart(); 
+                           delay(100); 
+                           break;
+                  case 1 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting ESP...")); 
+#ifdef REBOOT_REASON
+                           MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_D1;
+                           EEPROM.put(0, MQTT_server);
+                           EEPROM.commit();
+#endif /* REBOOT_REASON */
+                           delay(100); 
+                           ESP.reset(); 
+                           delay(100); 
+                           break;
                   case 2 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting maxLoopTime")); maxLoopTime = 0; break;
                   default : break;
                 }
@@ -509,6 +542,7 @@ void onInputReceived (String str) {
 
 bool OTAbusy = 0;
 static byte ignoreremainder = 2; // first line ignored - robustness
+static byte saveRebootReason = REBOOT_REASON_UNKNOWN;
 
 void setup() {
 // RESET_PIN (input mode unless reset ('A' command) actively pulls it down)
@@ -558,6 +592,24 @@ void setup() {
   // Custom static IP for client may be configured here
   // wifiManager.setSTAStaticIPConfig(IPAddress(192,168,0,99), IPAddress(192,168,0,1), IPAddress(255,255,255,0)); // optional DNS 4th argument
 
+// get EEPROM data and rebootReason
+  EEPROM.begin(sizeof(MQTTSettingsUnion));
+  EEPROM.get(0, MQTT_server);
+  saveRebootReason = REBOOT_REASON_NOTSUPPORTED;
+#ifdef REBOOT_REASON
+  if (!strcmp(MQTT_server.MQTTnew.signature, MQTT_SIGNATURE_NEW)) {
+    saveRebootReason = MQTT_server.MQTTnew.rebootReason;
+    if (saveRebootReason != REBOOT_REASON_UNKNOWN) {
+      MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_UNKNOWN;
+      EEPROM.put(0, MQTT_server);
+      EEPROM.commit();
+    }
+  } else {
+    saveRebootReason = REBOOT_REASON_NOTSTORED;
+  }
+#endif /* REBOOT_REASON */
+  Sprint_P(true, false, false, PSTR("* [ESP] ESP reboot reason %i"), saveRebootReason);
+
 // WiFiManager start
   // Fetches ssid, password, and tries to connect.
   // If it does not connect it starts an access point with the specified name,
@@ -567,6 +619,13 @@ void setup() {
   if (!wifiManager.autoConnect(WIFIMAN_SSID, WIFIMAN_PASSWORD)) {
     Serial_println(F("* [ESP] Failed to connect and hit timeout, resetting"));
     // Reset and try again
+#ifdef REBOOT_REASON
+    if (!strcmp(MQTT_server.MQTTnew.signature, MQTT_SIGNATURE_NEW)) {
+      MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_WIFIMAN;
+      EEPROM.put(0, MQTT_server);
+      EEPROM.commit();
+    }
+#endif /* REBOOT_REASON */
     ESP.reset();
     delay(2000);
   }
@@ -600,27 +659,42 @@ void setup() {
   mqttSignal[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
 
 // Store/retrieve MQTT settings entered in WiFiManager portal, and save to EEPROM
-  EEPROM.begin(sizeof(MQTTSettings));
   if (shouldSaveConfig) {
-    Serial_println(F("* [ESP] Writing new parameters to EEPROM"));
-    strlcpy(MQTT_server.signature,    MQTT_SIGNATURE, sizeof(MQTT_server.mqttUser));
-    strlcpy(MQTT_server.mqttServer,   WiFiManMqttServer.getValue(),   sizeof(MQTT_server.mqttServer));
-    if ((!strlen(WiFiManMqttPort.getValue())) || (sscanf(WiFiManMqttPort.getValue(), "%i", &MQTT_server.mqttPort) != 1)) MQTT_server.mqttPort = MQTT_PORT;
-    strlcpy(MQTT_server.mqttUser,     WiFiManMqttUser.getValue(),     sizeof(MQTT_server.mqttUser));
-    strlcpy(MQTT_server.mqttPassword, WiFiManMqttPassword.getValue(), sizeof(MQTT_server.mqttPassword));
+    Serial_println(F("* [ESP] Writing MQTTnew parameters to EEPROM"));
+    strlcpy(MQTT_server.MQTTnew.signature,    MQTT_SIGNATURE_NEW, sizeof(MQTT_server.MQTTnew.mqttUser));
+    strlcpy(MQTT_server.MQTTnew.mqttServer,   WiFiManMqttServer.getValue(),   sizeof(MQTT_server.MQTTnew.mqttServer));
+    if ((!strlen(WiFiManMqttPort.getValue())) || (sscanf(WiFiManMqttPort.getValue(), "%i", &MQTT_server.MQTTnew.mqttPort) != 1)) MQTT_server.MQTTnew.mqttPort = MQTT_PORT;
+    strlcpy(MQTT_server.MQTTnew.mqttUser,     WiFiManMqttUser.getValue(),     sizeof(MQTT_server.MQTTnew.mqttUser));
+    strlcpy(MQTT_server.MQTTnew.mqttPassword, WiFiManMqttPassword.getValue(), sizeof(MQTT_server.MQTTnew.mqttPassword));
     EEPROM.put(0, MQTT_server);
     EEPROM.commit();
   }
-  EEPROM.get(0, MQTT_server);
+
+  Serial_println(F("* [ESP] Check EEPROM for old signature"));
+  if (!strcmp(MQTT_server.MQTTold.signature, MQTT_SIGNATURE_OLD)) {
+    Serial_println(F("* [ESP] Old signature match, need to update EEPROM"));
+    Sprint_P(true, true, true, PSTR("* [ESP] Old signature match, need to update EEPROM"));
+    strlcpy(MQTT_server.MQTTnew.signature,    MQTT_SIGNATURE_NEW, sizeof(MQTT_server.MQTTnew.signature));
+    // order is important, don't overwrite old data before reading it
+    MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_UNKNOWN;
+    MQTT_server.MQTTnew.mqttPort = MQTT_server.MQTTold.mqttPort;
+    strlcpy(MQTT_server.MQTTnew.mqttServer,   MQTT_server.MQTTold.mqttServer,    sizeof(MQTT_server.MQTTnew.mqttServer));
+    strlcpy(MQTT_server.MQTTnew.mqttPassword, MQTT_server.MQTTold.mqttPassword,  sizeof(MQTT_server.MQTTnew.mqttPassword));
+    strlcpy(MQTT_server.MQTTnew.mqttUser,     MQTT_server.MQTTold.mqttUser,      sizeof(MQTT_server.MQTTnew.mqttUser));
+    EEPROM.put(0, MQTT_server);
+    EEPROM.commit();
+    EEPROM.get(0, MQTT_server);
+  }
   Serial_println(F("* [ESP] Check EEPROM signature, read EEPROM"));
-  if (strcmp(MQTT_server.signature, MQTT_SIGNATURE)) {
+  if (strcmp(MQTT_server.MQTTnew.signature, MQTT_SIGNATURE_NEW)) {
     Serial_println(F("* [ESP] Signature mismatch, need to init EEPROM"));
     Sprint_P(true, true, true, PSTR("* [ESP] Signature mismatch, need to init EEPROM"));
-    strlcpy(MQTT_server.signature,    MQTT_SIGNATURE, sizeof(MQTT_server.signature));
-    strlcpy(MQTT_server.mqttUser,     MQTT_USER,      sizeof(MQTT_server.mqttUser));
-    strlcpy(MQTT_server.mqttPassword, MQTT_PASSWORD,  sizeof(MQTT_server.mqttPassword));
-    strlcpy(MQTT_server.mqttServer,   MQTT_SERVER,    sizeof(MQTT_server.mqttServer));
-    MQTT_server.mqttPort = MQTT_PORT;
+    strlcpy(MQTT_server.MQTTnew.signature,    MQTT_SIGNATURE_NEW, sizeof(MQTT_server.MQTTnew.signature));
+    strlcpy(MQTT_server.MQTTnew.mqttUser,     MQTT_USER,          sizeof(MQTT_server.MQTTnew.mqttUser));
+    strlcpy(MQTT_server.MQTTnew.mqttPassword, MQTT_PASSWORD,      sizeof(MQTT_server.MQTTnew.mqttPassword));
+    strlcpy(MQTT_server.MQTTnew.mqttServer,   MQTT_SERVER,        sizeof(MQTT_server.MQTTnew.mqttServer));
+    MQTT_server.MQTTnew.mqttPort = MQTT_PORT;
+    MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_UNKNOWN;
     EEPROM.put(0, MQTT_server);
     EEPROM.commit();
   }
@@ -630,21 +704,21 @@ void setup() {
   client.onDisconnect(onMqttDisconnect);
   client.onPublish(onMqttPublish);
   client.onMessage(onMqttMessage);
-  client.setServer(MQTT_server.mqttServer, MQTT_server.mqttPort);
+  client.setServer(MQTT_server.MQTTnew.mqttServer, MQTT_server.MQTTnew.mqttPort);
 
   MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP]     = (local_ip[3] / 100) + '0';
   MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP + 1] = (local_ip[3] % 100) / 10 + '0';
   MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP + 2] = (local_ip[3] % 10) + '0';
 
   client.setClientId(MQTT_CLIENTNAME);
-  client.setCredentials((MQTT_server.mqttUser[0] == '\0') ? 0 : MQTT_server.mqttUser, (MQTT_server.mqttPassword[0] == '\0') ? 0 : MQTT_server.mqttPassword);
+  client.setCredentials((MQTT_server.MQTTnew.mqttUser[0] == '\0') ? 0 : MQTT_server.MQTTnew.mqttUser, (MQTT_server.MQTTnew.mqttPassword[0] == '\0') ? 0 : MQTT_server.MQTTnew.mqttPassword);
   // client.setWill(MQTT_WILL_TOPIC, MQTT_WILL_QOS, MQTT_WILL_RETAIN, MQTT_WILL_PAYLOAD); // TODO
 
   Serial_print(F("* [ESP] Clientname ")); Serial_println(MQTT_CLIENTNAME);
-  Serial_print(F("* [ESP] User ")); Serial_println(MQTT_server.mqttUser);
-  // Serial_print(F("* [ESP] Password ")); Serial_println(MQTT_server.mqttPassword);
-  Serial_print(F("* [ESP] Server ")); Serial_println(MQTT_server.mqttServer);
-  Serial_print(F("* [ESP] Port ")); Serial_println(MQTT_server.mqttPort);
+  Serial_print(F("* [ESP] User ")); Serial_println(MQTT_server.MQTTnew.mqttUser);
+  // Serial_print(F("* [ESP] Password ")); Serial_println(MQTT_server.MQTTnew.mqttPassword);
+  Serial_print(F("* [ESP] Server ")); Serial_println(MQTT_server.MQTTnew.mqttServer);
+  Serial_print(F("* [ESP] Port ")); Serial_println(MQTT_server.MQTTnew.mqttPort);
 
   delay(100);
   client.connect();
@@ -718,6 +792,11 @@ void setup() {
     Sprint_P(true, true, true, PSTR("* [ESP] OTA End"));
     Sprint_P(true, true, true, PSTR("* [ESP] Disconnect and stop telnet"));
     Serial_println(F("* [ESP] OTA End"));
+#ifdef REBOOT_REASON
+    MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_OTA;
+    EEPROM.put(0, MQTT_server);
+    EEPROM.commit();
+#endif /* REBOOT_REASON */
     delay(300);
     ESP.restart();
   });
@@ -784,7 +863,7 @@ void process_for_mqtt_json(byte* rb, int n) {
         throttle = throttleValue;
         int kvrbyte = bytes2keyvalue(rb[0], rb[2], i - 3, rb + 3, mqtt_key, mqtt_value);
         // returns 0 if byte does not trigger any output
-        // returns 1 if a new mqtt_key,mqtt_value should be output
+        // returns 1 if a MQTTnew mqtt_key,mqtt_value should be output
         // returns 8 if byte should be treated per bit
         // returns 9 if json string should be terminated
         if (kvrbyte == 9) {
@@ -895,6 +974,11 @@ void loop() {
       pseudo0F++;
       if (Mqtt_disconnectTime > MQTT_DISCONNECT_RESTART) {
         Sprint_P(true, true, true, PSTR("* [ESP] Restarting ESP to attempt to reconnect Mqtt")); 
+#ifdef REBOOT_REASON
+        MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_MQTT;
+        EEPROM.put(0, MQTT_server);
+        EEPROM.commit();
+#endif /* REBOOT_REASON */
         delay(100);
         ESP.restart(); 
         delay(100);
@@ -910,14 +994,14 @@ void loop() {
 #ifdef AVRISP
   // AVRISP
   static AVRISPState_t last_state = AVRISP_STATE_IDLE;
-  AVRISPState_t new_state = avrprog.update();
-  if (last_state != new_state) {
-    switch (new_state) {
+  AVRISPState_t MQTTnew_state = avrprog.update();
+  if (last_state != MQTTnew_state) {
+    switch (MQTTnew_state) {
       case AVRISP_STATE_IDLE:    Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] now idle"));           pinMode(RESET_PIN, INPUT); delay (200); ATmega_dummy_for_serial(); break;
       case AVRISP_STATE_PENDING: Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] connection pending")); pinMode(RESET_PIN, OUTPUT); break;
       case AVRISP_STATE_ACTIVE:  Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] programming mode"));   pinMode(RESET_PIN, OUTPUT); break;
     }
-    last_state = new_state;
+    last_state = MQTTnew_state;
   }
   // Serve the AVRISP client
   if (last_state != AVRISP_STATE_IDLE) avrprog.serve();
@@ -927,7 +1011,7 @@ void loop() {
   // mqtt connection check
   if (!client.connected()) {
     if (espUptime > reconnectTime) {
-      Sprint_P(true, false, true, PSTR("* [ESP] MQTT Try to reconnect to MQTT server %s:%i (%s/%s)"), MQTT_server.mqttServer, MQTT_server.mqttPort, MQTT_server.mqttUser, MQTT_server.mqttPassword);
+      Sprint_P(true, false, true, PSTR("* [ESP] MQTT Try to reconnect to MQTT server %s:%i (%s/%s)"), MQTT_server.MQTTnew.mqttServer, MQTT_server.MQTTnew.mqttPort, MQTT_server.MQTTnew.mqttUser, MQTT_server.MQTTnew.mqttPassword);
       client.connect();
       delay(500);
       if (client.connected()) {
@@ -1091,7 +1175,8 @@ void loop() {
       readHex[11] = Mqtt_disconnectTime & 0xFF;
       readHex[12] = WiFi.RSSI() & 0xFF;
       readHex[13] = WiFi.status() & 0xFF;
-      for (int i = 14; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
+      readHex[14] = saveRebootReason;
+      for (int i = 15; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
       writePseudoPacket(readHex, 23, readBuffer);
     }
     if (pseudo0E > 5) {

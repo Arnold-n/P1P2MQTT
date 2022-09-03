@@ -2276,6 +2276,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    8 : KEY("MQTT_disconnected_time");                         HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
         case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8;
         case   10 : KEY("WiFi_status");                                    HACONFIG;                                                             VALUE_u8;
+        case   11 : KEY("ESP_reboot_reason");                              HACONFIG;                                                             VALUE_u8hex;
         default   : return 0;
       }
       default   : return 0;
