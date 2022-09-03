@@ -28,7 +28,7 @@ By default, the interface only observes and attempts to interpret bus traffic. F
 
 **How can you build or buy one?**
 
-Buy new complete stand-alone P1P2-ESP-interface): I made a small number of factory-assembled PCBs (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, documented and tested), (August 2022:) these are all sold or reserved. I plan to make more. Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
+Buy new complete stand-alone P1P2-ESP-interface): I made a small number of factory-assembled PCBs (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, documented and tested), (August 2022:) these are all sold or reserved. I plan to make more, these will hopefully be ready in October 2022. Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
 
 Buy P1P2-adapter (older design below): I also sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno, as well as a newer MAX22088-based P1P2-adapter HAT which is slightly better.
 

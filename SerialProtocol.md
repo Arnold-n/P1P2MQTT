@@ -8,7 +8,7 @@ To suppress serial input not intended for P1P2Monitor (such as output (debug/boo
 
 ## Serial output
 
-The serial interface further provides hex-formatted raw P1/P2 packet data (and pseudopacket data). The serial output may be forwarded by P1P2-bridge-esp8266 over WiFi via telnet and via MQTT topics P1P2/R/# (raw hex data), P1P2/X/# (binary data), and P1P2/P/# (parameter data), and P1P2/S/# (reporting and status data).  
+The serial interface further provides hex-formatted raw P1/P2 packet data (and pseudo-packet data). The serial output may be forwarded by P1P2-bridge-esp8266 over WiFi via telnet and via MQTT topics P1P2/R/# (raw hex data), P1P2/X/# (binary data), and P1P2/P/# (parameter data), and P1P2/S/# (reporting and status data).  
 
 Verbosity of the serial output can be set to 0..4 with the 'V' command. Level 3 is default and recommended.
 
@@ -22,7 +22,7 @@ In all other verbosity levels, each serial output line starts with
 
 Hex packet data is formatted as 2 characters per byte. The CRC byte is included. In verbosity level 1, the CRC byte is separated by " CRC=".
 
-In verbosity level 1 or 3, a fixed-length relative timing info segment is added before the hex packet data, starting with a 'T' for a relative time stamp for P1/P2 bus data, or starting with a 'P' with an empty time stamp for pseudopacket data. 
+In verbosity level 1 or 3, a fixed-length relative timing info segment is added before the hex packet data, starting with a 'T' for a relative time stamp for P1/P2 bus data, or starting with a 'P' with an empty time stamp for pseudo-packet data. 
 
 In verbosity levels 1 or 4 provide more detail than other levels for debugging purposes. 
 
