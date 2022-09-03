@@ -149,10 +149,10 @@ static byte uom = 0;
 static byte stateclass = 0;
 
 #define HA_KEY snprintf_P(ha_mqttKey, HA_KEY_LEN, PSTR("%s/%s/%c%c_%s/config"), HA_PREFIX, HA_DEVICE_ID, mqtt_key[-4], mqtt_key[-2], mqtt_key);
-#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",\"state_class\":\"%s\",\"uniq_id\":\"%c%c_%s%s\",%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
+#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",%s\"uniq_id\":\"%c%c_%s%s\",%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
   /* name */         mqtt_key[-4], mqtt_key[-2], mqtt_key, \
   /* stat_t */       mqtt_key - MQTT_KEY_PREFIXLEN,\
-  /* state_class */  ((stateclass == 2) ? "total_increasing" : ((stateclass == 1) ? "measurement" : "")),\
+  /* state_class */  ((stateclass == 2) ? "\"state_class\":\"total_increasing\"," : ((stateclass == 1) ? "\"state_class\":\"measurement\"," : "")),\
   /* uniq_id */      mqtt_key[-4], mqtt_key[-2], mqtt_key, HA_POSTFIX, \
   /* dev_cla */      ((stateclass == 2) ? "\"dev_cla\":\"energy\"," : ""),\
   /* unit_of_meas */ ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"ºC\"," : ""))))))))),\
