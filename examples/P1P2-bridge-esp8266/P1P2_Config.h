@@ -37,8 +37,8 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability: don't #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.19"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.19"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.20"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.20"
 
 #define AVRISP // enables flashing ATmega by ESP
 
@@ -61,7 +61,7 @@
 #define HA_DEVICE_ID "P1P2ID12"               // uniq device_id. Currently all sensors in one device_ID
 #define HA_DEVICE_MODEL "P1P2_ESP_Interface"  // shows up as Device Info in HA
 #define HA_MF "NPC"
-#define HA_SW "0.9.18"
+#define HA_SW "0.9.20"
 #define HA_KEY_LEN 100
 #define HA_VALUE_LEN 600
 #define HA_POSTFIX "_12"
