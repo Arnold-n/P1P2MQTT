@@ -17,7 +17,8 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
- * 20220003 v0.9.19 longer MQTT user/password, ESP reboot reason (define REBOOT_REASON) added in reporting
+ * 20220904 v0.9.20 added E_SERIES/F_SERIES defines, and F-series VRV reporting in MQTT for 2 models
+ * 20220903 v0.9.19 longer MQTT user/password, ESP reboot reason (define REBOOT_REASON) added in reporting
  * 20220829 v0.9.18 state_class added in MQTT discovery enabling visibility in HA energy overview
  * 20220817 v0.9.17 handling telnet welcomestring, error/scopemode time info via P1P2/R/#, v9=ignoreserial
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
@@ -228,7 +229,13 @@ uint32_t Sprint_buffer_overflow = 0;
 // As this program does not use the (avr only) P1P2Serial library,
 // we need to include the json header file with a relative reference below
 // include here such that Sprint_P(PSTR()) is available in header file code
+
+#ifdef E_SERIES
 #include "P1P2_Daikin_ParameterConversion_EHYHB.h"
+#endif
+#ifdef F_SERIES
+#include "P1P2_Daikin_ParameterConversion_F.h"
+#endif
 
 static byte throttle = 1;
 static byte throttleValue = THROTTLE_VALUE;

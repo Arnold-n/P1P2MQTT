@@ -5,7 +5,8 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
- * 20220003 v0.9.19 longer MQTT user/password, ESP reboot reason (define REBOOT_REASON) added in reporting
+ * 20220904 v0.9.20 added E_SERIES/F_SERIES defines, and F-series VRV reporting in MQTT for 2 models
+ * 20220903 v0.9.19 longer MQTT user/password, ESP reboot reason (define REBOOT_REASON) added in reporting
  * 20220829 v0.9.18 state_class added in MQTT discovery enabling visibility in HA energy overview
  * 20220821 v0.9.17-fix1 corrected negative deviation temperature reporting, more temp settings reported
  * 20220817 v0.9.17 config file using COMBIBOARD, errors and scopemode-time info via P1P2/R/#
@@ -19,6 +20,10 @@
 #define P1P2_Config
 
 #define COMBIBOARD // define this for Arduino/ESP8266 combi-board and for P1P2-ESP-Interface, undefine for ESP-on-USB-debug
+
+// define only one of E_SERIES and F_SERIES:
+#define E_SERIES // for Daikin E* heat pumps
+//#define F_SERIES // for Daikin F* VRV systems
 
 #ifdef COMBIBOARD
 #define SERIALSPEED 250000
