@@ -6,7 +6,7 @@
 
 P1P2Monitor auxiliary control is currently only usable for Daikin E-series. Monitoring is also available for certain F-series models.
 
-[P1P2Monitor v0.9.18](P1P2Monitor-v0.9.18.ino.hex)
+[P1P2Monitor v0.9.18](P1P2Monitor-0.9.18.ino.hex)
 
 To install (Linux CLI):
 
