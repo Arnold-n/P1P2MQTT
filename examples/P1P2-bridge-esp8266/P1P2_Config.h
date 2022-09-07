@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20220907 v0.9.21 outputMode/outputFilter status survive ESP reboot (EEPROM), added MQTT_INPUT_BINDATA/MQTT_INPUT_HEXDATA (see below), reduced uptime update MQTT traffic
  * 20220904 v0.9.20 added E_SERIES/F_SERIES defines, and F-series VRV reporting in MQTT for 2 models
  * 20220903 v0.9.19 longer MQTT user/password, ESP reboot reason (define REBOOT_REASON) added in reporting
  * 20220829 v0.9.18 state_class added in MQTT discovery enabling visibility in HA energy overview
@@ -19,7 +20,7 @@
 #ifndef P1P2_Config
 #define P1P2_Config
 
-#define COMBIBOARD // define this for Arduino/ESP8266 combi-board and for P1P2-ESP-Interface, undefine for ESP-on-USB-debug
+//#define COMBIBOARD // define this for Arduino/ESP8266 combi-board and for P1P2-ESP-Interface, undefine for ESP01s-on-USB-debug
 
 // define only one of E_SERIES and F_SERIES:
 #define E_SERIES // for Daikin E* heat pumps
@@ -37,12 +38,12 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability: don't #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.20"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.20"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.21"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.21"
 
 #define AVRISP // enables flashing ATmega by ESP
 
-//#define DEBUG_OVER_SERIAL // sends lots of information over serial. Uncomment this to avoid P1P2Monitor receiving this information. 
+#define DEBUG_OVER_SERIAL // sends lots of information over serial. Uncomment this to avoid P1P2Monitor receiving this information. 
                           // Use only for serial over USB (or serial via 2nd ESP01) debugging
 //
 //#define REBOOT_REASON // stores reboot reason in flash upon 'D0', 'D1' command, MQTT reconnect failure, or wifimanager failure
@@ -55,13 +56,18 @@
 
 #define PSEUDO_PACKETS // define to have P1P2-bridge-esp8266 output additional P1P2-like packets with internal state information
 
+// if MQTT_INPUT_HEXDATA and/or MQTT_INPUT_BINDATA is defined, the serial input is ignored and data from either or both of
+// the defined topics is used for processing (subject to (outputMode & 0x4000) and (outputMode & 0x8000) respectively):
+#define MQTT_INPUT_HEXDATA "P1P2/R/190" // to use raw data from P1P2/X/xxx instead of serial input (for test purposes) (wildcard # does not seem to work)
+#define MQTT_INPUT_BINDATA "P1P2/X/190" // to use raw data from P1P2/X/xxx instead of serial input (for test purposes) (wildcard # does not seem to work)
+
 // home assistent discovery
 #define HA_PREFIX "homeassistant/sensor"      // homeassistant MQTT discovery prefix
 #define HA_DEVICE_NAME "P1P2"                 // becomes device name in HA
 #define HA_DEVICE_ID "P1P2ID12"               // uniq device_id. Currently all sensors in one device_ID
 #define HA_DEVICE_MODEL "P1P2_ESP_Interface"  // shows up as Device Info in HA
 #define HA_MF "NPC"
-#define HA_SW "0.9.20"
+#define HA_SW "0.9.21"
 #define HA_KEY_LEN 100
 #define HA_VALUE_LEN 600
 #define HA_POSTFIX "_12"
@@ -83,8 +89,7 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
 #define THROTTLE_VALUE 5 // start with 20% parameter coverage, increasing in (THROTTLE_VALUE-1)*(THROTTLE_STEP) seconds to 100%
 #define THROTTLE_STEP 4  // in seconds
 
-#define MQTT_PUBLISH_NONHA 1 // 1 publishes all parameters (subject to outputFilter and outputMode)
-                             // 0 (ugly, not entirely correct, implementation:) publishes only approximately subset of parameters which are defined to be discoverable by Home Assistant
+// #define MQTT_PUBLISH_NONHA 1 // this is now online configuration option as (outputMode & 0x10000)
 
 #define MQTT_DISCONNECT_CONTINUE 0 // 0 pauses processing packets if mqtt is disconnected (to avoid that changes are lost)
                                    // Set to 1 to continue (in case you have no mqtt of want to see changes via telnet or so)
@@ -99,7 +104,7 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
                                // 2 only changed parameters except measurements (temperature, flow)
                                // 3 only changed parameters except measurements (temperature, flow) and except date/time
                                // first-time parameters are always reported
-#define INIT_OUTPUTMODE 0x3803 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
+#define INIT_OUTPUTMODE 0x8001 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
                                // outputmode is sum of:
                                // 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx
                                // 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/xxx/#
@@ -108,13 +113,16 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
                                // 0x0010 ESP to output raw data over telnet
                                // 0x0020 to output mqtt individual parameter data over telnet
                                // 0x0040 to output json data over telnet
-                               // 0x0080 (reserved)
+                               // 0x0080 (reserved for time string in R output) 
                                // 0x0100 ESP to output raw data over serial
                                // 0x0200 to output mqtt individual parameter data over serial
                                // 0x0400 to output json data over serial
                                // 0x0800 to output raw bin data over P1P2/X/xxx
                                // 0x1000 to output timing data also over P1P2/R/xxx (prefix: C)
                                // 0x2000 to output error data also over P1P2/R/xxx (prefix: *)
+                               // 0x4000 to use P1P2/R/xxx as input (requires MQTT_INPUT_HEXDATA)
+                               // 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)
+                               // 0x10000 to include non-HACONFIG parameters in P1P2/P/#
 
 // no need to change these:
 #define RESET_PIN 5 // GPIO_5 on ESP-12F pin 20 connected to ATmega328P's reset line
@@ -140,6 +148,10 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
 #define REBOOT_REASON_OTA 0x03              // OTA restart
 #define REBOOT_REASON_D0 0xD0               // manual restart
 #define REBOOT_REASON_D1 0xD1               // manual reset
+
+#define EEPROM_SIGNATURE_OLD1 "P1P2sig" // old signature for EEPROM initialization (user/password length 19/39)
+#define EEPROM_SIGNATURE_OLD2 "P1P2sih" // new signature for EEPROM initialization (user/password length 80/80, rebootReason)
+#define EEPROM_SIGNATURE_NEW  "P1P2sii" // new signature for EEPROM initialization (user/password length 80/80, rebootReason, outputMode, outputFilter, reserved-data)
 
 #endif /* P1P2_Config */
 

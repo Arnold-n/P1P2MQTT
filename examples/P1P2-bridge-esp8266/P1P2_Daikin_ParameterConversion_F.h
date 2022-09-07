@@ -1,4 +1,4 @@
-/* P1P2_Daikin_ParameterConversion_F.h 
+/* P1P2_Daikin_ParameterConversion_F.h
  *
  * First attempt for product-dependent code for
  * - FDYQ180MV1
@@ -42,7 +42,8 @@
 #define CAT_TEMP         { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'T'); maxOutputFilter = 1; }  // TEMP
 #define CAT_MEASUREMENT  { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'M'); maxOutputFilter = 1; }  // non-TEMP measurements
 #define CAT_COUNTER      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'C'); } // kWh/hour counters
-#define CAT_PSEUDO       { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'A'); } // ATmega operation
+#define CAT_PSEUDO2      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'B'); } // 2nd ESP operation
+#define CAT_PSEUDO       { if (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] != 'B') mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'A'; } // ATmega/ESP operation
 #define CAT_TARGET       { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'D'); } // D desired
 #define CAT_DAILYSTATS   { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'R'); } // Results per day (tbd)
 #define CAT_UNKNOWN      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'U'); }
@@ -78,38 +79,18 @@ int TimeStringCnt = 0;  // reset when TimeString is changed, for use in P1P2Time
 byte maxOutputFilter = 0;
 
 #ifdef SAVEPACKETS
-#ifdef PSEUDO_PACKETS
-#define PCKTP_START  0x0D
-#define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 mapped to 0x16
-#define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 2)
-//byte packetsrc                                      = { {00                                           }, {  40                                              }}
-//byte packettype                                     = { {0D, 0E, 0F, 10,  11,  12,  13,  14,  15,  31 }, {  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  31 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { {20, 20, 20, 20,   8,  15,   3,  15,   6,   6 }, {  20,  20,  20,  20,  20,  20,  14,  19,   6,   0 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0, 20, 40, 60,  80,  88, 103, 106, 121, 127 }, { 133, 153, 173, 193, 213, 233, 253, 267, 286, 292 /* , sizeValSeen=292 */ }}; // Warning: if >256, make pi2 uint16_t // was 16-bit
-#define sizeValSeen 292
+#define PCKTP_START  0x08 // 0x08-0x11, 0x18 mapped to 0x12, 0x20 mapped to 0x13, 0x30 mapped to 0x14, 0x30-3F mapped to 0x15-0x24, 0x80 mapped to 0x25 // 0x37 zone name/0xC1 service mode subtype would require special coding, leave it out for now
+#define PCKTP_ARR_SZ 29
+//byte packetsrc                                      = { {00                                                                                               }, {40                                                                                               }}
+//byte packettype                                     = { {08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80 }, { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F, 80 }}
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  20,  20,  20,   0,  20,  20,  20,  20,  10,   7,   1,  20,   0,   0,   0,   0,   0,   0,   0,  16,  11,   0,  20,  12,   0,   0,   0,  10 }, {  0,  20,  20,  20,   0,  20,  20,  20,  20,   8,   0,  20,   0,   0,   0,   0,   0,   0,   0,   0,  15,   4,   0,  19,   2,   0,   0,   0, 10 }};
+const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 150, 157, 158, 178, 178, 178, 178, 178, 178, 178, 178, 194, 205, 205, 225, 237, 237, 237, 237 }, {247, 247, 267, 287, 307, 307, 327, 347, 367, 387, 395, 395, 415, 415, 415, 415, 415, 415, 415, 415, 415, 430, 434, 434, 453, 455, 455, 455, 455 /*, sizeValSeen = 465 */ }}; // Warning: if >256, make pi2 uint16_t // was 16-bit // TODO
+#define sizeValSeen 465
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
-#else /* PSEUDO_PACKETS */
-#define PCKTP_START  0x10
-#define PCKTP_END    0x15 // 0x10-0x15 and 0x31 mapped to 0x16
-#define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 2)
-//byte packetsrc                                  = { {00, 00, 00, 00, 00, 00, 00 }, {40, 40,  40,  40,  40,  40,  40 }}
-//byte packettype                                 = { {10, 11, 12, 13, 14, 15, 31 }, {10, 11,  12,  13,  14,  15,  31 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ] = { {20,  8, 15,  3, 15, 6,   6 }, {20, 20,  20,  14,  19,   6,   0 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ] = { { 0, 20, 28, 43, 46, 61, 67 }, {73, 93, 113, 133, 147, 166, 172 /*, sizeValSeen=172 */}}; // was 8-bit
-#define sizeValSeen 172
-byte payloadByteVal[sizeValSeen]  = { 0 };
-byte payloadByteSeen[sizeValSeen] = { 0 };
-#endif /* PSEUDO_PACKETS */
 #endif /* SAVEPACKETS */
-
-// for 0xB8 counters we store 36 bytes; 30 should suffice but not worth the extra code
 
 #define EMPTY_PAYLOAD 0xFF
-
-#ifdef SAVEPACKETS
-byte cntByte [36] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-#endif /* SAVEPACKETS */
 
 char ha_mqttKey[HA_KEY_LEN];
 char ha_mqttValue[HA_VALUE_LEN];
@@ -117,13 +98,13 @@ static byte uom = 0;
 static byte stateclass = 0;
 
 #define HA_KEY snprintf_P(ha_mqttKey, HA_KEY_LEN, PSTR("%s/%s/%c%c_%s/config"), HA_PREFIX, HA_DEVICE_ID, mqtt_key[-4], mqtt_key[-2], mqtt_key);
-#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",\"state_class\":\"%s\",\"uniq_id\":\"%c%c_%s%s\",%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
+#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",%s\"uniq_id\":\"%c%c_%s%s\",%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
   /* name */         mqtt_key[-4], mqtt_key[-2], mqtt_key, \
   /* stat_t */       mqtt_key - MQTT_KEY_PREFIXLEN,\
-  /* state_class */  ((stateclass == 2) ? "total_increasing" : ((stateclass == 1) ? "measurement" : "")),\
+  /* state_class */  ((stateclass == 2) ? "\"state_class\":\"total_increasing\"," : ((stateclass == 1) ? "\"state_class\":\"measurement\"," : "")),\
   /* uniq_id */      mqtt_key[-4], mqtt_key[-2], mqtt_key, HA_POSTFIX, \
   /* dev_cla */      ((stateclass == 2) ? "\"dev_cla\":\"energy\"," : ""),\
-  /* unit_of_meas */ ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"ºC\"," : ""))))))))),\
+  /* unit_of_meas */ ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"°C\"," : ""))))))))),\
   /* ic */ ((uom == 9) ? "\"ic\":\"mdi:counter\"," : ((uom == 8) ? "\"ic\":\"mdi:memory\"," : ((uom == 7) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 6) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 5) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 4) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 3) ? "\"ic\":\"mdi:water-boiler\"," : ((uom == 2) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 1) ? "\"ic\":\"mdi:coolant-temperature\"," : ""))))))))),\
   /* device */       \
     /* name */         HA_DEVICE_NAME,\
@@ -137,125 +118,57 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
 // returns true if a packet parameter is observed for the first time ((and publishes it for homeassistant if haConfig==true)
 // if (outputFilter <= maxOutputFilter), it detects if a parameter has changed, and returns true if changed (or if outputFilter==0)
 // Also, if saveSeen==true, the new value is saved
-// In BITBASIS calls, saveSeen should be false such that data can be handled again on bit-basis
 //
 #ifdef SAVEPACKETS
   bool newByte = (outputFilter == 0);
-  byte pts = (packetSrc >> 6) & 0x01;
-  byte pti = packetType - PCKTP_START;
-  if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x31 also covered, treat it as PCKTP_END + 1 (0x16)
+  byte pts = (packetSrc >> 6) & 0x01;  // 800018 -> 000018
+  byte pti = 0xFF;
+// ugly hard-coding, code is end-of-life, 0x0D-0x11, 0x18 mapped to 0x12, 0x20 mapped to 0x13, 0x30 mapped to 0x14, 0x30-3F mapped to 0x15-0x24, 0x80 mapped to 0x25 // 0x37 zone name/0xC1 service mode subtype would require special coding, leave it out for now
+  switch (packetType) {
+    case 0x08 ... 0x11 : pti = packetType - PCKTP_START; break;        // 0 .. 9
+    case          0x18 : pti = 0x12 - PCKTP_START; break;              // 10
+    case          0x20 : pti = 0x13 - PCKTP_START; break;              // 11
+    case 0x30 ... 0x3F : pti = packetType - 36; break;                 // 12 .. 27
+    case          0x80 : pti = 28; break;                              // 28
+    default            : /* pti = 0xFF;*/ newByte = 1; break;          // or newByte = 0;?
+  }
   if (payloadIndex == EMPTY_PAYLOAD) {
     newByte = 0;
-  } else if (packetType < PCKTP_START) {
-    newByte = 1;
-  } else if ((packetType > PCKTP_END) && (packetType != 0x31)) {
-    if (packetType == 0xB8) {
-      // Handle 0xB8 history
-      uint16_t pi2 = payloadIndex;
-      if (pi2 > 13) pi2 += 2;
-      pi2 >>= 2; // if payloadIndex is 3, 6, 9, 12, 15, 18, pi2 is now 0..5
-      pi2 += 6 * payload[0];
-      if (haConfig && (cntByte[pi2] & 0x80)) {
-        // MQTT discovery
-        // HA key
-        HA_KEY
-        // HA value
-        HA_VALUE
-        // publish key,value
-        client_publish_mqtt(ha_mqttKey, ha_mqttValue);
-      }
-      if (cntByte[pi2] != (payload[payloadIndex] & 0x7F) ) { // it's a 3-byte (slow) counter, so sufficient if we look at the 7 least significant bits LSB byte (LE); bit 7 = "!seen"
-        newByte = (outputFilter <= maxOutputFilter) || (cntByte[pi2] == 0xFF);
-        cntByte[pi2] = payload[payloadIndex] & 0x7F;
-      }
-      return (haConfig || MQTT_PUBLISH_NONHA) && newByte;
-    }
-    // not type packet type (0B-)10-15, 31, or B8, so indicate new if to be published:
-    newByte = (haConfig || MQTT_PUBLISH_NONHA);
-  } else if (payloadIndex > nr_bytes[pts][pti]) {
-    // Warning: payloadIndex > expected
-    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
-    newByte = (haConfig || MQTT_PUBLISH_NONHA);
-  } else if (payloadIndex + 1 < length) {
-    // Warning: payloadIndex + 1 < length
-    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex + 1 < length"));
-    return 0;
-  } else {
-    bool pubHA = false;
-    for (byte i = payloadIndex + 1 - length; i <= payloadIndex; i++) {
-      uint16_t pi2 = bytestart[pts][pti] + i;
-      if (pi2 >= sizeValSeen) {
-        pi2 = 0;
-        Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
-        return 0;
-      }
-      if (payloadByteSeen[pi2]) {
-        // this byte or at least some bits have been seen and saved before.
-        if (payloadByteVal[pi2] != payload[i]) {
-          newByte = (outputFilter <= maxOutputFilter);
-          if (saveSeen) payloadByteVal[pi2] = payload[i];
-        } // else payloadByteVal seen and not changed
-      } else {
-        // first time for this byte
-        newByte = 1;
-        if (saveSeen) {
-          pubHA = haConfig;
-          payloadByteSeen[pi2] = 0xFF;
-          payloadByteVal[pi2] = payload[i];
+  } else if (pti != 0xFF) {
+    if (payloadIndex > nr_bytes[pts][pti]) {
+      // Warning: payloadIndex > expected
+      Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
+      newByte = 1;
+    } else if (payloadIndex + 1 < length) {
+      // Warning: payloadIndex + 1 < length
+      Sprint_P(true, true, true, PSTR(" Warning: payloadIndex + 1 < length"));
+      return 0;
+    } else {
+      bool pubHA = false;
+      for (byte i = payloadIndex + 1 - length; i <= payloadIndex; i++) {
+        uint16_t pi2 = bytestart[pts][pti] + i;
+        if (pi2 >= sizeValSeen) {
+          pi2 = 0;
+          Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
+          return 0;
+        }
+        if (payloadByteSeen[pi2]) {
+          // this byte or at least some bits have been seen and saved before.
+          if (payloadByteVal[pi2] != payload[i]) {
+            newByte = (outputFilter <= maxOutputFilter);
+            if (saveSeen) payloadByteVal[pi2] = payload[i];
+          } // else payloadByteVal seen and not changed
+        } else {
+          // first time for this byte
+          newByte = 1;
+          if (saveSeen) {
+            pubHA = haConfig;
+            payloadByteSeen[pi2] = 0xFF;
+            payloadByteVal[pi2] = payload[i];
+          }
         }
       }
-    }
-    if (pubHA) {
-      // MQTT discovery
-      // HA key
-      HA_KEY
-      // HA value
-      HA_VALUE
-      // publish key,value
-      client_publish_mqtt(ha_mqttKey, ha_mqttValue);
-    }
-  }
-  return (haConfig || MQTT_PUBLISH_NONHA) && newByte;
-#else /* SAVEPACKETS */
-  return (haConfig || MQTT_PUBLISH_NONHA);
-#endif /* SAVEPACKETS */
-}
-
-bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte bitNr) {
-// returns whether bit bitNr of byte payload[payloadIndex] has a new value (also returns true if byte has not been saved)
-#ifdef SAVEPACKETS
-  bool newBit = (outputFilter == 0);
-  byte pts = (packetSrc >> 6);
-  byte pti = packetType - PCKTP_START;
-  if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x31 also covered
-  if (payloadIndex == EMPTY_PAYLOAD) {
-    newBit = 0;
-  } else if (bitNr > 7) {
-    // Warning: bitNr > 7
-    newBit = 1;
-  } else if (packetType < PCKTP_START) {
-    newBit = 1;
-  } else if ((packetType > PCKTP_END) && (packetType != 0x31)) {
-    newBit = 1;
-  } else if (payloadIndex > nr_bytes[pts][pti]) {
-    // Warning: payloadIndex > expected
-    newBit = 1;
-  } else {
-    uint16_t pi2 = bytestart[pts][pti] + payloadIndex; // no multiplication, bit-wise only for u8 type
-    if (pi2 >= sizeValSeen) {
-      pi2 = 0;
-      Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
-    }
-    byte bitMask = 1 << bitNr;
-    if (payloadByteSeen[pi2] & bitMask) {
-      if ((payloadByteVal[pi2] ^ payload[payloadIndex]) & bitMask) {
-        newBit = (outputFilter <= maxOutputFilter);
-        payloadByteVal[pi2] &= (0xFF ^ bitMask);
-        payloadByteVal[pi2] |= (payload[payloadIndex] & bitMask);
-      } // else payloadBit seen and not changed
-    } else {
-      // first time for this bit
-      if (haConfig) {
+      if (pubHA) {
         // MQTT discovery
         // HA key
         HA_KEY
@@ -264,16 +177,11 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
         // publish key,value
         client_publish_mqtt(ha_mqttKey, ha_mqttValue);
       }
-      newBit = 1;
-      payloadByteVal[pi2] &= (0xFF ^ bitMask); // if array initialized to zero, not needed
-      payloadByteVal[pi2] |= payload[payloadIndex] & bitMask;
-      payloadByteSeen[pi2] |= bitMask;
     }
-    if (outputFilter > maxOutputFilter) newBit = 0;
   }
-  return (haConfig || MQTT_PUBLISH_NONHA) && newBit;
+  return (haConfig || (outputMode & 0x10000) ) && newByte;
 #else /* SAVEPACKETS */
-  return (haConfig || MQTT_PUBLISH_NONHA);
+  return (haConfig || (outputMode & 0x10000) );
 #endif /* SAVEPACKETS */
 }
 
@@ -335,6 +243,19 @@ uint8_t value_u32_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* p
   return 1;
 }
 
+uint8_t value_u32_LE_uptime(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
+  uint8_t bitMaskUptime = 0x01;
+  if ((payload[payloadIndex - 3] == 0) && (payload[payloadIndex - 2] == 0)) {
+    while (payload[payloadIndex - 1] > bitMaskUptime) { bitMaskUptime <<= 1; bitMaskUptime |= 1; }
+  } else {
+    bitMaskUptime = 0xFF;
+  }
+  payload[payloadIndex] &= ~(bitMaskUptime >> 1);
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 4, 1)) return 0;
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%u", FN_u32_LE(&payload[payloadIndex]));
+  return 1;
+}
+
 // signed integers, LE
 
 uint8_t value_s8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
@@ -343,26 +264,18 @@ uint8_t value_s8(byte packetSrc, byte packetType, byte payloadIndex, byte* paylo
   return 1;
 }
 
+
+byte RSSIcnt = 0xFF;
+uint8_t value_s8_ratelimited(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
+  if (++RSSIcnt) return 0;
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1)) return 0;
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int8_t) payload[payloadIndex]);
+  return 1;
+}
+
 uint8_t value_s16_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
   if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1)) return 0;
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int16_t) FN_u16_LE(&payload[payloadIndex]));
-  return 1;
-}
-
-// single bit
-
-bool FN_flag8(uint8_t b, uint8_t n)  { return (b >> n) & 0x01; }
-
-uint8_t value_flag8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte bitNr) {
-  if (!newPayloadBitVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, bitNr))   return 0;
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", FN_flag8(payload[payloadIndex], bitNr));
-  return 1;
-}
-
-uint8_t unknownBit(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte bitNr) {
-  if (!outputUnknown || !(newPayloadBitVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, bitNr))) return 0;
-  snprintf(mqtt_key, MQTT_KEY_LEN, "PacketSrc_0x%02X_Type_0x%02X_Byte_%i_Bit_%i", packetSrc, packetType, payloadIndex, bitNr);
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", FN_flag8(payload[payloadIndex], bitNr));
   return 1;
 }
 
@@ -382,7 +295,7 @@ uint8_t value_u8_add2k(byte packetSrc, byte packetType, byte payloadIndex, byte*
 }
 
 int8_t FN_s4abs1c(uint8_t *b)        { int8_t c = b[0] & 0x0F; if (b[0] & 0x10) return -c; else return c; }
- 
+
 uint8_t value_s4abs1c(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
   if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1)) return 0;
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", FN_s4abs1c(&payload[payloadIndex]));
@@ -455,13 +368,7 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 }
 
 // return 0:            use this for all bytes (except for the last byte) which are part of a multi-byte parameter
-// BITBASIS (for j==8): this byte is to be treated on a bitbasis (by re-calling this function with j=0..7
-//                      switch-statement for j is needed as shown below
-//                      indicate for j=0..7: "KEY("KnownParameter"); VALUE_flag8" if bit usage is known
-//                      indicate for j=0..7: "UNKNOWN_BIT", mqtt_key will then be set to "Bit-0x[source]-0x[payloadnr]-0x[location]-[bitnr]"
-// BITBASIS_UNKNOWN:    shortcut for entire bit-switch statement if bit usage of all bits is unknown
 // UNKNOWN_BYTE:        byte function is unknown, mqtt_key will be: "PacketSrc-0xXX-Type-0xXX-Byte-I-Bit-I", value will be hex
-// UNKNOWN_BIT:         bit function is unknown, mqtt_key will be: "PacketSrc-0xXX-Type-0xXX-Byte-I-Bit-I", value will be hex
 // VALUE_u8:            1-byte unsigned integer value at current location payload[i]
 // VALUE_s8:            1-byte signed integer value at current location payload[i]
 // VALUE_u16:           3-byte unsigned integer value at location payload[i - 1]..payload[i]
@@ -486,12 +393,11 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 #define VALUE_u16_LE            { return         value_u16_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_u24_LE            { return         value_u24_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_u32_LE            { return         value_u32_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
+#define VALUE_u32_LE_uptime     { return         value_u32_LE_uptime(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 
 #define VALUE_s8                { return          value_s8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
+#define VALUE_s8_ratelimited    { return          value_s8_ratelimited(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_s16_LE            { return         value_s16_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
-
-#define VALUE_flag8             { return       value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, bitNr); }
-#define UNKNOWN_BIT             { CAT_UNKNOWN; return        unknownBit(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, bitNr); }
 
 #define VALUE_u8_add2k          { return    value_u8_add2k(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_s4abs1c             { return      value_s4abs1c(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
@@ -511,12 +417,7 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 #define UNKNOWN_BYTE            { CAT_UNKNOWN; return unknownByte(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_header            { return            value_trg(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 
-#define BITBASIS_UNKNOWN        { switch (bitNr) { case 8 : BITBASIS; default : UNKNOWN_BIT; } }
 #define TERMINATEJSON           { return 9; }
-
-#define BITBASIS                { return newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 0) << 3; }
-// BITBASIS returns 8 if at least one bit of a byte changed, or if at least one bit of a byte hasn't been seen before, otherwise 0
-// value of byte and of seen status should not be saved (yet) (saveSeen=0), this is done on bit basis
 
 #define HACONFIG { haConfig = 1; uom = 0; stateclass = 0;};
 #define HATEMP { uom = 1;  stateclass = 1;};
@@ -549,7 +450,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     payloadPointer = (payloadIndex == EMPTY_PAYLOAD ? 0 : &payload[payloadIndex]);
   };
 
-  byte PS = packetSrc ? 1 : 0;
+  byte PS = packetSrc ? ((packetSrc == 0x80) ? 6 : 1) : 0;
   byte src = PS;
   if ((packetType & 0xF0) == 0x30) src += 2;  // 2, 3 from/to auxiliary controller (use 4, 5 for 2nd auxiliary controller?)
   if ((packetType & 0xF8) == 0x00) src = 7; // boot
@@ -559,35 +460,35 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
   switch (packetType) {
     // Restart packet types 00-05 (restart procedure 00-05 followed by 20, 60-9F, A1, B1, B8, 21)
     // Main package communication packet types 10-16
-    case 0x10 :                                                 CAT_SETTING;
+    case 0x10 :
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
-        case    0 : KEY("Power_Off_On");                                   HACONFIG;                                                             VALUE_u8;
-        case    1 : KEY("Target_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    2 : KEY("Actual_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    3 : KEY("Target_Temperature");                             HACONFIG; HATEMP;                                                     VALUE_u8;
+        case    0 : KEY("Power_Off_On");                                   HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    1 : KEY("Target_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    2 : KEY("Actual_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    3 : KEY("Target_Temperature");                             HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
         case    4 : KEY("Unknown_000010_4");                               HACONFIG;                                                             VALUE_u8;
-        case    5 : KEY("Fan_Speed");                                      HACONFIG;                                                             VALUE_u8;
+        case    5 : KEY("Fan_Speed");                                      HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    6 : KEY("Unknown_000010_6");                               HACONFIG;                                                             VALUE_u8;
         case    7 : KEY("Unknown_000010_7");                               HACONFIG;                                                             VALUE_u8;
         case    8 : KEY("Unknown_000010_8");                               HACONFIG;                                                             VALUE_u8;
         case    9 : KEY("Unknown_000010_9");                               HACONFIG;                                                             VALUE_u8;
         case   10 : KEY("Unknown_000010_10");                              HACONFIG;                                                             VALUE_u8;
         case   11 : KEY("Unknown_000010_11");                              HACONFIG;                                                             VALUE_u8;
-        case   12 : KEY("Unknown_000010_12");                              HACONFIG;                                                             VALUE_u8;
-        case   13 : KEY("Unknown_000010_13");                              HACONFIG;                                                             VALUE_u8;
+        case   12 : KEY("Unknown_000010_12");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case   13 : KEY("System_status");                                  HACONFIG;                                                             VALUE_u8;
         case   14 : KEY("Unknown_000010_14");                              HACONFIG;                                                             VALUE_u8;
         case   15 : KEY("Unknown_000010_15");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
-        case    0 : KEY("Power_Off_On");                                   HACONFIG;                                                             VALUE_u8;
+        case    0 : KEY("Power_Off_On");                                   HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    1 : KEY("Unknown_000010_1");                               HACONFIG;                                                             VALUE_u8;
-        case    2 : KEY("Target_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    3 : KEY("Actual_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    4 : KEY("Target_Temperature");                             HACONFIG; HATEMP;                                                     VALUE_u8;
+        case    2 : KEY("Target_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    3 : KEY("Actual_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    4 : KEY("Target_Temperature");                             HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
         case    5 : KEY("Unknown_000010_5");                               HACONFIG;                                                             VALUE_u8;
-        case    6 : KEY("Fan_Speed");                                      HACONFIG;                                                             VALUE_u8;
+        case    6 : KEY("Fan_Speed");                                      HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    7 : KEY("Unknown_000010_7");                               HACONFIG;                                                             VALUE_u8;
         case    8 : KEY("Unknown_000010_8");                               HACONFIG;                                                             VALUE_u8;
         case    9 : KEY("Unknown_000010_9");                               HACONFIG;                                                             VALUE_u8;
@@ -595,22 +496,22 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   11 : KEY("Unknown_000010_11");                              HACONFIG;                                                             VALUE_u8;
         case   12 : KEY("Unknown_000010_12");                              HACONFIG;                                                             VALUE_u8;
         case   13 : KEY("Unknown_000010_13");                              HACONFIG;                                                             VALUE_u8;
-        case   14 : KEY("Unknown_000010_14");                              HACONFIG;                                                             VALUE_u8;
+        case   14 : KEY("System_status");                                  HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   15 : KEY("Unknown_000010_15");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       default   :               UNKNOWN_BYTE;
     }
-    case 0x11 :                                                
+    case 0x11 :
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    0 : KEY("Unknown_000011_0");                               HACONFIG;                                                             VALUE_u8;
         case    1 : KEY("Unknown_000011_1");                               HACONFIG;                                                             VALUE_u8;
         case    2 : return 0;
-        case    3 : KEY("Filter_related");                                 HACONFIG;                                                             VALUE_u16_LE;
+        case    3 : KEY("Filter_related");                                 HACONFIG; CAT_SETTING;                                                VALUE_u16_LE;
         case    4 : KEY("Unknown_000011_4");                               HACONFIG;                                                             VALUE_u8;
         case    5 : return 0;
-        case    6 : KEY("Temperature_Air_Intake");                         HACONFIG; CAT_TEMP; HATEMP;                                           VALUE_f8_8;
+        case    6 : KEY("Temperature_main_controller");                    HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_f8_8;
         default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
@@ -620,7 +521,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    3 : KEY("Unknown_400011_3");                               HACONFIG;                                                             VALUE_u8;
         case    4 : KEY("Unknown_400011_4");                               HACONFIG;                                                             VALUE_u8;
         case    5 : return 0;
-        case    6 : KEY("Temperature_Air_Intake_Q");                       HACONFIG;                                                             VALUE_f8_8;
+        case    6 : KEY("Temperature_inside_air_intake");                  HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_f8_8;
         default   : UNKNOWN_BYTE;
       }
       default   :               UNKNOWN_BYTE;
@@ -628,7 +529,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     case 0x18 :
                 switch (packetSrc) {
       case 0x80 : switch (payloadIndex) {
-        case    0 : KEY("Unknown_800018_0");                               HACONFIG;                                                             VALUE_u8;
+        case    0 : KEY("Heatpump_on");                                    HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    1 : KEY("Unknown_800018_1");                               HACONFIG;                                                             VALUE_u8;
         case    2 : KEY("Unknown_800018_2");                               HACONFIG;                                                             VALUE_u8;
         case    3 : KEY("Unknown_800018_3");                               HACONFIG;                                                             VALUE_u8;
@@ -638,7 +539,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       default   :               UNKNOWN_BYTE;
     }
-    case 0x20 :                                                 CAT_TEMP;
+    case 0x20 :
                 switch (packetSrc) {
       case 0x40 : switch (payloadIndex) {
         case    0 : KEY("Unknown_400020_0");                               HACONFIG;                                                             VALUE_u8;
@@ -665,7 +566,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       default   :               UNKNOWN_BYTE;
     }
-    case 0x30 :                                                 CAT_TEMP;
+    case 0x30 :
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    0 : KEY("Unknown_00F030_0");                               HACONFIG;                                                             VALUE_u8;
@@ -695,49 +596,49 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
 /*
  *  case 0x37 : // FDYQ180MV1 zone names TBD
  */
-   case 0x38 :                                                 CAT_SETTING; // FDY125LV1 operation mode
+   case 0x38 :                                                              // FDY125LV1 operation mode
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
-        case    0 : KEY("Power_Off_On");                                   HACONFIG;                                                             VALUE_u8;
+        case    0 : KEY("Power_Off_On");                                   HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    1 : KEY("Unknown_00F038_1");                               HACONFIG;                                                             VALUE_u8;
-        case    2 : KEY("Target_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    3 : KEY("Actual_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    4 : KEY("Target_Temperature_Cooling");                     HACONFIG; HATEMP;                                                     VALUE_u8;
-        case    5 : KEY("Error_Setting_1_Q");                              HACONFIG;                                                             VALUE_u8;
-        case    6 : KEY("Fan_Speed_Cooling");                              HACONFIG;                                                             VALUE_u8;
+        case    2 : KEY("Target_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    3 : KEY("Actual_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    4 : KEY("Target_Temperature_Cooling");                     HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
+        case    5 : KEY("Error_Setting_1_Q");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    6 : KEY("Fan_Speed_Cooling");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    7 : KEY("Unknown_00F038_7");                               HACONFIG;                                                             VALUE_u8;
-        case    8 : KEY("Target_Temperature_Heating");                     HACONFIG; HATEMP;                                                     VALUE_u8;
-        case    9 : KEY("Error_Setting_2_Q");                              HACONFIG;                                                             VALUE_u8;
-        case   10 : KEY("Fan_Speed_Heating");                              HACONFIG;                                                             VALUE_u8;
+        case    8 : KEY("Target_Temperature_Heating");                     HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
+        case    9 : KEY("Error_Setting_2_Q");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case   10 : KEY("Fan_Speed_Heating");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   11 : KEY("Unknown_00F038_11");                              HACONFIG;                                                             VALUE_u8;
         case   12 : KEY("Unknown_00F038_12");                              HACONFIG;                                                             VALUE_u8;
         case   13 : KEY("Unknown_00F038_13");                              HACONFIG;                                                             VALUE_u8;
-        case   14 : KEY("Clear_Error_Code");                               HACONFIG;                                                             VALUE_u8;
+        case   14 : KEY("Clear_Error_Code");                               HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   15 : KEY("Unknown_00F038_14");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
-        case    0 : KEY("Power_Off_On");                                   HACONFIG;                                                             VALUE_u8;
-        case    1 : KEY("Target_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    2 : KEY("Target_Temperature_Cooling");                     HACONFIG; HATEMP;                                                     VALUE_u8;
-        case    3 : KEY("Error_Setting_1_Q");                              HACONFIG;                                                             VALUE_u8;
-        case    4 : KEY("Fan_Speed_Cooling");                              HACONFIG;                                                             VALUE_u8;
+        case    0 : KEY("Power_Off_On");                                   HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    1 : KEY("Target_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    2 : KEY("Target_Temperature_Cooling");                     HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
+        case    3 : KEY("Error_Setting_1_Q");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    4 : KEY("Fan_Speed_Cooling");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    5 : KEY("Unknown_40F038_5");                               HACONFIG;                                                             VALUE_u8;
-        case    6 : KEY("Target_Temperature_Heating");                     HACONFIG; HATEMP;                                                     VALUE_u8;
-        case    7 : KEY("Error_Setting_2_Q");                              HACONFIG;                                                             VALUE_u8;
-        case    8 : KEY("Fan_Speed_Heating");                              HACONFIG;                                                             VALUE_u8;
+        case    6 : KEY("Target_Temperature_Heating");                     HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
+        case    7 : KEY("Error_Setting_2_Q");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    8 : KEY("Fan_Speed_Heating");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    9 : KEY("Unknown_40F038_9");                               HACONFIG;                                                             VALUE_u8;
         case   10 : KEY("Unknown_40F038_10");                              HACONFIG;                                                             VALUE_u8;
-        case   11 : KEY("Clear_Error_Code");                               HACONFIG;                                                             VALUE_u8;
-        case   12 : KEY("Clear_Error_Code");                               HACONFIG;                                                             VALUE_u8;
+        case   11 : KEY("Clear_Error_Code");                               HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case   12 : KEY("Clear_Error_Code");                               HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   13 : KEY("Unknown_40F038_13");                              HACONFIG;                                                             VALUE_u8;
-        case   14 : KEY("Fan_Mode_Q");                                     HACONFIG;                                                             VALUE_u8;
+        case   14 : KEY("Fan_Mode_Q");                                     HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   15 : KEY("Unknown_40F038_15");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       default   :               UNKNOWN_BYTE;
     }
-    case 0x39 :                                                 CAT_SETTING; // FDY125LV1 filter?
+    case 0x39 :                                                            // FDY125LV1 filter?
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    0 : KEY("Unknown_00F039_0");                               HACONFIG;                                                             VALUE_u8;
@@ -749,54 +650,54 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    6 : KEY("Unknown_00F039_6");                               HACONFIG;                                                             VALUE_u8;
         case    7 : KEY("Unknown_00F039_7");                               HACONFIG;                                                             VALUE_u8;
         case    8 : return 0;
-        case    9 : KEY("Filter_related");                                 HACONFIG;                                                             VALUE_u16hex_LE;
+        case    9 : KEY("Filter_related");                                 HACONFIG; CAT_SETTING;                                                VALUE_u16hex_LE;
         case   10 : KEY("Unknown_00F039_10");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
-        case    0 : KEY("Filter_Alarm_reset_Q");                           HACONFIG;                                                             VALUE_u8;
+        case    0 : KEY("Filter_Alarm_reset_Q");                           HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    1 : KEY("Unknown_40F039_1");                               HACONFIG;                                                             VALUE_u8;
         case    2 : return 0;
-        case    3 : KEY("Filter_related");                                 HACONFIG;                                                             VALUE_u16hex_LE;
+        case    3 : KEY("Filter_related");                                 HACONFIG; CAT_SETTING;                                                VALUE_u16hex_LE;
         default   : UNKNOWN_BYTE;
       }
       default   :               UNKNOWN_BYTE;
     }
-    case 0x3B :                                                 CAT_SETTING; // FDYQ180MV1 operation mode
+    case 0x3B :                                                           // FDYQ180MV1 operation mode
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
-        case    0 : KEY("Power_Off_On");                                   HACONFIG;                                                             VALUE_u8;
+        case    0 : KEY("Power_Off_On");                                   HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    1 : KEY("Unknown_00F03B_1");                               HACONFIG;                                                             VALUE_u8;
-        case    2 : KEY("Target_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    3 : KEY("Actual_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    4 : KEY("Target_Temperature_Cooling");                     HACONFIG; HATEMP;                                                     VALUE_u8;
-        case    5 : KEY("Error_Setting_1_Q");                              HACONFIG;                                                             VALUE_u8;
-        case    6 : KEY("Fan_Speed_Cooling");                              HACONFIG;                                                             VALUE_u8;
+        case    2 : KEY("Target_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    3 : KEY("Actual_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    4 : KEY("Target_Temperature_Cooling");                     HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
+        case    5 : KEY("Error_Setting_1_Q");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    6 : KEY("Fan_Speed_Cooling");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    7 : KEY("Unknown_00F03B_7");                               HACONFIG;                                                             VALUE_u8;
-        case    8 : KEY("Target_Temperature_Heating");                     HACONFIG; HATEMP;                                                     VALUE_u8;
-        case    9 : KEY("Error_Setting_2_Q");                              HACONFIG;                                                             VALUE_u8;
-        case   10 : KEY("Fan_Speed_Heating");                              HACONFIG;                                                             VALUE_u8;
+        case    8 : KEY("Target_Temperature_Heating");                     HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
+        case    9 : KEY("Error_Setting_2_Q");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case   10 : KEY("Fan_Speed_Heating");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   11 : KEY("Unknown_00F03B_11");                              HACONFIG;                                                             VALUE_u8;
         case   12 : KEY("Unknown_00F03B_12");                              HACONFIG;                                                             VALUE_u8;
         case   13 : KEY("Unknown_00F03B_13");                              HACONFIG;                                                             VALUE_u8;
-        case   14 : KEY("Clear_Error_Code");                               HACONFIG;                                                             VALUE_u8;
+        case   14 : KEY("Clear_Error_Code");                               HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   15 : KEY("Unknown_00F03B_15");                              HACONFIG;                                                             VALUE_u8;
         case   16 : KEY("Unknown_00F03B_16");                              HACONFIG;                                                             VALUE_u8;
-        case   17 : KEY("Zone_status");                                    HACONFIG;                                                             VALUE_u8;
-        case   18 : KEY("Fan_mode");                                       HACONFIG;                                                             VALUE_u8;
+        case   17 : KEY("Zone_status");                                    HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case   18 : KEY("Fan_mode");                                       HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   19 : KEY("Unknown_00F03B_14");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
-        case    0 : KEY("Power_Off_On");                                   HACONFIG;                                                             VALUE_u8;
-        case    1 : KEY("Target_Operating_Mode");                          HACONFIG;                                                             VALUE_u8;
-        case    2 : KEY("Target_Temperature_Cooling");                     HACONFIG; HATEMP;                                                     VALUE_u8;
-        case    3 : KEY("Error_Setting_1_Q");                              HACONFIG;                                                             VALUE_u8;
-        case    4 : KEY("Fan_Speed_Cooling");                              HACONFIG;                                                             VALUE_u8;
+        case    0 : KEY("Power_Off_On");                                   HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    1 : KEY("Target_Operating_Mode");                          HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    2 : KEY("Target_Temperature_Cooling");                     HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
+        case    3 : KEY("Error_Setting_1_Q");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    4 : KEY("Fan_Speed_Cooling");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    5 : KEY("Unknown_40F03B_5");                               HACONFIG;                                                             VALUE_u8;
-        case    6 : KEY("Target_Temperature_Heating");                     HACONFIG; HATEMP;                                                     VALUE_u8;
-        case    7 : KEY("Error_Setting_2_Q");                              HACONFIG;                                                             VALUE_u8;
-        case    8 : KEY("Fan_Speed_Heating");                              HACONFIG;                                                             VALUE_u8;
+        case    6 : KEY("Target_Temperature_Heating");                     HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_u8;
+        case    7 : KEY("Error_Setting_2_Q");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case    8 : KEY("Fan_Speed_Heating");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    9 : KEY("Unknown_40F03B_9");                               HACONFIG;                                                             VALUE_u8;
         case   10 : KEY("Unknown_40F03B_10");                              HACONFIG;                                                             VALUE_u8;
         case   11 : KEY("Unknown_40F03B_11");                              HACONFIG;                                                             VALUE_u8;
@@ -804,14 +705,14 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   13 : KEY("Unknown_40F03B_13");                              HACONFIG;                                                             VALUE_u8;
         case   14 : KEY("Unknown_40F03B_14");                              HACONFIG;                                                             VALUE_u8;
         case   15 : KEY("Unknown_40F03B_15");                              HACONFIG;                                                             VALUE_u8;
-        case   16 : KEY("Zone_status");                                    HACONFIG;                                                             VALUE_u8;
-        case   17 : KEY("Fan_mode");                                       HACONFIG;                                                             VALUE_u8;
+        case   16 : KEY("Zone_status");                                    HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case   17 : KEY("Fan_mode");                                       HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   18 : KEY("Unknown_40F03B_18");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       default   :               UNKNOWN_BYTE;
     }
-    case 0x3C :                                                 CAT_SETTING; // FDYQ180MV1 filter
+    case 0x3C :                                                            // FDYQ180MV1 filter
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    0 : KEY("Unknown_00F03C_0");                               HACONFIG;                                                             VALUE_u8;
@@ -823,27 +724,27 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    6 : KEY("Unknown_00F03C_6");                               HACONFIG;                                                             VALUE_u8;
         case    7 : KEY("Unknown_00F03C_7");                               HACONFIG;                                                             VALUE_u8;
         case    8 : return 0;
-        case    9 : KEY("Filter_related");                                 HACONFIG;                                                             VALUE_u16hex_LE;
+        case    9 : KEY("Filter_related");                                 HACONFIG; CAT_SETTING;                                                VALUE_u16hex_LE;
         case   10 : KEY("Unknown_00F03C_10");                              HACONFIG;                                                             VALUE_u8;
         case   11 : KEY("Unknown_00F03C_11");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
-        case    0 : KEY("Filter_Alarm_reset_Q");                           HACONFIG;                                                             VALUE_u8;
+        case    0 : KEY("Filter_Alarm_reset_Q");                           HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case    1 : KEY("Unknown_40F03C_1");                               HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       default   :               UNKNOWN_BYTE;
     }
-    case 0xC1 :                                                 CAT_TEMP; HATEMP; // FDY125LV1 service mode
+    case 0xC1 :                                                            // FDY125LV1 service mode
                 switch (packetSrc) {
       case 0x40 : switch (payloadIndex) {
         case    0 : C1_subtype = payloadByte; break;
         case    1 : KEY("Unknown_0000C1_1");                               HACONFIG;                                                             VALUE_u8;
         case    2 : return 0;
         case    3 : switch (C1_subtype){
-          case   1 : KEY("Temperature_Air_Intake");                        HACONFIG;                                                             VALUE_f8_8;
-          case   2 : KEY("Temperature_Heat_Exchanger");                    HACONFIG;                                                             VALUE_f8_8;
+          case   1 : KEY("Temperature_Air_Intake");                        HACONFIG; CAT_TEMP; HATEMP;                                           VALUE_f8_8;
+          case   2 : KEY("Temperature_Heat_Exchanger");                    HACONFIG; CAT_TEMP; HATEMP;                                           VALUE_f8_8;
           default  : UNKNOWN_BYTE;
         }
         default   : UNKNOWN_BYTE;
@@ -852,6 +753,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     }
 #ifdef PSEUDO_PACKETS
 // ATmega/ESP pseudopackets
+    case 0x09 :                                                            CAT_PSEUDO2;
     case 0x0D :                                                            CAT_PSEUDO;
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
@@ -860,18 +762,19 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       case 0x40 : switch (payloadIndex) {
         case    0 : KEY("ESP_Compile_Options");                                                                                                  VALUE_u8hex;
         case    2 : KEY("MQTT_messages_skipped_not_connected");            HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
-        case    6 : KEY("MQTT_messages_published");                        HACONFIG; HAEVENTS;                                                   VALUE_u32_LE;
+        case    6 : KEY("MQTT_messages_published");                     /* HACONFIG; HAEVENTS; */                                                VALUE_u32_LE;
         case    8 : KEY("MQTT_disconnected_time");                         HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
-        case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8;
+        case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8_ratelimited;
         case   10 : KEY("WiFi_status");                                    HACONFIG;                                                             VALUE_u8;
         default   : return 0;
       }
       default   : return 0;
     }
+    case 0x0A :                                                            CAT_PSEUDO2;
     case 0x0E :                                                            CAT_PSEUDO;
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
-        case    3 : KEY("ATmega_Uptime");                                  HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE;
+        case    3 : KEY("ATmega_Uptime");                                  HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE_uptime;
         case    7 : KEY("CPU_Frequency");                                                                                                        VALUE_u32_LE;
         case    8 : KEY("Writes_Refused");                                 HACONFIG;                                                             VALUE_u8;
         case    9 : KEY("Counter_Request_Repeat");                         HACONFIG;                                                             VALUE_u8;
@@ -884,7 +787,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         default   : return 0;
       }
       case 0x40 : switch (payloadIndex) {
-        case    3 : KEY("ESP_Uptime");                                     HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE;
+        case    3 : KEY("ESP_Uptime");                                     HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE_uptime;
         case    7 : KEY("MQTT_Acknowledged");                                                                                                    VALUE_u32_LE;
         case   11 : KEY("MQTT_Gaps");                                                                                                            VALUE_u32_LE;
         case   13 : KEY("MQTT_Min_Memory_Size");                           HACONFIG; HABYTES;                                                    VALUE_u16_LE;
@@ -894,6 +797,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       default   : return 0;
     }
+    case 0x0B :                                                            CAT_PSEUDO2;
     case 0x0F :                                                            CAT_PSEUDO;
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {

@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20220907 v0.9.21 outputMode/outputFilter status survive ESP reboot (EEPROM), added MQTT_INPUT_BINDATA/MQTT_INPUT_HEXDATA (see P1P2_Config.h), reduced uptime update MQTT traffic
  * 20220904 v0.9.20 added E_SERIES/F_SERIES defines, and F-series VRV reporting in MQTT for 2 models
  * 20220903 v0.9.19 longer MQTT user/password, ESP reboot reason (define REBOOT_REASON) added in reporting
  * 20220829 v0.9.18 state_class added in MQTT discovery enabling visibility in HA energy overview
@@ -67,8 +68,8 @@ ESP8266AVRISP avrprog(avrisp_port, RESET_PIN, 2e5); // default avrprog speed is 
 #endif
 
 static byte outputFilter = INIT_OUTPUTFILTER;
-static uint16_t outputMode = INIT_OUTPUTMODE;
-#define outputUnknown (outputMode & 0x08)
+static uint32_t outputMode = INIT_OUTPUTMODE;
+#define outputUnknown (outputMode & 0x0008)
 
 const byte Compile_Options = 0 // multi-line statement
 #ifdef SAVEPARAMS
@@ -134,18 +135,6 @@ void onTelnetConnectionAttempt(String ip) {
 }
 #endif
 
-#define RB 400     // max size of readBuffer (serial input from Arduino)
-#define HB 33      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
-
-char readBuffer[RB];
-byte readHex[HB];
-
-static uint8_t rb=0; // MOVE inside routine
-static char* rb_buffer = readBuffer;
-static int c;
-static byte ESP_serial_input_Errors_Data_Short = 0;
-static byte ESP_serial_input_Errors_CRC = 0;
-
 #ifndef MQTT_PORT
 #define MQTT_PORT 1883
 #endif
@@ -171,6 +160,7 @@ void client_publish_serial(char* key, char* value) {
 }
 
 bool mqttConnected = false;
+bool mqttSetupReady = false;
 uint16_t Mqtt_msgSkipLowMem = 0;
 uint16_t Mqtt_msgSkipNotConnected = 0;
 uint16_t Mqtt_disconnects = 0;
@@ -246,6 +236,14 @@ void onMqttConnect(bool sessionPresent) {
   Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttCommands, result);
   result = client.subscribe(mqttCommandsNoIP, MQTT_QOS);
   Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttCommandsNoIP, result);
+#ifdef MQTT_INPUT_BINDATA
+  result = client.subscribe(MQTT_INPUT_BINDATA, MQTT_QOS);
+  Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), MQTT_INPUT_BINDATA, result);
+#endif
+#ifdef MQTT_INPUT_HEXDATA
+  result = client.subscribe(MQTT_INPUT_HEXDATA, MQTT_QOS);
+  Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), MQTT_INPUT_HEXDATA, result);
+#endif
   throttleValue = THROTTLE_VALUE;
   mqttConnected = true;
 }
@@ -287,7 +285,7 @@ uint32_t prevMillis = 0; //millis();
 static uint32_t reconnectTime = 0;
 
 
-typedef struct MQTTSettingsOld {
+typedef struct EEPROMSettingsOld {
   char signature[10];
   char mqttUser[20];
   char mqttPassword[40];
@@ -295,21 +293,28 @@ typedef struct MQTTSettingsOld {
   int  mqttPort;
 };
 
-typedef struct MQTTSettingsNew {
+#define NR_RESERVED 100
+
+typedef struct EEPROMSettingsNew {
   char signature[10];
   char mqttUser[81];
   char mqttPassword[81];
   char mqttServer[20];
   int  mqttPort;
   byte rebootReason;
+// additional values with newest signature:
+  uint32_t outputMode;
+  byte outputFilter;
+  byte reserved[NR_RESERVED];
 };
 
-union MQTTSettingsUnion {
-  MQTTSettingsOld MQTTold;
-  MQTTSettingsNew MQTTnew;
+
+union EEPROMSettingsUnion {
+  EEPROMSettingsOld EEPROMold;
+  EEPROMSettingsNew EEPROMnew;
 };
 
-MQTTSettingsUnion MQTT_server;
+EEPROMSettingsUnion EEPROM_state;
 
 void ATmega_dummy_for_serial() {
   Sprint_P(true, true, true, PSTR("* [ESP] Two dummy lines to ATmega."));
@@ -317,6 +322,8 @@ void ATmega_dummy_for_serial() {
   Serial.println(F("* Dummy line 1."));
   Serial.print(F(SERIAL_MAGICSTRING));
   Serial.println(F("* Dummy line 2."));
+  Serial.print(F(SERIAL_MAGICSTRING));
+  Serial.println('V');
 }
 
 #define MAX_COMMAND_LENGTH 252 // B command can be long
@@ -325,9 +332,27 @@ char MQTT_commandString[MAX_COMMAND_LENGTH];
 bool telnetCommandReceived = false;
 char telnetCommandString[MAX_COMMAND_LENGTH];
 
+#define RB 400     // max size of readBuffer (serial input from Arduino)
+#define HB 33      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
+
+char readBuffer[RB];
+#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+#define MQTT_RB 1024 // must be 2^x
+char MQTT_readBuffer[MQTT_RB];
+volatile uint16_t MQTT_readBufferH = 0;
+volatile uint16_t MQTT_readBufferT = 0;
+
+#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
+
+static char* rb_buffer = readBuffer;
+static uint8_t serial_rb = 0;
+static int c;
+static byte ESP_serial_input_Errors_Data_Short = 0;
+static byte ESP_serial_input_Errors_CRC = 0;
+
 static uint32_t ATmega_uptime_prev = 0;
 
-void handleCommand(const char* cmdString) {
+void handleCommand(char* cmdString) {
 // handles a single command (not necessarily '\n'-terminated) received via telnet or MQTT (P1P2/W)
 // most of these messages are fowarded over serial to P1P2Monitor on ATmega
 // some messages are (also) handled on the ESP
@@ -352,30 +377,30 @@ void handleCommand(const char* cmdString) {
               ATmega_uptime_prev = 0;
               break;
     case 'b': // display or set MQTT settings
-    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s", &MQTT_server.MQTTnew.mqttServer, &MQTT_server.MQTTnew.mqttPort, &MQTT_server.MQTTnew.mqttUser, &MQTT_server.MQTTnew.mqttPassword)) > 0) {
+    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s", &EEPROM_state.EEPROMnew.mqttServer, &EEPROM_state.EEPROMnew.mqttPort, &EEPROM_state.EEPROMnew.mqttUser, &EEPROM_state.EEPROMnew.mqttPassword)) > 0) {
                 Sprint_P(true, true, true, PSTR("* [ESP] Writing new MQTT settings to EEPROM"));
-                EEPROM.put(0, MQTT_server);
+                EEPROM.put(0, EEPROM_state);
                 EEPROM.commit();
               } 
               if (n > 0) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server set to %s"), MQTT_server.MQTTnew.mqttServer);
+                Sprint_P(true, true, true, PSTR("* [ESP] EEPROM_state set to %s"), EEPROM_state.EEPROMnew.mqttServer);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server %s"), MQTT_server.MQTTnew.mqttServer);
+                Sprint_P(true, true, true, PSTR("* [ESP] EEPROM_state %s"), EEPROM_state.EEPROMnew.mqttServer);
               }
               if (n > 1) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port set to %i"), MQTT_server.MQTTnew.mqttPort);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port set to %i"), EEPROM_state.EEPROMnew.mqttPort);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port %i"), MQTT_server.MQTTnew.mqttPort);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port %i"), EEPROM_state.EEPROMnew.mqttPort);
               }
               if (n > 2) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user set to %s"), MQTT_server.MQTTnew.mqttUser);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user set to %s"), EEPROM_state.EEPROMnew.mqttUser);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user %s"), MQTT_server.MQTTnew.mqttUser);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user %s"), EEPROM_state.EEPROMnew.mqttUser);
               }
               if (n > 3) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password set to %s"), MQTT_server.MQTTnew.mqttPassword);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password set to %s"), EEPROM_state.EEPROMnew.mqttPassword);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password %s"), MQTT_server.MQTTnew.mqttPassword);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password %s"), EEPROM_state.EEPROMnew.mqttPassword);
               }
               Sprint_P(true, true, true, PSTR("* [ESP] Local IP address: %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
               if (n > 0) {
@@ -390,14 +415,14 @@ void handleCommand(const char* cmdString) {
                 } else {
                   Sprint_P(true, true, true, PSTR("* [ESP] MQTT Client disconnected"));
                 }
-                client.setServer(MQTT_server.MQTTnew.mqttServer, MQTT_server.MQTTnew.mqttPort);
-                client.setCredentials((MQTT_server.MQTTnew.mqttUser[0] == '\0') ? 0 : MQTT_server.MQTTnew.mqttUser, (MQTT_server.MQTTnew.mqttPassword[0] == '\0') ? 0 : MQTT_server.MQTTnew.mqttPassword);
+                client.setServer(EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort);
+                client.setCredentials((EEPROM_state.EEPROMnew.mqttUser[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttUser, (EEPROM_state.EEPROMnew.mqttPassword[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttPassword);
                 Sprint_P(true, true, true, PSTR("* [ESP] MQTT Try to connect"));
                 Mqtt_disconnectTime = 0;
                 client.connect();
                 delay(500);
                 if (client.connected()) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] MQTT client connected with MQTTnew settings"));
+                  Sprint_P(true, true, true, PSTR("* [ESP] MQTT client connected with EEPROMnew settings"));
                 } else {
                   Sprint_P(true, true, true, PSTR("* [ESP] MQTT connection failed, retrying in 5 seconds"));
                   reconnectTime = espUptime + 5;
@@ -410,8 +435,8 @@ void handleCommand(const char* cmdString) {
                 switch (temp) {
                   case 0 : Sprint_P(true, true, true, PSTR("* [ESP] Restarting ESP...")); 
 #ifdef REBOOT_REASON
-                           MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_D0;
-                           EEPROM.put(0, MQTT_server);
+                           EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_D0;
+                           EEPROM.put(0, EEPROM_state);
                            EEPROM.commit();
 #endif /* REBOOT_REASON */
                            delay(100); 
@@ -420,8 +445,8 @@ void handleCommand(const char* cmdString) {
                            break;
                   case 1 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting ESP...")); 
 #ifdef REBOOT_REASON
-                           MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_D1;
-                           EEPROM.put(0, MQTT_server);
+                           EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_D1;
+                           EEPROM.put(0, EEPROM_state);
                            EEPROM.commit();
 #endif /* REBOOT_REASON */
                            delay(100); 
@@ -438,24 +463,51 @@ void handleCommand(const char* cmdString) {
     case 'j': // OutputMode
     case 'J': if (sscanf((const char*) (cmdString + 1), "%x", &temp) == 1) {
                 outputMode = temp;
+                if (outputMode != EEPROM_state.EEPROMnew.outputMode) {
+                  EEPROM_state.EEPROMnew.outputMode = outputMode;
+                  EEPROM.put(0, EEPROM_state);
+                  EEPROM.commit();
+                }
                 Sprint_P(true, true, true, PSTR("* [ESP] Outputmode set to 0x%04X"), outputMode);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode 0x%04X"), outputMode);
+                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode 0x%04X is sum of"), outputMode);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx"), outputMode  & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/xxx/#"), (outputMode >> 1) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0004 to output json data over mqtt P1P2/J/xxx"), (outputMode >> 2) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0008 to have mqtt/json include parameters even if functionality is unknown, warning: easily overloads ATmega/ESP (best to combine this with outputfilter >=1)"), (outputMode >> 3) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0010 ESP to output raw data over telnet"), (outputMode >> 4) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0020 to output mqtt individual parameter data over telnet"), (outputMode >> 5) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0040 to output json data over telnet"), (outputMode >> 6) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0080 (reserved for time string in R output)"), (outputMode >> 7) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0100 ESP to output raw data over serial"), (outputMode >> 8) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0200 to output mqtt individual parameter data over serial"), (outputMode >> 9) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0400 to output json data over serial"), (outputMode >> 10) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0800 to output raw bin data over P1P2/X/xxx"), (outputMode >> 11) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x1000 to output timing data also over P1P2/R/xxx (prefix: C)"), (outputMode >> 12) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x2000 to output error data also over P1P2/R/xxx (prefix: *)"), (outputMode >> 13) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x4000 to use P1P2/R/xxx as input (requires MQTT_INPUT_HEXDATA)"), (outputMode >> 14) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)"), (outputMode >> 15) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x10000 to include non-HACONFIG parameters in P1P2/P/# "), (outputMode >> 16) & 0x01);
               }
               break;
     case 's': // OutputFilter
     case 'S': if (sscanf((const char*) (cmdString + 1), "%d", &temp) == 1) {
                 if (temp > 3) temp = 3;
                 outputFilter = temp;
+                if (outputFilter != EEPROM_state.EEPROMnew.outputFilter) {
+                  EEPROM_state.EEPROMnew.outputFilter = outputFilter;
+                  EEPROM.put(0, EEPROM_state);
+                  EEPROM.commit();
+                }
               } else {
                 temp = 99;
               }
               switch (outputFilter) {
-                case 0 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s 0 all parameters, no filter"), (temp != 99) ? "set to" : ""); break;
-                case 1 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s 1 only changed data"), (temp != 99) ? "set to" : ""); break;
-                case 2 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s 2 only changed data, excluding temp/flow"), (temp != 99) ? "set to" : ""); break;
-                case 3 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s 3 only changed data, excluding temp/flow/time"), (temp != 99) ? "set to" : ""); break;
-                default: break;
+                case 0 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s0 all parameters, no filter"), (temp != 99) ? "set to " : ""); break;
+                case 1 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s1 only changed data"), (temp != 99) ? "set to " : ""); break;
+                case 2 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s2 only changed data, excluding temp/flow"), (temp != 99) ? "set to " : ""); break;
+                case 3 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s3 only changed data, excluding temp/flow/time"), (temp != 99) ? "set to " : ""); break;
+                default: Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter illegal state %i"), outputFilter); break;
               }
               break;
     case '\0':break;
@@ -472,9 +524,16 @@ void handleCommand(const char* cmdString) {
                           Sprint_P(true, true, true, PSTR("* [ESP] Compiled %s %s"), __DATE__, __TIME__);
                           if (sscanf((const char*) (cmdString + 1), "%2x", &temp) == 1) {
                             if (temp < 2) {
-                              Sprint_P(true, true, true, PSTR("* [ESP] Warning: verbose < 2 not supported by P1P2-bridge-esp8266"));
+                              Sprint_P(true, true, true, PSTR("* [ESP] Warning: verbose < 2 not supported by P1P2-bridge-esp8266, changing to verbosity mode 3"));
+                              cmdString[1] = '3';
+                              cmdString[2] = '\n';
                             }
+                            // TODO perhaps catch v > 4 too
                             ignoreSerial = (temp == 9); // TODO document or remove
+                            if (ignoreSerial) {
+                              rb_buffer = readBuffer;
+                              serial_rb = 0;
+                            }
                           }
                           break;
                 case 'g':
@@ -503,29 +562,96 @@ void handleCommand(const char* cmdString) {
   }
 }
 
-bool MQTT_readBufferReceived = false;
-int MQTT_rh;
-byte MQTT_rbp = 0;
+static byte pseudo0D = 0;
+static byte pseudo0E = 0;
+static byte pseudo0F = 0;
+
+#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+void MQTT_readBuffer_writeChar (const char c) {
+  MQTT_readBuffer[MQTT_readBufferH] = c;
+  if (++MQTT_readBufferH >= MQTT_RB) MQTT_readBufferH = 0;
+}
+
+void MQTT_readBuffer_writeHex (byte c) {
+  byte p = c >> 4;
+  MQTT_readBuffer[MQTT_readBufferH] = (p < 10) ? '0' + p : 'A' + p - 10;
+  if (++MQTT_readBufferH >= MQTT_RB) MQTT_readBufferH = 0;
+  p = c & 0x0F;
+  MQTT_readBuffer[MQTT_readBufferH] = (p < 10) ? '0' + p : 'A' + p - 10;
+  if (++MQTT_readBufferH >= MQTT_RB) MQTT_readBufferH = 0;
+}
+
+int16_t MQTT_readBuffer_readChar (void) {
+// returns -1 if buffer empty, or c otherwise
+  if (MQTT_readBufferT == MQTT_readBufferH) return -1;
+  char c = MQTT_readBuffer[MQTT_readBufferT];
+  if (++MQTT_readBufferT >= MQTT_RB) MQTT_readBufferT = 0;
+  return c;
+}
+#endif
 
 void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessageProperties& properties,
                    const size_t& len, const size_t& index, const size_t& total) {
+  static bool MQTT_drop = false;
   (void) payload;
   if (!len) {
     Serial_println(F("* [ESP] Empty MQTT payload received and ignored"));
-  } else if (len > 0xFF) {
+  } else if (index + len > 0xFF) {
     Serial_println(F("* [ESP] Received MQTT payload too long"));
   } else if ((!strcmp(topic, mqttCommands)) || (!strcmp(topic, mqttCommandsNoIP))) {
     if (MQTT_commandReceived) {
       Serial_println(F("* [ESP] Ignoring MQTT command, previous command is still being processed"));
     } else {
-      if (len + 1 >= MAX_COMMAND_LENGTH) {
+      if (total + 1 >= MAX_COMMAND_LENGTH) {
         Serial_println(F("* [ESP] Received MQTT command too long"));
       } else {
-        strlcpy(MQTT_commandString, payload, len + 1); // create null-terminated copy
-        MQTT_commandString[len] = '\0';
-        MQTT_commandReceived = true;
+        strlcpy(MQTT_commandString + index, payload, len + 1); // create null-terminated copy
+        MQTT_commandString[index + len] = '\0';
+        if (index + len == total) MQTT_commandReceived = true;
       }
     }
+#ifdef MQTT_INPUT_BINDATA
+  } else if (!strcmp(topic, MQTT_INPUT_BINDATA)) {
+    if (index == 0) MQTT_drop = false;
+    if ((outputMode & 0x8000) && mqttSetupReady) {
+      uint16_t MQTT_readBufferH_new = MQTT_readBufferH + 3 + (total << 1); // 2 for "R ", 2 per byte, 1 for '\n'
+      if (((MQTT_readBufferH_new >= MQTT_RB)  && ((MQTT_readBufferT > MQTT_readBufferH) || (MQTT_readBufferT <= (MQTT_readBufferH_new - MQTT_RB)))) ||
+          ((MQTT_readBufferH_new  < MQTT_RB)  &&  (MQTT_readBufferT > MQTT_readBufferH) && (MQTT_readBufferT <= MQTT_readBufferH_new))) {
+        // buffer overrun
+        Sprint_P(true, false, false, PSTR("* [MON2] Mqtt packet input buffer overrun, dropped, index %i len %i total %i"), index, len, total);
+        MQTT_drop = true;
+      } else if (!MQTT_drop) {
+        if (index == 0) {
+          MQTT_readBuffer_writeChar('R');
+          MQTT_readBuffer_writeChar(' ');
+        }
+        for (uint8_t i = 0; i < len; i++) MQTT_readBuffer_writeHex(payload[i]);
+        if (index + len == total) MQTT_readBuffer_writeChar('\n');
+      }
+    } else {
+      // ignore based on outputMode
+    }
+#endif /* MQTT_INPUT_BINDATA */
+#ifdef MQTT_INPUT_HEXDATA
+  } else if (!strcmp(topic, MQTT_INPUT_HEXDATA)) {
+    if (index == 0) MQTT_drop = false;
+    if ((outputMode & 0x4000) && mqttSetupReady) {
+//Serial.print("hexdata len=");
+//Serial.println(len);
+      uint16_t MQTT_readBufferH_new = MQTT_readBufferH + total + 1; // 1 for '\n'
+      if (((MQTT_readBufferH_new >= MQTT_RB)  && ((MQTT_readBufferT > MQTT_readBufferH) || (MQTT_readBufferT <= (MQTT_readBufferH_new - MQTT_RB)))) ||
+          ((MQTT_readBufferH_new  < MQTT_RB)  &&  (MQTT_readBufferT > MQTT_readBufferH) && (MQTT_readBufferT <= MQTT_readBufferH_new))) {
+        // buffer overrun
+        Sprint_P(true, false, false, PSTR("* [MON2] Mqtt packet input buffer overrun, dropped, index %i len %i total %i"), index, len, total);
+        MQTT_drop = true;
+      } else if (!MQTT_drop) {
+        for (uint8_t i = 0; i < len; i++) MQTT_readBuffer_writeChar(payload[i]);
+        if (index + len == total) MQTT_readBuffer_writeChar('\n');
+      }
+    } else {
+      // ignore based on outputMode
+    }
+#endif /* MQTT_INPUT_HEXDATA */
   } else {
     Serial_println(F("Unknown MQTT topic received"));
   }
@@ -600,22 +726,21 @@ void setup() {
   // wifiManager.setSTAStaticIPConfig(IPAddress(192,168,0,99), IPAddress(192,168,0,1), IPAddress(255,255,255,0)); // optional DNS 4th argument
 
 // get EEPROM data and rebootReason
-  EEPROM.begin(sizeof(MQTTSettingsUnion));
-  EEPROM.get(0, MQTT_server);
+  EEPROM.begin(sizeof(EEPROMSettingsUnion));
+  EEPROM.get(0, EEPROM_state);
   saveRebootReason = REBOOT_REASON_NOTSUPPORTED;
 #ifdef REBOOT_REASON
-  if (!strcmp(MQTT_server.MQTTnew.signature, MQTT_SIGNATURE_NEW)) {
-    saveRebootReason = MQTT_server.MQTTnew.rebootReason;
+  if (!strcmp(EEPROM_state.EEPROMnew.signature, EEPROM_SIGNATURE_NEW)) {
+    saveRebootReason = EEPROM_state.EEPROMnew.rebootReason;
     if (saveRebootReason != REBOOT_REASON_UNKNOWN) {
-      MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_UNKNOWN;
-      EEPROM.put(0, MQTT_server);
+      EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
+      EEPROM.put(0, EEPROM_state);
       EEPROM.commit();
     }
   } else {
     saveRebootReason = REBOOT_REASON_NOTSTORED;
   }
 #endif /* REBOOT_REASON */
-  Sprint_P(true, false, false, PSTR("* [ESP] ESP reboot reason %i"), saveRebootReason);
 
 // WiFiManager start
   // Fetches ssid, password, and tries to connect.
@@ -627,9 +752,9 @@ void setup() {
     Serial_println(F("* [ESP] Failed to connect and hit timeout, resetting"));
     // Reset and try again
 #ifdef REBOOT_REASON
-    if (!strcmp(MQTT_server.MQTTnew.signature, MQTT_SIGNATURE_NEW)) {
-      MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_WIFIMAN;
-      EEPROM.put(0, MQTT_server);
+    if (!strcmp(EEPROM_state.EEPROMnew.signature, EEPROM_SIGNATURE_NEW)) {
+      EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_WIFIMAN;
+      EEPROM.put(0, EEPROM_state);
       EEPROM.commit();
     }
 #endif /* REBOOT_REASON */
@@ -665,67 +790,94 @@ void setup() {
   mqttSignal[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
   mqttSignal[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
 
+  Sprint_P(true, false, false, PSTR("* [ESP] ESP reboot reason %i"), saveRebootReason);
+
 // Store/retrieve MQTT settings entered in WiFiManager portal, and save to EEPROM
   if (shouldSaveConfig) {
-    Serial_println(F("* [ESP] Writing MQTTnew parameters to EEPROM"));
-    strlcpy(MQTT_server.MQTTnew.signature,    MQTT_SIGNATURE_NEW, sizeof(MQTT_server.MQTTnew.mqttUser));
-    strlcpy(MQTT_server.MQTTnew.mqttServer,   WiFiManMqttServer.getValue(),   sizeof(MQTT_server.MQTTnew.mqttServer));
-    if ((!strlen(WiFiManMqttPort.getValue())) || (sscanf(WiFiManMqttPort.getValue(), "%i", &MQTT_server.MQTTnew.mqttPort) != 1)) MQTT_server.MQTTnew.mqttPort = MQTT_PORT;
-    strlcpy(MQTT_server.MQTTnew.mqttUser,     WiFiManMqttUser.getValue(),     sizeof(MQTT_server.MQTTnew.mqttUser));
-    strlcpy(MQTT_server.MQTTnew.mqttPassword, WiFiManMqttPassword.getValue(), sizeof(MQTT_server.MQTTnew.mqttPassword));
-    EEPROM.put(0, MQTT_server);
+    Serial_println(F("* [ESP] Writing new MQTT parameters to EEPROM"));
+    strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.mqttUser));
+    strlcpy(EEPROM_state.EEPROMnew.mqttServer,   WiFiManMqttServer.getValue(),   sizeof(EEPROM_state.EEPROMnew.mqttServer));
+    if ((!strlen(WiFiManMqttPort.getValue())) || (sscanf(WiFiManMqttPort.getValue(), "%i", &EEPROM_state.EEPROMnew.mqttPort) != 1)) EEPROM_state.EEPROMnew.mqttPort = MQTT_PORT;
+    strlcpy(EEPROM_state.EEPROMnew.mqttUser,     WiFiManMqttUser.getValue(),     sizeof(EEPROM_state.EEPROMnew.mqttUser));
+    strlcpy(EEPROM_state.EEPROMnew.mqttPassword, WiFiManMqttPassword.getValue(), sizeof(EEPROM_state.EEPROMnew.mqttPassword));
+    EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
   }
 
-  Serial_println(F("* [ESP] Check EEPROM for old signature"));
-  if (!strcmp(MQTT_server.MQTTold.signature, MQTT_SIGNATURE_OLD)) {
-    Serial_println(F("* [ESP] Old signature match, need to update EEPROM"));
-    Sprint_P(true, true, true, PSTR("* [ESP] Old signature match, need to update EEPROM"));
-    strlcpy(MQTT_server.MQTTnew.signature,    MQTT_SIGNATURE_NEW, sizeof(MQTT_server.MQTTnew.signature));
+  EEPROM.get(0, EEPROM_state);
+  Serial_println(F("* [ESP] Check EEPROM for old1 signature"));
+  if (!strcmp(EEPROM_state.EEPROMold.signature, EEPROM_SIGNATURE_OLD1)) {
+    Serial_println(F("* [ESP] Old1 signature match, need to update EEPROM"));
+    Sprint_P(true, true, true, PSTR("* [ESP] Old1 signature match, need to update EEPROM"));
+    strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_OLD2, sizeof(EEPROM_state.EEPROMnew.signature));
     // order is important, don't overwrite old data before reading it
-    MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_UNKNOWN;
-    MQTT_server.MQTTnew.mqttPort = MQTT_server.MQTTold.mqttPort;
-    strlcpy(MQTT_server.MQTTnew.mqttServer,   MQTT_server.MQTTold.mqttServer,    sizeof(MQTT_server.MQTTnew.mqttServer));
-    strlcpy(MQTT_server.MQTTnew.mqttPassword, MQTT_server.MQTTold.mqttPassword,  sizeof(MQTT_server.MQTTnew.mqttPassword));
-    strlcpy(MQTT_server.MQTTnew.mqttUser,     MQTT_server.MQTTold.mqttUser,      sizeof(MQTT_server.MQTTnew.mqttUser));
-    EEPROM.put(0, MQTT_server);
+    EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
+    EEPROM_state.EEPROMnew.mqttPort = EEPROM_state.EEPROMold.mqttPort;
+    strlcpy(EEPROM_state.EEPROMnew.mqttServer,   EEPROM_state.EEPROMold.mqttServer,    sizeof(EEPROM_state.EEPROMnew.mqttServer));
+    strlcpy(EEPROM_state.EEPROMnew.mqttPassword, EEPROM_state.EEPROMold.mqttPassword,  sizeof(EEPROM_state.EEPROMnew.mqttPassword));
+    strlcpy(EEPROM_state.EEPROMnew.mqttUser,     EEPROM_state.EEPROMold.mqttUser,      sizeof(EEPROM_state.EEPROMnew.mqttUser));
+    EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
-    EEPROM.get(0, MQTT_server);
+    EEPROM.get(0, EEPROM_state);
   }
+
+  Serial_println(F("* [ESP] Check EEPROM for old2 signature"));
+  if (!strcmp(EEPROM_state.EEPROMold.signature, EEPROM_SIGNATURE_OLD2)) {
+    Serial_println(F("* [ESP] Old2 signature match, need to initiate outputMOde and zero more reserved bytes"));
+    Sprint_P(true, true, true, PSTR("* [ESP] Old2 signature match, need to initiate outputMode and zero more reserved bytes"));
+    strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
+    EEPROM_state.EEPROMnew.outputMode = INIT_OUTPUTMODE;
+    EEPROM_state.EEPROMnew.outputFilter = INIT_OUTPUTFILTER;
+    for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
+    EEPROM.put(0, EEPROM_state);
+    EEPROM.commit();
+    EEPROM.get(0, EEPROM_state);
+  }
+
   Serial_println(F("* [ESP] Check EEPROM signature, read EEPROM"));
-  if (strcmp(MQTT_server.MQTTnew.signature, MQTT_SIGNATURE_NEW)) {
+  if (strcmp(EEPROM_state.EEPROMnew.signature, EEPROM_SIGNATURE_NEW)) {
     Serial_println(F("* [ESP] Signature mismatch, need to init EEPROM"));
     Sprint_P(true, true, true, PSTR("* [ESP] Signature mismatch, need to init EEPROM"));
-    strlcpy(MQTT_server.MQTTnew.signature,    MQTT_SIGNATURE_NEW, sizeof(MQTT_server.MQTTnew.signature));
-    strlcpy(MQTT_server.MQTTnew.mqttUser,     MQTT_USER,          sizeof(MQTT_server.MQTTnew.mqttUser));
-    strlcpy(MQTT_server.MQTTnew.mqttPassword, MQTT_PASSWORD,      sizeof(MQTT_server.MQTTnew.mqttPassword));
-    strlcpy(MQTT_server.MQTTnew.mqttServer,   MQTT_SERVER,        sizeof(MQTT_server.MQTTnew.mqttServer));
-    MQTT_server.MQTTnew.mqttPort = MQTT_PORT;
-    MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_UNKNOWN;
-    EEPROM.put(0, MQTT_server);
+    strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
+    strlcpy(EEPROM_state.EEPROMnew.mqttUser,     MQTT_USER,          sizeof(EEPROM_state.EEPROMnew.mqttUser));
+    strlcpy(EEPROM_state.EEPROMnew.mqttPassword, MQTT_PASSWORD,      sizeof(EEPROM_state.EEPROMnew.mqttPassword));
+    strlcpy(EEPROM_state.EEPROMnew.mqttServer,   MQTT_SERVER,        sizeof(EEPROM_state.EEPROMnew.mqttServer));
+    EEPROM_state.EEPROMnew.mqttPort = MQTT_PORT;
+    EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
+    EEPROM_state.EEPROMnew.outputMode = INIT_OUTPUTMODE;
+    EEPROM_state.EEPROMnew.outputFilter = INIT_OUTPUTFILTER;
+    for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
+    EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
+  } else {
+    Serial_println(F("* [ESP] New EEPROM signature match, use EEPROM settings"));
   }
+
+  outputFilter = EEPROM_state.EEPROMnew.outputFilter;
+  outputMode = EEPROM_state.EEPROMnew.outputMode;
+  Serial_print(F("* [ESP] outputMode = ")); Serial.println(outputMode);
+  Serial_print(F("* [ESP] outputFilter = ")); Serial.println(outputFilter);
 
 // MQTT client setup
   client.onConnect(onMqttConnect);
   client.onDisconnect(onMqttDisconnect);
   client.onPublish(onMqttPublish);
   client.onMessage(onMqttMessage);
-  client.setServer(MQTT_server.MQTTnew.mqttServer, MQTT_server.MQTTnew.mqttPort);
+  client.setServer(EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort);
 
   MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP]     = (local_ip[3] / 100) + '0';
   MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP + 1] = (local_ip[3] % 100) / 10 + '0';
   MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP + 2] = (local_ip[3] % 10) + '0';
 
   client.setClientId(MQTT_CLIENTNAME);
-  client.setCredentials((MQTT_server.MQTTnew.mqttUser[0] == '\0') ? 0 : MQTT_server.MQTTnew.mqttUser, (MQTT_server.MQTTnew.mqttPassword[0] == '\0') ? 0 : MQTT_server.MQTTnew.mqttPassword);
+  client.setCredentials((EEPROM_state.EEPROMnew.mqttUser[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttUser, (EEPROM_state.EEPROMnew.mqttPassword[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttPassword);
   // client.setWill(MQTT_WILL_TOPIC, MQTT_WILL_QOS, MQTT_WILL_RETAIN, MQTT_WILL_PAYLOAD); // TODO
 
   Serial_print(F("* [ESP] Clientname ")); Serial_println(MQTT_CLIENTNAME);
-  Serial_print(F("* [ESP] User ")); Serial_println(MQTT_server.MQTTnew.mqttUser);
-  // Serial_print(F("* [ESP] Password ")); Serial_println(MQTT_server.MQTTnew.mqttPassword);
-  Serial_print(F("* [ESP] Server ")); Serial_println(MQTT_server.MQTTnew.mqttServer);
-  Serial_print(F("* [ESP] Port ")); Serial_println(MQTT_server.MQTTnew.mqttPort);
+  Serial_print(F("* [ESP] User ")); Serial_println(EEPROM_state.EEPROMnew.mqttUser);
+  // Serial_print(F("* [ESP] Password ")); Serial_println(EEPROM_state.EEPROMnew.mqttPassword);
+  Serial_print(F("* [ESP] Server ")); Serial_println(EEPROM_state.EEPROMnew.mqttServer);
+  Serial_print(F("* [ESP] Port ")); Serial_println(EEPROM_state.EEPROMnew.mqttPort);
 
   delay(100);
   client.connect();
@@ -744,7 +896,8 @@ void setup() {
       Serial.println(F("* [ESP] MQTT client connected"));
       break;
     } else {
-      Serial.println(F("* [ESP] MQTT client connect failed, retrying in setup() until time-out"));
+      Serial.print(F("* [ESP] MQTT client connect failed, retrying in setup() until time-out "));
+      Serial.println(connectTimeout);
       if (!--connectTimeout) break;
       delay(5000);
     }
@@ -763,7 +916,8 @@ void setup() {
   telnet.onReconnect(onTelnetReconnect);
   telnet.onDisconnect(onTelnetDisconnect);
   telnet.onInputReceived(onInputReceived);
-  if (telnet.begin(port)) {
+  bool telnetSuccess = telnet.begin(port);
+  if (telnetSuccess) {
     Sprint_P(true, false, false, PSTR("* [ESP] Telnet running on %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
   } else {
     Sprint_P(true, false, false, PSTR("* [ESP] Telnet error."));
@@ -800,8 +954,8 @@ void setup() {
     Sprint_P(true, true, true, PSTR("* [ESP] Disconnect and stop telnet"));
     Serial_println(F("* [ESP] OTA End"));
 #ifdef REBOOT_REASON
-    MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_OTA;
-    EEPROM.put(0, MQTT_server);
+    EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_OTA;
+    EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
 #endif /* REBOOT_REASON */
     delay(300);
@@ -851,8 +1005,13 @@ void setup() {
 
 // Ready, report status
   Sprint_P(true, true, true, PSTR("* [ESP] Setup ready"));
-  Sprint_P(true, true, true, PSTR("* [ESP] TELNET: telnet %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+  if (telnetSuccess) {
+    Sprint_P(true, true, true, PSTR("* [ESP] TELNET: telnet %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+  } else {
+    Sprint_P(true, true, true, PSTR("* [ESP] Telnet setup failed."));
+  }
   delay(1000);
+  mqttSetupReady = true;
 }
 
 static int jsonTerm = 1; // indicates whether json output was terminated
@@ -870,7 +1029,7 @@ void process_for_mqtt_json(byte* rb, int n) {
         throttle = throttleValue;
         int kvrbyte = bytes2keyvalue(rb[0], rb[2], i - 3, rb + 3, mqtt_key, mqtt_value);
         // returns 0 if byte does not trigger any output
-        // returns 1 if a MQTTnew mqtt_key,mqtt_value should be output
+        // returns 1 if new mqtt_key,mqtt_value should be output
         // returns 8 if byte should be treated per bit
         // returns 9 if json string should be terminated
         if (kvrbyte == 9) {
@@ -879,9 +1038,9 @@ void process_for_mqtt_json(byte* rb, int n) {
             jsonTerm = 1;
             jsonString[jsonStringp++] = '}';
             jsonString[jsonStringp++] = '\0';
-            if (outputMode & 0x004) client_publish_mqtt(mqttJsondata, jsonString);
-            if (outputMode & 0x040) client_publish_telnet(mqttJsondata, jsonString);
-            if (outputMode & 0x400) client_publish_serial(mqttJsondata, jsonString);
+            if (outputMode & 0x0004) client_publish_mqtt(mqttJsondata, jsonString);
+            if (outputMode & 0x0040) client_publish_telnet(mqttJsondata, jsonString);
+            if (outputMode & 0x0400) client_publish_serial(mqttJsondata, jsonString);
             jsonStringp = 1;
           }
         } else {
@@ -892,9 +1051,9 @@ void process_for_mqtt_json(byte* rb, int n) {
           for (byte j = 0; j < kvrbyte; j++) {
             int kvr = (kvrbyte == 8) ? bits2keyvalue(rb[0], rb[2], i - 3, rb + 3, mqtt_key, mqtt_value, j) : kvrbyte;
             if (kvr) {
-              if (outputMode & 0x002) client_publish_mqtt(mqtt_key, mqtt_value);
-              if (outputMode & 0x020) client_publish_telnet(mqtt_key, mqtt_value);
-              if (outputMode & 0x200) client_publish_serial(mqtt_key, mqtt_value);
+              if (outputMode & 0x0002) client_publish_mqtt(mqtt_key, mqtt_value);
+              if (outputMode & 0x0020) client_publish_telnet(mqtt_key, mqtt_value);
+              if (outputMode & 0x0200) client_publish_serial(mqtt_key, mqtt_value);
               // don't add another parameter if remaining space is not enough for mqtt_key, mqtt_value, and ',' '"', '"', ':', '}', and '\0'
               if (jsonStringp + strlen(mqtt_value) + strlen(mqtt_key + MQTT_KEY_PREFIXLEN) + 6 <= sizeof(jsonString)) {
                 if (jsonTerm) {
@@ -919,37 +1078,40 @@ void process_for_mqtt_json(byte* rb, int n) {
   }
 }
 
-byte timeStamp = 10;
+byte timeStamp = 10; // TODO change this for TIMESTRING
 
-void writePseudoPacket(byte* WB, byte rh, char* readBuffer)
+void writePseudoPacket(byte* WB, byte rh)
 // rh is packet size (without CRC byte)
 {
-  snprintf(readBuffer, 13, "R P         ");
+  char pseudoWriteBuffer[RB];
+  snprintf(pseudoWriteBuffer, 13, "R P         ");
+// if (outputMode & ??) add timestring TODO to pseudoWriteBuffer snprintf(pseudoWriteBuffer, 13, "R TIMESTRING P         ");
   uint8_t crc = crc_feed;
   for (uint8_t i = 0; i < rh; i++) {
     uint8_t c = WB[i];
-    snprintf(readBuffer + 2 + timeStamp + (i << 1), 3, "%02X", readHex[i]);
+    snprintf(pseudoWriteBuffer + 2 + timeStamp + (i << 1), 3, "%02X", c);
     if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
       crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
       c >>= 1;
     }
   }
   WB[rh] = crc;
-  if (crc_gen) snprintf(readBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", crc);
-  if (outputMode & 0x001) client_publish_mqtt(mqttHexdata, readBuffer);
-  if (outputMode & 0x010) client_publish_telnet(mqttHexdata, readBuffer);
-  if (outputMode & 0x100) client_publish_serial(mqttHexdata, readBuffer);
-  if ((outputMode & 0x800) && (mqttConnected)) client.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) WB, rh + 1);
-  if (outputMode & 0x666) process_for_mqtt_json(WB, rh);
+  if (crc_gen) snprintf(pseudoWriteBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", crc);
+#if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
+  if (outputMode & 0x0001) client_publish_mqtt(mqttHexdata, pseudoWriteBuffer);
+#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
+  if (outputMode & 0x0010) client_publish_telnet(mqttHexdata, pseudoWriteBuffer);
+  if (outputMode & 0x0100) client_publish_serial(mqttHexdata, pseudoWriteBuffer);
+#if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
+  if ((outputMode & 0x0800) && (mqttConnected)) client.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) WB, rh + 1);
+#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
+  if (outputMode & 0x0666) process_for_mqtt_json(WB, rh);
 }
-
-static byte pseudo0D = 0;
-static byte pseudo0E = 0;
-static byte pseudo0F = 0;
 
 uint32_t espUptime_telnet = 0;
 
 void loop() {
+  byte readHex[HB];
   // OTA
   ArduinoOTA.handle();
 
@@ -982,8 +1144,8 @@ void loop() {
       if (Mqtt_disconnectTime > MQTT_DISCONNECT_RESTART) {
         Sprint_P(true, true, true, PSTR("* [ESP] Restarting ESP to attempt to reconnect Mqtt")); 
 #ifdef REBOOT_REASON
-        MQTT_server.MQTTnew.rebootReason = REBOOT_REASON_MQTT;
-        EEPROM.put(0, MQTT_server);
+        EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_MQTT;
+        EEPROM.put(0, EEPROM_state);
         EEPROM.commit();
 #endif /* REBOOT_REASON */
         delay(100);
@@ -1001,14 +1163,14 @@ void loop() {
 #ifdef AVRISP
   // AVRISP
   static AVRISPState_t last_state = AVRISP_STATE_IDLE;
-  AVRISPState_t MQTTnew_state = avrprog.update();
-  if (last_state != MQTTnew_state) {
-    switch (MQTTnew_state) {
+  AVRISPState_t new_state = avrprog.update();
+  if (last_state != new_state) {
+    switch (new_state) {
       case AVRISP_STATE_IDLE:    Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] now idle"));           pinMode(RESET_PIN, INPUT); delay (200); ATmega_dummy_for_serial(); break;
       case AVRISP_STATE_PENDING: Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] connection pending")); pinMode(RESET_PIN, OUTPUT); break;
       case AVRISP_STATE_ACTIVE:  Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] programming mode"));   pinMode(RESET_PIN, OUTPUT); break;
     }
-    last_state = MQTTnew_state;
+    last_state = new_state;
   }
   // Serve the AVRISP client
   if (last_state != AVRISP_STATE_IDLE) avrprog.serve();
@@ -1018,7 +1180,7 @@ void loop() {
   // mqtt connection check
   if (!client.connected()) {
     if (espUptime > reconnectTime) {
-      Sprint_P(true, false, true, PSTR("* [ESP] MQTT Try to reconnect to MQTT server %s:%i (%s/%s)"), MQTT_server.MQTTnew.mqttServer, MQTT_server.MQTTnew.mqttPort, MQTT_server.MQTTnew.mqttUser, MQTT_server.MQTTnew.mqttPassword);
+      Sprint_P(true, false, true, PSTR("* [ESP] MQTT Try to reconnect to MQTT server %s:%i (%s/%s)"), EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort, EEPROM_state.EEPROMnew.mqttUser, EEPROM_state.EEPROMnew.mqttPassword);
       client.connect();
       delay(500);
       if (client.connected()) {
@@ -1035,9 +1197,10 @@ void loop() {
 
   if (!OTAbusy)  {
     // Non-blocking serial input
-    // rb is number of char received and stored in RB
-    // rb_buffer = readBuffer + rb
+    // serial_rb is number of char received and stored in RB
+    // rb_buffer = readBuffer + serial_rb
     // ignore first line and too-long lines
+    // readBuffer does not include '\n' but may include '\r' if Windows provides serial input
     if (MQTT_commandReceived) {
       Serial_print(F("* [ESP] handleCommand MQTT commandString ->"));
       Serial_print((char*) MQTT_commandString);
@@ -1054,18 +1217,28 @@ void loop() {
       handleCommand(telnetCommandString);
       telnetCommandReceived = false;
     }
-    if (!ignoreSerial) while (((c = Serial.read()) >= 0) && (c != '\n') && (rb < RB)) {
+    // read serial input OR MQTT_readBuffer input until and including '\n', but do not store '\n'
+#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+    while (((c = MQTT_readBuffer_readChar()) >= 0) && (c != '\n') && (serial_rb < RB)) {
       *rb_buffer++ = (char) c;
-      rb++;
+      serial_rb++;
     }
-    // ((c == '\n' and rb > 0))  and/or  rb == RB)  or  c == -1
+#else
+    if (!ignoreSerial) {
+       while (((c = Serial.read()) >= 0) && (c != '\n') && (serial_rb < RB)) {
+        *rb_buffer++ = (char) c;
+        serial_rb++;
+      }
+    }
+#endif
+    // ((c == '\n' and serial_rb > 0))  and/or  serial_rb == RB)  or  c == -1
     if (c >= 0) {
-      if ((c == '\n') && (rb < RB)) {
+      if ((c == '\n') && (serial_rb < RB)) {
         // c == '\n'
         *rb_buffer = '\0';
         // Remove \r before \n in DOS input
-        if ((rb > 0) && (*(rb_buffer - 1) == '\r')) {
-          rb--;
+        if ((serial_rb > 0) && (*(rb_buffer - 1) == '\r')) {
+          serial_rb--;
           *(--rb_buffer) = '\0';
         }
         if (ignoreremainder == 2) {
@@ -1079,7 +1252,7 @@ void loop() {
             int rbp = 1;
             int n, rbtemp;
             byte rh = 0;
-            if ((rb > 12) && ((readBuffer[2] == 'T') || (readBuffer[2] == 'P'))) {
+            if ((serial_rb > 12) && ((readBuffer[2] == 'T') || (readBuffer[2] == 'P') || (readBuffer[2] == 'X'))) {
               // skip 10-character time stamp
               rbp = 12;
               timeStamp = 10;
@@ -1102,12 +1275,13 @@ void loop() {
                   c >>= 1;
                 }
               }
+// if (outputMode & ??) add timestring TODO to readBuffer
               if ((!crc_gen) || (crc == readHex[rh])) {
-                if (outputMode & 0x001) client_publish_mqtt(mqttHexdata, readBuffer);
-                if (outputMode & 0x010) client_publish_telnet(mqttHexdata, readBuffer);
-                if (outputMode & 0x100) client_publish_serial(mqttHexdata, readBuffer);
-                if ((outputMode & 0x800) && (mqttConnected)) client.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) readHex, rh + 1);
-                if (outputMode & 0x666) process_for_mqtt_json(readHex, rh);
+                if (outputMode & 0x0001) client_publish_mqtt(mqttHexdata, readBuffer);
+                if (outputMode & 0x0010) client_publish_telnet(mqttHexdata, readBuffer);
+                if (outputMode & 0x0100) client_publish_serial(mqttHexdata, readBuffer);
+                if ((outputMode & 0x0800) && (mqttConnected)) client.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) readHex, rh + 1);
+                if (outputMode & 0x0666) process_for_mqtt_json(readHex, rh);
 #ifdef PSEUDO_PACKETS
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0D)) pseudo0D = 9; // Insert pseudo packet 40000D in output serial after 00000D
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) pseudo0F = 9; // Insert pseudo packet 40000F in output serial after 00000F
@@ -1125,7 +1299,8 @@ void loop() {
                   ATmega_uptime_prev = ATmega_uptime;
                 }
               } else {
-                Sprint_P(true, true, true, PSTR("* [MON] CRC error in R data:%s expected 0x%02X"), readBuffer + 1, crc);
+                Sprint_P(true, true, true, PSTR("* [MON] Serial input buffer overrun or CRC error in R data:%s expected 0x%02X"), readBuffer + 1, crc);
+// HERE TODO pseudo 0B ????
                 if (ESP_serial_input_Errors_CRC < 0xFF) ESP_serial_input_Errors_CRC++;
               }
             } else {
@@ -1148,7 +1323,7 @@ void loop() {
           }
         }
       } else {
-        //  (c != '\n' ||  rb == RB)
+        //  (c != '\n' ||  serial_rb == RB)
         char lst = *(rb_buffer - 1);
         *(rb_buffer - 1) = '\0';
         if (c != '\n') {
@@ -1160,17 +1335,20 @@ void loop() {
         }
       }
       rb_buffer = readBuffer;
-      rb = 0;
-      MQTT_readBufferReceived = false;
+      serial_rb = 0;
     } else {
-      // wait for more serial input, or just nothing to do
+      // wait for more serial input
     }
 #ifdef PSEUDO_PACKETS
     if (pseudo0D > 5) {
       pseudo0D = 0;
       readHex[0] = 0x40;
       readHex[1] = 0x00;
+#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+      readHex[2] = 0x09;
+#else
       readHex[2] = 0x0D;
+#endif
       readHex[3] = Compile_Options;
       readHex[4] = (Mqtt_msgSkipNotConnected >> 8) & 0xFF;
       readHex[5] = Mqtt_msgSkipNotConnected & 0xFF;
@@ -1184,13 +1362,17 @@ void loop() {
       readHex[13] = WiFi.status() & 0xFF;
       readHex[14] = saveRebootReason;
       for (int i = 15; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
-      writePseudoPacket(readHex, 23, readBuffer);
+      writePseudoPacket(readHex, 23);
     }
     if (pseudo0E > 5) {
       pseudo0E = 0;
       readHex[0]  = 0x40;
       readHex[1]  = 0x00;
-      readHex[2]  = 0x0E;
+#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+      readHex[2] = 0x0A;
+#else
+      readHex[2] = 0x0E;
+#endif
       readHex[3]  = (espUptime >> 24) & 0xFF;
       readHex[4]  = (espUptime >> 16) & 0xFF;
       readHex[5]  = (espUptime >> 8) & 0xFF;
@@ -1211,13 +1393,17 @@ void loop() {
       readHex[20] = (maxLoopTime >> 16) & 0xFF;
       readHex[21] = (maxLoopTime >> 8) & 0xFF;
       readHex[22] = maxLoopTime & 0xFF;
-      writePseudoPacket(readHex, 23, readBuffer);
+      writePseudoPacket(readHex, 23);
     }
     if (pseudo0F > 5) {
       pseudo0F = 0;
       readHex[0] = 0x40;
       readHex[1] = 0x00;
+#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+      readHex[2] = 0x0B;
+#else
       readHex[2] = 0x0F;
+#endif
       readHex[3]  = telnetConnected;
       readHex[4]  = outputFilter;
       uint16_t m1 = ESP.getMaxFreeBlockSize();
@@ -1239,7 +1425,7 @@ void loop() {
       readHex[20] = Mqtt_disconnectSkippedPackets & 0xFF;
       readHex[21] = (Mqtt_msgSkipLowMem >> 8) & 0xFF;
       readHex[22] = Mqtt_msgSkipLowMem & 0xFF;
-      writePseudoPacket(readHex, 23, readBuffer);
+      writePseudoPacket(readHex, 23);
     }
 #endif
   }

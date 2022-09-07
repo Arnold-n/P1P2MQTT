@@ -25,8 +25,6 @@
 #define MQTT_PORT_STRING "1883"       // optional, defaults to "1883" if undefined
 #define MQTT_USER "P1P2"              // optional, defaults to none if undefined
 #define MQTT_PASSWORD "P1P2"          // optional, defaults to none if undefined
-#define MQTT_SIGNATURE_OLD "P1P2sig"  // old signature for EEPROM initialization (user/password length 19/39)
-#define MQTT_SIGNATURE_NEW "P1P2sih"  // new signature for EEPROM initialization (user/password length 80/80, rebootReaon)
 char MQTT_CLIENTNAME[9] = "P1P2_xxx"; // Must be unique, include 4th byte of IPv4 address
 #define MQTT_CLIENTNAME_IP 5          // start of xxx for ip nr in MQTT_CLIENTNAME
 

@@ -42,7 +42,8 @@
 #define CAT_MEASUREMENT  { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'M'); maxOutputFilter = 1; }  // non-TEMP measurements
 #define CAT_FIELDSETTING { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'F'); } // field settings
 #define CAT_COUNTER      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'C'); } // kWh/hour counters
-#define CAT_PSEUDO       { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'A'); } // ATmega operation
+#define CAT_PSEUDO2      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'B'); } // 2nd ESP operation
+#define CAT_PSEUDO       { if (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] != 'B') mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'A'; } // ATmega/ESP operation
 #define CAT_TARGET       { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'D'); } // D desired
 #define CAT_DAILYSTATS   { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'R'); } // Results per day (tbd)
 #define CAT_SCHEDULE     { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'E'); } // Schedule
@@ -92,8 +93,8 @@ const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ] = { 0x014A, 0x002D, 0x0001, 0x00
 #ifdef SAVEPARAMS
 //byte packettype                                    = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
 const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      1,      1,      2,      3,      4 }; // byte per parameter // was 8-bit
-const PROGMEM uint32_t   valstart[PARAM_ARR_SZ] = { 0x0000, 0x014A, 0x01A4, 0x01A7, 0x0223, 0x0313, 0x037F, 0x04DD, 0x04E3 /* , 0x0563 */ }; // valstart = sum  (parnr_bytes * nr_params) // was 16-bit
-const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ] = { 0x0000, 0x014A, 0x0177, 0x0178, 0x0197, 0x0287, 0x02FF, 0x03A2, 0x03A4 /* , 0x03C4 */ }; // seenstart = sum (parnr_bytes) // was 16-bit
+const PROGMEM uint32_t   valstart[PARAM_ARR_SZ] = { 0x0000, 0x014A, 0x01A4, 0x01A7, 0x0223, 0x0313, 0x037F, 0x04DD, 0x04E3 /* , 0x0563 */ }; // valstart = sum  (parnr_bytes * nr_params)
+const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ] = { 0x0000, 0x014A, 0x0177, 0x0178, 0x0197, 0x0287, 0x02FF, 0x03A2, 0x03A4 /* , 0x03C4 */ }; // seenstart = sum (parnr_bytes)
 byte paramVal [2][0x0563] = { 0 }; // 2 * 2094 = 4188 bytes 2 * 0x0563
 byte paramSeen[2][0x03C4] = { 0 }; // 2 *  959 = 1918 bytes
 
@@ -111,14 +112,14 @@ bool scheduleMemSeen[2][SCHEDULE_MEM_SIZE] = {}; // 2 * 1166 = 2332 bytes
 
 #ifdef SAVEPACKETS
 #ifdef PSEUDO_PACKETS
-#define PCKTP_START  0x0D
+#define PCKTP_START  0x08
 #define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 mapped to 0x16
 #define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 2)
-//byte packetsrc                                      = { {00                                           }, {  40                                              }}
-//byte packettype                                     = { {0D, 0E, 0F, 10,  11,  12,  13,  14,  15,  31 }, {  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  31 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { {20, 20, 20, 20,   8,  15,   3,  15,   6,   6 }, {  20,  20,  20,  20,  20,  20,  14,  19,   6,   0 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0, 20, 40, 60,  80,  88, 103, 106, 121, 127 }, { 133, 153, 173, 193, 213, 233, 253, 267, 286, 292 /* , sizeValSeen=292 */ }}; // Warning: if >256, make pi2 uint16_t // was 16-bit
-#define sizeValSeen 292
+//byte packetsrc                                      = { {00                                                                 }, {  40                                                                       }}
+//byte packettype                                     = { {08, 09, 0A, 0B,  0C,  0D, 0E, 0F, 10,  11,  12,  13,  14,  15,  31 }, {  08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  31 }}
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,  20, 20, 20, 20,   8,  15,   3,  15,   6,   6 }, {   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0 }};
+const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,   0, 20, 40, 60,  80,  88, 103, 106, 121, 127 }, { 133, 133, 153, 173, 193, 193, 213, 233, 253, 273, 293, 313, 327, 346, 352 /* , sizeValSeen=352 */ }};
+#define sizeValSeen 352
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #else /* PSEUDO_PACKETS */
@@ -155,7 +156,7 @@ static byte stateclass = 0;
   /* state_class */  ((stateclass == 2) ? "\"state_class\":\"total_increasing\"," : ((stateclass == 1) ? "\"state_class\":\"measurement\"," : "")),\
   /* uniq_id */      mqtt_key[-4], mqtt_key[-2], mqtt_key, HA_POSTFIX, \
   /* dev_cla */      ((stateclass == 2) ? "\"dev_cla\":\"energy\"," : ""),\
-  /* unit_of_meas */ ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"ºC\"," : ""))))))))),\
+  /* unit_of_meas */ ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"°C\"," : ""))))))))),\
   /* ic */ ((uom == 9) ? "\"ic\":\"mdi:counter\"," : ((uom == 8) ? "\"ic\":\"mdi:memory\"," : ((uom == 7) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 6) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 5) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 4) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 3) ? "\"ic\":\"mdi:water-boiler\"," : ((uom == 2) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 1) ? "\"ic\":\"mdi:coolant-temperature\"," : ""))))))))),\
   /* device */       \
     /* name */         HA_DEVICE_NAME,\
@@ -200,14 +201,14 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
         newByte = (outputFilter <= maxOutputFilter) || (cntByte[pi2] == 0xFF);
         cntByte[pi2] = payload[payloadIndex] & 0x7F;
       }
-      return (haConfig || MQTT_PUBLISH_NONHA) && newByte;
+      return (haConfig || (outputMode & 0x10000) ) && newByte;
     }
     // not type packet type (0B-)10-15, 31, or B8, so indicate new if to be published:
-    newByte = (haConfig || MQTT_PUBLISH_NONHA);
+    newByte = true;
   } else if (payloadIndex > nr_bytes[pts][pti]) {
     // Warning: payloadIndex > expected
     Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
-    newByte = (haConfig || MQTT_PUBLISH_NONHA);
+    newByte = true;
   } else if (payloadIndex + 1 < length) {
     // Warning: payloadIndex + 1 < length
     Sprint_P(true, true, true, PSTR(" Warning: payloadIndex + 1 < length"));
@@ -247,9 +248,9 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       client_publish_mqtt(ha_mqttKey, ha_mqttValue);
     }
   }
-  return (haConfig || MQTT_PUBLISH_NONHA) && newByte;
+  return (haConfig || (outputMode & 0x10000) ) && newByte;
 #else /* SAVEPACKETS */
-  return (haConfig || MQTT_PUBLISH_NONHA);
+  return (haConfig || (outputMode & 0x10000) );
 #endif /* SAVEPACKETS */
 }
 
@@ -303,9 +304,9 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
     }
     if (outputFilter > maxOutputFilter) newBit = 0;
   }
-  return (haConfig || MQTT_PUBLISH_NONHA) && newBit;
+  return (haConfig || (outputMode & 0x10000)) && newBit;
 #else /* SAVEPACKETS */
-  return (haConfig || MQTT_PUBLISH_NONHA);
+  return (haConfig || (outputMode & 0x10000));
 #endif /* SAVEPACKETS */
 }
 
@@ -356,9 +357,9 @@ bool newParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte pay
     }
     if (outputFilter > maxOutputFilter) newParam = 0;
   }
-  return (haConfig || MQTT_PUBLISH_NONHA) && newParam;
+  return (haConfig || (outputMode & 0x10000)) && newParam;
 #else /* SAVEPARAMS */
-  return (haConfig || MQTT_PUBLISH_NONHA);
+  return (haConfig || (outputMode & 0x10000));
 #endif /* SAVEPARAMS */
 }
 
@@ -419,10 +420,31 @@ uint8_t value_u32_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* p
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%u", FN_u32_LE(&payload[payloadIndex]));
   return 1;
 }
+ 
+uint8_t value_u32_LE_uptime(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
+  uint8_t bitMaskUptime = 0x01;
+  if ((payload[payloadIndex - 3] == 0) && (payload[payloadIndex - 2] == 0)) {
+    while (payload[payloadIndex - 1] > bitMaskUptime) { bitMaskUptime <<= 1; bitMaskUptime |= 1; }
+  } else {
+    bitMaskUptime = 0xFF;
+  }
+  payload[payloadIndex] &= ~(bitMaskUptime >> 1);
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 4, 1)) return 0;
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%u", FN_u32_LE(&payload[payloadIndex]));
+  return 1;
+}
 
 // signed integers, LE
 
 uint8_t value_s8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1)) return 0;
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int8_t) payload[payloadIndex]);
+  return 1;
+}
+
+byte RSSIcnt = 0xFF;
+uint8_t value_s8_ratelimited(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
+  if (++RSSIcnt) return 0;
   if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1)) return 0;
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int8_t) payload[payloadIndex]);
   return 1;
@@ -963,8 +985,10 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define VALUE_u16_LE            { return         value_u16_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_u24_LE            { return         value_u24_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_u32_LE            { return         value_u32_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
+#define VALUE_u32_LE_uptime     { return         value_u32_LE_uptime(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 
 #define VALUE_s8                { return          value_s8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
+#define VALUE_s8_ratelimited    { return          value_s8_ratelimited(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_s16_LE            { return         value_s16_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 
 #define VALUE_flag8             { return       value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, bitNr); }
@@ -2264,6 +2288,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
 #endif /* SAVESCHEDULE */
 #ifdef PSEUDO_PACKETS
 // ATmega/ESP pseudopackets
+    case 0x09 :                                                            CAT_PSEUDO2;
     case 0x0D :                                                            CAT_PSEUDO;
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
@@ -2272,19 +2297,20 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       case 0x40 : switch (payloadIndex) {
         case    0 : KEY("ESP_Compile_Options");                                                                                                  VALUE_u8hex;
         case    2 : KEY("MQTT_messages_skipped_not_connected");            HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
-        case    6 : KEY("MQTT_messages_published");                        HACONFIG; HAEVENTS;                                                   VALUE_u32_LE;
+        case    6 : KEY("MQTT_messages_published");                    /*  HACONFIG; HAEVENTS;    */                                             VALUE_u32_LE;
         case    8 : KEY("MQTT_disconnected_time");                         HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
-        case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8;
+        case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8_ratelimited;
         case   10 : KEY("WiFi_status");                                    HACONFIG;                                                             VALUE_u8;
         case   11 : KEY("ESP_reboot_reason");                              HACONFIG;                                                             VALUE_u8hex;
         default   : return 0;
       }
       default   : return 0;
     }
+    case 0x0A :                                                            CAT_PSEUDO2;
     case 0x0E :                                                            CAT_PSEUDO;
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
-        case    3 : KEY("ATmega_Uptime");                                  HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE;
+        case    3 : KEY("ATmega_Uptime");                                  HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE_uptime;
         case    7 : KEY("CPU_Frequency");                                                                                                        VALUE_u32_LE;
         case    8 : KEY("Writes_Refused");                                 HACONFIG;                                                             VALUE_u8;
         case    9 : KEY("Counter_Request_Repeat");                         HACONFIG;                                                             VALUE_u8;
@@ -2297,7 +2323,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         default   : return 0;
       }
       case 0x40 : switch (payloadIndex) {
-        case    3 : KEY("ESP_Uptime");                                     HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE;
+        case    3 : KEY("ESP_Uptime");                                     HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE_uptime;
         case    7 : KEY("MQTT_Acknowledged");                                                                                                    VALUE_u32_LE;
         case   11 : KEY("MQTT_Gaps");                                                                                                            VALUE_u32_LE;
         case   13 : KEY("MQTT_Min_Memory_Size");                           HACONFIG; HABYTES;                                                    VALUE_u16_LE;
@@ -2307,6 +2333,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       default   : return 0;
     }
+    case 0x0B :                                                            CAT_PSEUDO2;
     case 0x0F :                                                            CAT_PSEUDO;
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {

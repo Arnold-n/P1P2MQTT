@@ -1,8 +1,26 @@
 **Release notes**
 
+v0.9.21 (September 7, 2022)
+
+- P1P2-bridge-ESP8266: maintain outputMode/outputFilter in EEPROM
+- P1P2-bridge-ESP8266: #define MQTT_INPUT_HEXDATA/MQTT_INPUT_BINDATA enables data input from MQTT instead of serial input
+- P1P2-bridge-ESP8266: reduce MQTT uptime and WiFi RSSI traffic
+
+v0.9.20 (September 4, 2022)
+
+- P1P2-bridge-ESP8266: F-series VRV decoding for FDY and FDYQ models
+
+v0.9.19 (September 3, 2022)
+
+- P1P2-bridge-ESP8266: MQTT user/password length 80/80
+-
+v0.9.18 (August 29, 2022)
+
+- P1P2-bridge-ESP8266: state_class for HA energy overview
+
 v0.9.17 (August 17, 2022)
 
-- License change to Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International license [(CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/) 
+- License change to Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International license [(CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/) (with exceptions)
 - P1P2Serial, P1P2Monitor, P1P2Serial: software-oscilloscope timing info ("U1"/"U0") added, available via R topic (outputmode 0x1000)
 - P1P2Serial: rare read error in spike suppression bug fixed (OLDP1P2LIB)
 - P1P2Serial: incorrect read-back-verification error report fixed (OLDP1P2LIB en NEWP1P2LIB/16MHz)
