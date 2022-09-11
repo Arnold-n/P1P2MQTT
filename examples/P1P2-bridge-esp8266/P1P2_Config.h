@@ -43,7 +43,7 @@
 
 #define AVRISP // enables flashing ATmega by ESP
 
-#define DEBUG_OVER_SERIAL // sends lots of information over serial. Uncomment this to avoid P1P2Monitor receiving this information. 
+//#define DEBUG_OVER_SERIAL // sends lots of information over serial. Uncomment this to avoid P1P2Monitor receiving this information. 
                           // Use only for serial over USB (or serial via 2nd ESP01) debugging
 //
 //#define REBOOT_REASON // stores reboot reason in flash upon 'D0', 'D1' command, MQTT reconnect failure, or wifimanager failure
@@ -104,7 +104,7 @@ char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
                                // 2 only changed parameters except measurements (temperature, flow)
                                // 3 only changed parameters except measurements (temperature, flow) and except date/time
                                // first-time parameters are always reported
-#define INIT_OUTPUTMODE 0x8001 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
+#define INIT_OUTPUTMODE 0x3003 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
                                // outputmode is sum of:
                                // 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx
                                // 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/xxx/#
