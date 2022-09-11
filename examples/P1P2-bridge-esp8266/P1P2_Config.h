@@ -20,7 +20,7 @@
 #ifndef P1P2_Config
 #define P1P2_Config
 
-//#define COMBIBOARD // define this for Arduino/ESP8266 combi-board and for P1P2-ESP-Interface, undefine for ESP01s-on-USB-debug
+#define COMBIBOARD // define this for Arduino/ESP8266 combi-board and for P1P2-ESP-Interface, undefine for ESP01s-on-USB-debug
 
 // define only one of E_SERIES and F_SERIES:
 #define E_SERIES // for Daikin E* heat pumps
@@ -58,8 +58,8 @@
 
 // if MQTT_INPUT_HEXDATA and/or MQTT_INPUT_BINDATA is defined, the serial input is ignored and data from either or both of
 // the defined topics is used for processing (subject to (outputMode & 0x4000) and (outputMode & 0x8000) respectively):
-#define MQTT_INPUT_HEXDATA "P1P2/R/190" // to use raw data from P1P2/X/xxx instead of serial input (for test purposes) (wildcard # does not seem to work)
-#define MQTT_INPUT_BINDATA "P1P2/X/190" // to use raw data from P1P2/X/xxx instead of serial input (for test purposes) (wildcard # does not seem to work)
+//#define MQTT_INPUT_HEXDATA "P1P2/R/190" // to use raw data from P1P2/X/xxx instead of serial input (for test purposes) (wildcard # does not seem to work)
+//#define MQTT_INPUT_BINDATA "P1P2/X/190" // to use raw data from P1P2/X/xxx instead of serial input (for test purposes) (wildcard # does not seem to work)
 
 // home assistent discovery
 #define HA_PREFIX "homeassistant/sensor"      // homeassistant MQTT discovery prefix
