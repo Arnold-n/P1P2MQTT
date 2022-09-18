@@ -18,7 +18,7 @@ On Daikin Altherma the user interface may be called EKRUCBL (https://www.daikin.
 
 #### Peripherals
 
-There is always at least one peripheral on the P1/P2 bus: the heat pump itself (address 00). Depending on the main controller, one or more external controllers are allowed as additional peripherals (address 0xF0 and higher). An additional peripheral (such as a Daikin LAN adapter BRP069A61 or BRP069A62, a Zennio KLIC-DA KNX adapter, or Realtime Modbus RTD-LT/CA adapter) acts as an auxiliary (or external) controller. 
+There is always at least one peripheral on the P1/P2 bus: the heat pump itself (address 00). Depending on the main controller, one or more external controllers are allowed as additional peripherals (address 0xF0 and higher). An additional peripheral (such as P1P2Monitor itself, a Daikin LAN adapter BRP069A61 or BRP069A62, a Zennio KLIC-DA KNX adapter, or Realtime Modbus RTD-LT/CA adapter) acts as an auxiliary (or external) controller. 
 
 #### How to avoid bus collissions when writing?
 

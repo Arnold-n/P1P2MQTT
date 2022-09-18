@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20220918 v0.9.22 scopemode for writes and focused on actual errors, fake error generation for test purposes, control for FDY/FDYQ (#define F_SERIES), L2/L3/L5 mode
  * 20220903 v0.9.19 minor change in serial output
  * 20220830 v0.9.18 version alignment for firmware image release
  * 20220819 v0.9.17-fix fixed non-functioning 'E'/'n' write commands
@@ -32,6 +33,10 @@
 //
 #define COMBIBOARD // define this for Uno+ESP combiboard, determines SERIALSPEED (250k instead of 115k2) and SERIAL_MAGICSTRING. Ignored if F_CPU=8MHz (as used in P1P2-ESP-Interface)
 
+// define only one of E_SERIES and F_SERIES:
+#define E_SERIES // for Daikin E* heat pumps
+//#define F_SERIES // for Daikin F* VRV systems
+
 #if F_CPU > 8000000L
 // Assume Arduino Uno (or Mega) hardware; use 115200 Baud for USB or 250000 Baud for combi-board
 #ifdef COMBIBOARD
@@ -47,7 +52,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.19"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.22"
 
 #define INIT_VERBOSE 3
 // Set verbosity level
@@ -99,16 +104,16 @@
 
 // Write budget: thottle parameter writes to limit flash memory wear
 #define TIME_WRITE_PERMISSION 3600 // on avg max one write per 3600s allowed
-#define MAX_WRITE_PERMISSION 100   // budget never higher than 100 (don't allow to burn more than 100 writes at once) // 8-bit, so max 255
-#define INIT_WRITE_PERMISSION 10   // initial write budget upon boot
+#define MAX_WRITE_PERMISSION   100 // budget never higher than 100 (don't allow to burn more than 100 writes at once) // 8-bit, so max 255
+#define INIT_WRITE_PERMISSION   10 // initial write budget upon boot
 
 // Error budget: P1P2Monitor should not see any errors except upon start falling into a packet
 // so if P1P2Monitor sees see too many errors, it stops writing
 //
 #define TIME_ERRORS_PERMITTED 3600 // on avg max one error per 3600s allowed (otherwise writing will be switched off)
-#define MAX_ERRORS_PERMITTED  20   // budget never higher than this (don't allow too many errors before we switch writing off) // 8-bit, so max 255
-#define INIT_ERRORS_PERMITTED 10   // initial error budget upon boot
-#define MIN_ERRORS_PERMITTED   5   // don't start control unless error budget is at least this value
+#define MAX_ERRORS_PERMITTED    20 // budget never higher than this (don't allow too many errors before we switch writing off) // 8-bit, so max 255
+#define INIT_ERRORS_PERMITTED   10 // initial error budget upon boot
+#define MIN_ERRORS_PERMITTED     5 // don't start control unless error budget is at least this value
 
 // serial read buffer size for reading from serial port, max line length on serial input is 99 (3 characters per byte, plus 'W" and '\r\n')
 #define RS_SIZE 99

@@ -1,5 +1,11 @@
 **Release notes**
 
+v0.9.22 (September 18, 2022)
+
+- P1P2Serial: scopemode focus on errors, various lib changes, fake error generation option for testing, irq load measurement, removing OLDP1P2LIB, hwID
+- P1P2Monitor: F-series control for FDY/FDYQ, scopemode improvements, additional L2/L3 modes (+experimental L5 mode for F-series)
+- P1P2-bridge-ESP8266: minor changes, hwID, HA degree symbol
+
 v0.9.21 (September 7, 2022)
 
 - P1P2-bridge-ESP8266: maintain outputMode/outputFilter in EEPROM

@@ -43,9 +43,9 @@ A description of the restart process follows at the end of this document.
 
 # Packet types 10-1F form communication package between main controller and heat pump
 
-## Packet type 10 - operating status
-
 Packet types 10-16 are part of the regular communication pattern between main controller and heat pump.
+
+## Packet type 10 - operating status
 
 ### Packet type 10: request
 
@@ -1000,7 +1000,7 @@ Header: 4000B1
 |  1-12         | XX                            | ASCII "EHYHBH08AAV3" name inside unit | c8
 | 13-17         | 00                            | ASCII '\0'            | c8
 
-# Packet type B8 - counters, #hours, #starts, electricy used, energy produced
+# Packet type B8 - counters, #hours, #starts, electricity used, energy produced
 
 Counters for energy consumed and operating hours. The main controller specifies which data type it would like to receive. The heat pump responds with the requested data type counters. A B8 package is only transmitted by the main controller after a manual menu request for these counters. P1P2Monitor can insert B8 requests to poll these counters, but this violates the rule that an auxiliary controller should not act as main controller. But if timed carefully, it works.
 
@@ -1088,7 +1088,7 @@ The restart process is initiated by setting byte 16 of packet "000012.." to 0x61
 
 ### Initial sequence
 
-During the initial sequence and test patterns, the main controller(or another entity taking over this role) uses address 0x80 instead of 0x40
+During the initial sequence and test patterns, the main controller (or another entity taking over this role) uses address 0x80 instead of 0x40
 
 - Request header: 808000, payload empty
 - Response header: 400000 payload empty

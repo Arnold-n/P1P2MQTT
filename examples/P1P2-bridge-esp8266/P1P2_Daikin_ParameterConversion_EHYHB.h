@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
  * 20220821 v0.9.17-fix1 corrected negative deviation temperature reporting, more temp settings reported
  * 20220817 v0.9.17 license change
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
@@ -129,7 +130,7 @@ byte payloadByteSeen[sizeValSeen] = { 0 };
 //byte packetsrc                                  = { {00, 00, 00, 00, 00, 00, 00 }, {40, 40,  40,  40,  40,  40,  40 }}
 //byte packettype                                 = { {10, 11, 12, 13, 14, 15, 31 }, {10, 11,  12,  13,  14,  15,  31 }}
 const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ] = { {20,  8, 15,  3, 15, 6,   6 }, {20, 20,  20,  14,  19,   6,   0 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ] = { { 0, 20, 28, 43, 46, 61, 67 }, {73, 93, 113, 133, 147, 166, 172 /*, sizeValSeen=172 */}}; // was 8-bit
+const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ] = { { 0, 20, 28, 43, 46, 61, 67 }, {73, 93, 113, 133, 147, 166, 172 /*, sizeValSeen=172 */}};
 #define sizeValSeen 172
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
@@ -1061,8 +1062,8 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define HAHOURS {uom = 5;  stateclass = 0;};
 #define HASECONDS {uom = 6;  stateclass = 0;};
 #define HAMILLISECONDS {uom = 7;  stateclass = 0;};
-#define HABYTES   {uom = 8;  stateclass = 0;};
-#define HAEVENTS  {uom = 9;  stateclass = 0;};
+#define HABYTES   {uom = 8;  stateclass = 1;};
+#define HAEVENTS  {uom = 9;  stateclass = 3;};
 
 byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, /*char &cat,*/ byte paramValLength) {
 // similar to bytes2keyvalue but using indirect parameter references in payloads
@@ -2302,6 +2303,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8_ratelimited;
         case   10 : KEY("WiFi_status");                                    HACONFIG;                                                             VALUE_u8;
         case   11 : KEY("ESP_reboot_reason");                              HACONFIG;                                                             VALUE_u8hex;
+        case   15 : KEY("ESP_Output_Mode");                                HACONFIG;                                                             VALUE_u32hex_LE;
         default   : return 0;
       }
       default   : return 0;
@@ -2327,7 +2329,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    7 : KEY("MQTT_Acknowledged");                                                                                                    VALUE_u32_LE;
         case   11 : KEY("MQTT_Gaps");                                                                                                            VALUE_u32_LE;
         case   13 : KEY("MQTT_Min_Memory_Size");                           HACONFIG; HABYTES;                                                    VALUE_u16_LE;
-        case   15 : KEY("ESP_Output_Mode");                                HACONFIG;                                                             VALUE_u16hex_LE;
+        case   15 : KEY("ESP_Output_Mode_old");                                                                                                  VALUE_u16hex_LE;
         case   19 : KEY("ESP_Max_Loop_Time");                              HACONFIG; HAMILLISECONDS                                              VALUE_u32_LE;
         default   : return 0;
       }
@@ -2346,6 +2348,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                                                                            HACONFIG;                                                             VALUE_u16_LE;
         case    8 : KEY("Delay_Packet_Write");                                                                                                   VALUE_u16_LE;
         case   10 : KEY("Delay_Packet_Write_Timeout");                                                                                           VALUE_u16_LE;
+        case   11 : KEY("P1P2_ESP_Interface_hwID");                                                                                              VALUE_u8hex;
         case   12 : KEY("Control_ID_EEPROM");                                                                                                    VALUE_u8hex;
         case   13 : KEY("Verbose_EEPROM");                                                                                                       VALUE_u8;
         case   14 : KEY("Counter_Request_Repeat_EEPROM");                                                                                        VALUE_u8;
@@ -2365,7 +2368,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    9 : KEY("ESP_serial_input_Errors_CRC");                    HACONFIG;                                                             VALUE_u8;
         case   13 : KEY("MQTT_Wait_Counter");                              HACONFIG; HAEVENTS;                                                   VALUE_u32_LE;
         case   15 : KEY("MQTT_disconnects");                               HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
-        case   17 : KEY("MQTT_disconnected_skipped_packets");              HACONFIG; HAEVENTS                                                    VALUE_u16_LE;
+        case   17 : KEY("MQTT_disconnected_skipped_packets");              HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
         case   19 : KEY("MQTT_messages_skipped_low_mem");                  HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
         default   : return 0;
       }

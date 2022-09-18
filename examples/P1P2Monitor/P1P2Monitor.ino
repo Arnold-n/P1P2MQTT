@@ -37,6 +37,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20220918 v0.9.22 scopemode for writes and focused on actual errors, fake error generation for test purposes, control for FDY/FDYQ (#define F_SERIES), L2/L3/L5 mode
  * 20220903 v0.9.19 minor change in serial output
  * 20220830 v0.9.18 version alignment for firmware image release
  * 20220819 v0.9.17-fix1 fixed non-functioning 'E'/'n' write commands
@@ -80,17 +81,23 @@
  * Arduino Mega      46        48       44, 45
  * ATmega328P        PB1      PB0
  *
- * Wishlist: schedule writes
+ * Wishlist:
+ * -schedule writes
+ * -do not accept write commands if not in control mode
+ * -continue control operating (L1) immediately after reset/brown-out, but not immediately after power-up reset
  */
 
 #include "P1P2Config.h"
 #include <P1P2Serial.h>
+
+#define SPI_CLK_PIN_VALUE (PINB & 0x20)
 
 static byte verbose = INIT_VERBOSE;
 static byte readErrors = 0;
 static byte readErrorLast = 0;
 static byte writeRefused = 0;
 static byte errorsLargePacket = 0;
+static byte controlLevel = 1; // for F-series L5 mode
 
 const byte Compile_Options = 0 // multi-line statement
 #ifdef MONITORCONTROL
@@ -107,6 +114,12 @@ const byte Compile_Options = 0 // multi-line statement
 #endif
 #ifdef SERIAL_MAGICSTRING
 +0x10
+#endif
+#ifdef E_SERIES
++0x20
+#endif
+#ifdef F_SERIES
++0x40
 #endif
 ;
 
@@ -137,8 +150,8 @@ P1P2Serial P1P2Serial;
 
 static uint16_t sd = INIT_SD;           // delay setting for each packet written upon manual instruction (changed to 50ms which seems to be a bit safer than 0)
 static uint16_t sdto = INIT_SDTO;       // time-out delay (applies both to manual instructed writes and controller writes)
-static byte echo = INIT_ECHO;         // echo setting (whether written data is read back)
-static byte scope = INIT_SCOPE;        // scope setting (to log timing info)
+static byte echo = INIT_ECHO;           // echo setting (whether written data is read back)
+static byte scope = INIT_SCOPE;         // scope setting (to log timing info)
 static uint8_t CONTROL_ID = CONTROL_ID_DEFAULT;
 static byte counterRequest = 0;
 static byte counterRepeatingRequest = 0;
@@ -184,7 +197,7 @@ static byte Fx30ReplyDelay[2] = { 0, 0 };
 static char RS[RS_SIZE];
 static byte WB[WB_SIZE];
 static byte RB[RB_SIZE];
-static byte EB[RB_SIZE];
+static errorbuf_t EB[RB_SIZE];
 
 // serial-receive using direct access to serial read buffer RS
 // rs is # characters in buffer;
@@ -192,10 +205,12 @@ static byte EB[RB_SIZE];
 
 static uint8_t rs=0;
 static char *RSp = RS;
+static byte hwID = 0;
 
 void setup() {
   save_MCUSR = MCUSR;
   MCUSR = 0;
+  hwID = SPI_CLK_PIN_VALUE ? 0 : 1;
   Serial.begin(SERIALSPEED);
   while (!Serial);      // wait for Arduino Serial Monitor to open
   Serial.println(F("*"));
@@ -210,7 +225,15 @@ void setup() {
 #ifdef KLICDA
   Serial.print(F(" +klicda"));
 #endif /* KLICDA */
+#ifdef E_SERIES
+  Serial.print(F(" E-series"));
+#endif /* E_SERIES */
+#ifdef F_SERIES
+  Serial.print(F(" F-series"));
+#endif /* F_SERIES */
   Serial.println();
+  Serial.print(F("* P1P2-ESP-Interface V"));
+  Serial.println(hwID);
 #ifdef EEPROM_SUPPORT
   initEEPROM();
   CONTROL_ID = EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
@@ -227,7 +250,7 @@ void setup() {
     Serial.print(F("* Reset cause: MCUSR="));
     Serial.print(save_MCUSR);
     if (save_MCUSR & (1 << BORF))  Serial.print(F(" (brown-out-detected)")); // 4
-    if (save_MCUSR & (1 << EXTRF)) Serial.print(F(" (external-reset)")); // 2
+    if (save_MCUSR & (1 << EXTRF)) Serial.print(F(" (ext-reset)")); // 2
     if (save_MCUSR & (1 << PORF)) Serial.print(F(" (power-on-reset)")); // 1
     Serial.println();
 // Initial parameters
@@ -308,7 +331,7 @@ static byte pseudo0D = 0;
 static byte pseudo0E = 0;
 static byte pseudo0F = 0;
 
-uint16_t scope_budget = 170;
+uint8_t scope_budget = 200;
 
 void loop() {
   uint16_t temp;
@@ -384,6 +407,7 @@ void loop() {
                         Serial.println(RSp);
                       }
                       break;
+#ifdef E_SERIES
             case 'e':
             case 'E':
                       if (wr_cnt) {
@@ -399,7 +423,7 @@ void loop() {
                         }
                         if (wr_nr > nr_params[wr_pt - PARAM_TP_START]) {
                           Serial.print(F("* wr_nr > expected: 0x"));
-                          Serial.println(wr_nr);
+                          Serial.println(wr_nr, HEX);
                           break;
                         }
                         uint8_t wr_nrb;
@@ -465,6 +489,81 @@ void loop() {
                         Serial.println();
                       }
                       break;
+#endif /* E_SERIES */
+#ifdef F_SERIES
+            case 'f':
+            case 'F': if (wr_cnt) {
+                        // previous write still being processed
+                        Serial.println(F("* Previous parameter write action still busy"));
+                        break;
+                      } else if ( (n = sscanf(RSp, (const char*) "%2x%2d%2x", &wr_pt, &wr_nr, &wr_val)) == 3) {
+                        if ((wr_pt != 0x38) && (wr_pt != 0x3B)) {
+                          Serial.print(F("* wr_pt: 0x"));
+                          Serial.print(wr_pt, HEX);
+                          Serial.println(F(" is not 0x38 or 0x3B"));
+                          break;
+                        }
+                        // check valid write parameters
+                        if ((wr_nr > 17) || (wr_nr == 3) || (wr_nr == 5) || (wr_nr == 7) || ((wr_nr >= 9) && (wr_nr <= 15)) || ((wr_nr == 16) && (wr_pt == 0x38)) || ((wr_nr == 17) && (wr_pt == 0x38))) {
+                          Serial.print(F("* wr_nr invalid, should be 0, 1, 2, 4, 6, 8 (or for packet type 0x3B: 16 or 17): "));
+                          Serial.println(wr_nr);
+                          break;
+                        }
+                        if (wr_val > 0xFF) {
+                          Serial.print(F("* wr_val > 0xFF: "));
+                          Serial.println(wr_val);
+                          break;
+                        }
+                        if ((wr_nr == 0) && (wr_val > 1)) {
+                          Serial.println(F("wr_val for payload byte 0 (status) must be 0 or 1"));
+                          break;
+                        }
+                        if ((wr_nr == 1) && ((wr_val < 0x60) || (wr_val > 0x67))) {
+                          Serial.println(F("wr_val for payload byte 1 (operating-mode) must be in range 0x60-0x67"));
+                          break;
+                        }
+                        if ((wr_nr == 2) && ((wr_val < 0x0A) || (wr_val > 0x1E))) {
+                          Serial.println(F("wr_val for payload byte 2 (target-cooling-temp) must be in range 0x10-0x20"));
+                          break;
+                        }
+                        if ((wr_nr == 4) && ((wr_val & 0xBF) != 0x11)) {
+                          Serial.println(F("wr_val for payload byte 4 (fan-speed) must be 0x11 or 0x51")); // perhaps also 0x31 for medium fan speed allowed ?
+                          break;
+                        }
+                        // no limitations for wr_nr == 16
+                        if ((wr_nr == 17) && (wr_val > 0x03)) {
+                          Serial.println(F("wr_val for payload byte 17 (fan-mode) must be in range 0x00-0x03"));
+                          break;
+                        }
+                        if (writePermission) {
+                          writePermission--;
+                          wr_cnt = WR_CNT; // write repetitions, 1 should be enough (especially for F-series)
+                          Serial.print(F("* Initiating write for packet-type 0x"));
+                          Serial.print(wr_pt, HEX);
+                          Serial.print(F(" payload byte "));
+                          Serial.print(wr_nr);
+                          Serial.print(F(" to value 0x"));
+                          Serial.print(wr_val, HEX);
+                          Serial.println();
+                        } else {
+                          Serial.println(F("* Currently no write budget left"));
+                          break;
+                        }
+                      } else {
+                        Serial.print(F("* Ignoring instruction, expected 3 arguments, received: "));
+                        Serial.print(n);
+                        if (n > 0) {
+                          Serial.print(F(" pt: 0x"));
+                          Serial.print(wr_pt, HEX);
+                        }
+                        if (n > 1) {
+                          Serial.print(F(" nr: "));
+                          Serial.print(wr_nr);
+                        }
+                        Serial.println();
+                      }
+                      break;
+#endif /* F_SERIES */
             case 'g':
             case 'G': if (verbose) Serial.print(F("* Crc_gen "));
                       if (scanhex(RSp, temphex) == 1) {
@@ -502,10 +601,16 @@ void loop() {
                       Serial.print(F(" "));
                       Serial.println(__TIME__);
 #ifdef OLDP1P2LIB
-                      Serial.println(F("* OLDP1P2LIB"));
+                      Serial.print(F("* OLDP1P2LIB"));
 #else
-                      Serial.println(F("* NEWP1P2LIB"));
+                      Serial.print(F("* NEWP1P2LIB"));
 #endif
+#ifdef E_SERIES
+                      Serial.println(F(" E-series"));
+#endif /* E_SERIES */
+#ifdef F_SERIES
+                       Serial.println(F(" F-series"));
+#endif /* F_SERIES */
                       break;
             case 't':
             case 'T': if (verbose) Serial.print(F("* Delay "));
@@ -531,14 +636,16 @@ void loop() {
 #ifdef SW_SCOPE
             case 'u':
             case 'U': if (verbose) Serial.print(F("* Software-scope "));
-                      if (scanint(RSp, temp) == 1) {
+                      n = sscanf(RSp,"%d %i %i", &temp);
+                      if (n > 0) {
                         scope = temp;
+                        if (scope > 1) scope = 1;
                         P1P2Serial.setScope(scope);
                         if (!verbose) break;
                         Serial.print(F("set to "));
                       }
                       Serial.println(scope);
-                      scope_budget = 170;
+                      scope_budget = 200;
                       break;
 #endif
             case 'x':
@@ -583,38 +690,54 @@ void loop() {
             case 'K': Serial.println(F("* Resetting ...."));
                       resetFunc(); //call reset
             case 'l': // set auxiliary controller function on/off; CONTROL_ID address is set automatically
-            case 'L': if (scanint(RSp, temp) == 1) {
-                        if (temp > 1) temp = 1;
-                        if (temp) {
+            case 'L': // 0 controller mode off, and store setting in EEPROM
+                      // 1 controller mode on, and store setting in EEPROM
+                      // 2 controller mode off, do not store setting in EEPROM
+                      // 3 controller mode on, do not store setting in EEPROM
+                      // 5 (for experimenting with F-series only) controller responds only to 00F030 message withan empty packet, but not to other 00F03x packets
+                      // other values are treated as 0 and are reserved for further experimentation of control modes
+                      if (scanint(RSp, temp) == 1) {
+#ifdef E_SERIES
+                        if (temp > 3) temp = 0;
+#endif
+#ifdef F_SERIES
+                        if ((temp > 5) || (temp == 4)) temp = 0;
+#endif
+                        byte setMode = temp & 0x01;
+                        if (setMode) {
                           if (errorsPermitted < MIN_ERRORS_PERMITTED) {
-                            Serial.println(F("* Errorspermitted too low; control functinality not enabled"));
+                            Serial.println(F("* Errorspermitted (error budget) too low; control functionality cannot enabled"));
                             break;
                           }
-                          if (CONTROL_ID && temp) {
+                          if (CONTROL_ID) {
                             Serial.print(F("* CONTROL_ID is already 0x"));
                             Serial.println(CONTROL_ID, HEX);
-                            break;
-                          }
-                          if (!CONTROL_ID && !temp) {
-                            Serial.print(F("* CONTROL_ID is already 0x00"));
+                            if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
                             break;
                           }
                           if (FxAbsentCnt[0] == F0THRESHOLD) {
-                            Serial.println(F("* Control_ID 0xF0 supported, no external controller found for 0xF0, switching control functionality on 0xF0 on"));
+                            Serial.println(F("* Control_ID 0xF0 supported, no auxiliary controller found for 0xF0, switching control functionality on 0xF0 on"));
                             CONTROL_ID = 0xF0;
-                            EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                            controlLevel = (temp == 5) ? 0 : 1; // F-series: special mode L5 answers only to F030
+                            if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID); // L2/L3/L5 for short experiments, doesn't survive ATmega reboot !
+#ifdef E_SERIES
                           } else if (FxAbsentCnt[1] == F0THRESHOLD) {
-                            Serial.println(F("* Control_ID 0xF1 supported, no external controller found for 0xF1, switching control functionality on 0xF1 on"));
+                            Serial.println(F("* Control_ID 0xF1 supported, no auxiliary controller found for 0xF1, switching control functionality on 0xF1 on"));
                             CONTROL_ID = 0xF1;
-                            EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                            if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+#endif
                           } else {
-                            Serial.println(F("* No free address for controller found (yet). Control functionality not enabled. You may wish to re-try in a few seconds (and perhaps switch external controllers off)"));
-                            CONTROL_ID = 0x00;
-                            EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                            Serial.println(F("* No free address for controller found (yet). Control functionality not enabled"));
+                            Serial.println(F("* You may wish to re-try in a few seconds (and perhaps switch auxiliary controllers off)"));
                           }
                         } else {
-                          CONTROL_ID = 0x00;
-                          EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                          if (!CONTROL_ID) {
+                            Serial.print(F("* CONTROL_ID is already 0x00"));
+                            break;
+                          } else {
+                            CONTROL_ID = 0x00;
+                          }
+                          if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
                         }
                         if (!verbose) break;
                         Serial.print(F("* Control_id set to 0x"));
@@ -626,6 +749,7 @@ void loop() {
                       if (CONTROL_ID <= 0x0F) Serial.print("0");
                       Serial.println(CONTROL_ID, HEX);
                       break;
+#ifdef E_SERIES
             case 'c': // set counterRequest cycle (once or repetitive)
             case 'C': if (scanint(RSp, temp) == 1) {
                         if (temp > 1) {
@@ -872,8 +996,9 @@ void loop() {
                         Serial.println(F(": no DHW-write-request pending"));
                       }
                       break;
+#endif /* E_SERIES */
             default:  Serial.print(F("* Command not understood: "));
-                      Serial.println(RS);
+                      Serial.println(RSp - 1);
                       break;
           }
 #ifdef SERIAL_MAGICSTRING
@@ -897,6 +1022,10 @@ void loop() {
     pseudo0E++;
     pseudo0F++;
     upt_prev_pseudo = upt;
+
+
+
+
   }
   if (upt >= upt_prev_write + TIME_WRITE_PERMISSION) {
     if (writePermission < MAX_WRITE_PERMISSION) writePermission++;
@@ -908,13 +1037,12 @@ void loop() {
   }
   while (P1P2Serial.packetavailable()) {
     uint16_t delta;
-    byte readError = 0;
-
+    errorbuf_t readError = 0;
     int nread = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, crc_gen, crc_feed);
     if (nread > RB_SIZE) {
       Serial.println(F("* Received packet longer than RB_SIZE"));
       nread = RB_SIZE;
-      readError = 1;
+      readError = 0xFF;
       if (errorsLargePacket < 0xFF) errorsLargePacket++;
     }
     for (int i = 0; i < nread; i++) readError |= EB[i];
@@ -925,70 +1053,126 @@ void loop() {
 #else
 #define FREQ_DIV 3 // 8 MHz
 #endif
-    // try to get sws output out before next packet reception starts/ no buffering of sws_data
-    uint8_t sws_cnt2 = sws_cnt; sws_cnt = SWS_MAX;
 
-    if ((readError && (scope_budget > 5)) || (((RB[0] == 0x40) && (RB[1] == 0xF0)) && (scope_budget > 50)) || (scope_budget > 170)) {
+    if (scope && ((readError && (scope_budget > 5)) || (((RB[0] == 0x40) && (RB[1] == 0xF0)) && (scope_budget > 50)) || (scope_budget > 150))) {
       // always keep scope write budget for 40F0 and expecially for readErrors
-      if (sws_cnt2) {
+      if (sws_cnt || (sws_event[SWS_MAX - 1] != SWS_EVENT_LOOP)) {
         scope_budget -= 5;
         if (readError) {
-          Serial.print('C');
+          Serial.print("C ");
         } else {
-          Serial.print('c');
+          Serial.print("c ");
         }
-        Serial.print(' ');
         if (RB[0] < 0x10) Serial.print('0');
         Serial.print(RB[0], HEX);
         if (RB[1] < 0x10) Serial.print('0');
         Serial.print(RB[1], HEX);
         if (RB[2] < 0x10) Serial.print('0');
         Serial.print(RB[2], HEX);
-        if (sws_overflow) {
-          sws_overflow = 0;
-          Serial.print(" OVF");
-        }
+        Serial.print(' ');
         static uint16_t capture_prev;
-        for (int i = 0; i < sws_cnt2; i++) {
-          Serial.print(' ');
-          Serial.print(sws_event[i] & 0x1F);
-          if (sws_event[i] & 0x80) { // pause
-            Serial.print("- ");
-            uint16_t t_diff = (sws_capture[i] - capture_prev) >> FREQ_DIV;
-            if (t_diff < 10) Serial.print(' ');
-            if (t_diff < 100) Serial.print(' ');
-            if (t_diff < 1000) Serial.print(' ');
-            Serial.print(t_diff);
-          } else if (sws_event[i] & 0x40) {
-            Serial.print("x");
-          } else if (sws_event[i] & 0x20) {
-            Serial.print("H    0");
-          } else {
-            Serial.print("L ");
-            if (i) {
-              uint16_t t_diff = (sws_capture[i] - capture_prev) >> FREQ_DIV;
-              if (t_diff < 10) Serial.print(' ');
-              if (t_diff < 100) Serial.print(' ');
-              if (t_diff < 1000) Serial.print(' ');
-              Serial.print(t_diff);
-            } else Serial.print('0');
-            capture_prev = sws_capture[i];
+        int i = 0;
+        if (sws_event[SWS_MAX - 1] != SWS_EVENT_LOOP) i = sws_cnt;
+        bool skipfirst = true;
+        do {
+          switch (sws_event[i]) {
+            // error events
+            case SWS_EVENT_ERR_BE      : Serial.print(F("   BE   ")); break;
+            case SWS_EVENT_ERR_BE_FAKE : Serial.print(F("   be   ")); break;
+            case SWS_EVENT_ERR_SB      : Serial.print(F("   SB   ")); break;
+            case SWS_EVENT_ERR_SB_FAKE : Serial.print(F("   sb   ")); break;
+            case SWS_EVENT_ERR_BC      : Serial.print(F("   BC   ")); break;
+            case SWS_EVENT_ERR_BC_FAKE : Serial.print(F("   bc   ")); break;
+            case SWS_EVENT_ERR_PE      : Serial.print(F("   PE   ")); break;
+            case SWS_EVENT_ERR_PE_FAKE : Serial.print(F("   pe   ")); break;
+            case SWS_EVENT_ERR_LOW     : Serial.print(F("   lw   ")); break;
+            // read/write related events
+            default   : byte sws_ev    = sws_event[i] & SWS_EVENT_MASK;
+                        byte sws_state = sws_event[i] & 0x1F;
+                        if (!skipfirst) {
+                          if (sws_ev == SWS_EVENT_EDGE_FALLING_W) Serial.print(' ');
+                          uint16_t t_diff = (sws_capture[i] - capture_prev) >> FREQ_DIV;
+                          if (t_diff < 10) Serial.print(' ');
+                          if (t_diff < 100) Serial.print(' ');
+                          Serial.print(t_diff);
+                          if (sws_ev != SWS_EVENT_EDGE_FALLING_W) Serial.print(':');
+                        }
+                        capture_prev = sws_capture[i];
+                        skipfirst = false;
+                        switch (sws_ev) {
+                          case SWS_EVENT_SIGNAL_LOW     : Serial.print('?'); break;
+                          case SWS_EVENT_EDGE_FALLING_W : Serial.print(' '); break;
+                          case SWS_EVENT_EDGE_RISING    :
+                                                          // state = 1 .. 20 (1,2 start bit, 3-18 data bit, 19,20 parity bit),
+                                                          switch (sws_state) {
+                                                            case 1       :
+                                                            case 2       : Serial.print('S'); break; // start bit
+                                                            case 3 ... 18: Serial.print((sws_state - 3) >> 1); break; // state=3-18 for data bit 0-7
+                                                            case 19      :
+                                                            case 20      : Serial.print('P'); break; // parity bit
+                                                            default      : Serial.print(' '); break;
+                                                          }
+                                                          break;
+                          case SWS_EVENT_EDGE_SPIKE     :
+                          case SWS_EVENT_SIGNAL_HIGH_R  :
+                          case SWS_EVENT_EDGE_FALLING_R :
+                                                          switch (sws_state) {
+                                                            case 11      : Serial.print('E'); break; // stop bit ('end' bit)
+                                                            case 10      : Serial.print('P'); break; // parity bit
+                                                            case 0       :
+                                                            case 1       : Serial.print('S'); break; // parity bit
+                                                            case 2 ... 9 : Serial.print(sws_state - 2); break; // state=2-9 for data bit 0-7
+                                                            default      : Serial.print(' '); break;
+                                                          }
+                                                          break;
+                          default                       : Serial.print(' ');
+                                                          break;
+                        }
+                        switch (sws_ev) {
+                          case SWS_EVENT_EDGE_SPIKE     : Serial.print("-X-");  break;
+                          case SWS_EVENT_SIGNAL_HIGH_R  : Serial.print("‾‾‾"); break;
+                          case SWS_EVENT_SIGNAL_LOW     : Serial.print("___"); break;
+                          case SWS_EVENT_EDGE_RISING    : Serial.print("_/‾"); break;
+                          case SWS_EVENT_EDGE_FALLING_W :
+                          case SWS_EVENT_EDGE_FALLING_R : Serial.print("‾\\_"); break;
+                          default                       : Serial.print(" ? "); break;
+                        }
           }
-          uint16_t t_diff = (sws_count[i] - capture_prev) >> FREQ_DIV;
-          Serial.print(' ');
-          if (t_diff < 10) Serial.print(' ');
-          if (t_diff < 100) Serial.print(' ');
-          if (t_diff < 1000) Serial.print(' ');
-          Serial.print(t_diff);
-        }
+          if (++i == SWS_MAX) i = 0;
+        } while (i != sws_cnt);
         Serial.println();
       }
     }
-    scope_budget++;
-    if (scope_budget > 200) scope_budget = 200;
-    sws_cnt = 0;
+    if (++scope_budget > 200) scope_budget = 200;
+    sws_block = 0; // release SW_SCOPE for next log operation
 #endif
-    if (readError && upt) { // don't count errors while upt == 0
+#ifdef MEASURE_LOAD
+    if (irq_r) {
+      uint8_t irq_busy_c1 = irq_busy;
+      uint16_t irq_lapsed_r_c = irq_lapsed_r;
+      uint16_t irq_r_c = irq_r;
+      uint8_t  irq_busy_c2 = irq_busy;
+      if (irq_busy_c1 || irq_busy_c2) {
+        Serial.println(F("* irq_busy"));
+      } else {
+        Serial.print(F("* sh_r="));
+        Serial.println(100.0 * irq_r_c / irq_lapsed_r_c);
+      }
+    }
+    if (irq_w) {
+      uint8_t irq_busy_c1 = irq_busy;
+      uint16_t irq_lapsed_w_c = irq_lapsed_w;
+      uint16_t irq_w_c = irq_w;
+      uint8_t  irq_busy_c2 = irq_busy;
+      if (irq_busy_c1 || irq_busy_c2) {
+        Serial.println(F("* irq_busy"));
+      } else {
+        Serial.print(F("* sh_w="));
+        Serial.println(100.0 * irq_w_c / irq_lapsed_w_c);
+      }
+    }
+#endif
+    if ((readError & ERROR_REAL_MASK) && upt) { // don't count errors while upt == 0
       if (readErrors < 0xFF) {
         readErrors++;
         readErrorLast = readError;
@@ -1047,7 +1231,7 @@ void loop() {
 #else /* KLICDA */
       if ((FxAbsentCnt[0] == F0THRESHOLD) && counterRequest && (nread > 4) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30)) {
         // 00F030 request message received; counterRequest > 0 so hijack every 4th time slot to request counters
-        // but only if external F0 controller has not been detected (so check on FxAbsentCnt[0])
+        // but only if auxiliary F0 controller has not been detected (so check on FxAbsentCnt[0])
         // This works only if there is no other auxiliary controller responding to 0xF0, TODO: in that case extend to hijack 0xF1 timeslot
         if ((counterRequest & 0x03) == 0x01) {
           WB[0] = 0x00;
@@ -1066,7 +1250,7 @@ void loop() {
       }
 #endif /* KLICDA */
       if ((nread > 4) && (RB[0] == 0x40) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
-        // 40Fx3x external controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < min(F03XDELAY, F030DELAY) (- margin)
+        // 40Fx3x auxiliary controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < min(F03XDELAY, F030DELAY) (- margin)
         // Note for developers using >1 P1P2Monitor-interfaces (=to self): this detection mechanism fails if there are 2 P1P2Monitor programs (and adapters) with same delay settings on the same bus.
         // check if there is any auxiliary controller on 0x30 (including P1P2Monitor self, requires echo)
         if (RB[2] == 0x30) FxAbsentCntInclOwn[RB[1] & 0x01] = 0;
@@ -1075,10 +1259,10 @@ void loop() {
         if ((delta < F03XDELAY - 2) && (delta < F030DELAY - 2)) {
           FxAbsentCnt[RB[1] & 0x01] = 0;
           if (RB[1] == CONTROL_ID) {
-            // this should only happen if an external controller is connected if/after CONTROL_ID is set, either because
-            //    -CONTROL_ID_DEFAULT is set and conflicts with external controller, or
-            //    -because an external controller has been connected after CONTROL_ID has been manually set
-            Serial.print(F("* Warning: external controller answering to address 0x"));
+            // this should only happen if an auxiliary controller is connected if/after CONTROL_ID is set, either because
+            //    -CONTROL_ID_DEFAULT is set and conflicts with auxiliary controller, or
+            //    -because an auxiliary controller has been connected after CONTROL_ID has been manually set
+            Serial.print(F("* Warning: another auxiliary controller is answering to address 0x"));
             Serial.print(RB[1], HEX);
             Serial.println(F(" detected"));
             CONTROL_ID = CONTROL_ID_NONE;
@@ -1095,11 +1279,11 @@ void loop() {
             FxAbsentCntInclOwn[RB[1] & 0x01]++;
           }
         }
-        // check if there is no other external controller
+        // check if there is no other auxiliary controller
         if ((RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x01] < F0THRESHOLD)) {
           FxAbsentCnt[RB[1] & 0x01]++;
           if (FxAbsentCnt[RB[1] & 0x01] == F0THRESHOLD) {
-            Serial.print(F("* No external controller answering to address 0x"));
+            Serial.print(F("* No auxiliary controller answering to address 0x"));
             Serial.print(RB[1], HEX);
             if (CONTROL_ID == RB[1]) {
               Serial.println(F(" detected, control functionality will restart"));
@@ -1108,7 +1292,7 @@ void loop() {
             }
           }
         }
-        // act as external controller:
+        // act as auxiliary controller:
         if (CONTROL_ID && (FxAbsentCnt[CONTROL_ID & 0x01] == F0THRESHOLD) && (RB[1] == CONTROL_ID)) {
           WB[0] = 0x40;
           WB[1] = RB[1];
@@ -1120,9 +1304,9 @@ void loop() {
           if (n > WB_SIZE) {
             n = WB_SIZE;
             Serial.print(F("* Surprise: received 00Fx3x packet of size "));
-            Serial.println(nread);
-          }
+            Serial.println(nread); }
           switch (RB[2]) {
+#ifdef E_SERIES
             case 0x30 : // in: 17 byte; out: 17 byte; answer WB[7] should contain a 01 if we want to communicate a new setting in packet type 35
                         for (w = 3; w < n; w++) WB[w] = 0x00;
                         // set byte WB[7] to 0x01 to request a F035 message to set Value35 and/or DHWstatus
@@ -1257,17 +1441,81 @@ void loop() {
                         for (w = 4; w < n; w++) WB[w] = 0xFF;
                         wr = 1;
                         break;
+#endif /* E_SERIES */
+#ifdef F_SERIES
+            case 0x30 : // polling auxiliary controller, reply with empty payload
+              d = F030DELAY;
+              wr = 1;
+              n = 3;
+              break;
+            case 0x37 : // FDYQ180MV1 zone name packet, reply with empty payload
+              wr = controlLevel;
+              n = 3;
+              break;
+            case 0x38 : // FHYC123KVE control message, copy bytes back and change if 'F' command is given
+              wr = controlLevel;
+              n = 18;
+              for (w = 13; w <= 15; w++) WB[w] = 0x00;
+              WB[3]  = RB[3] & 0x01;           // W target status
+              WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
+              WB[5]  = RB[7];                  // W target temperature cooling
+              WB[6]  = 0x00;                   //   clear change flag 80 from input (alternative:? WB[6] = RB[8] & 0x7F)
+              WB[7]  = (RB[9] & 0x60) | 0x11;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
+              WB[8]  = 0x00;                   //   clear change flag 80 from input
+              WB[9]  = RB[11];                 // W target temperature heating
+              WB[10] = 0x00;                   //   clear change flag from input    (alternative:? WB[10] = RB[12] & 0x7F)
+              WB[11] = (RB[13] & 0x60) | 0x11; // W target fan speed heating;       (alternative: WB[11] = RB[13] & 0x7F might work too)
+              WB[12] = RB[14] & 0x7F;          //   clear change flag from input
+              WB[16] = RB[18];                 //   target fan mode ?? & 0x03 ?
+              WB[17] = 0x00;                   //   ? (change flag, & 0x7F ?)
+              if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+              break;
+            case 0x39 : // guess that this is filter for FHYC123KVE, reply with 4-byte payload
+              wr = controlLevel;
+              n = 7;
+              WB[3] = 0x00;
+              WB[4] = 0x00;
+              WB[5] = RB[11];
+              WB[6] = RB[12];
+              if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+              break;
+            case 0x3B : // FDYQ180MV1 control message, copy bytes back and change if 'F' command is given
+              wr = controlLevel;
+              n = 22;
+              for (w = 13; w <= 18; w++) WB[w] = 0x00;
+              WB[3]  = RB[3] & 0x01;           // W target status
+              WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
+              WB[5]  = RB[7];                  // W target temperature cooling
+              WB[6]  = 0x00;                   //   clear change flag 80 from input (alternative:? WB[6] = RB[8] & 0x7F)
+              WB[7]  = (RB[9] & 0x60) | 0x11;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
+              WB[8]  = 0x00;                   //   clear change flag 80 from input
+              WB[9]  = RB[11];                 // W target temperature heating
+              WB[10] = 0x00;                   //   clear change flag from input    (alternative:? WB[10] = RB[12] & 0x7F)
+              WB[11] = (RB[13] & 0x60) | 0x11; // W target fan speed heating        (alternative: WB[11] = RB[13] & 0x7F might work too)
+              WB[12] = RB[14] & 0x7F;          //   clear change flag from input
+              WB[19] = RB[20];                 // W active hvac zones
+              WB[20] = RB[21] & 0x03;          // W target fan mode
+              WB[21] = 0x00;                   //   ? (change flag, & 0x7F ?)
+              if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+              break;
+            case 0x3C : // FDYQ180MV1 filter message, reply with 2-byte zero payload
+              wr = controlLevel;
+              n = 5;
+              WB[3] = 0x00;
+              WB[4] = 0x00;
+              if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+              break;
+#endif /* F_SERIES */
             default   : // not seen, no response
-                        break;
+              break;
           }
           if (wr) {
             if (P1P2Serial.writeready()) {
               P1P2Serial.writepacket(WB, n, d, crc_gen, crc_feed);
               parameterWritesDone += wr_req;
               wr_req = 0;
-// TODO wr_req seems unneeded, just increment parameterWritesDone when wr_cnt-- above ?
             } else {
-              Serial.println(F("* Refusing to write packet while previous packet wasn't finished"));
+              Serial.println(F("* Refusing to write packet while previous packet wasn't finished, flushing write action"));
               if (writeRefused < 0xFF) writeRefused++;
               wr_req = 0;
             }
@@ -1299,11 +1547,15 @@ void loop() {
     }
     if ((verbose < 4) || readError) {
       for (int i = 0; i < nread; i++) {
-        if (verbose && (EB[i] & ERROR_READBACK)) {
+        if (verbose && (EB[i] & ERROR_SB)) {
+          // collision suspicion due to data verification error in reading back written data
+          Serial.print(F("-SB:"));
+        }
+        if (verbose && (EB[i] & ERROR_BE)) { // or BE3 (duplicate code)
           // collision suspicion due to data verification error in reading back written data
           Serial.print(F("-XX:"));
         }
-        if (verbose && (EB[i] & ERROR_BUSCOLLISION)) {
+        if (verbose && (EB[i] & ERROR_BC)) {
           // collision suspicion due to 0 during 2nd half bit signal read back
           Serial.print(F("-BC:"));
         }
@@ -1311,13 +1563,31 @@ void loop() {
           // parity error detected
           Serial.print(F("-PE:"));
         }
+#ifdef GENERATE_FAKE_ERRORS
+        if (verbose && (EB[i] & (ERROR_SB << 8))) {
+          // collision suspicion due to data verification error in reading back written data
+          Serial.print(F("-sb:"));
+        }
+        if (verbose && (EB[i] & (ERROR_BE << 8))) {
+          // collision suspicion due to data verification error in reading back written data
+          Serial.print(F("-xx:"));
+        }
+        if (verbose && (EB[i] & (ERROR_BC << 8))) {
+          // collision suspicion due to 0 during 2nd half bit signal read back
+          Serial.print(F("-bc:"));
+        }
+        if (verbose && (EB[i] & (ERROR_PE << 8))) {
+          // parity error detected
+          Serial.print(F("-pe:"));
+        }
+#endif
         byte c = RB[i];
         if (crc_gen && (verbose == 1) && (i == nread - 1)) {
           Serial.print(F(" CRC="));
         }
         if (c < 0x10) Serial.print(F("0"));
         Serial.print(c, HEX);
-        if (verbose && (EB[i] & ERROR_OVERRUN)) {
+        if (verbose && (EB[i] & ERROR_OR)) {
           // buffer overrun detected (overrun is after, not before, the read byte)
           Serial.print(F(":OR-"));
         }
@@ -1328,6 +1598,9 @@ void loop() {
       }
       if (readError) {
         Serial.print(" readError=0x");
+        if (readError < 0x10) Serial.print('0');
+        if (readError < 0x100) Serial.print('0');
+        if (readError < 0x1000) Serial.print('0');
         Serial.print(readError, HEX);
       }
       Serial.println();
@@ -1386,7 +1659,7 @@ void loop() {
     WB[11] = sd & 0xFF;
     WB[12] = (sdto >> 8) & 0xFF;
     WB[13] = sdto & 0xFF;
-    WB[14] = 0x00;
+    WB[14] = hwID;
 #ifdef EEPROM_SUPPORT
     WB[15] = EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
     WB[16] = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);

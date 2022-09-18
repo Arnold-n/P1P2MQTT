@@ -147,7 +147,7 @@ Topics providing information or commands to P1P2MQTT:
 
 Commands to be executed by P1P2MQTT can be given over P1P2/W/\<xxx\> or via telnet:
 - "A" Execute hard reset of ATmega328P
-- "B" MQTT_server_IPv4 [MQTT_portnr [MQTT_user MQTT_password]] sets MQTT server details.
+- "B" [MQTT_server_IPv4 [MQTT_portnr [MQTT_user [MQTT_password [MQTT_INPUT_IPv4-byte4]]]]] sets MQTT server details and, for ESP01s taking input over MQTT, 4th byte of IPv4 of data source (with 0 for subscribing to P1P2/R/#).
 - "D0" Reset ESP8266
 - "D1" Restart ESP8266
 - "S"  Display output filter level (replaces previous changed-only mode)
@@ -165,15 +165,16 @@ Commands to be executed by P1P2MQTT can be given over P1P2/W/\<xxx\> or via teln
   - 0x0010 ESP to output raw data over telnet
   - 0x0020 to output mqtt individual parameter data over telnet
   - 0x0040 to output json data over telnet
-  - 0x0080 (reserved)
+  - 0x0080 (reserved for adding time string in R output)
   - 0x0100 ESP to output raw data over serial
   - 0x0200 to output mqtt individual parameter data over serial
   - 0x0400 to output json data over serial
   - 0x0800 to output raw binary data over P1P2/X/#
-  - 0x1000 output timing data (if scope mode is set to 1) via P1P2/R/xxx (with prefix C)
+  - 0x1000 output timing data (if scope mode is set to 1) via P1P2/R/xxx (with prefixes C and c)
   - 0x2000 output packets with errors also over P1P2/R/xxx (with prefix \*)
-  - 0x4000 (reserved)
-  - 0x8000 (reserved)
+  - 0x4000 to use P1P2/R/xxx as input instead of serial (requires MQTT_INPUT_HEXDATA)
+  - 0x8000 to use P1P2/X/xxx as input instead of serial (requires MQTT_INPUT_BINDAT)
+  - 0x10000 to include non-HACONFIG parameters in P1P2/P/#
 - "V" Display verbosity (and displays software version + compile date/time of both P1P2MQTT and P1P2Monitor)
 - "Vx" Sets verbosity (and displays software version + compile date/time of both P1P2MQTT and P1P2Monitor)  (for verbosity levels 0-4, see [P1P2Monitor-commands.md](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Monitor-commands.md); level 9: ESP8266 ignoring serial input (safe mode))
 - "U" Display scope mode (0 off, 1 on)
@@ -186,8 +187,9 @@ Further, supported but advised not to use, and not really needed (some may be re
 - "Hx" Sets crc_feed (default 0x00) (we have not seen any other values so no need to change)
 
 No longer supported:
-- "Ux" Diaplay-unknown mode on/off, replaced by 0x0008 contribution in J command
+- "Ux" Display-unknown mode on/off, replaced by 0x0008 contribution in J command
 - "U"  Display display-unknown mode
+- ("U"  command is now used to switch scope-mode in P1P2Monitor)
 
 #### P1P2Monitor commands (forwarded by P1P2MQTT)
 
@@ -196,5 +198,9 @@ All other commands received by P1P2MQTT (as well as the CRC-related G and H comm
  - "L0" to stop auxiliary controller
  - "C2" to start requesting counters ("C" state info maintained in EEPROM)
  - "C0" to stop requesting counters
- - "E" for parameter writing, for example,
+ - "E" for parameter writing for Daikin E-series, for example,
  - "E 35002F01" to switch heating on (packet type 0x35, parameter 0x002F, value 0x01). Other allowable formats are space-separated "E 35 2F 1" or shortening the third parameter as in "E35002F1".
+ - "F" (not released yet) for writing for Daikin F-series, for example,
+ - "F 38 0 1" to set packet type 38 byte 0 to 0 to power FDY model on
+ - "F 38 0 0" to power FDY model off
+ - "F 38 8 51" to set FDY model heating fan mode high

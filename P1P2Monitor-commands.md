@@ -52,55 +52,57 @@ A few pre-defined parameter writing actions are still available from earlier P1P
 
 ## Old parameter write commands (will be outphased):
 
-- Px sets (16-bit) parameter number in packet type 35 to use for Zx command (default PARAM_HC_ONOFF)
-- P reports parameter number used for writes to packet type 35
-- Qx sets (16-bit) parameter number in packet type 36 to use for Rx command (default PARAM_TEMP)
-- Q reports parameter number used for writes to packet type 36
-- Mx sets (16-bit) parameter number in packet type 3A to use for Nx command (default PARAM_SYS)
-- M reports parameter number used for writes to packet type 3A
-- Zx sets heating(/cooling) on/off (1/0) (function can be changed using Px command below to set any 8-bit parameter in packet type 35)
-- Z reports status of write action
-- Rx sets DHW temperature (function can be changed using Qx command below to set any 16-bit parameter in packet type 36)
-- R reports status of write action
-- Nx sets 8-bit value of 8-bit parameter selected by Q command) in packet type 3A
-- N reports status of write action
-- Yx sets DHW on/off (using parameter PARAM_DHW_ONOFF, cannot be changed)
-- Y reports status of write action
+- Px sets (16-bit) parameter number in packet type 35 to use for Zx command (default PARAM_HC_ONOFF),
+- P reports parameter number used for writes to packet type 35,
+- Qx sets (16-bit) parameter number in packet type 36 to use for Rx command (default PARAM_TEMP),
+- Q reports parameter number used for writes to packet type 36,
+- Mx sets (16-bit) parameter number in packet type 3A to use for Nx command (default PARAM_SYS),
+- M reports parameter number used for writes to packet type 3A,
+- Zx sets heating(/cooling) on/off (1/0) (function can be changed using Px command below to set any 8-bit parameter in packet type 35),
+- Z reports status of write action,
+- Rx sets DHW temperature (function can be changed using Qx command below to set any 16-bit parameter in packet type 36),
+- R reports status of write action,
+- Nx sets 8-bit value of 8-bit parameter selected by Q command) in packet type 3A,
+- N reports status of write action,
+- Yx sets DHW on/off (using parameter PARAM_DHW_ONOFF, cannot be changed), and
+- Y reports status of write action.
 
 ### Monitor commands:
 
-- V  Show verbosity mode (default 3 for interfacing to P1P2MQTT), P1P2Monitor version and date/time of compilation
-- Vx Sets verbosity mode (0 minimal, 1 traditional, 2 for P1P2MQTT, 3 like 2 with timing info added, 4 for suppression of hex data)
-- U  Shows scope mode (default 0 off, 1 on)
-- Ux Sets scope mode (default 0 off, 1 on); adds timing info for the start of some of the packets read via serial output and R topic
-- \* comment lines starting with an asterisk are ignored (and echoed in verbosity modes 1 and 4)
+- V  Show verbosity mode (default 3 for interfacing to P1P2MQTT), P1P2Monitor version and date/time of compilation,
+- Vx Sets verbosity mode (0 minimal, 1 traditional, 2 for P1P2MQTT, 3 like 2 with timing info added, 4 for suppression of hex data),
+- U  Shows scope mode (default 0 off, 1 on),
+- Ux Sets scope mode (default 0 off, 1 on); adds timing info for the start of some of the packets read via serial output and R topic, and
+- \* comment lines starting with an asterisk are ignored (and echoed in verbosity modes 1 and 4).
 
 ## Auxiliary controller commands:
 
-- L1 sets auxiliary controller mode on (controller address (0xF0 or 0xF1) is auto-detected after check whether another auxiliary controller is present or not) (can also be set in P1P2Config.h) (controller ID is saved in EEPROM, so this command remains effective after a restart)
-- L0 sets auxiliary controller mode off
-- L  displays current controller_id (0x00 = off; 0xF0/0xF1 is first/secondary auxiliary controller)
-- C1 triggers single cycle of 6 B8 packets to request (energy/operation/starts) counters from heat pump
-- C2 like C1, but keeps repeating every new minute
-- C0 Stop requesting counters
-- C  Show counter-repeating-request status
+- L1 sets auxiliary controller mode on (controller address (0xF0 or 0xF1) is auto-detected after check whether another auxiliary controller is present or not) (can also be set in P1P2Config.h) (controller ID is saved in EEPROM, so this command remains effective after a restart),
+- L0 sets auxiliary controller mode off,
+- L2 (and L3) switch auxiliary controller mode off (and on) but do not save this change to EEPROM,
+- L5 (F-series only) switches auxiliary controller mode partially on: only 00F030 messages are responded to. This enable monitoring which 00F03x packets will be requested. Not saved to EEPROM,
+- L  displays current controller_id (0x00 = off; 0xF0/0xF1 is first/secondary auxiliary controller),
+- C1 triggers single cycle of 6 B8 packets to request (energy/operation/starts) counters from heat pump,
+- C2 like C1, but keeps repeating every new minute,
+- C0 stop requesting counters, and
+- C  show counter-repeating-request status.
 
 ## Raw data commands:
 
 Commands for raw data writing to the bus (only for reverse engineering purposes), avoid these commands unless you know what you do:
-- W\<hex data\> Write raw packet (max 32 bytes (as defined by WB_SIZE)) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space)
-- T  Display current delay value (a packet will be written after exactly <delay> ms after the latest start bit, or if the bus has been silent for <delaytimeout> ms)
-- Tx sets new delay value in ms, to be used for future packets (default 50 (older versions: 0))
-- O  Display current delaytimeout value
-- Ox sets new delay timeout value in ms, to be used immediately (default 2500)
+- W\<hex data\> Write raw packet (max 32 bytes (as defined by WB_SIZE)) (no 0x prefix should be used for the hex bytes; hex bytes may be concatenated or separated by white space),
+- T  display current delay value (a packet will be written after exactly <delay> ms after the latest start bit, or if the bus has been silent for <delaytimeout> ms),
+- Tx sets new delay value in ms, to be used for future packets (default 50 (older versions: 0)),
+- O  display current delaytimeout value, and
+- Ox sets new delay timeout value in ms, to be used immediately (default 2500).
 
 ## Miscellaneous
 
 Supported but advised not to use, not really needed (some may be removed in a future version):
-- G  Display current crc_gen value
-- Gx Sets crc_gen (default 0xD9) (we have not seen any other values so no need to change)
-- H  Display current crc_feed value
-- Hx Sets crc_feed (default 0x00) (we have not seen any other values so no need to change)
-- X  Display current echo status (determines whether bytes written will be echoed on the serial line, and also whether bus errors will be detected during writing)
-- Xx sets echo status on/off (recommended to keep on to detect bus errors)
-- K instruct ATmega328P to reset itself
+- G  display current crc_gen value,
+- Gx sets crc_gen (default 0xD9) (we have not seen any other values so no need to change),
+- H  display current crc_feed value,
+- Hx sets crc_feed (default 0x00) (we have not seen any other values so no need to change),
+- X  display current echo status (determines whether bytes written will be echoed on the serial line, and also whether bus errors will be detected during writing),
+- Xx sets echo status on/off (recommended to keep on to detect bus errors), and
+- K instruct ATmega328P to reset itself.

@@ -10,6 +10,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
  * 20220904 v0.9.20 new file for F-series VRV reporting in MQTT for 2 models
  *
  */
@@ -84,7 +85,7 @@ byte maxOutputFilter = 0;
 //byte packetsrc                                      = { {00                                                                                               }, {40                                                                                               }}
 //byte packettype                                     = { {08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80 }, { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F, 80 }}
 const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  20,  20,  20,   0,  20,  20,  20,  20,  10,   7,   1,  20,   0,   0,   0,   0,   0,   0,   0,  16,  11,   0,  20,  12,   0,   0,   0,  10 }, {  0,  20,  20,  20,   0,  20,  20,  20,  20,   8,   0,  20,   0,   0,   0,   0,   0,   0,   0,   0,  15,   4,   0,  19,   2,   0,   0,   0, 10 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 150, 157, 158, 178, 178, 178, 178, 178, 178, 178, 178, 194, 205, 205, 225, 237, 237, 237, 237 }, {247, 247, 267, 287, 307, 307, 327, 347, 367, 387, 395, 395, 415, 415, 415, 415, 415, 415, 415, 415, 415, 430, 434, 434, 453, 455, 455, 455, 455 /*, sizeValSeen = 465 */ }}; // Warning: if >256, make pi2 uint16_t // was 16-bit // TODO
+const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 150, 157, 158, 178, 178, 178, 178, 178, 178, 178, 178, 194, 205, 205, 225, 237, 237, 237, 237 }, {247, 247, 267, 287, 307, 307, 327, 347, 367, 387, 395, 395, 415, 415, 415, 415, 415, 415, 415, 415, 415, 430, 434, 434, 453, 455, 455, 455, 455 /*, sizeValSeen = 465 */ }};
 #define sizeValSeen 465
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
@@ -427,8 +428,8 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 #define HAHOURS {uom = 5;  stateclass = 0;};
 #define HASECONDS {uom = 6;  stateclass = 0;};
 #define HAMILLISECONDS {uom = 7;  stateclass = 0;};
-#define HABYTES   {uom = 8;  stateclass = 0;};
-#define HAEVENTS  {uom = 9;  stateclass = 0;};
+#define HABYTES   {uom = 8;  stateclass = 1;};
+#define HAEVENTS  {uom = 9;  stateclass = 3;};
 
 uint16_t parameterWritesDone = 0; // # writes done by ATmega; perhaps useful for ESP-side queueing
 
@@ -766,6 +767,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    8 : KEY("MQTT_disconnected_time");                         HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
         case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8_ratelimited;
         case   10 : KEY("WiFi_status");                                    HACONFIG;                                                             VALUE_u8;
+        case   11 : KEY("ESP_reboot_reason");                              HACONFIG;                                                             VALUE_u8hex;
+        case   15 : KEY("ESP_Output_Mode");                                HACONFIG;                                                             VALUE_u32hex_LE;
         default   : return 0;
       }
       default   : return 0;
@@ -791,7 +794,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    7 : KEY("MQTT_Acknowledged");                                                                                                    VALUE_u32_LE;
         case   11 : KEY("MQTT_Gaps");                                                                                                            VALUE_u32_LE;
         case   13 : KEY("MQTT_Min_Memory_Size");                           HACONFIG; HABYTES;                                                    VALUE_u16_LE;
-        case   15 : KEY("ESP_Output_Mode");                                HACONFIG;                                                             VALUE_u16hex_LE;
+        case   15 : KEY("ESP_Output_Mode_old");                                                                                                  VALUE_u16hex_LE;
         case   19 : KEY("ESP_Max_Loop_Time");                              HACONFIG; HAMILLISECONDS                                              VALUE_u32_LE;
         default   : return 0;
       }
@@ -810,6 +813,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                                                                            HACONFIG;                                                             VALUE_u16_LE;
         case    8 : KEY("Delay_Packet_Write");                                                                                                   VALUE_u16_LE;
         case   10 : KEY("Delay_Packet_Write_Timeout");                                                                                           VALUE_u16_LE;
+        case   11 : KEY("P1P2_ESP_Interface_hwID");                                                                                              VALUE_u8hex;
         case   12 : KEY("Control_ID_EEPROM");                                                                                                    VALUE_u8hex;
         case   13 : KEY("Verbose_EEPROM");                                                                                                       VALUE_u8;
         case   14 : KEY("Counter_Request_Repeat_EEPROM");                                                                                        VALUE_u8;
@@ -829,7 +833,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    9 : KEY("ESP_serial_input_Errors_CRC");                    HACONFIG;                                                             VALUE_u8;
         case   13 : KEY("MQTT_Wait_Counter");                              HACONFIG; HAEVENTS;                                                   VALUE_u32_LE;
         case   15 : KEY("MQTT_disconnects");                               HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
-        case   17 : KEY("MQTT_disconnected_skipped_packets");              HACONFIG; HAEVENTS                                                    VALUE_u16_LE;
+        case   17 : KEY("MQTT_disconnected_skipped_packets");              HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
         case   19 : KEY("MQTT_messages_skipped_low_mem");                  HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
         default   : return 0;
       }
