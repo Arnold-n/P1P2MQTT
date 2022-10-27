@@ -1,5 +1,11 @@
 **Release notes**
 
+v0.9.23 (October 30, 2022)
+
+- P1P2Serial and P1P2Monitor: ADC support
+- P1P2-bridge-ESP8266: ADC, bit-banging SPI support, w5500 ethernet support
+- See also [in which situations a few changes](OSS-dependencies/README.md) need to be made to the BSP and to the libraries
+
 v0.9.22 (September 18, 2022)
 
 - P1P2Serial: scopemode focus on errors, various lib changes, fake error generation option for testing, irq load measurement, removing OLDP1P2LIB, hwID

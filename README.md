@@ -1,38 +1,41 @@
-**Monitor and control your Daikin system via the room controller (P1/P2) interface!**
+# Monitor and control your Daikin system via the room controller (P1/P2) interface!
 
 Daikin (hybrid) heat pump systems are usually controlled by a room thermostat (and/or other controller) over a 2-wire interface, called P1/P2. This project enables to monitor (and, for some systems, control) your Daikin system from e.g. Home Assistant over MQTT via the P1/P2 thermostat wires, using the hard- and software of this project. For monitoring it is only eavesdropping on the regular communication between the main controller and the heat pump. For some models it provides control by acting as an "auxiliary controller" to the main thermostat, requesting the main controller to set certain system parameters on the Daikin system. Depending on your model it may be possible to switch the heat pump or DHW boiler on or off, switch between heating or cooling, set target temperatures, etcetera.
 
 ![Home assistant](images/homeassistant300.png)
 
-If this project is useful for you, or valuable (I hope it reduces your energy bills and CO2 emissions), please consider to [buy me a coffee](https://www.buymeacoffee.com/arnoldniessen) or sponsor this project or share your experiences and log files. It motivates me to extend its functionality to other models.
+If this project is useful for you, or valuable (I hope you can improve your system's SCOP and reduce your energy bills and CO2 emissions), you may contact me for purchasing a P1P2-ESP-interface, or to share your experiences and log files, or to [buy me a coffee](https://www.buymeacoffee.com/arnoldniessen). It helps to bring functionality to other models.
 
-**New design: P1P2-ESP-interface**
+**New design: P1P2-ESP-interface v1.1**
 
-![P1P2-ESP-interface PCB](circuits/P1P2-ESP-interface1.png)
+![P1P2-ESP-interface.png](circuits/P1P2-ESP-interface.png)
 
-Pictured is the new "P1P2-ESP-interface", a complete single-PCB bus-powered wireless P1P2-MQTT bridge. It is based on an ESP8266 (running P1P2-ESP-MQTT), an ATmega328P (running P1P2Monitor), and the MAX22088 HBS adapter (mounted on the lower side of the PCB). No Arduino or power supply is needed any more. Power is supplied by a DC/DC converter to minimize bus load (30-40mA at 15V). Connect it to P1/P2 near your main controller or near your Daikin system, enter your wifi and mqtt credentials via its built-in AP, and the system runs. Functionality:
+
+Shown is the new P1P2-ESP-interface v1.1 (more pictures [here](circuits/README.md)), a complete single-PCB bus-powered wireless P1P2-MQTT bridge. It is based on an ESP8266 (running P1P2-bridge-esp8266), an ATmega328P (running P1P2Monitor), and the MAX22088 HBS adapter (mounted on the lower side of the PCB). No Arduino or power supply is needed any more. Power is supplied by a DC/DC converter to minimize bus load (30-40mA at 15V). Connect it to P1/P2 near your main controller or near your Daikin system, enter your wifi and mqtt credentials via its built-in AP, and the system runs. Functionality:
 - monitor and (for some models) control the Daikin heat pump via the P1/P2 bus from Home Assistant (automatic configuration, using MQTT discovery),
 - communicate via MQTT over WiFi,
 - accessible via telnet,
 - OTA upgradable (both ESP and ATmega) (and if that would fail, using an ESP01-programmer via an ESP01-compatible connector),
-- powered entirely by the P1/P2 bus, no external power supply is needed, low power consumption (30-40mA/0.5W from the P1/P2 bus) thanks to a DC/DC converter,
+- powered entirely by the P1/P2 bus, no external power supply is needed, low power consumption (only 30-40mA or 0.5W from the P1/P2 bus) thanks to a DC/DC converter,
 - 4 LEDS for power (white), reading (green), writing (blue), or to signal an error (red),
-- screw terminals for P1 and P2 wires, and
-- fits nicely in a small semi-transparant enclosure (50mm x 35mm x 20mm).
+- monitors P1/P2 DC bus voltage,
+- screw terminals for P1 and P2 wires,
+- SPI interface option for W5500 ethernet adapter (using an enclosure extension), and
+- fits nicely in a small semi-transparant enclosure (50mm x 35mm x 20mm without ethernet, or 82mm x 35mm x 29mm with ethernet adapter).
 
-With communication over MQTT, integration with Home Assistand will be automatic, and interfacing to other systems (grafana, OpenHab, EmonCMS) should not be too much work.
+With communication over MQTT, integration with Home Assistand will be(come) automatic, and interfacing to other systems (grafana, OpenHab, EmonCMS) should not be too much work.
 
-By default, the interface only observes and attempts to interpret bus traffic. For some models, it may also act as auxiliary controller and control parameter settings over MQTT.
+By default, the interface only observes and attempts to interpret bus traffic. For some E-series models, especially hybrid models, it may also act as auxiliary controller and control parameter settings over MQTT. FDY(Q) systems are also supported.
 
 ![Grafana electricity usage](images/grafana-electricity-usage.png)
 
 **How can you build or buy one?**
 
-Buy new complete stand-alone P1P2-ESP-interface): I made a small number of factory-assembled PCBs (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, documented and tested), (August 2022:) these are all sold or reserved. I plan to make more, these will hopefully be ready in October 2022. Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
+Buy new complete stand-alone P1P2-ESP-interface): I have a number of factory-assembled PCBs (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, documented and tested) available(2nd version, shown above, v1.1, October 2022). Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
 
-Buy P1P2-adapter (older design below): I also sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno, as well as a newer MAX22088-based P1P2-adapter HAT which is slightly better.
+Buy P1P2-adapter (older design described below): I also sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno.
 
-Build P1P2-adapter (MM1192/XL1192): schematics and pictures for the MM1192/XL1192-based P1P2-adapter (for use with the Arduino Uno) are [here](https://github.com/Arnold-n/P1P2Serial/tree/main/circuits). The MM1192 is available in traditional DIP format so you can build it on a breadboard. 
+Build P1P2-adapter yourself (MM1192/XL1192): schematics and pictures for the MM1192/XL1192-based P1P2-adapter (for use with the Arduino Uno) are [here](https://github.com/Arnold-n/P1P2Serial/tree/main/circuits). The MM1192 is available in traditional DIP format so you can build it on a breadboard. 
 
 Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. Be warned that it is difficult to solder: it's only available as a 4x4mm 0.5mm pitch TQFN-24 package. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power Daikin's P1/P2 bus may provide, perhaps max 60mA) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a [MAX22088-based design](https://github.com/rothn/P1P2Adapter) are made available by Nicholas Roth. His design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
 
@@ -79,6 +82,8 @@ The current COP value is calculated every second and averaged over a predetermin
 -the energy consumption based on an external electricity meter.
 
 ESPAltherma also reports energy consumption (or actually current and voltage) but the readings from my Daikin system are not very accurate, its resolution in my system is 115Watt.
+
+*Some newer Daikin hybrid systems do not seem to measure water flow and are not able to calculate heating energy produced. This means it may be fundamentally impossible to calculate heating power and COP without additional external flow sensor.*
 
 **No liability, no warranty**
 
@@ -325,6 +330,8 @@ For ESP8266 support, install the ESP8266 BSP by adding [board manager URL](http:
 **Acknowledgements**
 
 Many thanks to the following persons:
+- Martin Dell for providing me with an RTD Modbus interface for further testing and for getting another system under control
+- Robert Pot for diving into and solving the MQTT disconnect problem and library memory leak
 - jarosolanic for adding parameter support for EHVX08S26CA9W and for adding initial MQTT topic output in P1P2Monitor (now moved to P1P2MQTT)
 - a user called "donato35" for discovering that the [P1/P2 bus is using HBS adapters](http://www.grix.it/forum/forum_thread.php?ftpage=2&id_forum=1&id_thread=519140?id_forum=1),
 - a user called "Krakra" published a link to a description of the HBS protocol in the [Echonet standard](https://community.openenergymonitor.org/t/hack-my-heat-pump-and-publish-data-onto-emoncms/2551/43) and shared thoughts and code on product-dependent header files,

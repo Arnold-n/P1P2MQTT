@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20221029 v0.9.23 ISPAVR over BB SPI, ADC, misc
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
  * 20220907 v0.9.21 outputMode/outputFilter status survive ESP reboot (EEPROM), added MQTT_INPUT_BINDATA/MQTT_INPUT_HEXDATA (see below), reduced uptime update MQTT traffic
  * 20220904 v0.9.20 added E_SERIES/F_SERIES defines, and F-series VRV reporting in MQTT for 2 models
@@ -21,10 +22,23 @@
 #ifndef P1P2_Config
 #define P1P2_Config
 
-// User configurable options: borad, and E_SERIES/F_SERIES
+// User configurable options: board, and model E_SERIES/F_SERIES
 
-#define COMBIBOARD // define this for Arduino/ESP8266 combi-board and for P1P2-ESP-Interface, undefine for ESP01s-on-USB-debug
-//#define ESP01S     // define this for input from P1P2/R channel, DEBUG_OVER_SERIAL, and 115.2kBaud 
+// Define one of these options below
+#define P1P2_ESP_INTERFACE_250   // define this for regular operation of P1P2-ESP-Interface (ESP8266 + ATmega328P using 250kBaud)
+//#define P1P2_ESP_INTERFACE_115 // define this for debugging P1P2-ESP-Interface, using 115.2kBaud for serial output debugging 
+//                               // (in this case DO NOT connect to P1/P2), but power with 3V3 via ESP01-connector *or* with 16V DC power supply on P1/P2
+//#define ARDUINO_COMBIBOARD     // define this for Arduino/ESP8266 combi-board, using 250kBaud between ESP8266 and ATmega238P
+//#define ESP01S_R               // define this for P1/P2 data input from P1P2/R MQTT topic, using 115.2kBaud for debugging over USB
+//#define ESP01S_RX              // define this for P1P2 data input over 250kBaud serial, for debugging over MQTT
+
+// Define P1P2-ESP-Interface version, set during EEPROM initialization only (can be changed with 6th parameter of 'B' command)
+// To avoid erasing the ESP EEPROM and overwriting the hw-identifier, use "Sketch Only" when flashing over USB
+#define INIT_HW_ID 1    // hardware identifier for P1P2-ESP-Interface, valid values are
+                        //   0 for Arduino Uno/ESP combi-board, for ESP01_R, ESP01_RX (INIT_HW_ID is redefined below for these boards)
+                        //   0 for P1P2-ESP-Interface v1.0, August 2022, ISPAVR over HSPI
+                        //   1 for P1P2-ESP-Interface v1.1, October 2022, ISPAVR over BB SPI, ADC
+                        //   (Note: if INIT_HW_ID is 1, BSP with modified library for ESP8266AVRISP library is required for updating firmware of ATmega328P)
 
 // define only one of E_SERIES and F_SERIES:
 #define E_SERIES // for Daikin E* heat pumps
@@ -32,36 +46,69 @@
 
 // Other options below should be OK
 
-#ifdef COMBIBOARD
+
+#ifdef P1P2_ESP_INTERFACE_250
 #define SERIALSPEED 250000
-#define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
-#else
-#define SERIALSPEED 115200
-// do not #define SERIAL_MAGICSTRING
+#define SERIAL_MAGICSTRING "1P2P" // Each serial communication line to ATmega must start with SERIAL_MAGICSTRING, otherwise line is ignored
+// ETHERNET must be defined if a W5500 adapter is used for ethernet (option for P1P2-ESP-Interface v1.1); otherwise ETHERNET is still optional, but please
+// note that if W5500 adapter is absent, a BSP with modified w5500 library is required to avoid a WDT reboot when constructor hangs
+// INIT_HW_ID = 0 does not require ethernet or BSP modification
+#if INIT_HW_ID > 0
+#define ETHERNET
+#endif
 #endif
 
-#ifdef ESP01S
-#define DEBUG_OVER_SERIAL // sends lots of information over serial. Uncomment this to avoid P1P2Monitor receiving this information. 
-                          // Use only for serial over USB (or serial via 2nd ESP01) debugging
-// if MQTT_INPUT_HEXDATA and/or MQTT_INPUT_BINDATA is defined, the serial input is ignored and data from either or both of
+#ifdef P1P2_ESP_INTERFACE_115
+#define SERIALSPEED 115200 // for debugging, do not connect interface to P1/P2 when doing this
+#define SERIAL_MAGICSTRING "[ESP-TX]" // Each serial communication line to ATmega must start with SERIAL_MAGICSTRING, otherwise line is ignored
+#define DEBUG_OVER_SERIAL // send debugging output over serial for ESP01S_RX or USB serial interface
+// ETHERNET must be defined if a W5500 adapter is used for ethernet; otherwise ETHERNET is optional, but please
+// note that if W5500 adapter is absent, a BSP with modified w5500 library is required to avoid a WDT reboot when constructor hangs
+#define ETHERNET
+#endif
+
+#ifdef ARDUINO_COMBIBOARD
+#define SERIALSPEED 250000
+#define SERIAL_MAGICSTRING "1P2P" // Each serial communication line to ATmega must start with SERIAL_MAGICSTRING, otherwise line is ignored
+// no ethernet, no ESP8266 BSP modification needed
+#undef INIT_HW_ID
+#define INIT_HW_ID 0
+#endif
+
+#ifdef ESP01S_R
+#define SERIALSPEED 115200
+#define DEBUG_OVER_SERIAL // send debugging output over serial (to be captured over USB)
+#define MQTT_INPUT_HEXDATA // use raw data from P1P2/X/xxx instead of serial input (for ESP01S_R)
+//#define MQTT_INPUT_BINDATA // use raw data from P1P2/X/xxx instead of serial input (for ESP01S_R)
+// if MQTT_INPUT_HEXDATA and/or MQTT_INPUT_BINDATA is defined, the serial input to the ESP (from ATmega) is ignored and data from either or both of
 // the defined R/X topics is used for processing (subject to (outputMode & 0x4000) and (outputMode & 0x8000) respectively):
-// The 4th  IPv4 byte can be set using the 'B' command.
-#define MQTT_INPUT_HEXDATA // to use raw data from P1P2/X/xxx instead of serial input (for test purposes)
-//#define MQTT_INPUT_BINDATA // to use raw data from P1P2/X/xxx instead of serial input (for test purposes)
-#endif /* ESP01S */
+// The 4th IPv4 byte of the topic to subscribe to can be set using 5th parameter in the 'B' command.
+// no ethernet, no ESP8266 BSP modification needed
+#undef INIT_HW_ID
+#define INIT_HW_ID 0
+#endif
+
+#ifdef ESP01S_RX
+#define SERIALSPEED 250000
+// no ethernet, no ESP8266 BSP modification needed
+#undef INIT_HW_ID
+#define INIT_HW_ID 0
+#endif
 
 #define SAVEPARAMS
 #define SAVEPACKETS
-// to save memory to avoid ESP instability: don't #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
+// to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.22"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.22"
-#define HA_SW "0.9.22"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.23"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.23"
+#define HA_SW "0.9.23"
 
-#define AVRISP // enables flashing ATmega by ESP
+#define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
+#define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
+#define SPI_SPEED_1   0 // for BB-SPI
 
 //#define REBOOT_REASON // stores reboot reason in flash upon 'D0', 'D1' command, MQTT reconnect failure, or wifimanager failure
-                      // only use this on stable systems or systems under test to avoid unnecessary flash writes
+                      // only use this on stable systems or if searching for reboot cause to avoid unnecessary flash writes
 
 #define TELNET // define to allow telnet access (no password protection!) for monitoring and control
                // the telnet library provides no authentication for telnet
@@ -90,10 +137,10 @@ char mqttCommandsNoIP[7] = "P1P2/W";
 char mqttJsondata[11]    = "P1P2/J/xxx";
 char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
 #ifdef MQTT_INPUT_HEXDATA
-char mqttInputHexData[11]= "P1P2/R";  // default accepts input from any P1P2/R/#; can be changed to P1P2/R/### via 'B' command
+char mqttInputHexData[11]= "P1P2/R";  // default accepts input from any P1P2/R/#; can be changed to P1P2/R/xxx via 'B' command
 #endif
 #ifdef MQTT_INPUT_BINDATA
-char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#; can be changed to P1P2/X/### via 'B' command
+char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#; can be changed to P1P2/X/xxx via 'B' command
 #endif
 #define MQTT_KEY_PREFIXCAT 11 // location in prefix for category identification
 #define MQTT_KEY_PREFIXSRC 13 // location in prefix for source identification
@@ -118,10 +165,11 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
                                // 2 only changed parameters except measurements (temperature, flow)
                                // 3 only changed parameters except measurements (temperature, flow) and except date/time
                                // first-time parameters are always reported
-#ifdef ESP01S
-#define INIT_OUTPUTMODE 0x4003
+
+#ifdef ESP01S_R
+#define INIT_OUTPUTMODE 0x1C003
 #else
-#define INIT_OUTPUTMODE 0x3003 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
+#define INIT_OUTPUTMODE 0x13003 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
 #endif
                                // outputmode is sum of:
                                // 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx
@@ -131,7 +179,7 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
                                // 0x0010 ESP to output raw data over telnet
                                // 0x0020 to output mqtt individual parameter data over telnet
                                // 0x0040 to output json data over telnet
-                               // 0x0080 (reserved for time string in R output) 
+                               // 0x0080 (reserved for time string in R output)
                                // 0x0100 ESP to output raw data over serial
                                // 0x0200 to output mqtt individual parameter data over serial
                                // 0x0400 to output json data over serial
@@ -168,11 +216,13 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #define REBOOT_REASON_WIFIMAN 0x01          // wifiMagaer time-out
 #define REBOOT_REASON_MQTT 0x02             // MQTT reconnect time-out
 #define REBOOT_REASON_OTA 0x03              // OTA restart
+#define REBOOT_REASON_HWID 0x04             // hwID change restart
 #define REBOOT_REASON_D0 0xD0               // manual restart
 #define REBOOT_REASON_D1 0xD1               // manual reset
 
 #define EEPROM_SIGNATURE_OLD1 "P1P2sig" // old signature for EEPROM initialization (user/password length 19/39)
-#define EEPROM_SIGNATURE_OLD2 "P1P2sih" // new signature for EEPROM initialization (user/password length 80/80, rebootReason)
-#define EEPROM_SIGNATURE_NEW  "P1P2sii" // new signature for EEPROM initialization (user/password length 80/80, rebootReason, outputMode, outputFilter, reserved-data)
+#define EEPROM_SIGNATURE_OLD2 "P1P2sih" // old signature for EEPROM initialization (user/password length 80/80, rebootReason)
+#define EEPROM_SIGNATURE_OLD3 "P1P2sii" // old signature for EEPROM initialization (user/password length 80/80, rebootReason, outputMode, outputFilter, mqttInputByte4, reserved-data)
+#define EEPROM_SIGNATURE_NEW  "P1P2sij" // new signature for EEPROM initialization (user/password length 80/80, rebootReason, outputMode, outputFilter, mqttInputByte4, hwId, EEPROM_version, reserved-data)
 
 #endif /* P1P2_Config */

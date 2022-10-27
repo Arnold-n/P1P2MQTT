@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20221028 v0.9.23 ADC code
  * 20220918 v0.9.22 scopemode also for writes, focused on actual errors, fake error generation for test purposes, removing OLDP1P2LIB
  * 20220830 v0.9.18 version alignment with example programs (last version supporting OLDP1P2LIB)
  * 20220817 v0.9.17 read-back-verification bug fixes in new and old library, scopemode
@@ -226,7 +227,6 @@ bool fakeError(byte x)
 /**        CPU load measurement        **/
 /****************************************/
 
-
 #ifdef MEASURE_LOAD
 
 // CLOCK msg 32 bytes ca 33ms 33000 us so irq_time is 16-bit counter 1us resolution, irq_lapsed is also 1us resolution
@@ -249,7 +249,7 @@ volatile uint8_t irq_ovf = 0, irq_busy = 0;
 #define ENABLE_OVF                      (TIFR1 = (1 << TOV1), TIMSK1 |= (1 << TOIE1))
 
 
-#else
+#else /* MEASURE_LOAD */
 
 #define OVF_vect   TIMER1_OVF_vect
 #define ENABLE_OVF ;
@@ -259,8 +259,101 @@ volatile uint8_t irq_ovf = 0, irq_busy = 0;
 #define IRQ_END_R  ;
 #define IRQ_END_W  ;
 
-#endif
+#endif /* MEASURE_LOAD */
 
+/************************/
+/**  ADC for voltages  **/
+/************************/
+
+static bool _use_ADC = false;
+static byte ADMUX0 = 0;
+static byte ADMUX1 = 0;
+static uint16_t V0min = 0x3FF << ADC_AVG_SHIFT;
+static uint16_t V0max = 0x0000;
+static uint32_t V0avg = 0x00;
+static uint16_t V1min = 0x3FF << ADC_AVG_SHIFT;
+static uint16_t V1max = 0x0000;
+static uint32_t V1avg = 0x00;
+
+static uint16_t V0cnt = 0;
+static uint16_t V1cnt = 0;
+static uint32_t V0sum0 = 0x00;
+static uint32_t V0sum = 0x00;
+static uint32_t V1sum0 = 0x00;
+static uint32_t V1sum = 0x00;
+
+// hard-coded for 8 MHz ATmega328P
+//
+//
+#define ADC_TRIGGER                     (ADCSRA = 0xDE)  // set ADSC to 1
+#define ADC_INTERRUPT                   ADC_vect
+#define ADC_VALUE                       (ADCL + (ADCH << 8))
+#define ADC_ADC0                        (ADMUX = ADMUX0)
+#define ADC_ADC1                        (ADMUX = ADMUX1)
+#define ADC_INT_DISABLE                 (ADCSRA = 0x86)
+#define ADC_INT_ENABLE                  (ADCSRA = 0x8E)
+
+ISR(ADC_vect) {
+  static bool ADC0used = true;
+  uint16_t V = ADC_VALUE;
+  if (ADC0used) {
+    ADC0used = false;
+    ADC_ADC1;
+    V0cnt ++;
+    V0sum0 += V;
+    if (!(V0cnt << (16 - ADC_AVG_SHIFT))) { // sum (avg) a few samples before min/max check
+      V0sum += V0sum0;
+      if (V0sum0 < V0min) V0min = V0sum0;
+      if (V0sum0 > V0max) V0max = V0sum0;
+      V0sum0 = 0;
+      if (!(V0cnt << ADC_CNT_SHIFT)) {
+        // sum 4k samples for average calculation approximately every second
+        V0avg = V0sum;
+        V0sum = 0;
+      }
+    }
+  } else {
+    ADC0used = true;
+    ADC_ADC0;
+    V1cnt ++;
+    V1sum0 += V;
+    if (!(V1cnt << (16 - ADC_AVG_SHIFT))) { // sum samples (16 samples if ADC_AVG_SHIFT1 == 4)
+      V1sum += V1sum0;
+      if (V1sum0 < V1min) V1min = V1sum0;
+      if (V1sum0 > V1max) V1max = V1sum0;
+      V1sum0 = 0;
+      if (!(V1cnt << ADC_CNT_SHIFT)) {
+        V1avg = V1sum;
+        V1sum = 0;
+      }
+    }
+  }
+  ADC_TRIGGER;
+}
+
+void P1P2Serial::ADC_results(uint16_t &V0_min, uint16_t &V0_max, uint32_t &V0_avg,
+                             uint16_t &V1_min, uint16_t &V1_max, uint32_t &V1_avg) {
+// if use_ADC is true in P1P2Serial::begin,
+// ADC measurements are done alternating on pins ADC_pin0 and ADC_pin1
+// at 8MHz the average measured voltage is updated approximately every second
+// V0_avg and V1_avg are summations of 2^(16 - ADC_CNT_SHIFT)) samples (default: 4k)
+// V0_min/max and V1_min/max are sample summations over 2^ADC_AVG_SHIFT samples (default: 16)
+// the mimimum and maximum values are reset upon each call of ADC_results
+  if (_use_ADC) {
+    ADC_INT_DISABLE;
+    V0_min = V0min;
+    V0_max = V0max;
+    V0_avg = V0avg;
+    V1_min = V1min;
+    V1_max = V1max;
+    V1_avg = V1avg;
+    V0min = 0x3FF << ADC_AVG_SHIFT;
+    V0max = 0x000;
+    V1min = 0x3FF << ADC_AVG_SHIFT;
+    V1max = 0x000;
+    ADC_INT_ENABLE;
+  }
+}
 
 /****************************************/
 /**          Initialization            **/
@@ -306,7 +399,7 @@ static volatile int32_t time_millisec = 0;
 #define INPUT_PULLUP INPUT
 #endif /* INPUT_PULLUP */
 
-void P1P2Serial::begin(uint32_t baud)
+void P1P2Serial::begin(uint32_t baud, bool use_ADC /* = false */, uint8_t ADC_pin0 /* = 0 */, uint8_t ADC_pin1 /* = 1 */)
 {
   uint32_t cycles_per_bit = ((ALTSS_BASE_FREQ + baud / 2) / baud); // 833 cycles at 16MHz
 
@@ -357,6 +450,16 @@ void P1P2Serial::begin(uint32_t baud)
   // start reading mode
   ENABLE_INT_INPUT_CAPTURE();
   ENABLE_OVF;
+  // start ADC measurements on pins ADC_pin0 and ADC_pin1 if use_ADC is true
+  _use_ADC = use_ADC;
+  if (_use_ADC) {
+    ADMUX0 = 0xC0 | ADC_pin0; // 1.1V reference
+    ADMUX1 = 0xC0 | ADC_pin1; // 1.1V reference
+    DIDR0 = ((1 << ADC_pin0) | (1 << ADC_pin1)) & 0x3F; // disable digital input on analog pins
+    ADC_ADC0;      // start with ADC_pin0
+    ADCSRB = 0x00; // ACME disabled, free running mode, conversions will be triggered by ADSC
+    ADCSRA = 0xDE; // enable ADC, 8MHz/64=125kHz, clear ADC interrupt flag and trigger single ADC conversion
+  }
 }
 
 void P1P2Serial::end(void)

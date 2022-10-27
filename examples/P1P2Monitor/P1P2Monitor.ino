@@ -37,6 +37,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20221029 v0.9.23 ADC code, fix 'W' command, misc
  * 20220918 v0.9.22 scopemode for writes and focused on actual errors, fake error generation for test purposes, control for FDY/FDYQ (#define F_SERIES), L2/L3/L5 mode
  * 20220903 v0.9.19 minor change in serial output
  * 20220830 v0.9.18 version alignment for firmware image release
@@ -232,7 +233,7 @@ void setup() {
   Serial.print(F(" F-series"));
 #endif /* F_SERIES */
   Serial.println();
-  Serial.print(F("* P1P2-ESP-Interface V"));
+  Serial.print(F("* P1P2-ESP-interface hwID "));
   Serial.println(hwID);
 #ifdef EEPROM_SUPPORT
   initEEPROM();
@@ -277,7 +278,7 @@ void setup() {
     Serial.println(F("* NEWP1P2LIB"));
 #endif
   }
-  P1P2Serial.begin(9600);
+  P1P2Serial.begin(9600, hwID ? true : false, 6, 7); // if hwID = 1, use ADC6 and ADC7
   P1P2Serial.setEcho(echo);
 #ifdef SW_SCOPE
   P1P2Serial.setScope(scope);
@@ -609,8 +610,16 @@ void loop() {
                       Serial.println(F(" E-series"));
 #endif /* E_SERIES */
 #ifdef F_SERIES
-                       Serial.println(F(" F-series"));
+                      Serial.println(F(" F-series"));
 #endif /* F_SERIES */
+                      Serial.print(F("* Reset cause: MCUSR="));
+                      Serial.print(save_MCUSR);
+                      if (save_MCUSR & (1 << BORF))  Serial.print(F(" (brown-out-detected)")); // 4
+                      if (save_MCUSR & (1 << EXTRF)) Serial.print(F(" (ext-reset)")); // 2
+                      if (save_MCUSR & (1 << PORF)) Serial.print(F(" (power-on-reset)")); // 1
+                      Serial.println();
+                      Serial.print(F("* P1P2-ESP-Interface hwID "));
+                      Serial.println(hwID);
                       break;
             case 't':
             case 'T': if (verbose) Serial.print(F("* Delay "));
@@ -666,7 +675,7 @@ void loop() {
                       } // don't write while controller is on
                       if (verbose) Serial.print(F("* Writing: "));
                       wb = 0;
-                      while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) F("%2x%n"), &wbtemp, &n) == 1)) {
+                      while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
                         WB[wb++] = wbtemp;
                         RSp += n;
                         if (verbose) {
@@ -1002,6 +1011,7 @@ void loop() {
                       break;
           }
 #ifdef SERIAL_MAGICSTRING
+/*
         } else {
           if (!strncmp(RS, "* [ESP]", 7)) {
             Serial.print(F("* Ignoring: "));
@@ -1009,6 +1019,7 @@ void loop() {
             Serial.print(F("* Magic String mismatch: "));
           }
           Serial.println(RS);
+*/
 #endif
         }
       }
@@ -1612,7 +1623,37 @@ void loop() {
     WB[0]  = 0x00;
     WB[1]  = 0x00;
     WB[2]  = 0x0D;
-    for (int i = 3; i <= 22; i++) WB[i]  = 0x00; // reserved for future use
+    if (hwID) {
+      uint16_t V0_min;
+      uint16_t V0_max;
+      uint32_t V0_avg;
+      uint16_t V1_min;
+      uint16_t V1_max;
+      uint32_t V1_avg;
+      P1P2Serial.ADC_results(V0_min, V0_max, V0_avg, V1_min, V1_max, V1_avg);
+      WB[3]  = (V0_min >> 8) & 0xFF;
+      WB[4]  = V0_min & 0xFF;
+      WB[5]  = (V0_max >> 8) & 0xFF;
+      WB[6]  = V0_max & 0xFF;
+      WB[7]  = (V0_avg >> 24) & 0xFF;
+      WB[8]  = (V0_avg >> 16) & 0xFF;
+      WB[9]  = (V0_avg >> 8) & 0xFF;
+      WB[10] = V0_avg & 0xFF;
+      WB[11]  = (V1_min >> 8) & 0xFF;
+      WB[12] = V1_min & 0xFF;
+      WB[13] = (V1_max >> 8) & 0xFF;
+      WB[14] = V1_max & 0xFF;
+      WB[15] = (V1_avg >> 24) & 0xFF;
+      WB[16] = (V1_avg >> 16) & 0xFF;
+      WB[17] = (V1_avg >> 8) & 0xFF;
+      WB[18] = V1_avg & 0xFF;
+      WB[19] = 0x00;
+      WB[20] = 0x00;
+      WB[21] = 0x00;
+      WB[22] = 0x00;
+    } else { 
+      for (int i = 3; i <= 22; i++) WB[i]  = 0x00;
+    }
     if (verbose < 4) writePseudoPacket(WB, 23);
   }
   if (pseudo0E > 4) {

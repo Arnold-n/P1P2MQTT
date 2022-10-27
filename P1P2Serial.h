@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20221028 v0.9.23 ADC code
  * 20220918 v0.9.22 scopemode also for writes, focused on actual errors, fake error generation for test purposes, removing OLDP1P2LIB
  * 20220830 v0.9.18 version alignment with example programs
  * 20220817 v0.9.17 read-back-verification bug fixes in new and old library; config SERIALSPEED and OLDP1P2LIB selection depends on F_CPU
@@ -63,6 +64,7 @@
 
 #include <inttypes.h>
 #include "Arduino.h"
+#include "P1P2Serial_ADC.h"
 
 // Configuration options
 //#define MEASURE_LOAD                // measures irq processing time
@@ -163,9 +165,9 @@ extern volatile byte sw_scope;
 class P1P2Serial
 {
 public:
-	P1P2Serial() { }
+	P1P2Serial() { };
 	~P1P2Serial() { end(); }
-	static void begin(uint32_t baud);
+	static void begin(uint32_t baud, bool use_ADC = false, uint8_t ADC_pin0 = 0, uint8_t ADC_pin1 = 1);
 	static void end();
 	uint8_t read();      // returns next byte in read buffer
         errorbuf_t read_error(); // returns error code or EOP signal for next byte in read buffer, to be called before read()
@@ -186,5 +188,6 @@ public:
 	void writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
         int32_t uptime_sec(void);
         int32_t uptime_millisec(void);
+        void ADC_results(uint16_t &V0_min, uint16_t &V0_max, uint32_t &V0_avg, uint16_t &V1_min, uint16_t &V1_max, uint32_t &V1_avg);
 };
 #endif /* P1P2Serial_h */

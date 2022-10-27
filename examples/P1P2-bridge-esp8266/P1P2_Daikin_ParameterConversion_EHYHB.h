@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20221029 v0.9.23 ISPAVR over BB SPI, ADC, misc
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
  * 20220821 v0.9.17-fix1 corrected negative deviation temperature reporting, more temp settings reported
  * 20220817 v0.9.17 license change
@@ -37,6 +38,7 @@
 #define P1P2_Daikin_ParameterConversion_EHYHB
 
 #include "P1P2_Config.h"
+#include "P1P2Serial_ADC.h"
 
 #define CAT_SETTING      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'S'); }  // system settings
 #define CAT_TEMP         { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'T'); maxOutputFilter = 1; }  // TEMP
@@ -1930,16 +1932,16 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case  6 :           KEY("Hours_Gasboiler_DHW");                                        HAHOURS;                                        VALUE_u24_LE;
           case  7 :           return 0;
           case  8 :           return 0;
-          case  9 :           KEY("Counter_Gasboiler_Unknown_52");                                                                               VALUE_u24_LE; // reports 0?
+          case  9 :           KEY("Counter_Gasboiler_Heating");                                                                                  VALUE_u24_LE; // older models report 0
           case 10 :           return 0;
           case 11 :           return 0;
-          case 12 :           KEY("Counter_Gasboiler_Unknown_53");                                                                               VALUE_u24_LE; // reports 0?
+          case 12 :           KEY("Counter_Gasboiler_DHW");                                                                                      VALUE_u24_LE; // older models report 0
           case 13 :           return 0;
           case 14 :           return 0;
-          case 15 :           KEY("Starts_Gasboiler");                                                                                           VALUE_u24_LE; // ?
+          case 15 :           KEY("Starts_Gasboiler");                                                                                           VALUE_u24_LE;
           case 16 :           return 0;
           case 17 :           return 0;
-          case 18 :           KEY("Counter_Gasboiler_Unknown_55");                                                                               VALUE_u24_LE; // reports 0? // reports multiple if not changed ????
+          case 18 :           KEY("Counter_Gasboiler_Total");                                                                                    VALUE_u24_LE; // older models report 0
           default :           UNKNOWN_BYTE;
         }
         default :             UNKNOWN_BYTE;
@@ -2292,7 +2294,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     case 0x09 :                                                            CAT_PSEUDO2;
     case 0x0D :                                                            CAT_PSEUDO;
                 switch (packetSrc) {
+//#define ADC_AVG_SHIFT 4     // P1P2Serial sums 16 = 2^ADC_AVG_SHIFT samples before doing min/max check
+//#define ADC_CNT_SHIFT 4     // P1P2Serial sums 16384 = 2^(16-ADC_CNT_SHIFT) samples to V0avg/V1avg
       case 0x00 : switch (payloadIndex) {
+        case    1 : if (hwID) { KEY("V_bus_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 180k/10k resistor divider, 1.1V range
+        case    3 : if (hwID) { KEY("V_bus_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
+        case    7 : if (hwID) { KEY("V_bus_ATmega_ADC_avg"); VALUE_F_L(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4); };
+        case    9 : if (hwID) { KEY("V_3V3_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 34k3/10k resistor divider, 1.1V range
+        case   11 : if (hwID) { KEY("V_3V3_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
+        case   15 : if (hwID) { KEY("V_3V3_ATmega_ADC_avg"); VALUE_F_L(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4); };
         default   : return 0;
       }
       case 0x40 : switch (payloadIndex) {
@@ -2329,7 +2339,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    7 : KEY("MQTT_Acknowledged");                                                                                                    VALUE_u32_LE;
         case   11 : KEY("MQTT_Gaps");                                                                                                            VALUE_u32_LE;
         case   13 : KEY("MQTT_Min_Memory_Size");                           HACONFIG; HABYTES;                                                    VALUE_u16_LE;
-        case   15 : KEY("ESP_Output_Mode_old");                                                                                                  VALUE_u16hex_LE;
+        case   14 : KEY("P1P2_ESP_Interface_hwID_ESP");                                                                                          VALUE_u8hex;
+        case   15 : KEY("ESP_ethernet_connected");                                                                                               VALUE_u8hex;
         case   19 : KEY("ESP_Max_Loop_Time");                              HACONFIG; HAMILLISECONDS                                              VALUE_u32_LE;
         default   : return 0;
       }
@@ -2348,7 +2359,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                                                                            HACONFIG;                                                             VALUE_u16_LE;
         case    8 : KEY("Delay_Packet_Write");                                                                                                   VALUE_u16_LE;
         case   10 : KEY("Delay_Packet_Write_Timeout");                                                                                           VALUE_u16_LE;
-        case   11 : KEY("P1P2_ESP_Interface_hwID");                                                                                              VALUE_u8hex;
+        case   11 : KEY("P1P2_ESP_Interface_hwID_ATmega");                                                                                       VALUE_u8hex;
         case   12 : KEY("Control_ID_EEPROM");                                                                                                    VALUE_u8hex;
         case   13 : KEY("Verbose_EEPROM");                                                                                                       VALUE_u8;
         case   14 : KEY("Counter_Request_Repeat_EEPROM");                                                                                        VALUE_u8;
