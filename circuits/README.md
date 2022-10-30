@@ -1,9 +1,9 @@
 # P1P2-ESP-interface v1.1
 
 
-![P1P2-ESP-interface.png](circuits/P1P2-ESP-interface.png)
-![P1P2-ESP-interface-reset-buttons.png](circuits/P1P2-ESP-interface-reset-buttons.png)
-![P1P2-ESP-interface-with-ethernet.png](circuits/P1P2-ESP-interface-with-ethernet.png)
+![P1P2-ESP-interface.png](P1P2-ESP-interface.png)
+![P1P2-ESP-interface-reset-buttons.png](P1P2-ESP-interface-reset-buttons.png)
+![P1P2-ESP-interface-with-ethernet.png](P1P2-ESP-interface-with-ethernet.png)
 
 The P1P2-ESP-interface is stand-alone and powered by the P1/P2 bus. Ethernet is an optional extension.
 
