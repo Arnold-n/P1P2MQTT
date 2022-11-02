@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20221102 v0.9.24 noWiFi option, w5500 reset added, fix switch to verbose=9, misc
  * 20221029 v0.9.23 ISPAVR over BB SPI, ADC, misc
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
  * 20220907 v0.9.21 outputMode/outputFilter status survive ESP reboot (EEPROM), added MQTT_INPUT_BINDATA/MQTT_INPUT_HEXDATA (see below), reduced uptime update MQTT traffic
@@ -22,15 +23,19 @@
 #ifndef P1P2_Config
 #define P1P2_Config
 
-// User configurable options: board, and model E_SERIES/F_SERIES
+// User configurable options: board, ethernet, hw_id, and model E_SERIES/F_SERIES
 
 // Define one of these options below
 #define P1P2_ESP_INTERFACE_250   // define this for regular operation of P1P2-ESP-Interface (ESP8266 + ATmega328P using 250kBaud)
 //#define P1P2_ESP_INTERFACE_115 // define this for debugging P1P2-ESP-Interface, using 115.2kBaud for serial output debugging 
 //                               // (in this case DO NOT connect to P1/P2), but power with 3V3 via ESP01-connector *or* with 16V DC power supply on P1/P2
 //#define ARDUINO_COMBIBOARD     // define this for Arduino/ESP8266 combi-board, using 250kBaud between ESP8266 and ATmega238P
-//#define ESP01S_R               // define this for P1/P2 data input from P1P2/R MQTT topic, using 115.2kBaud for debugging over USB
+//#define ESP01S_MQTT            // define this for P1/P2 data input from P1P2/R MQTT topic, using 115.2kBaud for debugging over USB
 //#define ESP01S_RX              // define this for P1P2 data input over 250kBaud serial, for debugging over MQTT
+
+// Setting option NOWIFI to 1 (can be changed via 7th parameter of 'B' command) prevents WiFi use
+// Only useful if ethernet adapter is installed, to prevent use of WiFi as fall-back when ethernet fails
+#define INIT_NOWIFI 0
 
 // Define P1P2-ESP-Interface version, set during EEPROM initialization only (can be changed with 6th parameter of 'B' command)
 // To avoid erasing the ESP EEPROM and overwriting the hw-identifier, use "Sketch Only" when flashing over USB
@@ -46,6 +51,8 @@
 
 // Other options below should be OK
 
+// if ethernet adapter is detected, but does not connect (no cable/other issue), time-out in seconds until fall-back to WiFi (if NoWiFi = 0) or until restart (if NoWiFi = 1)
+#define ETHERNET_CONNECTION_TIMEOUT 60
 
 #ifdef P1P2_ESP_INTERFACE_250
 #define SERIALSPEED 250000
@@ -75,11 +82,11 @@
 #define INIT_HW_ID 0
 #endif
 
-#ifdef ESP01S_R
+#ifdef ESP01S_MQTT
 #define SERIALSPEED 115200
 #define DEBUG_OVER_SERIAL // send debugging output over serial (to be captured over USB)
-#define MQTT_INPUT_HEXDATA // use raw data from P1P2/X/xxx instead of serial input (for ESP01S_R)
-//#define MQTT_INPUT_BINDATA // use raw data from P1P2/X/xxx instead of serial input (for ESP01S_R)
+#define MQTT_INPUT_HEXDATA // use raw data from P1P2/X/xxx instead of serial input (for ESP01S_MQTT)
+//#define MQTT_INPUT_BINDATA // use raw data from P1P2/X/xxx instead of serial input (for ESP01S_MQTT)
 // if MQTT_INPUT_HEXDATA and/or MQTT_INPUT_BINDATA is defined, the serial input to the ESP (from ATmega) is ignored and data from either or both of
 // the defined R/X topics is used for processing (subject to (outputMode & 0x4000) and (outputMode & 0x8000) respectively):
 // The 4th IPv4 byte of the topic to subscribe to can be set using 5th parameter in the 'B' command.
@@ -99,15 +106,15 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.23"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.23"
-#define HA_SW "0.9.23"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.24"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.24"
+#define HA_SW "0.9.24"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
 #define SPI_SPEED_1   0 // for BB-SPI
 
-//#define REBOOT_REASON // stores reboot reason in flash upon 'D0', 'D1' command, MQTT reconnect failure, or wifimanager failure
+//#define REBOOT_REASON // stores reboot reason in flash upon 'D0', 'D1' command, MQTT reconnect failure, nowifi change, ethernet failure, or wifimanager failure
                       // only use this on stable systems or if searching for reboot cause to avoid unnecessary flash writes
 
 #define TELNET // define to allow telnet access (no password protection!) for monitoring and control
@@ -166,7 +173,7 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
                                // 3 only changed parameters except measurements (temperature, flow) and except date/time
                                // first-time parameters are always reported
 
-#ifdef ESP01S_R
+#ifdef ESP01S_MQTT
 #define INIT_OUTPUTMODE 0x1C003
 #else
 #define INIT_OUTPUTMODE 0x13003 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
@@ -213,10 +220,12 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #define REBOOT_REASON_NOTSTORED 0xFE
 #define REBOOT_REASON_NOTSUPPORTED 0xFF
 #define REBOOT_REASON_UNKNOWN 0x00          // could be power-down or crash
-#define REBOOT_REASON_WIFIMAN 0x01          // wifiMagaer time-out
+#define REBOOT_REASON_WIFIMAN 0x01          // wifiManager time-out
 #define REBOOT_REASON_MQTT 0x02             // MQTT reconnect time-out
 #define REBOOT_REASON_OTA 0x03              // OTA restart
 #define REBOOT_REASON_HWID 0x04             // hwID change restart
+#define REBOOT_REASON_NOWIFI 0x05           // noWiFi change restart
+#define REBOOT_REASON_ETH 0x06              // ethernet failure restart (only if noWiFi)
 #define REBOOT_REASON_D0 0xD0               // manual restart
 #define REBOOT_REASON_D1 0xD1               // manual reset
 

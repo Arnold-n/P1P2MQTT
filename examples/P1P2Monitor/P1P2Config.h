@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20221102 v0.9.24 suppress repeated "too long" warnings
  * 20221029 v0.9.23 ADC code, fix 'W' command, misc
  * 20220918 v0.9.22 scopemode for writes and focused on actual errors, fake error generation for test purposes, control for FDY/FDYQ (#define F_SERIES), L2/L3/L5 mode
  * 20220903 v0.9.19 minor change in serial output
@@ -54,7 +55,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.23"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.24"
 
 #define INIT_VERBOSE 3
 // Set verbosity level

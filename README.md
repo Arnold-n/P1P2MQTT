@@ -16,11 +16,11 @@ Shown is the new P1P2-ESP-interface v1.1 (more pictures [here](circuits/README.m
 - communicate via MQTT over WiFi,
 - accessible via telnet,
 - OTA upgradable (both ESP and ATmega) (and if that would fail, using an ESP01-programmer via an ESP01-compatible connector),
-- powered entirely by the P1/P2 bus, no external power supply is needed, low power consumption (only 30-40mA or 0.5W from the P1/P2 bus) thanks to a DC/DC converter,
+- powered entirely by the P1/P2 bus, no external power supply is needed, low power consumption (only 30mA at 15V or 0.5W from the P1/P2 bus) thanks to a DC/DC converter,
 - 4 LEDS for power (white), reading (green), writing (blue), or to signal an error (red),
 - monitors P1/P2 DC bus voltage,
 - screw terminals for P1 and P2 wires,
-- SPI interface option for W5500 ethernet adapter (using an enclosure extension), and
+- SPI interface option for W5500 ethernet adapter (using an enclosure extension, power consumption with adapter 60mA at 15V or 0.9W from P1/P2 bus), and
 - fits nicely in a small semi-transparant enclosure (50mm x 35mm x 20mm without ethernet, or 82mm x 35mm x 29mm with ethernet adapter).
 
 With communication over MQTT, integration with Home Assistand will be(come) automatic, and interfacing to other systems (grafana, OpenHab, EmonCMS) should not be too much work.
@@ -31,7 +31,7 @@ By default, the interface only observes and attempts to interpret bus traffic. F
 
 **How can you build or buy one?**
 
-Buy new complete stand-alone P1P2-ESP-interface): I have a number of factory-assembled PCBs (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, documented and tested) available(2nd version, shown above, v1.1, October 2022). Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
+Buy new complete stand-alone P1P2-ESP-interface): I have a number of factory-assembled PCBs (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, optionally with ethernet, documented and tested) available(2nd version, shown above, v1.1, October 2022). Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
 
 Buy P1P2-adapter (older design described below): I also sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno.
 

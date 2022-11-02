@@ -67,8 +67,7 @@ Header: 000010
 |     4    | 00                 | ?                        |
 |     5    | 00                 | ?                        |
 |     6    | 00                 | ?                        |
-|     7    | 14                 | Target room temperature  | u8 / f8.8?
-|     8    | 00                 | ?                        |
+|   7-8    | 13 05              | Target room temperature  | f8.8
 | 9:6      | 0/1                | ?                        | bit
 | 9:5      | 0/1                | Heating/Cooling automatic mode | bit
 | 9:others | 0                  | ?                        | bit
@@ -205,7 +204,7 @@ Header: 400012
 |    11      | 00/7F              | once 00, then 7F      | u8
 |    12      |                    | operating mode        | flag8
 |    12:7    | 0/1                | DHW active2           | bit
-|    12:6    | 0/1                | gas?                  | bit
+|    12:6    | 0/1                | gas? (depends on DHW on/off and heating on/off) | bit
 |    12:0    | 0/1                | heat pump?            | bit
 |    12:other| 0                  | ?                     | bit
 |    13:2    | 1                  | ?                     | bit
@@ -221,7 +220,9 @@ Header: 000013
 | Byte(:bit) | Hex value observed | Description                        | Data type
 |:-----------|:-------------------|:-----------------------------------|:-
 |    0-1     | 00                 | ?
-|     2      | 00/40/C0/D0        | first package 0x00 instead of 0xD0 | flag8 ?
+|   2:4      | 0/1                | ?                                  | bit
+|   2:5,3-0  | 0                  | ?                                  | bit
+|   2:7-6    | 00/01/10/11        | modus ABS / WD / ABS+prog / WD+dev | bit2
 
 ### Packet type 13: response
 
@@ -233,6 +234,8 @@ Header: 400013
 |     1      | 00                 |  +fractional part?
 |     2      | 01                 | ?
 |     3      | 40/D0              | ?
+|   3:5-0    | 0                  | ?                                  | bit
+|   3:7-6    | 00/01/10/11        | modus ABS / WD / ABS+prog / WD+dev | bit2
 |   4-7      | 00                 | ?
 |    8-9     | 0000-010E          | flow (in 0.1 l/min)         | u16div10
 |    10-11   | xxxx               | software version inner unit | u16
@@ -453,9 +456,10 @@ These 2 parameters frequently differ by 1 or by 4 positions in parameter number.
 |:--------------|:------------------------------|:----------------------|:-
 |  0008
 |  000E         | 00/01                         | Circ.pump off/on
-|  000A         | 00/01
-|  000E         | 00/01
-|  0011         | 00/01                         | DHW active
+|  000A         | 00/01                         |
+|  000E         | 00/01                         |
+|  0011         | 00/01                         | DHW related ?
+|  0012         | 00/01                         | DHW active or flow sensor
 |  0013         | 01                            | ?
 |  0019         | 00/01                         | kWh preference input off/on
 |  0021         | 01                            | ?
@@ -467,25 +471,29 @@ These 2 parameters frequently differ by 1 or by 4 positions in parameter number.
 |  0030         | 00/01                         | heating/cooling off/on
 |  0031         | 00/01                         | heating/cooling off/on  (on some systems: setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on)
 |  0032         | 00/01                         | heating/cooling off/on
-|  0037         | 00/01/04                      | Related to heating/cooling and DHW on/off
+|  0037         | 00/01/04/05                   | Status gas boiler ? related to heating/cooling on/off, DHW on/off, and DHW water flow
 |  0039         | 01/02                         | ?
 |  003A         | 01/02                         | ?
 |  003C         | 00/01
 |  003E         | 00/01                         | DHW off/on (setting this parameter in a 40Fx35 response to 0x00/0x01 switches DHW off/on on some systems)
 |  003F         | 00/01                         | DHW off/on
 |  0040         | 00/01                         | DHW off/on (setting this parameter in a 40Fx35 response to 0x00/0x01 switches DHW off/on on some systems)
+|  0041         | 00/01                         | DHW related ?
+|  0042         | 00/01                         | DHW related ?
+|  0047         | 00/01                         | DHW booster on/off (on some systems: writable)
 |  0048         | 00/01                         | DHW booster on/off (on some systems: writable)
 |  004E         | 00/01/02                      | 00=Heating/01=cooling/02=automatic mode
 |  004F         | 01                            | ?
-|  0050         | 00/01                         | DHW active
-|  0055         | 03                            | ?
-|  0056         | 03                            | ?
+|  0050         | 00/01                         | DHW active or flow sensor
+|  0055         | 00/01/02/03                   | modus ABS / WD / ABS+prog / WD+dev
+|  0056         | 00/01/02/03                   | modus ABS / WD / ABS+prog / WD+dev (writable, 02/03 only in LWT modus)
 |  005C         | 7F                            | ?
 |  0088         | 01                            | ?
 |  008D         | 02                            | ?
 |  0093         | 02                            | ?
 |  0098         | 01                            | indication manual setting?
 |  009A         | 4B                            | ?
+|  009B         | 00/01                         | 00 = room thermostat, 01 = LWT modus
 |  009D         | XX                            | counter, schedule related
 |  00A2         | XX                            | sequence counter/timer?
 |  00B4         | 01                            | ?
@@ -1077,10 +1085,12 @@ Header: 4000B8
 |    0          | 05                            | data type 05 : gas boiler in hybrid model | u8
 |  1-3          | XX XX XX                      | boiler operating hours for heating        | u24
 |  4-6          | XX XX XX                      | boiler operating hours for DHW            | u24
-|  7-9          | XX XX XX                      | ?                                         | u24
-| 10-12         | XX XX XX                      | ?                                         | u24
+|  7-9          | XX XX XX                      | gas usage for heating (unit tbd)          | u24
+| 10-12         | XX XX XX                      | gas usage for heating (unit tbd)          | u24
 | 13-15         | XX XX XX                      | number of boiler starts                   | u24
-| 16-18         | XX XX XX                      | ?                                         | u24
+| 16-18         | XX XX XX                      | gas usage total (unit tbd)                | u24
+
+Internal gas metering seems only supported on newer models, not on the AAV3.
 
 # Restart process
 

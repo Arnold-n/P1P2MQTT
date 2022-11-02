@@ -342,6 +342,7 @@ void loop() {
   int wbtemp;
   int c;
   static byte ignoreremainder = 2; // ignore first line from serial input to avoid misreading a partial message just after reboot
+  static bool reportedTooLong = 0;
 
 // Non-blocking serial input
 // rs is number of char received and stored in readbuf
@@ -358,17 +359,23 @@ void loop() {
       char lst = *(RSp - 1);
       *(RSp - 1) = '\0';
       if (c != '\n') {
-        Serial.print("* Line too long, ignored, ignoring remainder: ->");
-        Serial.print(RS);
-        Serial.print(lst);
-        Serial.print(c);
-        Serial.println("<-");
+        if (!reportedTooLong) {
+          Serial.print("* Line too long, ignored, ignoring remainder: ->");
+          Serial.print(RS);
+          Serial.print(lst);
+          Serial.print(c);
+          Serial.println("<-");
+          // show full line, so not yet setting reportedTooLong = 1 here;
+        }
         ignoreremainder = 1;
       } else {
-        Serial.print("* Line too long, terminated, ignored: ->");
-        Serial.print(RS);
-        Serial.print(lst);
-        Serial.println("<-");
+        if (!reportedTooLong) {
+          Serial.print("* Line too long, terminated, ignored: ->");
+          Serial.print(RS);
+          Serial.print(lst);
+          Serial.println("<-");
+          reportedTooLong = 1;
+        }
         ignoreremainder = 0;
       }
     } else {
@@ -380,12 +387,16 @@ void loop() {
         *(--RSp) = '\0';
       }
       if (ignoreremainder == 2) {
-        Serial.print(F("* First line ignored: "));
-        Serial.println(RS);
+        // Serial.print(F("* First line ignored: ->")); // do not copy - usually contains boot-related nonsense
+        // Serial.print(RS);
+        // Serial.println("<-");
         ignoreremainder = 0;
       } else if (ignoreremainder == 1) {
-        Serial.print(F("* Line too long, last part: "));
-        Serial.println(RS);
+        if (!reportedTooLong) {
+          Serial.print(F("* Line too long, last part: "));
+          Serial.println(RS);
+          reportedTooLong = 1;
+        }
         ignoreremainder = 0;
       } else {
 #define maxVerbose ((verbose == 1) || (verbose == 4))

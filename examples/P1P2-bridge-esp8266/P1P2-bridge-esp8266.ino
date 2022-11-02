@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20221102 v0.9.24 noWiFi option, w5500 reset added, fix switch to verbose=9, misc
  * 20221029 v0.9.23 ISPAVR over BB SPI, ADC, misc, W5500 ethernet
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
  * 20220907 v0.9.21 outputMode/outputFilter status survive ESP reboot (EEPROM), added MQTT_INPUT_BINDATA/MQTT_INPUT_HEXDATA (see P1P2_Config.h), reduced uptime update MQTT traffic
@@ -68,19 +69,21 @@
 #endif /* DEBUG_OVER_SERIAL */
 
 bool ethernetConnected  = false;
+static uint32_t noWiFi = INIT_NOWIFI;
 
 #ifdef ETHERNET
 // Connections W5500: Arduino Mega pins 50 (MISO), 51 (MOSI), 52 (SCK), and 10 (SS) (https://www.arduino.cc/en/Reference/Ethernet)
 //                       Pin 53 (hardware SS) is not used but must be kept as output. In addition, connect RST, GND, and 5V.
 
 // W5500:
-// MISO GPIO12 pin 6 // PB4 // 
+// MISO GPIO12 pin 6 // PB4 //
 // MOSI GPIO13 pin 7 // PB3 //
 // CLK  GPIO14 pin 5 // PB5 //
 // ~RST GPIO16 pin 4 // PD7 //
-// SCS  GPIO 4 pin 19// PB2 //
+// SCS  GPIO4  pin 19// PB2 //
 // #define _ASYNC_MQTT_LOGLEVEL_               1
-#define CSPIN                  4  // GPIO4 was 16      // 5
+#define ETH_CS_PIN        4  // GPIO4
+#define ETH_RESET_PIN     16 // GPIO16
 #define SHIELD_TYPE       "ESP8266_W5500 Ethernet"
 
 #ifndef AVRISP
@@ -88,11 +91,49 @@ bool ethernetConnected  = false;
 #endif
 
 #include "W5500lwIP.h"
-Wiznet5500lwIP eth(CSPIN); 
+Wiznet5500lwIP eth(ETH_CS_PIN);
 
 #include <WiFiClient.h> // WiFiClient (-> TCPClient), WiFiServer (->TCPServer)
  using TCPClient = WiFiClient;
  using TCPServer = WiFiServer;
+
+// EEPROM values for EEPROM_SIGNATURE_OLD1
+typedef struct EEPROMSettingsOld {
+  char signature[10];
+  char mqttUser[20];
+  char mqttPassword[40];
+  char mqttServer[20];
+  int  mqttPort;
+};
+
+#define NR_RESERVED 96
+
+typedef struct EEPROMSettingsNew {
+  // EEPROM values for EEPROM_SIGNATURE_OLD2
+  char signature[10];
+  char mqttUser[81];     // will be overwritten in case of shouldSaveConfig
+  char mqttPassword[81]; // will be overwritten in case of shouldSaveConfig
+  char mqttServer[20];   // will be overwritten in case of shouldSaveConfig
+  int  mqttPort;
+  byte rebootReason;
+  // EEPROM values added for EEPROM_SIGNATURE_OLD3
+  uint32_t outputMode;
+  byte outputFilter;
+  byte mqttInputByte4;
+  // EEPROM values added for EEPROM_SIGNATURE_NEW
+  byte hwID;
+  byte EEPROM_version;
+  byte noWiFi;
+  // EEPROM values added for EEPROM_SIGNATURE_OLD3
+  byte reserved[NR_RESERVED];
+};
+
+union EEPROMSettingsUnion {
+  EEPROMSettingsOld EEPROMold;
+  EEPROMSettingsNew EEPROMnew;
+};
+
+EEPROMSettingsUnion EEPROM_state;
 
 bool initEthernet()
 {
@@ -103,20 +144,33 @@ bool initEthernet()
   eth.setDefault();
   delay(100);
   if (!eth.begin()) {
-    Serial.println("* [ESP] No Ethernet hardware");
+    Serial.println("* [ESP] No Ethernet hardware detected");
     return false;
   } else {
-    Serial_println("* [ESP] Connecting to network : ");
+    Serial_println("* [ESP] Connecting to network");
     int timeoutcnt = 0;
     while (!eth.connected()) {
-      if (++timeoutcnt > 6) {
-        Serial_println(F("* [ESP] Ethernet failed, trying WiFi"));
-        return false;
+      if (++timeoutcnt > ETHERNET_CONNECTION_TIMEOUT) {
+        if (noWiFi) {
+          Serial.println(F("* [ESP] Ethernet failed, restart"));
+#ifdef REBOOT_REASON
+          EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_ETH;
+          EEPROM.put(0, EEPROM_state);
+          EEPROM.commit();
+#endif /* REBOOT_REASON */
+          delay(500);
+          ESP.restart();
+          delay(100);
+        } else {
+          Serial.println(F("* [ESP] Ethernet failed, trying WiFi"));
+          return false;
+        }
       }
-      Serial.println("* [ESP] Waiting for ethernet connection...");
+      Serial.print("* [ESP] Waiting for ethernet connection... ");
+      Serial.println(timeoutcnt);
       delay(1000);
     }
-    Serial.println("Ethernet connected");
+    Serial_println(F("* [ESP] Ethernet connected"));
     return true;
   }
 }
@@ -138,7 +192,7 @@ ESP8266AVRISP* avrprog;
 
 static byte outputFilter = INIT_OUTPUTFILTER;
 static uint32_t outputMode = INIT_OUTPUTMODE;
-static int hwID = INIT_HW_ID;
+static uint32_t hwID = INIT_HW_ID;
 #define outputUnknown (outputMode & 0x0008)
 
 const byte Compile_Options = 0 // multi-line statement
@@ -366,44 +420,6 @@ uint32_t milliInc = 0;
 uint32_t prevMillis = 0; //millis();
 static uint32_t reconnectTime = 0;
 
-// EEPROM values for EEPROM_SIGNATURE_OLD1
-typedef struct EEPROMSettingsOld {
-  char signature[10];
-  char mqttUser[20];
-  char mqttPassword[40];
-  char mqttServer[20];
-  int  mqttPort;
-};
-
-#define NR_RESERVED 97
-
-typedef struct EEPROMSettingsNew {
-  // EEPROM values for EEPROM_SIGNATURE_OLD2
-  char signature[10];
-  char mqttUser[81];     // will be overwritten in case of shouldSaveConfig
-  char mqttPassword[81]; // will be overwritten in case of shouldSaveConfig
-  char mqttServer[20];   // will be overwritten in case of shouldSaveConfig
-  int  mqttPort;
-  byte rebootReason;
-  // EEPROM values added for EEPROM_SIGNATURE_OLD3
-  uint32_t outputMode;
-  byte outputFilter;
-  byte mqttInputByte4;
-  // EEPROM values added for EEPROM_SIGNATURE_NEW
-  byte hwID;
-  byte EEPROM_version;
-  // EEPROM values added for EEPROM_SIGNATURE_OLD3
-  byte reserved[NR_RESERVED];
-};
-
-
-union EEPROMSettingsUnion {
-  EEPROMSettingsOld EEPROMold;
-  EEPROMSettingsNew EEPROMnew;
-};
-
-EEPROMSettingsUnion EEPROM_state;
-
 void ATmega_dummy_for_serial() {
   Sprint_P(true, true, true, PSTR("* [ESP] Two dummy lines to ATmega."));
   Serial.print(F(SERIAL_MAGICSTRING));
@@ -472,38 +488,40 @@ void handleCommand(char* cmdString) {
               ATmega_uptime_prev = 0;
               break;
     case 'b': // display or set MQTT settings
-    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s %i %i", &EEPROM_state.EEPROMnew.mqttServer, &EEPROM_state.EEPROMnew.mqttPort, &EEPROM_state.EEPROMnew.mqttUser, &EEPROM_state.EEPROMnew.mqttPassword, &mqttInputByte4, &hwID)) > 0) {
+    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s %i %i", &EEPROM_state.EEPROMnew.mqttServer, &EEPROM_state.EEPROMnew.mqttPort, &EEPROM_state.EEPROMnew.mqttUser, &EEPROM_state.EEPROMnew.mqttPassword, &mqttInputByte4, &hwID, &noWiFi)) > 0) {
                 Sprint_P(true, true, true, PSTR("* [ESP] Writing new MQTT settings to EEPROM"));
                 if (n > 4) EEPROM_state.EEPROMnew.mqttInputByte4 = mqttInputByte4;
                 if (n > 5) EEPROM_state.EEPROMnew.hwID = hwID;
+                if (n > 6) EEPROM_state.EEPROMnew.noWiFi = noWiFi;
                 EEPROM.put(0, EEPROM_state);
                 EEPROM.commit();
               }
               if (n > 0) {
                 Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server set to %s"), EEPROM_state.EEPROMnew.mqttServer);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server %s"), EEPROM_state.EEPROMnew.mqttServer);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server is %s"), EEPROM_state.EEPROMnew.mqttServer);
               }
               if (n > 1) {
                 Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port set to %i"), EEPROM_state.EEPROMnew.mqttPort);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port %i"), EEPROM_state.EEPROMnew.mqttPort);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port is %i"), EEPROM_state.EEPROMnew.mqttPort);
               }
               if (n > 2) {
                 Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user set to %s"), EEPROM_state.EEPROMnew.mqttUser);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user %s"), EEPROM_state.EEPROMnew.mqttUser);
+                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user is %s"), EEPROM_state.EEPROMnew.mqttUser);
               }
               if (n > 3) {
                 Sprint_P(true, true, true, PSTR("* [ESP] New MQTT_password set") /*, EEPROM_state.EEPROMnew.mqttPassword */);
               } else {
-                // Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password %s"), EEPROM_state.EEPROMnew.mqttPassword);
+                // Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password is %s"), EEPROM_state.EEPROMnew.mqttPassword);
               }
               if (n > 4) {
                 Sprint_P(true, true, true, PSTR("* [ESP] mqttInputByte4 set to %i"), EEPROM_state.EEPROMnew.mqttInputByte4);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] mqttInputByte4 %i"), EEPROM_state.EEPROMnew.mqttInputByte4);
+                Sprint_P(true, true, true, PSTR("* [ESP] mqttInputByte4 is %i"), EEPROM_state.EEPROMnew.mqttInputByte4);
               }
+
               if (n > 5) {
                 Sprint_P(true, true, true, PSTR("* [ESP] hwID set to %i"), EEPROM_state.EEPROMnew.hwID);
                 Sprint_P(true, true, true, PSTR("* [ESP] Reboot required"));
@@ -517,6 +535,22 @@ void handleCommand(char* cmdString) {
                 delay(100);
               } else {
                 Sprint_P(true, true, true, PSTR("* [ESP] hwID %i"), EEPROM_state.EEPROMnew.hwID);
+              }
+              if (n > 6) {
+                Sprint_P(true, true, true, PSTR("* [ESP] noWiFi set to %i"), EEPROM_state.EEPROMnew.noWiFi);
+                if (noWiFi && (WiFi.status() == WL_CONNECTED)) {
+                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to switch off WiFi"));
+#ifdef REBOOT_REASON
+                  EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_NOWIFI;
+                  EEPROM.put(0, EEPROM_state);
+                  EEPROM.commit();
+#endif /* REBOOT_REASON */
+                  delay(500);
+                  ESP.restart();
+                  delay(100);
+                }
+              } else {
+                Sprint_P(true, true, true, PSTR("* [ESP] noWiFi is %i"), EEPROM_state.EEPROMnew.noWiFi);
               }
               Sprint_P(true, true, true, PSTR("* [ESP] Local IP address: %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
               // TODO enable in future WiFiManager version: if (WiFi.isConnected()) Sprint_P(true, true, true, PSTR("* [ESP] Connected to WiFi SSID %s"), wifiManager.getWiFiSSID());
@@ -837,7 +871,9 @@ void onInputReceived (String str) {
 
 bool OTAbusy = 0;
 static byte ignoreremainder = 2; // first line ignored - robustness
-
+#ifdef REBOOT_REASON
+uint8_t delayedRebootReasonReset = 0;
+#endif
 
 void setup() {
   // set RESET_PIN high, and then in input mode unless reset ('A' command) actively pulls it down
@@ -845,18 +881,25 @@ void setup() {
   pinMode(RESET_PIN, OUTPUT);
   delay(1);
   pinMode(RESET_PIN, INPUT);
+#ifdef ETHERNET
+  digitalWrite(ETH_RESET_PIN, LOW);
+  pinMode(ETH_RESET_PIN, OUTPUT);
+  delay(25);
+  digitalWrite(ETH_RESET_PIN, HIGH);
+  pinMode(ETH_RESET_PIN, INPUT);
+#endif
 
 // Set up Serial from/to P1P2Monitor on ATmega (250kBaud); or serial from/to USB debugging (115.2kBaud);
   delay(100);
   Serial.setRxBufferSize(RX_BUFFER_SIZE); // default value is too low for ESP taking long pauses at random moments...
   Serial.begin(SERIALSPEED);
   while (!Serial);      // wait for Arduino Serial Monitor to open
-  Serial_println(F("*"));        // this line is copied back by ATmega as "first line ignored"
-  Serial_println(WELCOMESTRING);
-  Serial_print(F("* Compiled "));
-  Serial_print(__DATE__);
-  Serial_print(' ');
-  Serial_println(__TIME__);
+  Serial.println(F("*"));        // this line is copied back by ATmega as "first line ignored"
+  Serial.println(WELCOMESTRING);
+  Serial.print(F("* Compiled "));
+  Serial.print(__DATE__);
+  Serial.print(' ');
+  Serial.println(__TIME__);
 
   // get EEPROM data and rebootReason
   EEPROM.begin(sizeof(EEPROMSettingsUnion));
@@ -878,6 +921,7 @@ void setup() {
     EEPROM_state.EEPROMnew.mqttInputByte4 = 0;
     EEPROM_state.EEPROMnew.hwID = 0;
     EEPROM_state.EEPROMnew.EEPROM_version = 0;
+    EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
     EEPROM.put(0, EEPROM_state);
@@ -895,6 +939,7 @@ void setup() {
     EEPROM_state.EEPROMnew.mqttInputByte4 = 0;
     EEPROM_state.EEPROMnew.hwID = 0;
     EEPROM_state.EEPROMnew.EEPROM_version = 0;
+    EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
     EEPROM.put(0, EEPROM_state);
@@ -906,6 +951,7 @@ void setup() {
     Serial_println(F("* [ESP] Old3 signature match, need to upgrade signature and set hwID and EEPROM_version to 0"));
     // EEPROM_state.EEPROMnew.hwID = 0; // was 0 already
     // EEPROM_state.EEPROMnew.EEPROM_version = 0; //was 0 already
+    EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
     EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
@@ -925,6 +971,7 @@ void setup() {
     EEPROM_state.EEPROMnew.mqttInputByte4 = 0;
     EEPROM_state.EEPROMnew.hwID = INIT_HW_ID;
     EEPROM_state.EEPROMnew.EEPROM_version = 0; // use counter instead of new signature in future
+    EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
@@ -936,22 +983,26 @@ void setup() {
   if (!strcmp(EEPROM_state.EEPROMnew.signature, EEPROM_SIGNATURE_NEW)) {
     saveRebootReason = EEPROM_state.EEPROMnew.rebootReason;
     if (saveRebootReason != REBOOT_REASON_UNKNOWN) {
-      EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
-      EEPROM.put(0, EEPROM_state);
-      EEPROM.commit();
+      if ((saveRebootReason == REBOOT_REASON_WIFIMAN) || (saveRebootReason == REBOOT_REASON_ETH)) {
+        // avoid writing to EEPROM here, resulting in 2 writes per cycle, if ESP cycles/restarts due to WiFiMan or ethernet problem
+        delayedRebootReasonReset = 1;
+      } else if (saveRebootReason == REBOOT_REASON_MQTT) {
+        // avoid writing to EEPROM here, resulting in 2 writes per cycle, if ESP cycles/restarts due to MQTT not connecting
+        delayedRebootReasonReset = 2;
+      } else {
+        EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
+        EEPROM.put(0, EEPROM_state);
+        EEPROM.commit();
+      }
     }
   } else {
     saveRebootReason = REBOOT_REASON_NOTSTORED;
   }
+  Serial.print(F("* [ESP] ESP reboot reason 0x"));
+  Serial.println(saveRebootReason, HEX);
 #endif /* REBOOT_REASON */
 
   IPAddress local_ip;
-
-
-
-
-
-
 
 #ifdef TELNET
 // setup telnet
@@ -965,12 +1016,12 @@ void setup() {
 #endif TELNET
 
 #ifdef ETHERNET
-  Serial_println(F("* [ESP] Trying initEthernet"));
+  Serial.println(F("* [ESP] Trying initEthernet"));
   if (ethernetConnected = initEthernet()) {
     telnetSuccess = telnet.begin(telnet_port, true);
     local_ip = eth.localIP();
-    Serial_print(F("* [ESP] Connected to ethernet, IP address: "));
-    Serial_println(local_ip);
+    Serial.print(F("* [ESP] Connected to ethernet, IP address: "));
+    Serial.println(local_ip);
   } else {
 #else
   {
@@ -996,7 +1047,7 @@ void setup() {
     wifiManager.addParameter(&WiFiManMqttUser);
     wifiManager.addParameter(&WiFiManMqttPassword);
 
-    // reset WiFiMangager settings - for testing only;
+    // reset WiFiManager settings - for testing only;
     // wifiManager.resetSettings();
 
     // Set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
@@ -1011,7 +1062,7 @@ void setup() {
     // If it does not connect it starts an access point with the specified name,
     // and goes into a blocking loop awaiting configuration.
     // First parameter is name of access point, second is the password.
-    Serial_println(F("* [ESP] Trying autoconnect"));
+    Serial.println(F("* [ESP] Trying autoconnect"));
     if (!wifiManager.autoConnect(WIFIMAN_SSID, WIFIMAN_PASSWORD)) {
       Serial_println(F("* [ESP] Failed to connect and hit timeout, resetting"));
       // Reset and try again
@@ -1050,6 +1101,14 @@ void setup() {
     telnetSuccess = telnet.begin(telnet_port);
 #endif
   }
+
+#ifdef REBOOT_REASON
+  if (delayedRebootReasonReset == 1) {
+    EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
+    EEPROM.put(0, EEPROM_state);
+    EEPROM.commit();
+  }
+#endif
 
 // Fill in 4th byte of IPv4 address to MQTT topics
   mqttKeyPrefix[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
@@ -1100,6 +1159,14 @@ void setup() {
 
   if (mqttClient.connected()) {
     Serial.println(F("* [ESP] MQTT client connected on first try"));
+#ifdef REBOOT_REASON
+    if (delayedRebootReasonReset == 2) {
+      EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
+      EEPROM.put(0, EEPROM_state);
+      EEPROM.commit();
+      delayedRebootReasonReset = 0;
+    }
+#endif
   } else {
     Serial.println(F("* [ESP] MQTT client connect failed"));
   }
@@ -1109,6 +1176,14 @@ void setup() {
     mqttClient.connect();
     if (mqttClient.connected()) {
       Serial.println(F("* [ESP] MQTT client connected"));
+#ifdef REBOOT_REASON
+      if (delayedRebootReasonReset == 2) {
+        EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
+        EEPROM.put(0, EEPROM_state);
+        EEPROM.commit();
+        delayedRebootReasonReset = 0;
+      }
+#endif
       break;
     } else {
       Serial.print(F("* [ESP] MQTT client connect failed, retrying in setup() until time-out "));
@@ -1138,6 +1213,7 @@ void setup() {
   outputFilter = EEPROM_state.EEPROMnew.outputFilter;
   outputMode = EEPROM_state.EEPROMnew.outputMode;
   hwID = EEPROM_state.EEPROMnew.hwID;
+  noWiFi = EEPROM_state.EEPROMnew.noWiFi;
 
   if (mqttClient.connected()) {
     Sprint_P(true, true, true, PSTR(WELCOMESTRING));
@@ -1148,6 +1224,7 @@ void setup() {
     Sprint_P(true, true, true, PSTR("* [ESP] F-Series"));
 #endif
     Sprint_P(true, true, true, PSTR("* [ESP] hw_identifier %i"), hwID);
+    Sprint_P(true, true, true, PSTR("* [ESP] noWiFi %i"), noWiFi);
     Sprint_P(true, true, true, PSTR("* [ESP] Connected to MQTT server"));
     Sprint_P(true, true, true, PSTR("* [ESP] MQTT Clientname = %s"), MQTT_CLIENTNAME);
     Sprint_P(true, true, true, PSTR("* [ESP] MQTT User = %s"), EEPROM_state.EEPROMnew.mqttUser);
@@ -1370,11 +1447,19 @@ void loop() {
   while (milliInc >= 1000) {
     milliInc -= 1000;
     espUptime += 1;
-    if (!mqttClient.connected()) {
+    if (mqttClient.connected()) {
+#ifdef REBOOT_REASON
+      if (delayedRebootReasonReset == 2) {
+        EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
+        EEPROM.put(0, EEPROM_state);
+        EEPROM.commit();
+        delayedRebootReasonReset = 0;
+      }
+#endif
+      Mqtt_disconnectTime = 0;
+    } else {
       Mqtt_disconnectTimeTotal++;
       Mqtt_disconnectTime++;
-    } else {
-      Mqtt_disconnectTime = 0;
     }
     if (milliInc < 1000) {
       if ((throttleValue > 1) && (espUptime > (THROTTLE_VALUE - throttleValue + 1) * THROTTLE_STEP)) throttleValue--;
@@ -1425,8 +1510,8 @@ void loop() {
 #endif /* AVRISP */
 
   // network and mqtt connection check
-  // if (WiFi.isConnected() || eth.connected()) { // TODO this does not work. eth.connected() becomes true after 4 minutes even if there is no ethernet cable attached. 
-                                                  // TODO and eth.connected() remains true even after disconnecting the ethernet cable.
+  // if (WiFi.isConnected() || eth.connected()) { // TODO this does not work. eth.connected() becomes true after 4 minutes even if there is no ethernet cable attached
+                                                  // TODO and eth.connected() remains true even after disconnecting the ethernet cable (and perhaps also after 'D1' soft ESP.reset()
   // ethernetConnected = ???;                     // TODO try to update ethernetConnected based on actual ethernet status
   if (WiFi.isConnected() || ethernetConnected) {  // TODO for now: use initial ethernet connection status instead (ethernet cable disconnect is thus not detected)
     if (!mqttClient.connected()) {
@@ -1491,6 +1576,8 @@ void loop() {
         *rb_buffer++ = (char) c;
         serial_rb++;
       }
+    } else {
+      c = -1;
     }
 #endif
     // ((c == '\n' and serial_rb > 0))  and/or  serial_rb == RB)  or  c == -1
