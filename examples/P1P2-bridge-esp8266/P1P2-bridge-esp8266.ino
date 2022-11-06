@@ -1323,6 +1323,7 @@ void setup() {
   prevMillis = millis();
 
 // Flush ATmega's serial input
+  delay(200);
   ATmega_dummy_for_serial();
 
 // Ready, report status
