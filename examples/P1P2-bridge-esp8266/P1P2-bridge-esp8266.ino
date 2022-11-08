@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20221108 v0.9.25 move EEPROM outside ETHERNET code
  * 20221102 v0.9.24 noWiFi option, w5500 reset added, fix switch to verbose=9, misc
  * 20221029 v0.9.23 ISPAVR over BB SPI, ADC, misc, W5500 ethernet
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
@@ -68,35 +69,6 @@
 #define Serial_println(...) {};
 #endif /* DEBUG_OVER_SERIAL */
 
-bool ethernetConnected  = false;
-static uint32_t noWiFi = INIT_NOWIFI;
-
-#ifdef ETHERNET
-// Connections W5500: Arduino Mega pins 50 (MISO), 51 (MOSI), 52 (SCK), and 10 (SS) (https://www.arduino.cc/en/Reference/Ethernet)
-//                       Pin 53 (hardware SS) is not used but must be kept as output. In addition, connect RST, GND, and 5V.
-
-// W5500:
-// MISO GPIO12 pin 6 // PB4 //
-// MOSI GPIO13 pin 7 // PB3 //
-// CLK  GPIO14 pin 5 // PB5 //
-// ~RST GPIO16 pin 4 // PD7 //
-// SCS  GPIO4  pin 19// PB2 //
-// #define _ASYNC_MQTT_LOGLEVEL_               1
-#define ETH_CS_PIN        4  // GPIO4
-#define ETH_RESET_PIN     16 // GPIO16
-#define SHIELD_TYPE       "ESP8266_W5500 Ethernet"
-
-#ifndef AVRISP
-#include <SPI.h>
-#endif
-
-#include "W5500lwIP.h"
-Wiznet5500lwIP eth(ETH_CS_PIN);
-
-#include <WiFiClient.h> // WiFiClient (-> TCPClient), WiFiServer (->TCPServer)
- using TCPClient = WiFiClient;
- using TCPServer = WiFiServer;
-
 // EEPROM values for EEPROM_SIGNATURE_OLD1
 typedef struct EEPROMSettingsOld {
   char signature[10];
@@ -134,6 +106,35 @@ union EEPROMSettingsUnion {
 };
 
 EEPROMSettingsUnion EEPROM_state;
+
+bool ethernetConnected  = false;
+static uint32_t noWiFi = INIT_NOWIFI;
+
+#ifdef ETHERNET
+// Connections W5500: Arduino Mega pins 50 (MISO), 51 (MOSI), 52 (SCK), and 10 (SS) (https://www.arduino.cc/en/Reference/Ethernet)
+//                       Pin 53 (hardware SS) is not used but must be kept as output. In addition, connect RST, GND, and 5V.
+
+// W5500:
+// MISO GPIO12 pin 6 // PB4 //
+// MOSI GPIO13 pin 7 // PB3 //
+// CLK  GPIO14 pin 5 // PB5 //
+// ~RST GPIO16 pin 4 // PD7 //
+// SCS  GPIO4  pin 19// PB2 //
+// #define _ASYNC_MQTT_LOGLEVEL_               1
+#define ETH_CS_PIN        4  // GPIO4
+#define ETH_RESET_PIN     16 // GPIO16
+#define SHIELD_TYPE       "ESP8266_W5500 Ethernet"
+
+#ifndef AVRISP
+#include <SPI.h>
+#endif
+
+#include "W5500lwIP.h"
+Wiznet5500lwIP eth(ETH_CS_PIN);
+
+#include <WiFiClient.h> // WiFiClient (-> TCPClient), WiFiServer (->TCPServer)
+ using TCPClient = WiFiClient;
+ using TCPServer = WiFiServer;
 
 bool initEthernet()
 {

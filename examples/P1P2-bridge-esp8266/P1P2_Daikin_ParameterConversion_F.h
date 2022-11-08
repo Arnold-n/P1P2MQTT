@@ -10,6 +10,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20221108 v0.9.25 ADC support
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
  * 20220904 v0.9.20 new file for F-series VRV reporting in MQTT for 2 models
  *
@@ -38,6 +39,7 @@
 #define P1P2_Daikin_ParameterConversion_F
 
 #include "P1P2_Config.h"
+#include "P1P2Serial_ADC.h"
 
 #define CAT_SETTING      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'S'); }  // system settings
 #define CAT_TEMP         { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'T'); maxOutputFilter = 1; }  // TEMP
@@ -757,13 +759,21 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     case 0x09 :                                                            CAT_PSEUDO2;
     case 0x0D :                                                            CAT_PSEUDO;
                 switch (packetSrc) {
+//#define ADC_AVG_SHIFT 4     // P1P2Serial sums 16 = 2^ADC_AVG_SHIFT samples before doing min/max check
+//#define ADC_CNT_SHIFT 4     // P1P2Serial sums 16384 = 2^(16-ADC_CNT_SHIFT) samples to V0avg/V1avg
       case 0x00 : switch (payloadIndex) {
+        case    1 : if (hwID) { KEY("V_bus_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 180k/10k resistor divider, 1.1V range
+        case    3 : if (hwID) { KEY("V_bus_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
+        case    7 : if (hwID) { KEY("V_bus_ATmega_ADC_avg"); VALUE_F_L(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4); };
+        case    9 : if (hwID) { KEY("V_3V3_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 34k3/10k resistor divider, 1.1V range
+        case   11 : if (hwID) { KEY("V_3V3_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
+        case   15 : if (hwID) { KEY("V_3V3_ATmega_ADC_avg"); VALUE_F_L(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4); };
         default   : return 0;
       }
       case 0x40 : switch (payloadIndex) {
         case    0 : KEY("ESP_Compile_Options");                                                                                                  VALUE_u8hex;
         case    2 : KEY("MQTT_messages_skipped_not_connected");            HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
-        case    6 : KEY("MQTT_messages_published");                     /* HACONFIG; HAEVENTS; */                                                VALUE_u32_LE;
+        case    6 : KEY("MQTT_messages_published");                    /*  HACONFIG; HAEVENTS;    */                                             VALUE_u32_LE;
         case    8 : KEY("MQTT_disconnected_time");                         HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
         case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8_ratelimited;
         case   10 : KEY("WiFi_status");                                    HACONFIG;                                                             VALUE_u8;

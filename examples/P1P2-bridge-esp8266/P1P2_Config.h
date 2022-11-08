@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20221108 v0.9.25 ADC report added to F-series
  * 20221102 v0.9.24 noWiFi option, w5500 reset added, fix switch to verbose=9, misc
  * 20221029 v0.9.23 ISPAVR over BB SPI, ADC, misc
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
@@ -26,11 +27,11 @@
 // User configurable options: board, ethernet, hw_id, and model E_SERIES/F_SERIES
 
 // Define one of these options below
-#define P1P2_ESP_INTERFACE_250   // define this for regular operation of P1P2-ESP-Interface (ESP8266 + ATmega328P using 250kBaud)
+//#define P1P2_ESP_INTERFACE_250   // define this for regular operation of P1P2-ESP-Interface (ESP8266 + ATmega328P using 250kBaud)
 //#define P1P2_ESP_INTERFACE_115 // define this for debugging P1P2-ESP-Interface, using 115.2kBaud for serial output debugging 
 //                               // (in this case DO NOT connect to P1/P2), but power with 3V3 via ESP01-connector *or* with 16V DC power supply on P1/P2
 //#define ARDUINO_COMBIBOARD     // define this for Arduino/ESP8266 combi-board, using 250kBaud between ESP8266 and ATmega238P
-//#define ESP01S_MQTT            // define this for P1/P2 data input from P1P2/R MQTT topic, using 115.2kBaud for debugging over USB
+#define ESP01S_MQTT            // define this for P1/P2 data input from P1P2/R MQTT topic, using 115.2kBaud for debugging over USB
 //#define ESP01S_RX              // define this for P1P2 data input over 250kBaud serial, for debugging over MQTT
 
 // Setting option NOWIFI to 1 (can be changed via 7th parameter of 'B' command) prevents WiFi use
@@ -106,9 +107,9 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.24"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.24"
-#define HA_SW "0.9.24"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.25"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.25"
+#define HA_SW "0.9.25"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
