@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20221109 v0.9.26 clarify WiFiManager screen, fix to accept 80-char user/password also in WiFiManager
  * 20221108 v0.9.25 move EEPROM outside ETHERNET code
  * 20221102 v0.9.24 noWiFi option, w5500 reset added, fix switch to verbose=9, misc
  * 20221029 v0.9.23 ISPAVR over BB SPI, ADC, misc, W5500 ethernet
@@ -1032,7 +1033,10 @@ void setup() {
     wifiManager.setSaveConfigCallback(WiFiManagerSaveConfigCallback);
     // Customize AP
     WiFiManagerParameter custom_text("<p>P1P2-ESP-Interface</p>");
-    wifiManager.addParameter(&custom_text);
+    WiFiManagerParameter custom_text1("<b>Your MQTT server IPv4 address</b>");
+    WiFiManagerParameter custom_text2("<b>Your MQTT server port</b>");
+    WiFiManagerParameter custom_text3("<b>MQTT user</b>");
+    WiFiManagerParameter custom_text4("<b>MQTT password</b>");
     // Debug info?
 #ifdef DEBUG_OVER_SERIAL
     wifiManager.setDebugOutput(true);
@@ -1041,11 +1045,16 @@ void setup() {
     // add 4 MQTT settings to WiFiManager, with default settings preconfigured in NetworkParams.h
     WiFiManagerParameter WiFiManMqttServer("mqttserver", "MqttServer (IPv4, required)", MQTT_SERVER, 19);
     WiFiManagerParameter WiFiManMqttPort("mqttport", "MqttPort (optional, default 1883)", MQTT_PORT_STRING, 9);
-    WiFiManagerParameter WiFiManMqttUser("mqttuser", "MqttUser (optional)", MQTT_USER, 19);
-    WiFiManagerParameter WiFiManMqttPassword("mqttpassword", "MqttPassword (optional)", MQTT_PASSWORD, 39);
+    WiFiManagerParameter WiFiManMqttUser("mqttuser", "MqttUser (optional)", MQTT_USER, 80);
+    WiFiManagerParameter WiFiManMqttPassword("mqttpassword", "MqttPassword (optional)", MQTT_PASSWORD, 80);
+    wifiManager.addParameter(&custom_text);
+    wifiManager.addParameter(&custom_text1);
     wifiManager.addParameter(&WiFiManMqttServer);
+    wifiManager.addParameter(&custom_text2);
     wifiManager.addParameter(&WiFiManMqttPort);
+    wifiManager.addParameter(&custom_text3);
     wifiManager.addParameter(&WiFiManMqttUser);
+    wifiManager.addParameter(&custom_text4);
     wifiManager.addParameter(&WiFiManMqttPassword);
 
     // reset WiFiManager settings - for testing only;
