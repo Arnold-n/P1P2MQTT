@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20221112 v0.9.27 static IP support, fix to get Power_* also in HA
  * 20221109 v0.9.26 clarify WiFiManager screen, fix to accept 80-char user/password also in WiFiManager
  * 20221108 v0.9.25 ADC report added to F-series
  * 20221102 v0.9.24 noWiFi option, w5500 reset added, fix switch to verbose=9, misc
@@ -108,9 +109,9 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.26"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.26"
-#define HA_SW "0.9.26"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.27"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.27"
+#define HA_SW "0.9.27"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
@@ -228,6 +229,7 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #define REBOOT_REASON_HWID 0x04             // hwID change restart
 #define REBOOT_REASON_NOWIFI 0x05           // noWiFi change restart
 #define REBOOT_REASON_ETH 0x06              // ethernet failure restart (only if noWiFi)
+#define REBOOT_REASON_STATICIP 0x06         // staticIP setting restart
 #define REBOOT_REASON_D0 0xD0               // manual restart
 #define REBOOT_REASON_D1 0xD1               // manual reset
 

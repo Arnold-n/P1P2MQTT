@@ -147,9 +147,10 @@ Topics providing information or commands to P1P2MQTT:
 
 Commands to be executed by P1P2MQTT can be given over P1P2/W/\<xxx\> or via telnet:
 - "A" Execute hard reset of ATmega328P
-- "B" [MQTT_server_IPv4 [MQTT_portnr [MQTT_user [MQTT_password [MQTT_INPUT_IPv4-byte4 [hwId [noWiFi]]]]]]] sets MQTT server details and, for ESP01s taking input over MQTT, 4th byte of IPv4 of data source (with 0 for subscribing to P1P2/R/#). hwId sets hwId (useful only to reset to 0 for August 2022 batch after flash erasure). noWiFi can be set to 1 to prohibit WiFi use (no WiFi fall-back if ethernet fails).
+- "B [MQTT_server_IPv4 [MQTT_portnr [MQTT_user [MQTT_password [MQTT_INPUT_IPv4-byte4 [hwId [noWiFi]]]]]]]" sets MQTT server details and, for ESP01s taking input over MQTT, 4th byte of IPv4 of data source (with 0 for subscribing to P1P2/R/#). hwId sets hwId (useful only to reset to 0 for August 2022 batch after flash erasure). noWiFi can be set to 1 to prohibit WiFi use (no WiFi fall-back if ethernet fails).
 - "D0" Reset ESP8266
 - "D1" Restart ESP8266
+- "I [ use_static_ip  [ static IPv4 address  [  gateway   [ netmask ]]]]" sets static IPv4 address (if use_static_ip = 1) or DHCP (if 0)
 - "S"  Display output filter level (replaces previous changed-only mode)
 - "Sx" Sets output filter level:
   - 0 all parameters

@@ -4,7 +4,7 @@ Daikin (hybrid) heat pump systems are usually controlled by a room thermostat (a
 
 ![Home assistant](images/homeassistant300.png)
 
-If this project is useful for you, or valuable (I hope you can improve your system's SCOP and reduce your energy bills and CO2 emissions), you may contact me for purchasing a P1P2-ESP-interface, or to share your experiences and log files, or to [buy me a coffee](https://www.buymeacoffee.com/arnoldniessen). It helps to bring functionality to other models.
+I hope this project is valuable for you, so that you can help reduce CO2 emissions. You can support this project by sharing your experiences and log files, buying an interface, sponsoring this project or [buying me a coffee](https://www.buymeacoffee.com/arnoldniessen). It helps to bring functionality to other models.
 
 **New design: P1P2-ESP-interface v1.1**
 
@@ -23,15 +23,20 @@ Shown is the new P1P2-ESP-interface v1.1 (more pictures [here](circuits/README.m
 - SPI interface option for W5500 ethernet adapter (using an enclosure extension, power consumption with adapter 60mA at 15V or 0.9W from P1/P2 bus), and
 - fits nicely in a small semi-transparant enclosure (50mm x 35mm x 20mm without ethernet, or 82mm x 35mm x 29mm with ethernet adapter).
 
+If your system is supported, and you have your HA and MQTT server already running, the only things you need to do is
+- connect the P1P2-ESP-interface to P1/P2 wires (leave the main room thermostat connected),
+- connect to the WiFiManager AP to enter your WiFi SSID/password and MQTT address/port/user/password, and
+- see HA autodetect the P1P2 device with its sensors.
+
 With communication over MQTT, integration with Home Assistand will be(come) automatic, and interfacing to other systems (grafana, OpenHab, EmonCMS) should not be too much work.
 
-By default, the interface only observes and attempts to interpret bus traffic. For some E-series models, especially hybrid models, it may also act as auxiliary controller and control parameter settings over MQTT. FDY(Q) systems are also supported.
+By default, the interface only observes and attempts to interpret bus traffic. For several E-series models, especially hybrid models, it may also act as auxiliary controller to control parameter settings over MQTT. FDY(Q) systems are also supported. With your help we can add more models!
 
 ![Grafana electricity usage](images/grafana-electricity-usage.png)
 
 **How can you build or buy one?**
 
-Buy new complete stand-alone P1P2-ESP-interface): I have a number of factory-assembled PCBs (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, optionally with ethernet, documented and tested) available(2nd version, shown above, v1.1, October 2022). Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
+Buy new complete stand-alone P1P2-ESP-interface): I have a number of factory-assembled PCBs available (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, optionally with ethernet, documented and tested, this is the 2nd version, shown above, v1.1, of October 2022). Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
 
 Buy P1P2-adapter (older design described below): I also sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno.
 

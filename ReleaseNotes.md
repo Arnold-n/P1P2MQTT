@@ -1,5 +1,25 @@
 **Release notes**
 
+v0.9.28 (November 12, 2022)
+
+- adds static IPv4 option
+
+v0.9.27 (November 12, 2022)
+
+- fix to get Power\_\* visible in HA
+
+v0.9.26 (November 9, 2022)
+
+- fix MQTT password length to 80 in WiFiManager, clarify WiFiManager start screen
+
+v0.9.25 (November 8, 2022)
+
+- fix compilation issue for ETHERNET config
+
+v0.9.24 (November 2, 2022)
+
+- noWiFi option added
+
 v0.9.23 (October 30, 2022)
 
 - P1P2Serial and P1P2Monitor: ADC support
@@ -25,7 +45,7 @@ v0.9.20 (September 4, 2022)
 v0.9.19 (September 3, 2022)
 
 - P1P2-bridge-ESP8266: MQTT user/password length 80/80
--
+
 v0.9.18 (August 29, 2022)
 
 - P1P2-bridge-ESP8266: state_class for HA energy overview

@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20221112 v0.9.27 fix to get Power_* also in HA
  * 20221102 v0.9.24 minor DHW/gas changes in reporting
  * 20221029 v0.9.23 ISPAVR over BB SPI, ADC, misc
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
@@ -118,12 +119,12 @@ bool scheduleMemSeen[2][SCHEDULE_MEM_SIZE] = {}; // 2 * 1166 = 2332 bytes
 #ifdef PSEUDO_PACKETS
 #define PCKTP_START  0x08
 #define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 mapped to 0x16
-#define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 2)
+#define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 3)
 //byte packetsrc                                      = { {00                                                                 }, {  40                                                                       }}
-//byte packettype                                     = { {08, 09, 0A, 0B,  0C,  0D, 0E, 0F, 10,  11,  12,  13,  14,  15,  31 }, {  08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  31 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,  20, 20, 20, 20,   8,  15,   3,  15,   6,   6 }, {   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,   0, 20, 40, 60,  80,  88, 103, 106, 121, 127 }, { 133, 133, 153, 173, 193, 193, 213, 233, 253, 273, 293, 313, 327, 346, 352 /* , sizeValSeen=352 */ }};
-#define sizeValSeen 352
+//byte packettype                                     = { {08, 09, 0A, 0B,  0C,  0D, 0E, 0F, 10,  11,  12,  13,  14,  15,  30,  31 }, {  08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  30,  31 }}
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,  20, 20, 20, 20,   8,  15,   3,  15,   6,   2,   6 }, {   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0,   0 }};
+const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,   0, 20, 40, 60,  80,  88, 103, 106, 121, 127, 129 }, { 135, 135, 155, 175, 195, 195, 215, 235, 255, 275, 295, 315, 329, 348, 354, 354 /* , sizeValSeen=354 */ }};
+#define sizeValSeen 354
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #else /* PSEUDO_PACKETS */
@@ -180,12 +181,13 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
   bool newByte = (outputFilter == 0);
   byte pts = (packetSrc >> 6) & 0x01;
   byte pti = packetType - PCKTP_START;
-  if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x31 also covered, treat it as PCKTP_END + 1 (0x16)
+  if (packetType == 0x30) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x30 also covered, treat it as PCKTP_END + 1 (0x16)
+  if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 2; // hack to get 0x31 also covered, treat it as PCKTP_END + 2 (0x17)
   if (payloadIndex == EMPTY_PAYLOAD) {
     newByte = 0;
   } else if (packetType < PCKTP_START) {
     newByte = 1;
-  } else if ((packetType > PCKTP_END) && (packetType != 0x31)) {
+  } else if ((packetType > PCKTP_END) && (packetType != 0x30) && (packetType != 0x31)) {
     if (packetType == 0xB8) {
       // Handle 0xB8 history
       uint16_t pi2 = payloadIndex;
@@ -546,6 +548,7 @@ uint8_t value_f8s8(byte packetSrc, byte packetType, byte payloadIndex, byte* pay
 // change to Watt ?
 uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, float v, int length = 0) {
   if (length && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1))) return 0;
+  if (!length) newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1);
 #ifdef __AVR__
   dtostrf(v, 1, 3, mqtt_value);
 #else
@@ -556,6 +559,7 @@ uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payloa
 
 uint8_t value_s(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, int v, int length = 0) {
   if (length && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1))) return 0;
+  if (!length) newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1);
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", v);
   return (outputFilter > maxOutputFilter ? 0 : 1);
 }
@@ -1968,15 +1972,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                   if (LWT_changed || MWT_changed || Flow_changed) {
                     Power1 = (LWT - MWT) * Flow * 0.0697;
                     KEY("Power_Gasboiler");
-                    SRC(9);                                                                                                                      VALUE_F(Power1);
                     LWT_changed = MWT_changed = Flow_changed = 0;          HACONFIG; HAPOWER;
+                    SRC(9);                                                                                                                      VALUE_F(Power1);
                   } else return 0;
         case  1 : // power produced by heat pump
                   if (RWT_changed || MWT_changed || Flow_changed) {
                     Power2 = (MWT - RWT) * Flow * 0.0697;
                     KEY("Power_Heatpump");
-                    SRC(9);                                                HACONFIG; HAPOWER;                                                    VALUE_F(Power2);
                     LWT_changed = MWT_changed = Flow_changed = 0;
+                    SRC(9);                                                HACONFIG; HAPOWER;                                                    VALUE_F(Power2);
                   } else return 0;
         case  2 : // terminate json string at end of package
                   TERMINATEJSON;

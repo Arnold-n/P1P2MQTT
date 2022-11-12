@@ -2,10 +2,14 @@
 
 ### Software related
 
- - MQTT username/password length is limited to 19/39 characters. HA's MQTT server may generate 64-char passwords. Max length will be increased in a next release.
- - MQTT reconnect may fail, especially if the WIFI signal is weak (~ -90 dBm), resulting in an ESP8266 reboot
- - repeated MQTT reconnects due to poor WiFi may reduce free memory (repeated subscription related)?
  - P1P2-bridge-esp8266 is end-of-life and will be replaced by P1P2MQTT, which is more robust and more memory-efficient, and more user friendly
+ - 'C1' and 'C2' command violate P1/P2 bus protocol, check your status log P1P2/S/# and raw data logs P1P2/R/# for bus collissions and other problems when using this, use with care!
+
+### Software related, fixed
+
+ - (solved in 0.9.27) Power\_\* was not visible in HA
+ - (solved in 0.9.26) MQTT username/password length was limited to 19/39 characters in WiFiManager. Max length now 80.
+ - (solved in 0.9.23) MQTT reconnect may fail, especially if the WIFI signal is weak (~ -90 dBm), resulting in an ESP8266 reboot
 
 ### Hardware related
 

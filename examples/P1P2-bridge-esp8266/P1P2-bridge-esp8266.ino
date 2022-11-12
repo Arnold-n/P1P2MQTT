@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20221112 v0.9.27 static IP support, fix to get Power_* also in HA
  * 20221109 v0.9.26 clarify WiFiManager screen, fix to accept 80-char user/password also in WiFiManager
  * 20221108 v0.9.25 move EEPROM outside ETHERNET code
  * 20221102 v0.9.24 noWiFi option, w5500 reset added, fix switch to verbose=9, misc
@@ -79,7 +80,7 @@ typedef struct EEPROMSettingsOld {
   int  mqttPort;
 };
 
-#define NR_RESERVED 96
+#define NR_RESERVED 47
 
 typedef struct EEPROMSettingsNew {
   // EEPROM values for EEPROM_SIGNATURE_OLD2
@@ -97,7 +98,10 @@ typedef struct EEPROMSettingsNew {
   byte hwID;
   byte EEPROM_version;
   byte noWiFi;
-  // EEPROM values added for EEPROM_SIGNATURE_OLD3
+  byte useStaticIP;
+  char static_ip[16];
+  char static_gw[16];
+  char static_nm[16];
   byte reserved[NR_RESERVED];
 };
 
@@ -110,6 +114,7 @@ EEPROMSettingsUnion EEPROM_state;
 
 bool ethernetConnected  = false;
 static uint32_t noWiFi = INIT_NOWIFI;
+static uint32_t useStaticIP = INIT_USE_STATIC_IP;
 
 #ifdef ETHERNET
 // Connections W5500: Arduino Mega pins 50 (MISO), 51 (MOSI), 52 (SCK), and 10 (SS) (https://www.arduino.cc/en/Reference/Ethernet)
@@ -145,6 +150,16 @@ bool initEthernet()
   SPI.setDataMode(SPI_MODE0);
   eth.setDefault();
   delay(100);
+  // see also https://github.com/esp8266/Arduino/pull/8395 and https://github.com/esp8266/Arduino/issues/8144
+  if (EEPROM_state.EEPROMnew.useStaticIP) {
+    Serial.println(F("* [ESP] Using static IP"));
+    IPAddress _ip, _gw, _nm;
+    _ip.fromString(EEPROM_state.EEPROMnew.static_ip);
+    _gw.fromString(EEPROM_state.EEPROMnew.static_gw);
+    _nm.fromString(EEPROM_state.EEPROMnew.static_nm);
+    eth.config(_ip, _gw, _nm, _gw);
+  }
+  // eth.setDefault();
   if (!eth.begin()) {
     Serial.println("* [ESP] No Ethernet hardware detected");
     return false;
@@ -296,7 +311,6 @@ uint32_t Mqtt_gap = 0;          // does not increment in case of QOS=0
 uint16_t prevpacketId = 0;
 
 #define MAXWAIT 20
-
 
 uint32_t mqttPublished = 0;
 bool ignoreSerial = false;
@@ -639,6 +653,43 @@ void handleCommand(char* cmdString) {
                 Sprint_P(true, true, true, PSTR("* [ESP] Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime"));
               }
               break;
+    case 'i': // static IP address (for now, WiFi only) //  TODO ethernet
+    case 'I': if ((n = sscanf((const char*) (cmdString + 1), "%i %15s %15s %15s %15s", &useStaticIP, &EEPROM_state.EEPROMnew.static_ip, &EEPROM_state.EEPROMnew.static_gw, &EEPROM_state.EEPROMnew.static_nm)) > 0) {
+                Sprint_P(true, true, true, PSTR("* [ESP] Writing new static ip settings to EEPROM"));
+                EEPROM_state.EEPROMnew.useStaticIP = useStaticIP;
+#ifdef REBOOT_REASON
+                EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_STATICIP;
+#endif /* REBOOT_REASON */
+                EEPROM.put(0, EEPROM_state);
+                EEPROM.commit();
+              }
+              if (n > 0) {
+                Sprint_P(true, true, true, PSTR("* [ESP] useStaticIP set to %i"), EEPROM_state.EEPROMnew.useStaticIP);
+              } else {
+                Sprint_P(true, true, true, PSTR("* [ESP] useStaticIP is %i"), EEPROM_state.EEPROMnew.useStaticIP);
+              }
+              if (n > 1) {
+                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 address set to %s"), EEPROM_state.EEPROMnew.static_ip);
+              } else {
+                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 address is %s"), EEPROM_state.EEPROMnew.static_ip);
+              }
+              if (n > 2) {
+                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 gateway set to %s"), EEPROM_state.EEPROMnew.static_gw);
+              } else {
+                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 gateway is %s"), EEPROM_state.EEPROMnew.static_gw);
+              }
+              if (n > 3) {
+                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 netmask set to %s"), EEPROM_state.EEPROMnew.static_nm);
+              } else {
+                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 netmask is %s"), EEPROM_state.EEPROMnew.static_nm);
+              }
+              if (n > 0) {
+                Sprint_P(true, true, true, PSTR("* [ESP] Restart required to use new settings"));
+                delay(500);
+                ESP.restart();
+                delay(100);
+              }
+              break;
     case 'j': // OutputMode
     case 'J': if (sscanf((const char*) (cmdString + 1), "%x", &temp) == 1) {
                 outputMode = temp;
@@ -755,6 +806,8 @@ void handleCommand(char* cmdString) {
                 default : break;
               }
               // fallthrough for v/g/h commands handled both by P1P2-bridge-esp8266 and P1P2Monitor
+              // 'c' 'C' 'p' 'P' 'e' 'E' 't' 'T" 'o' 'O" 'u' 'U" 'x' 'X" 'w' 'W" 'k' 'K' 'l' 'L' 'q' 'Q' 'm' 'M' 'z' 'Z' 'r' 'R' 'n' 'N' 'y' 'Y' handled by P1P2Monitor
+              // (reserved 'f' 'F") 
     default : Sprint_P(true, true, true, PSTR("* [ESP] To ATmega: ->%s<-"), cmdString);
               Serial.print(F(SERIAL_MAGICSTRING));
               Serial.println((char *) cmdString);
@@ -924,6 +977,7 @@ void setup() {
     EEPROM_state.EEPROMnew.hwID = 0;
     EEPROM_state.EEPROMnew.EEPROM_version = 0;
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
+    EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
     EEPROM.put(0, EEPROM_state);
@@ -942,6 +996,7 @@ void setup() {
     EEPROM_state.EEPROMnew.hwID = 0;
     EEPROM_state.EEPROMnew.EEPROM_version = 0;
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
+    EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
     EEPROM.put(0, EEPROM_state);
@@ -954,6 +1009,7 @@ void setup() {
     // EEPROM_state.EEPROMnew.hwID = 0; // was 0 already
     // EEPROM_state.EEPROMnew.EEPROM_version = 0; //was 0 already
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
+    EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
     strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
     EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
@@ -974,6 +1030,7 @@ void setup() {
     EEPROM_state.EEPROMnew.hwID = INIT_HW_ID;
     EEPROM_state.EEPROMnew.EEPROM_version = 0; // use counter instead of new signature in future
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
+    EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
@@ -1032,11 +1089,15 @@ void setup() {
     // Set config save notify callback
     wifiManager.setSaveConfigCallback(WiFiManagerSaveConfigCallback);
     // Customize AP
-    WiFiManagerParameter custom_text("<p>P1P2-ESP-Interface</p>");
+    WiFiManagerParameter custom_text("<p><b>P1P2MQTT</b></p>");
     WiFiManagerParameter custom_text1("<b>Your MQTT server IPv4 address</b>");
     WiFiManagerParameter custom_text2("<b>Your MQTT server port</b>");
     WiFiManagerParameter custom_text3("<b>MQTT user</b>");
     WiFiManagerParameter custom_text4("<b>MQTT password</b>");
+    WiFiManagerParameter custom_text5("<b>0=DHCP 1=static IP</b>");
+    WiFiManagerParameter custom_text6("<b>Static IPv4 (ignored for DHCP)</b>");
+    WiFiManagerParameter custom_text7("<b>Gateway (ignored for DHCP)</b>");
+    WiFiManagerParameter custom_text8("<b>Subnetwork (ignored for DHCP)</b>");
     // Debug info?
 #ifdef DEBUG_OVER_SERIAL
     wifiManager.setDebugOutput(true);
@@ -1047,6 +1108,13 @@ void setup() {
     WiFiManagerParameter WiFiManMqttPort("mqttport", "MqttPort (optional, default 1883)", MQTT_PORT_STRING, 9);
     WiFiManagerParameter WiFiManMqttUser("mqttuser", "MqttUser (optional)", MQTT_USER, 80);
     WiFiManagerParameter WiFiManMqttPassword("mqttpassword", "MqttPassword (optional)", MQTT_PASSWORD, 80);
+
+    // add 4 static IP settings to WiFiManager, with default settings preconfigured in NetworkParams.h
+    WiFiManagerParameter WiFiMan_use_static_ip("use_static_ip", "0=DHCP 1=staticIP", INIT_USE_STATIC_IP_STRING, 1);
+    WiFiManagerParameter WiFiMan_static_ip("static_ip", "Static IPv4 (optional)", STATIC_IP, 15);
+    WiFiManagerParameter WiFiMan_static_gw("static_gw", "Static GW (optional)", STATIC_GW, 15);
+    WiFiManagerParameter WiFiMan_static_nm("static_nm", "Static NM (optional)", STATIC_NM, 15);
+
     wifiManager.addParameter(&custom_text);
     wifiManager.addParameter(&custom_text1);
     wifiManager.addParameter(&WiFiManMqttServer);
@@ -1056,6 +1124,14 @@ void setup() {
     wifiManager.addParameter(&WiFiManMqttUser);
     wifiManager.addParameter(&custom_text4);
     wifiManager.addParameter(&WiFiManMqttPassword);
+    wifiManager.addParameter(&custom_text5);
+    wifiManager.addParameter(&WiFiMan_use_static_ip);
+    wifiManager.addParameter(&custom_text6);
+    wifiManager.addParameter(&WiFiMan_static_ip);
+    wifiManager.addParameter(&custom_text7);
+    wifiManager.addParameter(&WiFiMan_static_gw);
+    wifiManager.addParameter(&custom_text8);
+    wifiManager.addParameter(&WiFiMan_static_nm);
 
     // reset WiFiManager settings - for testing only;
     // wifiManager.resetSettings();
@@ -1066,7 +1142,13 @@ void setup() {
     // wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
     // Custom static IP for client may be configured here
     // wifiManager.setSTAStaticIPConfig(IPAddress(192,168,0,99), IPAddress(192,168,0,1), IPAddress(255,255,255,0)); // optional DNS 4th argument
-
+    if (EEPROM_state.EEPROMnew.useStaticIP) {
+      IPAddress _ip, _gw, _nm;
+      _ip.fromString(EEPROM_state.EEPROMnew.static_ip);
+      _gw.fromString(EEPROM_state.EEPROMnew.static_gw);
+      _nm.fromString(EEPROM_state.EEPROMnew.static_nm);
+      wifiManager.setSTAStaticIPConfig(_ip, _gw, _nm);
+    }
 // WiFiManager start
     // Fetches ssid, password, and tries to connect.
     // If it does not connect it starts an access point with the specified name,
@@ -1104,8 +1186,19 @@ void setup() {
       if ((!strlen(WiFiManMqttPort.getValue())) || (sscanf(WiFiManMqttPort.getValue(), "%i", &EEPROM_state.EEPROMnew.mqttPort) != 1)) EEPROM_state.EEPROMnew.mqttPort = MQTT_PORT;
       strlcpy(EEPROM_state.EEPROMnew.mqttUser,     WiFiManMqttUser.getValue(),     sizeof(EEPROM_state.EEPROMnew.mqttUser));
       strlcpy(EEPROM_state.EEPROMnew.mqttPassword, WiFiManMqttPassword.getValue(), sizeof(EEPROM_state.EEPROMnew.mqttPassword));
+      if ((!strlen(WiFiMan_use_static_ip.getValue())) || (sscanf(WiFiMan_use_static_ip.getValue(), "%i", &useStaticIP) != 1)) useStaticIP = INIT_USE_STATIC_IP;
+      EEPROM_state.EEPROMnew.useStaticIP = useStaticIP;
+      strlcpy(EEPROM_state.EEPROMnew.static_ip,   WiFiMan_static_ip.getValue(),   sizeof(EEPROM_state.EEPROMnew.static_ip));
+      strlcpy(EEPROM_state.EEPROMnew.static_gw,   WiFiMan_static_gw.getValue(),   sizeof(EEPROM_state.EEPROMnew.static_gw));
+      strlcpy(EEPROM_state.EEPROMnew.static_nm,   WiFiMan_static_nm.getValue(),   sizeof(EEPROM_state.EEPROMnew.static_nm));
       EEPROM.put(0, EEPROM_state);
       EEPROM.commit();
+      if (useStaticIP) {
+        Sprint_P(true, true, true, PSTR("* [ESP] Restart ESP to set static IP"));
+        delay(500);
+        ESP.restart();
+        delay(200);
+      }
     }
 #ifdef TELNET
     telnetSuccess = telnet.begin(telnet_port);
@@ -1224,6 +1317,7 @@ void setup() {
   outputMode = EEPROM_state.EEPROMnew.outputMode;
   hwID = EEPROM_state.EEPROMnew.hwID;
   noWiFi = EEPROM_state.EEPROMnew.noWiFi;
+  useStaticIP = EEPROM_state.EEPROMnew.useStaticIP;
 
   if (mqttClient.connected()) {
     Sprint_P(true, true, true, PSTR(WELCOMESTRING));
@@ -1235,6 +1329,7 @@ void setup() {
 #endif
     Sprint_P(true, true, true, PSTR("* [ESP] hw_identifier %i"), hwID);
     Sprint_P(true, true, true, PSTR("* [ESP] noWiFi %i"), noWiFi);
+    Sprint_P(true, true, true, PSTR("* [ESP] useStaticIP %i"), useStaticIP);
     Sprint_P(true, true, true, PSTR("* [ESP] Connected to MQTT server"));
     Sprint_P(true, true, true, PSTR("* [ESP] MQTT Clientname = %s"), MQTT_CLIENTNAME);
     Sprint_P(true, true, true, PSTR("* [ESP] MQTT User = %s"), EEPROM_state.EEPROMnew.mqttUser);

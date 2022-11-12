@@ -25,7 +25,3 @@ It can not be used on an Arduino Mega2560 directly, but it can be used with some
 ## Schematics
 
 [Schematics as PDF](Daikin_P1P2_Uno_version2.pdf)
-
-## Pictures of Arduino Uno HAT adapter
-
-
