@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20221116 v0.9.28 reset-line behaviour, IPv4 EEPROM init
  * 20221112 v0.9.27 static IP support, fix to get Power_* also in HA
  * 20221109 v0.9.26 clarify WiFiManager screen, fix to accept 80-char user/password also in WiFiManager
  * 20221108 v0.9.25 move EEPROM outside ETHERNET code
@@ -494,11 +495,11 @@ void handleCommand(char* cmdString) {
   switch (cmdString[0]) {
     case 'a': // reset ATmega
     case 'A': Sprint_P(true, true, true, PSTR("* [ESP] Hard resetting ATmega..."));
-              pinMode(RESET_PIN, OUTPUT);
               digitalWrite(RESET_PIN, LOW);
+              pinMode(RESET_PIN, OUTPUT);
               delay(1);
-              digitalWrite(RESET_PIN, HIGH);
               pinMode(RESET_PIN, INPUT);
+              digitalWrite(RESET_PIN, HIGH);
               delay(200);
               ATmega_dummy_for_serial();
               ATmega_uptime_prev = 0;
@@ -931,11 +932,6 @@ uint8_t delayedRebootReasonReset = 0;
 #endif
 
 void setup() {
-  // set RESET_PIN high, and then in input mode unless reset ('A' command) actively pulls it down
-  digitalWrite(RESET_PIN, HIGH);
-  pinMode(RESET_PIN, OUTPUT);
-  delay(1);
-  pinMode(RESET_PIN, INPUT);
 #ifdef ETHERNET
   digitalWrite(ETH_RESET_PIN, LOW);
   pinMode(ETH_RESET_PIN, OUTPUT);
@@ -978,6 +974,9 @@ void setup() {
     EEPROM_state.EEPROMnew.EEPROM_version = 0;
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
+    EEPROM_state.EEPROMnew.static_ip[0] = '\0';
+    EEPROM_state.EEPROMnew.static_gw[0] = '\0';
+    EEPROM_state.EEPROMnew.static_nm[0] = '\0';
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
     EEPROM.put(0, EEPROM_state);
@@ -997,6 +996,9 @@ void setup() {
     EEPROM_state.EEPROMnew.EEPROM_version = 0;
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
+    EEPROM_state.EEPROMnew.static_ip[0] = '\0';
+    EEPROM_state.EEPROMnew.static_gw[0] = '\0';
+    EEPROM_state.EEPROMnew.static_nm[0] = '\0';
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
     EEPROM.put(0, EEPROM_state);
@@ -1010,6 +1012,9 @@ void setup() {
     // EEPROM_state.EEPROMnew.EEPROM_version = 0; //was 0 already
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
+    EEPROM_state.EEPROMnew.static_ip[0] = '\0';
+    EEPROM_state.EEPROMnew.static_gw[0] = '\0';
+    EEPROM_state.EEPROMnew.static_nm[0] = '\0';
     strlcpy(EEPROM_state.EEPROMnew.signature,    EEPROM_SIGNATURE_NEW, sizeof(EEPROM_state.EEPROMnew.signature));
     EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
@@ -1031,6 +1036,9 @@ void setup() {
     EEPROM_state.EEPROMnew.EEPROM_version = 0; // use counter instead of new signature in future
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
+    EEPROM_state.EEPROMnew.static_ip[0] = '\0';
+    EEPROM_state.EEPROMnew.static_gw[0] = '\0';
+    EEPROM_state.EEPROMnew.static_nm[0] = '\0';
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
@@ -1417,7 +1425,11 @@ void setup() {
 
 #ifdef AVRISP
 // AVRISP
+  // set RESET_PIN high, to prevent ESP8266AVRISP from resetting ATmega328P
+  digitalWrite(RESET_PIN, HIGH);
   avrprog = new ESP8266AVRISP(avrisp_port, RESET_PIN, hwID ? SPI_SPEED_1 : SPI_SPEED_0);
+  // set RESET_PIN back to INPUT mode
+  pinMode(RESET_PIN, INPUT);
   MDNS.begin(avrisp_host);
   MDNS.addService("avrisp", "tcp", avrisp_port);
   Sprint_P(true, true, true, PSTR("* [ESP] AVRISP: ATmega programming: avrdude -c avrisp -p atmega328p -P net:%i.%i.%i.%i:%i -t # or -U ..."), local_ip[0], local_ip[1], local_ip[2], local_ip[3], avrisp_port);
