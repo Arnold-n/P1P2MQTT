@@ -51,11 +51,7 @@
 
 #ifdef AVRISP
 #include <SPI.h>
-#if INIT_HW_ID == 0
 #include <ESP8266AVRISP.h>
-#else /* INIT_HW_ID */
-#include <ESP8266AVRISP-BB.h>
-#endif /* INIT_HW_ID */
 #endif /* AVRISP */
 
 #include <ArduinoOTA.h>
