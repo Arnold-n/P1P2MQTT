@@ -37,6 +37,8 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20221129 v0.9.28 option to insert message in 40F030 time slot for restart or user-defined write message
+ * 20221102 v0.9.24 suppress repeated "too long" warnings
  * 20221029 v0.9.23 ADC code, fix 'W' command, misc
  * 20220918 v0.9.22 scopemode for writes and focused on actual errors, fake error generation for test purposes, control for FDY/FDYQ (#define F_SERIES), L2/L3/L5 mode
  * 20220903 v0.9.19 minor change in serial output
@@ -84,7 +86,6 @@
  *
  * Wishlist:
  * -schedule writes
- * -do not accept write commands if not in control mode
  * -continue control operating (L1) immediately after reset/brown-out, but not immediately after power-up reset
  */
 
@@ -99,6 +100,13 @@ static byte readErrorLast = 0;
 static byte writeRefused = 0;
 static byte errorsLargePacket = 0;
 static byte controlLevel = 1; // for F-series L5 mode
+#ifdef ENABLE_INSERT_MESSAGE
+static byte restartDaikinCnt = 0;
+static byte restartDaikinReady = 0;
+static byte insertMessageCnt = 0;
+static byte insertMessage[RB_SIZE];
+static byte insertMessageLength = 0;
+#endif
 
 const byte Compile_Options = 0 // multi-line statement
 #ifdef MONITORCONTROL
@@ -217,9 +225,9 @@ void setup() {
   Serial.println(F("*"));
   Serial.println(F(WELCOMESTRING));
   Serial.print(F("* Compiled "));
-  Serial.print(__DATE__);
+  Serial.print(F(__DATE__));
   Serial.print(F(" "));
-  Serial.print(__TIME__);
+  Serial.print(F(__TIME__));
 #ifdef MONITORCONTROL
   Serial.print(F(" +control"));
 #endif /* MONITORCONTROL */
@@ -323,8 +331,8 @@ void writePseudoPacket(byte* WB, byte rh)
 #define PARAM_TP_START      0x35
 #define PARAM_TP_END        0x3D
 #define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1)
-const uint16_t  nr_params[PARAM_ARR_SZ] = { 0x014A, 0x002D, 0x0001, 0x001F, 0x00F0, 0x006C, 0x00AF, 0x0002, 0x0020 }; // number of parameters observed
-//byte packettype                       = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
+const uint32_t PROGMEM nr_params[PARAM_ARR_SZ] = { 0x014A, 0x002D, 0x0001, 0x001F, 0x00F0, 0x006C, 0x00AF, 0x0002, 0x0020 }; // number of parameters observed
+//byte packettype                              = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
 
 void(* resetFunc) (void) = 0; // declare reset function at address 0
 
@@ -360,20 +368,20 @@ void loop() {
       *(RSp - 1) = '\0';
       if (c != '\n') {
         if (!reportedTooLong) {
-          Serial.print("* Line too long, ignored, ignoring remainder: ->");
+          Serial.print(F("* Line too long, ignored, ignoring remainder: ->"));
           Serial.print(RS);
           Serial.print(lst);
           Serial.print(c);
-          Serial.println("<-");
+          Serial.println(F("<-"));
           // show full line, so not yet setting reportedTooLong = 1 here;
         }
         ignoreremainder = 1;
       } else {
         if (!reportedTooLong) {
-          Serial.print("* Line too long, terminated, ignored: ->");
+          Serial.print(F("* Line too long, terminated, ignored: ->"));
           Serial.print(RS);
           Serial.print(lst);
-          Serial.println("<-");
+          Serial.println(F("<-"));
           reportedTooLong = 1;
         }
         ignoreremainder = 0;
@@ -609,9 +617,9 @@ void loop() {
                       Serial.println(verbose);
                       Serial.println(F(WELCOMESTRING));
                       Serial.print(F("* Compiled "));
-                      Serial.print(__DATE__);
+                      Serial.print(F(__DATE__));
                       Serial.print(F(" "));
-                      Serial.println(__TIME__);
+                      Serial.println(F(__TIME__));
 #ifdef OLDP1P2LIB
                       Serial.print(F("* OLDP1P2LIB"));
 #else
@@ -656,8 +664,7 @@ void loop() {
 #ifdef SW_SCOPE
             case 'u':
             case 'U': if (verbose) Serial.print(F("* Software-scope "));
-                      n = sscanf(RSp,"%d %i %i", &temp);
-                      if (n > 0) {
+                      if (scanint(RSp, temp) == 1) {
                         scope = temp;
                         if (scope > 1) scope = 1;
                         P1P2Serial.setScope(scope);
@@ -681,9 +688,26 @@ void loop() {
                       break;
             case 'w':
             case 'W': if (CONTROL_ID) {
-                        if (verbose) Serial.println(F("* Write refused; controller is on"));
+                        // insert message in time for 40F030 slot in L1 mode
+                        if (insertMessageCnt || restartDaikinCnt) {
+                          Serial.println(F("* insertMessage (or restartDaikin) already scheduled"));
+                          break;
+                        }
+                        if (verbose) Serial.print(F("* Writing next 40F030 slot: "));
+                        insertMessageLength = 0;
+                        restartDaikinReady = 0; // indicate the insertMessage is overwritten and restart cannot be done until new packet received/loaded
+                        while ((wb < RB_SIZE) && (wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
+                          insertMessage[insertMessageLength++] = wbtemp;
+                          insertMessageCnt = 1;
+                          RSp += n;
+                          if (verbose) {
+                            if (wbtemp <= 0x0F) Serial.print("0");
+                            Serial.print(wbtemp, HEX);
+                          }
+                        }
+                        Serial.println();
                         break;
-                      } // don't write while controller is on
+                      }
                       if (verbose) Serial.print(F("* Writing: "));
                       wb = 0;
                       while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
@@ -717,6 +741,25 @@ void loop() {
                       // 5 (for experimenting with F-series only) controller responds only to 00F030 message withan empty packet, but not to other 00F03x packets
                       // other values are treated as 0 and are reserved for further experimentation of control modes
                       if (scanint(RSp, temp) == 1) {
+#ifdef ENABLE_INSERT_MESSAGE
+                        if (temp == 99) {
+                          if (insertMessageCnt) {
+                            Serial.println(F("* insertMessage already scheduled"));
+                            break;
+                          }
+                          if (restartDaikinCnt) {
+                            Serial.println(F("* restartDaikin already scheduled"));
+                            break;
+                          }
+                          if (!restartDaikinReady) {
+                            Serial.println(F("* restartDaikin waiting to receive sample payload"));
+                            break;
+                          }
+                          restartDaikinCnt = RESTART_NR_MESSAGES;
+                          Serial.println(F("* Scheduling attempt to restart Daikin"));
+                          break;
+                        }
+#endif
 #ifdef E_SERIES
                         if (temp > 3) temp = 0;
 #endif
@@ -1081,9 +1124,9 @@ void loop() {
       if (sws_cnt || (sws_event[SWS_MAX - 1] != SWS_EVENT_LOOP)) {
         scope_budget -= 5;
         if (readError) {
-          Serial.print("C ");
+          Serial.print(F("C "));
         } else {
-          Serial.print("c ");
+          Serial.print(F("c "));
         }
         if (RB[0] < 0x10) Serial.print('0');
         Serial.print(RB[0], HEX);
@@ -1151,13 +1194,13 @@ void loop() {
                                                           break;
                         }
                         switch (sws_ev) {
-                          case SWS_EVENT_EDGE_SPIKE     : Serial.print("-X-");  break;
-                          case SWS_EVENT_SIGNAL_HIGH_R  : Serial.print("‾‾‾"); break;
-                          case SWS_EVENT_SIGNAL_LOW     : Serial.print("___"); break;
-                          case SWS_EVENT_EDGE_RISING    : Serial.print("_/‾"); break;
+                          case SWS_EVENT_EDGE_SPIKE     : Serial.print(F("-X-"));  break;
+                          case SWS_EVENT_SIGNAL_HIGH_R  : Serial.print(F("‾‾‾")); break;
+                          case SWS_EVENT_SIGNAL_LOW     : Serial.print(F("___")); break;
+                          case SWS_EVENT_EDGE_RISING    : Serial.print(F("_/‾")); break;
                           case SWS_EVENT_EDGE_FALLING_W :
-                          case SWS_EVENT_EDGE_FALLING_R : Serial.print("‾\\_"); break;
-                          default                       : Serial.print(" ? "); break;
+                          case SWS_EVENT_EDGE_FALLING_R : Serial.print(F("‾\\_")); break;
+                          default                       : Serial.print(F(" ? ")); break;
                         }
           }
           if (++i == SWS_MAX) i = 0;
@@ -1309,13 +1352,19 @@ void loop() {
             Serial.print(RB[1], HEX);
             if (CONTROL_ID == RB[1]) {
               Serial.println(F(" detected, control functionality will restart"));
+              insertMessageCnt = 0;  // avoid delayed insertMessage/restartDaikin
+              restartDaikinCnt = 0;
             } else {
               Serial.println(F(" detected, switching control functionality can be switched on (using L1)"));
             }
           }
         }
         // act as auxiliary controller:
-        if (CONTROL_ID && (FxAbsentCnt[CONTROL_ID & 0x01] == F0THRESHOLD) && (RB[1] == CONTROL_ID)) {
+        if ((CONTROL_ID && (FxAbsentCnt[CONTROL_ID & 0x01] == F0THRESHOLD) && (RB[1] == CONTROL_ID))
+#ifdef ENABLE_INSERT_MESSAGE
+            || ((insertMessageCnt || restartDaikinCnt) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30))
+#endif
+                                                                                                     ) {
           WB[0] = 0x40;
           WB[1] = RB[1];
           WB[2] = RB[2];
@@ -1329,7 +1378,26 @@ void loop() {
             Serial.println(nread); }
           switch (RB[2]) {
 #ifdef E_SERIES
-            case 0x30 : // in: 17 byte; out: 17 byte; answer WB[7] should contain a 01 if we want to communicate a new setting in packet type 35
+            case 0x30 : 
+#ifdef ENABLE_INSERT_MESSAGE
+                        if (insertMessageCnt || restartDaikinCnt) {
+                          for (int i = 0; i < insertMessageLength; i++) WB[i] = insertMessage[i];
+                          if (insertMessageCnt) {
+                            Serial.println(F("* Insert user-specified message"));
+                            insertMessageCnt--;
+                          }
+                          if (restartDaikinCnt) {
+                            Serial.println(F("* Attempt to restart Daikin"));
+                            WB[RESTART_PACKET_PAYLOAD_BYTE + 3] |= RESTART_PACKET_BYTE;
+                            restartDaikinCnt--;
+                          }
+                          d = F030DELAY_INSERT;
+                          n = insertMessageLength;
+                          wr = 1;
+                          break;
+                        }
+#endif
+                        // in: 17 byte; out: 17 byte; answer WB[7] should contain a 01 if we want to communicate a new setting in packet type 35
                         for (w = 3; w < n; w++) WB[w] = 0x00;
                         // set byte WB[7] to 0x01 to request a F035 message to set Value35 and/or DHWstatus
                         if (setRequestDHW || setRequest35) WB[7] = 0x01;
@@ -1546,10 +1614,24 @@ void loop() {
       }
     }
 #endif /* MONITORCONTROL */
+#ifdef ENABLE_INSERT_MESSAGE
+    if ((insertMessageCnt == 0) && (RB[0] == 0x00) && (RB[1] == 0x00) && (RB[2] == RESTART_PACKET_TYPE)) {
+      for (int i = 0; i < nread; i++) insertMessage[i] = RB[i];
+      insertMessageLength = nread;
+      restartDaikinReady = 1;
+    }
+#endif
 #ifdef PSEUDO_PACKETS
+#ifdef E_SERIES
     if ((RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x10)) pseudo0D = 5; // Insert one pseudo packet 00000D in output serial after 400010
     if ((RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x11)) pseudo0E = 5; // Insert one pseudo packet 00000E in output serial after 400011
     if ((RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x12)) pseudo0F = 5; // Insert one pseudo packet 00000F in output serial after 400012
+#endif /* E_SERIES */
+#ifdef F_SERIES
+    if ((RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x10)) pseudo0D = 5; // Insert one pseudo packet 00000D in output serial after 400010
+    if ((RB[0] == 0x00) && (RB[1] == 0x00) && (RB[2] == 0x1F)) pseudo0E = 5; // Insert one pseudo packet 00000E in output serial after 00001F
+    if ((RB[0] == 0x80) && (RB[1] == 0x00) && (RB[2] == 0x18)) pseudo0F = 5; // Insert one pseudo packet 00000F in output serial after 800018
+#endif /* F_SERIES */
 #endif /* PSEUDO_PACKETS */
     if (readError) {
       Serial.print(F("E "));
@@ -1619,7 +1701,7 @@ void loop() {
         }
       }
       if (readError) {
-        Serial.print(" readError=0x");
+        Serial.print(F(" readError=0x"));
         if (readError < 0x10) Serial.print('0');
         if (readError < 0x100) Serial.print('0');
         if (readError < 0x1000) Serial.print('0');
@@ -1724,7 +1806,7 @@ void loop() {
     WB[17] = 0x00;
     WB[18] = 0x00;
 #endif
-    WB[19] = 0x00;
+    WB[19] = scope;
     WB[20] = readErrors;
     WB[21] = readErrorLast;
     WB[22] = CONTROL_ID;
