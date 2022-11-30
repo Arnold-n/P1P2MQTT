@@ -1727,7 +1727,7 @@ void loop() {
               rbp += n;
             }
             if (rh == HB) Sprint_P(true, true, true, PSTR("* [MON] Buffer full, overflow not checked"));
-            if (rh > 1) {
+            if ((rh > 1) || (rh == 1) && !crc_gen) {
               if (crc_gen) rh--;
               // rh is packet length (not counting CRC byte readHex[rh])
               uint8_t crc = crc_feed;

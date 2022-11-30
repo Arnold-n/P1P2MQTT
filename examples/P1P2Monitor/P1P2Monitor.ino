@@ -705,7 +705,11 @@ void loop() {
                             Serial.print(wbtemp, HEX);
                           }
                         }
-                        Serial.println();
+                        if (insertMessageCnt) {
+                          Serial.println();
+                        } else {
+                          Serial.println(F("- valid data missing, write skipped"));
+                        }
                         break;
                       }
                       if (verbose) Serial.print(F("* Writing: "));
