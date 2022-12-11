@@ -121,12 +121,13 @@ Header: 400010
 |13        | 00                 | Error code part 2        | u8
 |14        | 00                 | Error subcode            | u8
 |15-17     | 00                 | ?
+|17:1      | 0/1                | Defrost operation        | bit
 |18:3      | 0/1                | Circ.pump (off/on)       | bit
 |18:1      | 0/1                | ?                        | bit
 |18:0      | 0/1                | Compressor (off/on)      | bit
 |18:other  | 0                  | ?                        | bit
 |19:2      | 0/1                | DHW mode                 | bit
-|19:1      | 0/1                | DHW active1 (off/on)     | bit
+|19:1      | 0/1                | gasboiler active1 (off/on) | bit
 |19:other  | 0                  | ?                        | bit
 
 Error codes: tbd, HJ-11 is coded as 024D2C, 89-2 is coded as 08B908, 89-3 is coded as 08B90C.

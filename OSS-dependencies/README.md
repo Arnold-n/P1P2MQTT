@@ -20,9 +20,9 @@ You can use the unmodified BSP if (1) you either have the W5500 adapter installe
 - for P1P2Monitor: none (the EEPROM library is part of the BSP)
 - for P1P2-bridge-esp8266:
   - [WiFiManager 2.0.14-beta tablatronix](libraries/WiFiManager-2.0.14-beta.zip), installable via Arduino IDE (MIT license, [github repo with newer beta releases](https://github.com/tzapu/WiFiManager))
-  - modified) version of [ESP Telnet 1.3.1 by Lennart Hennigs version 1.3.1](libraries/ESPTelnet-1.3.1-07cc852ec610183db5f7aa1c94bda2ec7fe4d9c3-modified.zip), installable via Arduino IDE (MIT license, [github repo newer versions]( https://github.com/LennartHennigs/ESPTelnet)
-  - [async-mqtt-client 0.9.0 by Marvin Roger](libraries/async-mqtt-client-develop.zip) (MIT license, [github repo](https://github.com/marvinroger/async-mqtt-client))
-  - fixed version of [ESPAsyncTCP 2.0.1 by Phil Bowles](libraries/ESPAsyncTCP-master-modified.zip) (LGPLv3, [github repo](https://github.com/philbowles/ESPAsyncTCP))
+  - [ESP Telnet 1.3.1 by Lennart Hennigs version 1.3.1 with modification](libraries/ESPTelnet-1.3.1-07cc852ec610183db5f7aa1c94bda2ec7fe4d9c3-modified.zip), download/unzip this in library folder, or unmodified version installable via Arduino IDE (MIT license, [github repo newer versions]( https://github.com/LennartHennigs/ESPTelnet)
+  - [async-mqtt-client 0.9.0 by Marvin Roger](libraries/async-mqtt-client-develop.zip) (MIT license, from [github repo](https://github.com/marvinroger/async-mqtt-client))
+  - [ESPAsyncTCP 2.0.1 by Phil Bowles with extra fix](libraries/ESPAsyncTCP-master-modified.zip) (LGPLv3, download/unzip this in library folder, [github repo](https://github.com/philbowles/ESPAsyncTCP))
 
 #### Modifications explained:
 

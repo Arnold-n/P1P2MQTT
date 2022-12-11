@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20221211 v0.9.29 add control_ID in bool in pseudopacket, fix 3+4-byte writes, FXMQ support
  * 20221129 v0.9.28 option to insert message in 40F030 time slot for restart or user-defined write message
  * 20221102 v0.9.24 suppress repeated "too long" warnings
  * 20221029 v0.9.23 ADC code, fix 'W' command, misc
@@ -38,8 +39,10 @@
 
 // define only one of E_SERIES and F_SERIES:
 #define E_SERIES // for Daikin E* heat pumps
-//#define F_SERIES // for Daikin F* VRV systems
-
+//#define F_SERIES // for Daikin F* VRV systems, defining this enables "L5" and a reply to (only) 00F030; for experimenting with particular models and "L1" mode, uncomment line for your model:
+//#define FDY
+//#define FDYQ
+//#define FXMQ
 
 #if F_CPU > 8000000L
 // Assume Arduino Uno (or Mega) hardware; use 115200 Baud for USB or 250000 Baud for combi-board
@@ -56,7 +59,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.28"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.29"
 
 #define INIT_VERBOSE 3
 // Set verbosity level
@@ -108,8 +111,8 @@
 
 // Write budget: thottle parameter writes to limit flash memory wear
 #define TIME_WRITE_PERMISSION 3600 // on avg max one write per 3600s allowed
-#define MAX_WRITE_PERMISSION   100 // budget never higher than 100 (don't allow to burn more than 100 writes at once) // 8-bit, so max 255
-#define INIT_WRITE_PERMISSION   10 // initial write budget upon boot
+#define MAX_WRITE_PERMISSION   100 // budget never higher than 100 (don't allow to burn more than 100 writes at once) // 8-bit, so max 254; 255 is "infinity" (i.e. no budget limit)
+#define INIT_WRITE_PERMISSION   10 // initial write budget upon boot (255 = unlimited; recommended: 10)
 
 // Error budget: P1P2Monitor should not see any errors except upon start falling into a packet
 // so if P1P2Monitor sees see too many errors, it stops writing

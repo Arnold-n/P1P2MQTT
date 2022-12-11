@@ -37,6 +37,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20221211 v0.9.29 add control_ID in bool in pseudopacket, fix 3+4-byte writes, FXMQ support
  * 20221129 v0.9.28 option to insert message in 40F030 time slot for restart or user-defined write message
  * 20221102 v0.9.24 suppress repeated "too long" warnings
  * 20221029 v0.9.23 ADC code, fix 'W' command, misc
@@ -363,7 +364,7 @@ void loop() {
   // ((c == '\n' and rs > 0))  and/or  rs == RS_SIZE)  or  c == -1
   if (c >= 0) {
     if ((c != '\n') || (rs == RS_SIZE)) {
-      //  (c != '\n' ||  rb == RB)
+      //  (c != '\n' ||  rs == RS_SIZE)
       char lst = *(RSp - 1);
       *(RSp - 1) = '\0';
       if (c != '\n') {
@@ -395,9 +396,15 @@ void loop() {
         *(--RSp) = '\0';
       }
       if (ignoreremainder == 2) {
-        // Serial.print(F("* First line ignored: ->")); // do not copy - usually contains boot-related nonsense
-        // Serial.print(RS);
-        // Serial.println("<-");
+        Serial.print(F("* First line ignored: ->")); // do not copy - usually contains boot-related nonsense
+        if (rs < 10) {
+          Serial.print(RS);
+        } else {
+          RS[9] = '\0';
+          Serial.print(RS);
+          Serial.print("...");
+        }
+        Serial.println("<-");
         ignoreremainder = 0;
       } else if (ignoreremainder == 1) {
         if (!reportedTooLong) {
@@ -434,7 +441,7 @@ void loop() {
                         // previous write still being processed
                         Serial.println(F("* Previous parameter write action still busy"));
                         break;
-                      } else if ( (n = sscanf(RSp, (const char*) "%2x%4x%8x", &wr_pt, &wr_nr, &wr_val)) == 3) {
+                      } else if ( (n = sscanf(RSp, (const char*) "%2x%4x%8lx", &wr_pt, &wr_nr, &wr_val)) == 3) {
                         if ((wr_pt < PARAM_TP_START) || (wr_pt > PARAM_TP_END)) {
                           Serial.print(F("* wr_pt: 0x"));
                           Serial.print(wr_pt, HEX);
@@ -482,7 +489,7 @@ void loop() {
                           break;
                         }
                         if (writePermission) {
-                          writePermission--;
+                          if (writePermission != 0xFF) writePermission--;
                           wr_cnt = WR_CNT; // write repetitions, 1 should be enough
                           Serial.print(F("* Initiating parameter write for packet-type 0x"));
                           Serial.print(wr_pt, HEX);
@@ -556,7 +563,7 @@ void loop() {
                           break;
                         }
                         if (writePermission) {
-                          writePermission--;
+                          if (writePermission != 0xFF) writePermission--;
                           wr_cnt = WR_CNT; // write repetitions, 1 should be enough (especially for F-series)
                           Serial.print(F("* Initiating write for packet-type 0x"));
                           Serial.print(wr_pt, HEX);
@@ -935,7 +942,7 @@ void loop() {
                           break;
                         }
                         if (writePermission) {
-                          writePermission--;
+                          if (writePermission != 0xFF) writePermission--;
                           setRequest35 = 1;
                           setValue35 = temphex;
                           if (!verbose) break;
@@ -969,7 +976,7 @@ void loop() {
                           break;
                         }
                         if (writePermission) {
-                          writePermission--;
+                          if (writePermission != 0xFF) writePermission--;
                           setRequest36 = 1;
                           setValue36 = temphex;
                           if (!verbose) break;
@@ -1005,7 +1012,7 @@ void loop() {
                           break;
                         }
                         if (writePermission) {
-                          writePermission--;
+                          if (writePermission != 0xFF) writePermission--;
                           setRequest3A = 1;
                           setValue3A = temphex;
                           if (!verbose) break;
@@ -1043,7 +1050,7 @@ void loop() {
                           break;
                         }
                         if (writePermission) {
-                          writePermission--;
+                          if (writePermission != 0xFF) writePermission--;
                           setRequestDHW = 1;
                           setStatusDHW = temp;
                           if (!verbose) break;
@@ -1382,7 +1389,7 @@ void loop() {
             Serial.println(nread); }
           switch (RB[2]) {
 #ifdef E_SERIES
-            case 0x30 : 
+            case 0x30 :
 #ifdef ENABLE_INSERT_MESSAGE
                         if (insertMessageCnt || restartDaikinCnt) {
                           for (int i = 0; i < insertMessageLength; i++) WB[i] = insertMessage[i];
@@ -1537,16 +1544,13 @@ void loop() {
                         break;
 #endif /* E_SERIES */
 #ifdef F_SERIES
-            case 0x30 : // polling auxiliary controller, reply with empty payload
+            case 0x30 : // all models: polling auxiliary controller, reply with empty payload
               d = F030DELAY;
               wr = 1;
               n = 3;
               break;
-            case 0x37 : // FDYQ180MV1 zone name packet, reply with empty payload
-              wr = controlLevel;
-              n = 3;
-              break;
-            case 0x38 : // FHYC123KVE control message, copy bytes back and change if 'F' command is given
+#ifdef FDY
+            case 0x38 : // FDY control message, copy bytes back and change if 'F' command is given
               wr = controlLevel;
               n = 18;
               for (w = 13; w <= 15; w++) WB[w] = 0x00;
@@ -1564,7 +1568,7 @@ void loop() {
               WB[17] = 0x00;                   //   ? (change flag, & 0x7F ?)
               if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
               break;
-            case 0x39 : // guess that this is filter for FHYC123KVE, reply with 4-byte payload
+            case 0x39 : // guess that this is filter for FDY, reply with 4-byte payload
               wr = controlLevel;
               n = 7;
               WB[3] = 0x00;
@@ -1573,7 +1577,13 @@ void loop() {
               WB[6] = RB[12];
               if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
               break;
-            case 0x3B : // FDYQ180MV1 control message, copy bytes back and change if 'F' command is given
+#endif
+#ifdef FDYQ
+            case 0x37 : // FDYQ zone name packet, reply with empty payload
+              wr = controlLevel;
+              n = 3;
+              break;
+            case 0x3B : // FDYQ control message, copy bytes back and change if 'F' command is given
               wr = controlLevel;
               n = 22;
               for (w = 13; w <= 18; w++) WB[w] = 0x00;
@@ -1592,13 +1602,71 @@ void loop() {
               WB[21] = 0x00;                   //   ? (change flag, & 0x7F ?)
               if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
               break;
-            case 0x3C : // FDYQ180MV1 filter message, reply with 2-byte zero payload
+            case 0x3C : // FDYQ filter message, reply with 2-byte zero payload
               wr = controlLevel;
               n = 5;
               WB[3] = 0x00;
               WB[4] = 0x00;
               if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
               break;
+#endif
+#ifdef FXMQ
+            case 0x32 : // incoming message,  occurs only once, 8 bytes, first byte is 0xC0, others 0x00; reply is one byte value 0x01? polling auxiliary controller?, reply with empty payload
+              d = F030DELAY;
+              wr = controlLevel;
+              n = 4;
+              WB[3]  = 0x01; // W target status
+              break;
+            case 0x35 : // FXMQ outside unit name, reply with empty payload
+              wr = controlLevel;
+              n = 3;
+              break;
+            case 0x36 : // FXMQ indoor unit name, reply with empty payload
+              wr = controlLevel;
+              n = 3;
+              break;
+            case 0x38 : // FXMQ control message, copy a few bytes back, change bytes if 'F' command is given
+              wr = controlLevel;
+              n = 20;
+              for (w = 3; w <= 20; w++) WB[w] = 0x00;
+              WB[3]  = RB[3] & 0x01;           // W target status
+              WB[4]  = RB[5];                  // W target operating mode
+              WB[5]  = RB[7];                  // W target temperature cooling (can be changed by reply with different value)
+              WB[7]  = RB[9];                  // W target fan speed cooling/fan (11 / 31 / 51) (can be changed by reply with different value)
+              WB[9]  = RB[11];                 // W target temperature cooling (can be changed by reply with different value)
+              WB[11] = RB[13];                 // W target fan speed cooling/fan (11 / 31 / 51)
+              WB[12] = RB[14];                 // no flag?
+              WB[16] = RB[18];                 // C0, E0 when payload byte 0 set to 1
+              WB[18] = 0;                      // puzzle: initially 0, then 2, then 1 ????
+              if (wr_cnt && (wr_pt == RB[2])) {
+                if ((wr_nr == 0) && (WB[wr_nr + 3] == 0x00) && (wr_val)) WB[16] |= 0x20; // chnage payload byte 13 from C0 to E0, only if payload byte 0 is set to 1 here
+                WB[wr_nr + 3] = wr_val;
+                wr_cnt--;
+              }
+              break;
+            case 0x39 : // ??, reply with 5-byte all-zero payload
+              wr = controlLevel;
+              n = 8;
+              WB[3] = 0x00;
+              WB[4] = 0x00;
+              WB[5] = 0x00;
+              WB[6] = 0x00;
+              WB[7] = 0x00;
+              // for now, don't support write: if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+              break;
+            case 0x3A : // ??, reply with 8-byte all-zero payload
+              wr = controlLevel;
+              n = 11;
+              WB[3] = 0x00;
+              WB[4] = 0x00;
+              WB[5] = 0x00;
+              WB[6] = 0x00;
+              WB[7] = 0x00;
+              WB[8] = 0x00;
+              WB[9] = 0x00;
+              // for now, don't support write: if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+              break;
+#endif
 #endif /* F_SERIES */
             default   : // not seen, no response
               break;
@@ -1744,11 +1812,11 @@ void loop() {
       WB[16] = (V1_avg >> 16) & 0xFF;
       WB[17] = (V1_avg >> 8) & 0xFF;
       WB[18] = V1_avg & 0xFF;
-      WB[19] = 0x00;
-      WB[20] = 0x00;
+      WB[19] = controlLevel;
+      WB[20] = CONTROL_ID ? controlLevel : 0; // auxiliary control mode fully on; is 1 for control modes 1 and 3
       WB[21] = 0x00;
       WB[22] = 0x00;
-    } else { 
+    } else {
       for (int i = 3; i <= 22; i++) WB[i]  = 0x00;
     }
     if (verbose < 4) writePseudoPacket(WB, 23);

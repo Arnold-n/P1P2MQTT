@@ -68,7 +68,7 @@ There is a large variation in the P1/P2 logical protocol implementation of vario
 
 As we have no access to Daikin's documentation, we do not know which systems are supported. Various users have reported success in basic control functions. In my hybrid system I can control almost all parameters. It is logical to assume that devices supported by commercial auxiliary controllers (Daikin LAN adapter, Zennio KLIC-DA KNX interface, Coolmaster) could be supported by this project.
 
-We have very limited experience with VRV-based systems (systems with multiple indoor ceiling units), of which model numbers start with an "F". These models also use the P1/P2 bus to the controller, with a similar protocol for basic communication, but we don't know how the auxiliary controller communication goes. It should be possible to at least monitor the packets on the bus. If someone figures out how the auxiliary controller protocol works for these systems, it should be possible to set the unit on/off, set operating mode, fan speed level and swing function, and temperature setoint.
+We have very limited experience with VRV-based systems (systems with multiple indoor ceiling units), of which model numbers start with an "F". These models also use the P1/P2 bus to the controller, with a similar protocol for basic communication, but we don't know how the auxiliary controller communication goes. It should be possible to at least monitor the packets on the bus. If someone figures out how the auxiliary controller protocol works for these systems, it should be possible to set the unit on/off, set operating mode, fan speed level and swing function, and temperature setpoint.
 
 **COP calculation, defrost energy losses**
 

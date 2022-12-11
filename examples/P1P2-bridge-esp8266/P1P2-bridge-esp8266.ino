@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20221211 v0.9.29 misc fixes, defrost E-series
  * 20221116 v0.9.28 reset-line behaviour, IPv4 EEPROM init
  * 20221112 v0.9.27 static IP support, fix to get Power_* also in HA
  * 20221109 v0.9.26 clarify WiFiManager screen, fix to accept 80-char user/password also in WiFiManager
@@ -454,7 +455,7 @@ volatile uint16_t MQTT_readBufferH = 0;
 volatile uint16_t MQTT_readBufferT = 0;
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
 static char* rb_buffer = readBuffer;
-static uint8_t serial_rb = 0;
+static uint16_t serial_rb = 0;
 static int c;
 static byte ESP_serial_input_Errors_Data_Short = 0;
 static byte ESP_serial_input_Errors_CRC = 0;
@@ -710,7 +711,7 @@ void handleCommand(char* cmdString) {
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0200 to output mqtt individual parameter data over serial"), (outputMode >> 9) & 0x01);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0400 to output json data over serial"), (outputMode >> 10) & 0x01);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0800 to output raw bin data over P1P2/X/xxx"), (outputMode >> 11) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x1000 to output timing data also over P1P2/R/xxx (prefix: C)"), (outputMode >> 12) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x1000 to output timing data also over P1P2/R/xxx (prefix: C) and via telnet"), (outputMode >> 12) & 0x01);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x2000 to output error data also over P1P2/R/xxx (prefix: *)"), (outputMode >> 13) & 0x01);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x4000 to use P1P2/R/xxx as input (requires MQTT_INPUT_HEXDATA)"), (outputMode >> 14) & 0x01);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)"), (outputMode >> 15) & 0x01);
@@ -875,7 +876,7 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
           MQTT_readBuffer_writeChar('R');
           MQTT_readBuffer_writeChar(' ');
         }
-        for (uint8_t i = 0; i < len; i++) MQTT_readBuffer_writeHex(payload[i]);
+        for (uint16_t i = 0; i < len; i++) MQTT_readBuffer_writeHex(payload[i]);
         if (index + len == total) MQTT_readBuffer_writeChar('\n');
       }
     } else {
@@ -893,7 +894,7 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
         Sprint_P(true, false, false, PSTR("* [MON2] Mqtt packet input buffer overrun, dropped, index %i len %i total %i"), index, len, total);
         MQTT_drop = true;
       } else if (!MQTT_drop) {
-        for (uint8_t i = 0; i < len; i++) MQTT_readBuffer_writeChar(payload[i]);
+        for (uint16_t i = 0; i < len; i++) MQTT_readBuffer_writeChar(payload[i]);
         if (index + len == total) MQTT_readBuffer_writeChar('\n');
       }
     } else {
@@ -1775,7 +1776,10 @@ void loop() {
             }
           } else if ((readBuffer[0] == 'C') || (readBuffer[0] == 'c')) {
             // timing info
-            if (outputMode & 0x1000) client_publish_mqtt(mqttHexdata, readBuffer);
+            if (outputMode & 0x1000) {
+              client_publish_mqtt(mqttHexdata, readBuffer);
+              client_publish_telnet(mqttHexdata, readBuffer);
+            }
           } else if (readBuffer[0] == 'E') {
             // data with errors
             readBuffer[0] = '*'; // backwards output report compatibility
@@ -1793,7 +1797,7 @@ void loop() {
         char lst = *(rb_buffer - 1);
         *(rb_buffer - 1) = '\0';
         if (c != '\n') {
-          Sprint_P(true, true, true, PSTR("* [MON] Line too long, ignored, ignoring remainder: ->%s<-->%c%c<-"), readBuffer, lst, c);
+          Sprint_P(true, true, true, PSTR("* [MON] Line too long, ignored, ignoring remainder: ->%s%c%c<-"), readBuffer, lst, c);
           ignoreremainder = 1;
         } else {
           Sprint_P(true, true, true, PSTR("* [MON] Line too long, terminated, ignored: ->%s<-->%c<-"), readBuffer, lst);

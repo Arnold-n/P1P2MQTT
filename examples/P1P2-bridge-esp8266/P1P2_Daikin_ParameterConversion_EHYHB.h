@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20221211 v0.9.29 defrost, DHW->gasboiler
  * 20221112 v0.9.27 fix to get Power_* also in HA
  * 20221102 v0.9.24 minor DHW/gas changes in reporting
  * 20221029 v0.9.23 ISPAVR over BB SPI, ADC, misc
@@ -426,7 +427,7 @@ uint8_t value_u32_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* p
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%u", FN_u32_LE(&payload[payloadIndex]));
   return 1;
 }
- 
+
 uint8_t value_u32_LE_uptime(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
   uint8_t bitMaskUptime = 0x01;
   if ((payload[payloadIndex - 3] == 0) && (payload[payloadIndex - 2] == 0)) {
@@ -495,7 +496,7 @@ uint8_t value_u8_add2k(byte packetSrc, byte packetType, byte payloadIndex, byte*
 }
 
 int8_t FN_s4abs1c(uint8_t *b)        { int8_t c = b[0] & 0x0F; if (b[0] & 0x10) return -c; else return c; }
- 
+
 uint8_t value_s4abs1c(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
   if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1)) return 0;
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", FN_s4abs1c(&payload[payloadIndex]));
@@ -1612,7 +1613,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   14 : KEY("ErrorSubCode");                                                                                                         VALUE_u8hex; // >>2 for Subcode, and what are 2 lsbits ??
         case   17 : switch (bitNr) {
           case    8 : BITBASIS;
-          case    1 : KEY("Changed_At_Night_QQ");                                                                                                VALUE_flag8;
+          case    1 : KEY("Defrost_Operation");                            HACONFIG;                                                             VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
         case   18 : switch (bitNr) {
@@ -1623,7 +1624,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         }
         case   19 : switch (bitNr) {
           case  8 : BITBASIS;
-          case  1 : KEY("DHW_Active_0");                                   HACONFIG;                                                             VALUE_flag8; // ??
+          case  1 : KEY("Gasboiler_Active_0");                             HACONFIG;                                                             VALUE_flag8; // ??
           case  2 : KEY("DHW_Mode_OnOff");                                 HACONFIG;                                                             VALUE_flag8; // ??
 //          case  1 : KEY("DHWactive1");                                                                                                           VALUE_flag8;
                     default : UNKNOWN_BIT;
