@@ -2401,7 +2401,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       default   : return 0;
     }
 #else
-    case 0x08 .. 0x0F : return 0;
+    case 0x08 ... 0x0F : return 0;
 #endif /* PSEUDO_PACKETS */
     default : UNKNOWN_BYTE // unknown PacketByte
   }
