@@ -599,7 +599,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
 /*
  *  case 0x37 : // FDYQ180MV1 zone names TBD
  */
-   case 0x38 :                                                              // FDY125LV1 operation mode
+   case 0x38 :                                                              // FDY125LV1 operation mode, added bytes 16-19 for FXMQ and FTQ
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    0 : KEY("Power_Off_On");                                   HACONFIG; CAT_SETTING;                                                VALUE_u8;
@@ -617,7 +617,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   12 : KEY("Unknown_00F038_12");                              HACONFIG;                                                             VALUE_u8;
         case   13 : KEY("Unknown_00F038_13");                              HACONFIG;                                                             VALUE_u8;
         case   14 : KEY("Clear_Error_Code");                               HACONFIG; CAT_SETTING;                                                VALUE_u8;
-        case   15 : KEY("Unknown_00F038_14");                              HACONFIG;                                                             VALUE_u8;
+        case   15 : KEY("Unknown_00F038_15");                              HACONFIG;                                                             VALUE_u8;
+        case   16 : KEY("Unknown_00F038_16");                              HACONFIG;                                                             VALUE_u8;
+        case   17 : KEY("Unknown_00F038_17");                              HACONFIG;                                                             VALUE_u8;
+        case   18 : KEY("Unknown_00F038_18");                              HACONFIG;                                                             VALUE_u8;
+        case   19 : KEY("Unknown_00F038_19");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
