@@ -208,7 +208,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
         newByte = (outputFilter <= maxOutputFilter) || (cntByte[pi2] == 0xFF);
         cntByte[pi2] = payload[payloadIndex] & 0x7F;
       }
-      return (haConfig || (outputMode & 0x10000) ) && newByte;
+      return (haConfig || (outputMode & 0x10000) || !saveSeen) && newByte;
     }
     // not type packet type (0B-)10-15, 31, or B8, so indicate new if to be published:
     newByte = true;
@@ -255,9 +255,9 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       client_publish_mqtt(ha_mqttKey, ha_mqttValue);
     }
   }
-  return (haConfig || (outputMode & 0x10000) ) && newByte;
+  return (haConfig || (outputMode & 0x10000) || !saveSeen) && newByte;
 #else /* SAVEPACKETS */
-  return (haConfig || (outputMode & 0x10000) );
+  return (haConfig || (outputMode & 0x10000) || !saveSeen);
 #endif /* SAVEPACKETS */
 }
 
