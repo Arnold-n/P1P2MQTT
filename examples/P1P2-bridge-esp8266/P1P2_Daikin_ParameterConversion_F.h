@@ -182,9 +182,9 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
     }
   }
-  return (haConfig || (outputMode & 0x10000) ) && newByte;
+  return (haConfig || (outputMode & 0x10000) || !saveSeen) && newByte;
 #else /* SAVEPACKETS */
-  return (haConfig || (outputMode & 0x10000) );
+  return (haConfig || (outputMode & 0x10000) || !saveSeen);
 #endif /* SAVEPACKETS */
 }
 
