@@ -1611,6 +1611,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   12 : KEY("ErrorCode1");                                                                                                           VALUE_u8hex; // coding mechanism unknown. 024D2C = HJ-11 08B908 = 89-2 08B90C = 89-3
         case   13 : KEY("ErrorCode2");                                                                                                           VALUE_u8hex;
         case   14 : KEY("ErrorSubCode");                                                                                                         VALUE_u8hex; // >>2 for Subcode, and what are 2 lsbits ??
+        case   15 : KEY("Temperature_Outside");                            HACONFIG; HATEMP;                                                     VALUE_f8_8;
         case   17 : switch (bitNr) {
           case    8 : BITBASIS;
           case    1 : KEY("Defrost_Operation");                            HACONFIG;                                                             VALUE_flag8;
@@ -1645,15 +1646,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    1 : KEY("Temperature_Leaving_Water");                      HACONFIG; HATEMP;
                     LWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(LWT_changed);
         case    2 : return 0;                         // Domestic hot water temperature (on some models)
-        case    3 : KEY("Temperature_DHW_Tank");                            HACONFIG; HATEMP; VALUE_f8_8;                                        VALUE_f8_8;   // DHW tank, unconnected on EHYHBX08AAV3?, then reading -40
-        case    4 : return 0;                         // Outside air temperature (low res)
-        case    5 : KEY("Temperature_HP2Gas_Water");                          HACONFIG; HATEMP;                                                     VALUE_f8_8;
+        case    3 : KEY("Temperature_DHW_Tank");                           HACONFIG; HATEMP; VALUE_f8_8;                                         VALUE_f8_8;   // DHW tank, unconnected on EHYHBX08AAV3?, then reading -40
+        case    4 : return 0;
+        case    5 : KEY("Temperature_HP2Gas_Water");                       HACONFIG; HATEMP;                                                     VALUE_f8_8;
         case    6 : return 0;
         case    7 : // UOM("C");
                     KEY("Temperature_Return_Water");                       HACONFIG; HATEMP;
                     RWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(RWT_changed);
         case    8 : return 0;
-        case    9 : KEY("Temperature_Leaving_Water");                       HACONFIG;HATEMP;  // Leaving water temperature after backup heater
+        case    9 : KEY("Temperature_Leaving_Water");                      HACONFIG;HATEMP;  // Leaving water temperature after backup heater
                     MWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(MWT_changed);
         case   10 : return 0;                         // Refrigerant temperature
         case   11 : KEY("Temperature_Refrigerant_1");                      HACONFIG;  HATEMP;                                                    VALUE_f8_8;
