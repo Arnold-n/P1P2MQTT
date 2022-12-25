@@ -22,7 +22,7 @@
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
  * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
  * ..
- *  
+ *
  */
 
 #ifndef P1P2_Config
@@ -32,7 +32,7 @@
 
 // Define one of these options below
 #define P1P2_ESP_INTERFACE_250   // define this for regular operation of P1P2-ESP-Interface (ESP8266 + ATmega328P using 250kBaud)
-//#define P1P2_ESP_INTERFACE_115 // define this for debugging P1P2-ESP-Interface, using 115.2kBaud for serial output debugging 
+//#define P1P2_ESP_INTERFACE_115 // define this for debugging P1P2-ESP-Interface, using 115.2kBaud for serial output debugging
 //                               // (in this case DO NOT connect to P1/P2), but power with 3V3 via ESP01-connector *or* with 16V DC power supply on P1/P2
 //#define ARDUINO_COMBIBOARD     // define this for Arduino/ESP8266 combi-board, using 250kBaud between ESP8266 and ATmega238P
 //#define ESP01S_MQTT            // define this for P1/P2 data input from P1P2/R MQTT topic, using 115.2kBaud for debugging over USB
@@ -66,7 +66,7 @@
 // note that if W5500 adapter is absent, a BSP with modified w5500 library is required to avoid a WDT reboot when constructor hangs
 // INIT_HW_ID = 0 does not require ethernet or BSP modification
 #if INIT_HW_ID > 0
-#define ETHERNET
+//#define ETHERNET
 #endif
 #endif
 
