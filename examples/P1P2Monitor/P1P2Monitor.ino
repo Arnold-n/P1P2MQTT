@@ -551,11 +551,11 @@ void loop() {
                           break;
                         }
                         if ((wr_nr == 2) || (wr_nr == 6)) && ((wr_val < 0x0A) || (wr_val > 0x1E))) {
-                          Serial.println(F("wr_val for payload byte 2 (target-temp) must be in range 0x10-0x20"));
+                          Serial.println(F("wr_val for payload byte 2/6 (target-temp cooling/heating) must be in range 0x10-0x20"));
                           break;
                         }
                         if ((wr_nr == 4) || (wr_nr == 8)) && ((wr_val < 0x11) || (wr_val > 0x51))) {
-                          Serial.println(F("wr_val for payload byte 4 (fan-speed) must be in range 0x11-0x51"));
+                          Serial.println(F("wr_val for payload byte 4/8 (fan-speed cooling/heating) must be in range 0x11-0x51"));
                           break;
                         }
                         // no limitations for wr_nr == 16
@@ -1634,8 +1634,8 @@ void loop() {
               WB[4]  = RB[5];                  // W target operating mode
               WB[5]  = RB[7];                  // W target temperature cooling (can be changed by reply with different value)
               WB[7]  = RB[9];                  // W target fan speed cooling/fan (11 / 31 / 51) (can be changed by reply with different value)
-              WB[9]  = RB[11];                 // W target temperature cooling (can be changed by reply with different value)
-              WB[11] = RB[13];                 // W target fan speed cooling/fan (11 / 31 / 51)
+              WB[9]  = RB[11];                 // W target temperature heating (can be changed by reply with different value)
+              WB[11] = RB[13];                 // W target fan speed heating/fan (11 / 31 / 51)
               WB[12] = RB[14];                 // no flag?
               WB[16] = RB[18];                 // C0, E0 when payload byte 0 set to 1
               WB[18] = 0;                      // puzzle: initially 0, then 2, then 1 ????
