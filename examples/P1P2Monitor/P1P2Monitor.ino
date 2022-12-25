@@ -37,6 +37,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20221224 v0.9.30 expand F series write possibilities
  * 20221211 v0.9.29 add control_ID in bool in pseudopacket, fix 3+4-byte writes, FXMQ support
  * 20221129 v0.9.28 option to insert message in 40F030 time slot for restart or user-defined write message
  * 20221102 v0.9.24 suppress repeated "too long" warnings
@@ -549,12 +550,12 @@ void loop() {
                           Serial.println(F("wr_val for payload byte 1 (operating-mode) must be in range 0x60-0x67"));
                           break;
                         }
-                        if ((wr_nr == 2) && ((wr_val < 0x0A) || (wr_val > 0x1E))) {
-                          Serial.println(F("wr_val for payload byte 2 (target-cooling-temp) must be in range 0x10-0x20"));
+                        if ((wr_nr == 2) || (wr_nr == 6)) && ((wr_val < 0x0A) || (wr_val > 0x1E))) {
+                          Serial.println(F("wr_val for payload byte 2 (target-temp) must be in range 0x10-0x20"));
                           break;
                         }
-                        if ((wr_nr == 4) && ((wr_val & 0xBF) != 0x11)) {
-                          Serial.println(F("wr_val for payload byte 4 (fan-speed) must be 0x11 or 0x51")); // perhaps also 0x31 for medium fan speed allowed ?
+                        if ((wr_nr == 4) || (wr_nr == 8)) && ((wr_val < 0x11) || (wr_val > 0x51))) {
+                          Serial.println(F("wr_val for payload byte 4 (fan-speed) must be in range 0x11-0x51"));
                           break;
                         }
                         // no limitations for wr_nr == 16
