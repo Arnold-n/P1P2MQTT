@@ -1183,7 +1183,7 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
       case 0x00 :
       case 0x40 :
                   switch (paramNr) {
-        case 0x0000 : PARAM_KEY("Target_Temperature_Room");                                         CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 0x0000 = 0x10-0x_0-(7/8)
+        case 0x0000 : PARAM_KEY("Target_Temperature_DHW");                                         CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 0x0000 = 0x10-0x_0-(7/8)
         case 0x0001 : PARAM_KEY("Temperature_Unknown_Q1");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  15.0? (min/max heating?)
         case 0x0002 : PARAM_KEY("Temperature_Room_1");                                              CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // Temproom1 (reported by main controller)
         case 0x0003 : PARAM_KEY("Target_Temperature_DHW_1");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0
@@ -1599,10 +1599,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           default   : UNKNOWN_BIT;
         }
         case    4 : return 0;
-        case    5 : KEY("Target_Temperature_Room");                          HACONFIG; HATEMP;                                                     VALUE_f8s8; // 8 or 16 bit?
+        case    5 : KEY("Target_Temperature_Leaving_Water");                 HACONFIG; HATEMP;                                                   VALUE_f8s8; // 8 or 16 bit?
         case    6 : BITBASIS_UNKNOWN;
         case    8 : return 0;
-        case    9 : KEY("DHW_Setpoint_Response");                                                                                              VALUE_f8s8;
+        case    9 : KEY("DHW_Setpoint_Response");                                                                                                VALUE_f8s8;
         case   11 : switch (bitNr) {
           case    8 : BITBASIS;
           case    2 : KEY("Quiet_Mode");                                                                                                         VALUE_flag8;
