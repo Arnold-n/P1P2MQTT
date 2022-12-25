@@ -1611,7 +1611,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   12 : KEY("ErrorCode1");                                                                                                           VALUE_u8hex; // coding mechanism unknown. 024D2C = HJ-11 08B908 = 89-2 08B90C = 89-3
         case   13 : KEY("ErrorCode2");                                                                                                           VALUE_u8hex;
         case   14 : KEY("ErrorSubCode");                                                                                                         VALUE_u8hex; // >>2 for Subcode, and what are 2 lsbits ??
-        case   15 : KEY("Temperature_Outside");                            HACONFIG; HATEMP;                                                     VALUE_f8_8;
+        case   15 : KEY("Temperature_Outside");                            CAT_TEMP; HACONFIG; HATEMP;                                           VALUE_f8_8;
         case   17 : switch (bitNr) {
           case    8 : BITBASIS;
           case    1 : KEY("Defrost_Operation");                            HACONFIG;                                                             VALUE_flag8;
