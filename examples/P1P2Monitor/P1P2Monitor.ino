@@ -550,11 +550,11 @@ void loop() {
                           Serial.println(F("wr_val for payload byte 1 (operating-mode) must be in range 0x60-0x67"));
                           break;
                         }
-                        if ((wr_nr == 2) || (wr_nr == 6)) && ((wr_val < 0x0A) || (wr_val > 0x1E))) {
+                        if (((wr_nr == 2) || (wr_nr == 6)) && ((wr_val < 0x0A) || (wr_val > 0x1E))) {
                           Serial.println(F("wr_val for payload byte 2/6 (target-temp cooling/heating) must be in range 0x10-0x20"));
                           break;
                         }
-                        if ((wr_nr == 4) || (wr_nr == 8)) && ((wr_val < 0x11) || (wr_val > 0x51))) {
+                        if (((wr_nr == 4) || (wr_nr == 8)) && ((wr_val < 0x11) || (wr_val > 0x51))) {
                           Serial.println(F("wr_val for payload byte 4/8 (fan-speed cooling/heating) must be in range 0x11-0x51"));
                           break;
                         }
