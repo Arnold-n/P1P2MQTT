@@ -478,8 +478,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    9 : KEY("Unknown_000010_9");                               HACONFIG;                                                             VALUE_u8;
         case   10 : KEY("Unknown_000010_10");                              HACONFIG;                                                             VALUE_u8;
         case   11 : KEY("Unknown_000010_11");                              HACONFIG;                                                             VALUE_u8;
-        case   12 : KEY("Unknown_000010_12");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
-        case   13 : KEY("System_status");                                  HACONFIG;                                                             VALUE_u8;
+        case   12 : KEY("Unknown_000010_12");                              HACONFIG;                                                             VALUE_u8;
+        case   13 : KEY("System_status");                                  HACONFIG; CAT_SETTING;                                                VALUE_u8;
         case   14 : KEY("Unknown_000010_14");                              HACONFIG;                                                             VALUE_u8;
         case   15 : KEY("Unknown_000010_15");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
