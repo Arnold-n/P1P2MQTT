@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20221228 v0.9.30 switch from modified ESP_telnet library to ESP_telnet v2.0.0
  * 20221211 v0.9.29 misc fixes, defrost E-series
  * 20221116 v0.9.28 reset-line behaviour, IPv4 EEPROM init
  * 20221112 v0.9.27 static IP support, fix to get Power_* also in HA
@@ -1082,7 +1083,7 @@ void setup() {
 #ifdef ETHERNET
   Serial.println(F("* [ESP] Trying initEthernet"));
   if (ethernetConnected = initEthernet()) {
-    telnetSuccess = telnet.begin(telnet_port, true);
+    telnetSuccess = telnet.begin(telnet_port, false); // change in v0.9.30 to official unmodified ESP_telnet v2.0.0
     local_ip = eth.localIP();
     Serial.print(F("* [ESP] Connected to ethernet, IP address: "));
     Serial.println(local_ip);
