@@ -1,6 +1,6 @@
 # EHYHB(H/X)-AV3 and EHV(H/X)-C(A/B) protocol data format
 
-Protocol data format for Daikin Altherma hybrid heat pump for the EHYHBX08AAV3 (perhaps all EHYHB(H/X)-AV3 models) and (at least partially for the) Daikin Altherma LT heat pump EHV(H/X)-CA/CB. A lot of data is also valid for EHB\* models.
+Protocol data format for Daikin Altherma hybrid heat pump for the EHYHBX08AAV3 (perhaps all EHYHB(H/X)-AV3 models), EJHA04AAV3 (perhaps all EJHA-AV3 models) and (at least partially for the) Daikin Altherma LT heat pump EHV(H/X)-CA/CB. A lot of data is also valid for EHB\* models.
 
 If you have any information, please contribute to one of the data format files or create a new one so we can support more models.
 
@@ -238,7 +238,7 @@ Header: 400013
 |   3:5-0    | 0                  | ?                                  | bit
 |   3:7-6    | 00/01/10/11        | modus ABS / WD / ABS+prog / WD+dev | bit2
 |   4-7      | 00                 | ?
-|    8-9     | 0000-010E          | flow (in 0.1 l/min)         | u16div10
+|    8-9     | 0000-010E          | flow (in 0.1 l/min) (EHV/EHYHB only. Zero on EJHA) | u16div10
 |    10-11   | xxxx               | software version inner unit | u16
 |    12-13   | xxxx               | software version outer unit | u16
 |EHV only: 14| 00                 | ?                           | u8
@@ -321,7 +321,7 @@ These parameters are likely s16div10.
 
 ## Packet type 16 - temperatures
 
-Only observed on EHV\* heat pumps.
+Only observed on EHV\* and EJHA\* heat pumps.
 
 ### Packet type 16: request
 
@@ -558,6 +558,7 @@ A few hundred 16-bit parameters can be exchanged via packet type 36 and 3A.
 ### Parameters for packet type 36
 
 The parameter range in this system is 0x0000-0x002C, can be different on other models.
+On EJHA\* "Flow" and "software version fields" are not supported.
 
 | Param nr | Description                              | HA? | MQTT/HA name                  | Data type
 |:---------|:-----------------------------------------|:----|:------------------------------|:-
@@ -643,6 +644,7 @@ The parameter range in this system is 0x0000-0x001E for packet type 38, 0x0000-0
 ### Parameters for packet type 38 - (counters, #hours, #starts)
 
 The parameter range in this system is 0x0000-0x001E, it can be different on other models.
+On EJHA\* "Energy produced" always reads as zero.
 
 These parameters resemble the counters in packet type B8 but there are some differences and the order is different.
 
@@ -1046,6 +1048,8 @@ Header: 4000B8
 |   4-6         | XX XX XX                      | for cooling                          | u24
 |   7-9         | XX XX XX                      | for DHW                              | u24
 | 10-12         | XX XX XX                      | total                                | u24
+
+On EJHA\* all counters for type 01 are always zero.
 
 #### Data type 02
 
