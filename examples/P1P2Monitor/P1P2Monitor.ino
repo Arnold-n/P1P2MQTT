@@ -34,9 +34,10 @@
  *              Support for parameter setting in P1P2Monitor is rather simple. There is no buffering, so enough time (a few seconds)
  *              is needed in between commands.
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
+ * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20230108 v0.9.31 fix nr_param check
  * 20221224 v0.9.30 expand F series write possibilities
  * 20221211 v0.9.29 add control_ID in bool in pseudopacket, fix 3+4-byte writes, FXMQ support
  * 20221129 v0.9.28 option to insert message in 40F030 time slot for restart or user-defined write message
@@ -333,8 +334,8 @@ void writePseudoPacket(byte* WB, byte rh)
 #define PARAM_TP_START      0x35
 #define PARAM_TP_END        0x3D
 #define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1)
-const uint32_t PROGMEM nr_params[PARAM_ARR_SZ] = { 0x014A, 0x002D, 0x0001, 0x001F, 0x00F0, 0x006C, 0x00AF, 0x0002, 0x0020 }; // number of parameters observed
-//byte packettype                              = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
+const uint32_t nr_params[PARAM_ARR_SZ] = { 0x014A, 0x002D, 0x0001, 0x001F, 0x00F0, 0x006C, 0x00AF, 0x0002, 0x0020 }; // number of parameters observed
+//byte packettype                      = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
 
 void(* resetFunc) (void) = 0; // declare reset function at address 0
 
