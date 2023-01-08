@@ -4,7 +4,7 @@
   - free for personal use,
   - further distribution is allowed only in unmodified form ("ND") and only for non-commercial use ("NC") and any distribution requires attribution ("BY"),
   - commercial redistribution is not allowed ("NC") at all without explicit prior written approval from the project owner,
-  - with exception 1: you may distribute any modifications but only under the same license in the form of a direct or indirect fork on github of this project, thus ensuring everyone easy access to your modifications under the same license conditions, and
+  - with exception 1: you may distribute any modifications but only under the same license in the form of a direct or indirect public fork on github of this project, thus ensuring everyone easy access to your modifications, under the same license conditions, and
   - with exception 2: the "NC" and "ND" limitations no longer apply if the project is no longer maintained for at least 3 years, the project will then be deemed available under the Creative Commons ShareAlike 4.0 International [(CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).
 
 Contributions to this project are very welcome: feedback, P1/P2 bus logs, documentation, reverse engineering notes, or code. Code contributions are to be done under the project license, which is the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International license [(CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/) with additional exceptions as indicated above.
