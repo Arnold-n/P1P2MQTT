@@ -1,11 +1,11 @@
 /* P1P2_Config.h
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
+ * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
- * 20230108 v0.9.31 fix bit history for 0x30/0x31; added pseudo controlLevel
+ * 20230108 v0.9.31 sensor prefix, +2 valves in HA, fix bit history for 0x30/0x31, +pseudo controlLevel
  * 20221228 v0.9.30 switch from modified ESP_telnet library to ESP_telnet v2.0.0
  * 20221211 v0.9.29 misc fixes, defrost E-series
  * 20221116 v0.9.28 reset-line behaviour, IPv4 EEPROM init
@@ -131,15 +131,20 @@
 
 #define PSEUDO_PACKETS // define to have P1P2-bridge-esp8266 output additional P1P2-like packets with internal state information
 
-// home assistent discovery
-#define HA_PREFIX "homeassistant/sensor"      // homeassistant MQTT discovery prefix
-#define HA_DEVICE_NAME "P1P2"                 // becomes device name in HA
-#define HA_DEVICE_ID "P1P2ID12"               // uniq device_id. Currently all sensors in one device_ID
-#define HA_DEVICE_MODEL "P1P2_ESP_Interface"  // shows up as Device Info in HA
+// home assistant (including MQTT discovery)
+#define HA_PREFIX "homeassistant/sensor"   // homeassistant MQTT discovery prefix
+char haDeviceName[9] = "P1P2-xxx";         // becomes device name in HA
+#define HA_DEVICE_NAME_PREFIX 5
+char haDeviceID[10] = "P1P2IDxxx";         // uniq device_id. Currently all sensors in one device_ID
+#define HA_DEVICE_ID_PREFIX 6
+#define HA_DEVICE_MODEL "P1P2MQTT_bridge"  // shows up as Device Info in HA
 #define HA_MF "NPC"
 #define HA_KEY_LEN 100
 #define HA_VALUE_LEN 600
-#define HA_POSTFIX "_12"
+char haPostfix[5] = "_xxx";
+#define HA_POSTFIX_PREFIX 1
+#define HA_SENSOR_PREFIX "P1P2_"
+#define INIT_USE_SENSOR_PREFIX_HA 0
 
 // MQTT topics
 #define MQTT_KEY_PREFIXIP   7
@@ -230,8 +235,7 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #define REBOOT_REASON_WIFIMAN 0x01          // wifiManager time-out
 #define REBOOT_REASON_MQTT 0x02             // MQTT reconnect time-out
 #define REBOOT_REASON_OTA 0x03              // OTA restart
-#define REBOOT_REASON_HWID 0x04             // hwID change restart
-#define REBOOT_REASON_NOWIFI 0x05           // noWiFi change restart
+#define REBOOT_REASON_BCMD 0x04             // hwID/noWiFi/useSensorPrefixHA change restart
 #define REBOOT_REASON_ETH 0x06              // ethernet failure restart (only if noWiFi)
 #define REBOOT_REASON_STATICIP 0x06         // staticIP setting restart
 #define REBOOT_REASON_D0 0xD0               // manual restart

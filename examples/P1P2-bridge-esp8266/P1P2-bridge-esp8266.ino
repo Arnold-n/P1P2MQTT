@@ -17,7 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
- * 20230108 v0.9.31 fix bit history for 0x30/0x31; added pseudo controlLevel
+ * 20230108 v0.9.31 sensor prefix, +2 valves in HA, fix bit history for 0x30/0x31, +pseudo controlLevel
  * 20221228 v0.9.30 switch from modified ESP_telnet library to ESP_telnet v2.0.0
  * 20221211 v0.9.29 misc fixes, defrost E-series
  * 20221116 v0.9.28 reset-line behaviour, IPv4 EEPROM init
@@ -80,7 +80,7 @@ typedef struct EEPROMSettingsOld {
   int  mqttPort;
 };
 
-#define NR_RESERVED 47
+#define NR_RESERVED 46
 
 typedef struct EEPROMSettingsNew {
   // EEPROM values for EEPROM_SIGNATURE_OLD2
@@ -102,6 +102,7 @@ typedef struct EEPROMSettingsNew {
   char static_ip[16];
   char static_gw[16];
   char static_nm[16];
+  byte useSensorPrefixHA;
   byte reserved[NR_RESERVED];
 };
 
@@ -115,6 +116,7 @@ EEPROMSettingsUnion EEPROM_state;
 bool ethernetConnected  = false;
 static uint32_t noWiFi = INIT_NOWIFI;
 static uint32_t useStaticIP = INIT_USE_STATIC_IP;
+static uint32_t useSensorPrefixHA = INIT_USE_SENSOR_PREFIX_HA;
 
 #ifdef ETHERNET
 // Connections W5500: Arduino Mega pins 50 (MISO), 51 (MOSI), 52 (SCK), and 10 (SS) (https://www.arduino.cc/en/Reference/Ethernet)
@@ -352,6 +354,23 @@ uint32_t Sprint_buffer_overflow = 0;
   if (pubTelnet) client_publish_telnet(mqttSignal, sprint_value);\
 };
 
+#define HA_KEY snprintf_P(ha_mqttKey, HA_KEY_LEN, PSTR("%s/%s/%s%c%c_%s/config"), HA_PREFIX, haDeviceID, useSensorPrefixHA ? HA_SENSOR_PREFIX : "", mqtt_key[-4], mqtt_key[-2], mqtt_key);
+#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",%s\"uniq_id\":\"%c%c_%s%s\",%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
+  /* name */         mqtt_key[-4], mqtt_key[-2], mqtt_key, \
+  /* stat_t */       mqtt_key - MQTT_KEY_PREFIXLEN,\
+  /* state_class */  ((stateclass == 2) ? "\"state_class\":\"total_increasing\"," : ((stateclass == 1) ? "\"state_class\":\"measurement\"," : "")),\
+  /* uniq_id */      mqtt_key[-4], mqtt_key[-2], mqtt_key, haPostfix, \
+  /* dev_cla */      ((stateclass == 2) ? "\"dev_cla\":\"energy\"," : ""),\
+  /* unit_of_meas */ ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"°C\"," : ""))))))))),\
+  /* ic */ ((uom == 9) ? "\"ic\":\"mdi:counter\"," : ((uom == 8) ? "\"ic\":\"mdi:memory\"," : ((uom == 7) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 6) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 5) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 4) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 3) ? "\"ic\":\"mdi:water-boiler\"," : ((uom == 2) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 1) ? "\"ic\":\"mdi:coolant-temperature\"," : ""))))))))),\
+  /* device */       \
+    /* name */         haDeviceName,\
+    /* ids */\
+      /* id */         haDeviceID,\
+    /* mf */           HA_MF,\
+    /* mdl */          HA_DEVICE_MODEL,\
+    /* sw */           HA_SW);
+
 // Include Daikin product-dependent header file for parameter conversion
 // include here such that Sprint_P(PSTR()) is available in header file code
 
@@ -504,14 +523,33 @@ void handleCommand(char* cmdString) {
               ATmega_uptime_prev = 0;
               break;
     case 'b': // display or set MQTT settings
-    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s %i %i", &EEPROM_state.EEPROMnew.mqttServer, &EEPROM_state.EEPROMnew.mqttPort, &EEPROM_state.EEPROMnew.mqttUser, &EEPROM_state.EEPROMnew.mqttPassword, &mqttInputByte4, &hwID, &noWiFi)) > 0) {
+    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s %i %i %i %i", &EEPROM_state.EEPROMnew.mqttServer, &EEPROM_state.EEPROMnew.mqttPort, &EEPROM_state.EEPROMnew.mqttUser, &EEPROM_state.EEPROMnew.mqttPassword, &mqttInputByte4, &hwID, &noWiFi, &useSensorPrefixHA)) > 0) {
                 Sprint_P(true, true, true, PSTR("* [ESP] Writing new MQTT settings to EEPROM"));
                 if (n > 4) EEPROM_state.EEPROMnew.mqttInputByte4 = mqttInputByte4;
-                if (n > 5) EEPROM_state.EEPROMnew.hwID = hwID;
-                if (n > 6) EEPROM_state.EEPROMnew.noWiFi = noWiFi;
-                EEPROM.put(0, EEPROM_state);
-                EEPROM.commit();
+                if ((n > 5) && (hwID != EEPROM_state.EEPROMnew.hwID)) {
+                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to change hwID"));
+#ifdef REBOOT_REASON
+                  EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
+#endif /* REBOOT_REASON */
+                  EEPROM_state.EEPROMnew.hwID = hwID;
+                }
+                if ((n > 6) && (EEPROM_state.EEPROMnew.noWiFi != noWiFi)) {
+                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to change noWiFi"));
+#ifdef REBOOT_REASON
+                  EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
+#endif /* REBOOT_REASON */
+                  EEPROM_state.EEPROMnew.noWiFi = noWiFi;
+                }
+                if ((n > 7)  && (useSensorPrefixHA != EEPROM_state.EEPROMnew.useSensorPrefixHA)) {
+                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to rediscover new sensor names"));
+#ifdef REBOOT_REASON
+                  EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
+#endif /* REBOOT_REASON */
+                  EEPROM_state.EEPROMnew.useSensorPrefixHA = useSensorPrefixHA;
+                }
               }
+              EEPROM.put(0, EEPROM_state);
+              EEPROM.commit();
               if (n > 0) {
                 Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server set to %s"), EEPROM_state.EEPROMnew.mqttServer);
               } else {
@@ -537,36 +575,25 @@ void handleCommand(char* cmdString) {
               } else {
                 Sprint_P(true, true, true, PSTR("* [ESP] mqttInputByte4 is %i"), EEPROM_state.EEPROMnew.mqttInputByte4);
               }
-
               if (n > 5) {
                 Sprint_P(true, true, true, PSTR("* [ESP] hwID set to %i"), EEPROM_state.EEPROMnew.hwID);
-                Sprint_P(true, true, true, PSTR("* [ESP] Reboot required"));
-#ifdef REBOOT_REASON
-                EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_HWID;
-                EEPROM.put(0, EEPROM_state);
-                EEPROM.commit();
-#endif /* REBOOT_REASON */
-                delay(500);
-                ESP.restart();
-                delay(100);
               } else {
                 Sprint_P(true, true, true, PSTR("* [ESP] hwID %i"), EEPROM_state.EEPROMnew.hwID);
               }
               if (n > 6) {
                 Sprint_P(true, true, true, PSTR("* [ESP] noWiFi set to %i"), EEPROM_state.EEPROMnew.noWiFi);
-                if (noWiFi && (WiFi.status() == WL_CONNECTED)) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to switch off WiFi"));
-#ifdef REBOOT_REASON
-                  EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_NOWIFI;
-                  EEPROM.put(0, EEPROM_state);
-                  EEPROM.commit();
-#endif /* REBOOT_REASON */
-                  delay(500);
-                  ESP.restart();
-                  delay(100);
-                }
               } else {
                 Sprint_P(true, true, true, PSTR("* [ESP] noWiFi is %i"), EEPROM_state.EEPROMnew.noWiFi);
+              }
+              if (n > 7) {
+                Sprint_P(true, true, true, PSTR("* [ESP] useSensorPrefixHA set to %i"), EEPROM_state.EEPROMnew.useSensorPrefixHA);
+              } else {
+                Sprint_P(true, true, true, PSTR("* [ESP] useSensorPrefixHA is %i"), EEPROM_state.EEPROMnew.useSensorPrefixHA);
+              }
+              if (n > 5) {
+                delay(500);
+                ESP.restart();
+                delay(100);
               }
               Sprint_P(true, true, true, PSTR("* [ESP] Local IP address: %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
               // TODO enable in future WiFiManager version: if (WiFi.isConnected()) Sprint_P(true, true, true, PSTR("* [ESP] Connected to WiFi SSID %s"), wifiManager.getWiFiSSID());
@@ -1239,6 +1266,15 @@ void setup() {
   mqttSignal[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
   mqttSignal[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
   mqttSignal[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
+  haDeviceName[HA_DEVICE_NAME_PREFIX] = (local_ip[3] / 100) + '0';
+  haDeviceName[HA_DEVICE_NAME_PREFIX + 1] = (local_ip[3] % 100) / 10 + '0';
+  haDeviceName[HA_DEVICE_NAME_PREFIX + 2] = (local_ip[3] % 10) + '0';
+  haDeviceID[HA_DEVICE_ID_PREFIX] = (local_ip[3] / 100) + '0';
+  haDeviceID[HA_DEVICE_ID_PREFIX + 1] = (local_ip[3] % 100) / 10 + '0';
+  haDeviceID[HA_DEVICE_ID_PREFIX + 2] = (local_ip[3] % 10) + '0';
+  haPostfix[HA_POSTFIX_PREFIX] = (local_ip[3] / 100) + '0';
+  haPostfix[HA_POSTFIX_PREFIX + 1] = (local_ip[3] % 100) / 10 + '0';
+  haPostfix[HA_POSTFIX_PREFIX + 2] = (local_ip[3] % 10) + '0';
 
   Sprint_P(true, false, false, PSTR("* [ESP] ESP reboot reason 0x%2X"), saveRebootReason);
 
