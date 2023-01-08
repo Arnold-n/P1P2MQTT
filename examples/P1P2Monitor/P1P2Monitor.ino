@@ -1630,16 +1630,23 @@ void loop() {
             case 0x38 : // FXMQ control message, copy a few bytes back, change bytes if 'F' command is given
               wr = controlLevel;
               n = 20;
-              for (w = 3; w <= 20; w++) WB[w] = 0x00;
               WB[3]  = RB[3] & 0x01;           // W target status
               WB[4]  = RB[5];                  // W target operating mode
               WB[5]  = RB[7];                  // W target temperature cooling (can be changed by reply with different value)
+              WB[6]  = 0x00;
               WB[7]  = RB[9];                  // W target fan speed cooling/fan (11 / 31 / 51) (can be changed by reply with different value)
+              WB[8]  = 0x00;
               WB[9]  = RB[11];                 // W target temperature heating (can be changed by reply with different value)
+              WB[10] = 0x00;
               WB[11] = RB[13];                 // W target fan speed heating/fan (11 / 31 / 51)
               WB[12] = RB[14];                 // no flag?
+              WB[13] = 0x00;
+              WB[14] = 0x00;
+              WB[15] = 0x00;
               WB[16] = RB[18];                 // C0, E0 when payload byte 0 set to 1
+              WB[17] = 0x00;
               WB[18] = 0;                      // puzzle: initially 0, then 2, then 1 ????
+              WB[19] = 0x00;
               if (wr_cnt && (wr_pt == RB[2])) {
                 if ((wr_nr == 0) && (WB[wr_nr + 3] == 0x00) && (wr_val)) WB[16] |= 0x20; // chnage payload byte 13 from C0 to E0, only if payload byte 0 is set to 1 here
                 WB[wr_nr + 3] = wr_val;
