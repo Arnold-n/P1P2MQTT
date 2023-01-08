@@ -1111,7 +1111,7 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0030 : PARAM_KEY("Room_Temperature_Control_OnOff_1");                                                                             PARAM_VALUE_u8;
         case 0x0031 : PARAM_KEY("Room_Temperature_Control_OnOff_2");                                                                             PARAM_VALUE_u8;
         case 0x003A : PARAM_KEY("Heating_Cooling");                                                                                              PARAM_VALUE_u8;
-        case 0x0037 : PARAM_KEY("DHW_Heating_Gas_Status_related");                                                                               PARAM_VALUE_u8; // 0x00 0x01 0x04 0x05 ?? status depends on DHW on/off, heating on/off, and tapwater-flow yes/no ?
+        case 0x0037 : PARAM_KEY("IU_Operation_Mode");                                                                                            PARAM_VALUE_u8; // 0x00 0x01 0x04 0x05 ?? status depends on DHW on/off, heating on/off, and tapwater-flow yes/no ? / seems to match combined info from S1_Valve_Zone_Main and S1_Valve_DHW_Tank
         case 0x003F : PARAM_KEY("DHW_OnOff_2");                                                                                                  PARAM_VALUE_u8; // DHW on/off setting
         case 0x0040 : PARAM_KEY("DHW_OnOff_3");                                                                                                  PARAM_VALUE_u8; // DHW on/off setting
         case 0x0041 : PARAM_KEY("DHW_OnOff_4");                                                                                                  PARAM_VALUE_u8; // always 0 on tank-less model?
@@ -1587,9 +1587,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case    8 : BITBASIS;
           case    0 : KEY("Valve_Heating");                                                                                                      VALUE_flag8;
           case    1 : KEY("Valve_Cooling");                                                                                                      VALUE_flag8;
-          case    5 : KEY("Valve_Zone_Main");                                                                                                    VALUE_flag8;
+          case    5 : KEY("Valve_Zone_Main");                             HACONFIG;                                                              VALUE_flag8;
           case    6 : KEY("Valve_Zone_Add");                                                                                                     VALUE_flag8;
-          case    7 : KEY("Valve_DHW_Tank");                                                                                                     VALUE_flag8;
+          case    7 : KEY("Valve_DHW_Tank");                              HACONFIG;                                                              VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
         case    3 : switch (bitNr) {
