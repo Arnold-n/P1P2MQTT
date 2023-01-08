@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230108 v0.9.31 fix bit history for 0x30/0x31; added pseudo controlLevel
  * 20221211 v0.9.29 defrost, DHW->gasboiler
  * 20221112 v0.9.27 fix to get Power_* also in HA
  * 20221102 v0.9.24 minor DHW/gas changes in reporting
@@ -267,7 +268,8 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
   bool newBit = (outputFilter == 0);
   byte pts = (packetSrc >> 6);
   byte pti = packetType - PCKTP_START;
-  if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x31 also covered
+  if (packetType == 0x30) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x31 also covered
+  if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 2; // hack to get 0x31 also covered
   if (payloadIndex == EMPTY_PAYLOAD) {
     newBit = 0;
   } else if (bitNr > 7) {
@@ -275,7 +277,7 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
     newBit = 1;
   } else if (packetType < PCKTP_START) {
     newBit = 1;
-  } else if ((packetType > PCKTP_END) && (packetType != 0x31)) {
+  } else if ((packetType > PCKTP_END) && (packetType != 0x30) && (packetType != 0x31)) {
     newBit = 1;
   } else if (payloadIndex > nr_bytes[pts][pti]) {
     // Warning: payloadIndex > expected
@@ -2311,7 +2313,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                 switch (packetSrc) {
 //#define ADC_AVG_SHIFT 4     // P1P2Serial sums 16 = 2^ADC_AVG_SHIFT samples before doing min/max check
 //#define ADC_CNT_SHIFT 4     // P1P2Serial sums 16384 = 2^(16-ADC_CNT_SHIFT) samples to V0avg/V1avg
-      case 0x00 : switch (payloadIndex) {
+      case 0x00 : maxOutputFilter = 1;
+                  switch (payloadIndex) {
+        case   16 : KEY("ATmega_controlLevel");                                                          maxOutputFilter = 9;                    VALUE_u8;
+        case   17 : KEY("ATmega_controlLevel_bin");                                                      maxOutputFilter = 9;                    VALUE_u8;
         case    1 : if (hwID) { KEY("V_bus_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 180k/10k resistor divider, 1.1V range
         case    3 : if (hwID) { KEY("V_bus_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
         case    7 : if (hwID) { KEY("V_bus_ATmega_ADC_avg"); VALUE_F_L(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4); };

@@ -82,7 +82,7 @@ int TimeStringCnt = 0;  // reset when TimeString is changed, for use in P1P2Time
 byte maxOutputFilter = 0;
 
 #ifdef SAVEPACKETS
-#define PCKTP_START  0x08 // 0x08-0x11, 0x18 mapped to 0x12, 0x20 mapped to 0x13, 0x30 mapped to 0x14, 0x30-3F mapped to 0x15-0x24, 0x80 mapped to 0x25 // 0x37 zone name/0xC1 service mode subtype would require special coding, leave it out for now
+#define PCKTP_START  0x08 // 0x08-0x11, 0x18 mapped to 0x12, 0x20 mapped to 0x13, 0x30-3F mapped to 0x14-0x23, 0x80 mapped to 0x24 // 0x37 zone name/0xC1 service mode subtype would require special coding, leave it out for now
 #define PCKTP_ARR_SZ 29
 //byte packetsrc                                      = { {00                                                                                               }, {40                                                                                               }}
 //byte packettype                                     = { {08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80 }, { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F, 80 }}
@@ -765,7 +765,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                 switch (packetSrc) {
 //#define ADC_AVG_SHIFT 4     // P1P2Serial sums 16 = 2^ADC_AVG_SHIFT samples before doing min/max check
 //#define ADC_CNT_SHIFT 4     // P1P2Serial sums 16384 = 2^(16-ADC_CNT_SHIFT) samples to V0avg/V1avg
-      case 0x00 : switch (payloadIndex) {
+      case 0x00 : maxOutputFilter = 1;
+                  switch (payloadIndex) {
+        case   16 : KEY("ATmega_controlLevel");                                                          maxOutputFilter = 9;                    VALUE_u8;
+        case   17 : KEY("ATmega_controlLevel_bin");                                                      maxOutputFilter = 9;                    VALUE_u8;
         case    1 : if (hwID) { KEY("V_bus_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 180k/10k resistor divider, 1.1V range
         case    3 : if (hwID) { KEY("V_bus_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
         case    7 : if (hwID) { KEY("V_bus_ATmega_ADC_avg"); VALUE_F_L(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4); };
