@@ -1,8 +1,11 @@
 /* P1P2Serial: Library for reading/writing Daikin/Rotex P1P2 protocol
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
+ * Version for Mitsubishi Heavy Industries (MHI) with increased TX_BUFFER_SIZE/RX_BUFFER_SIZE and data-conversion
+ *
+ * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20230114 v0.9.31 MHI
  * 20221028 v0.9.23 ADC code
  * 20220918 v0.9.22 scopemode also for writes, focused on actual errors, fake error generation for test purposes, removing OLDP1P2LIB
  * 20220830 v0.9.18 version alignment with example programs
@@ -76,15 +79,15 @@
                                     // Daikin devices do not add a pause between bytes, but some other controllers do, like the KLIC-DA from Zennios.
                                     // To avoid end-of-packet detection due to such an inter-byte pause, a pause between bytes of at most
                                     // ALLOW_PAUSE_BETWEEN_BYTES bit lengths is accepted; ALLOW_PAUSE_BETWEEN_BYTES should be less than
-                                    //  (65536 / Rticks_per_bit) - 2; for 16MHz at most ~37 (not sure if this value is still correct)
-                                    // For KLICDA devices a value of 9 bit lengths seems to work.
+                                    //   (65536 / Rticks_per_bit) - 2; for 8MHz at most ~76
+                                    //   value can be changed with X command
 #define S_TIMER                     // support for uptime_sec() in new library, but monopolizes TIMER0, so millis() cannot be used.
                                     // if undefined, TIMER0 is not used, and millis() can be used
                                     // if S_TIMER is undefined, the write budget (and error budget) will not increase over time TODO fix this
 // End of configuration options
 
-#define TX_BUFFER_SIZE 25  // write buffer size (1 more than max size needed)
-#define RX_BUFFER_SIZE 25  // read buffer (1 more than max size needed), should be <=254
+#define TX_BUFFER_SIZE 65  // write buffer size (1 more than max size needed)
+#define RX_BUFFER_SIZE 65  // read buffer (1 more than max size needed), should be <=254
 #define NO_HEAD2 0xFF
 
 
@@ -105,11 +108,11 @@
 
 // read + read-back-verify errors
 #define ERROR_OR                  0x08 // read buffer overrun
-#define ERROR_CRC                 0x10 // CRC error
+#define ERROR_CS                  0x10 // CS error
                                        // 0x20, 0x40, available for other errors
 #define SIGNAL_EOP                0x80 // signaling end of packet, this is not an error flag
 
-#define ERROR_REAL_MASK           0x7F // Error mask to remove SIGNAL_EOP and fake errors
+#define ERROR_REAL_MASK           0x3F // Error mask to remove SIGNAL_EOP and fake errors
 #ifdef GENERATE_FAKE_ERRORS
 #define ERROR_FLAGS               0xFF7F
 #else /* GENERATE_FAKE_ERRORS */
@@ -184,10 +187,15 @@ public:
         static void setScope(byte b);
 #endif /* SW_SCOPE */
 	static void setEcho(uint8_t b);
-	uint16_t readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* errorbuf, uint8_t maxlen, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
-	void writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
+        static void setAllow(uint8_t b);
+        static void setMHI(uint8_t b);
+	uint16_t readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* errorbuf, uint8_t maxlen, uint8_t cs_gen = 0);
+	void writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t cs_gen = 0);
         int32_t uptime_sec(void);
         int32_t uptime_millisec(void);
         void ADC_results(uint16_t &V0_min, uint16_t &V0_max, uint32_t &V0_avg, uint16_t &V1_min, uint16_t &V1_max, uint32_t &V1_avg);
+private:
+	static void writebyte(uint8_t byte);
+	uint8_t readbyte();
 };
 #endif /* P1P2Serial_h */

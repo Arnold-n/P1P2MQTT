@@ -1,13 +1,14 @@
 /* P1P2_Config.h
  *
+ * For Mitsubishi Heavy Industries (MHI) increased buffer sizes, checksum
+ *
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
- * 20230108 v0.9.31 sensor prefix, +2 valves in HA, fix bit history for 0x30/0x31, +pseudo controlLevel
+ * 20230114 v0.9.31 MHI
  * 20221228 v0.9.30 switch from modified ESP_telnet library to ESP_telnet v2.0.0
- * 20221211 v0.9.29 misc fixes, defrost E-series
  * 20221116 v0.9.28 reset-line behaviour, IPv4 EEPROM init
  * 20221112 v0.9.27 static IP support, fix to get Power_* also in HA
  * 20221109 v0.9.26 clarify WiFiManager screen, fix to accept 80-char user/password also in WiFiManager
@@ -30,7 +31,7 @@
 #ifndef P1P2_Config
 #define P1P2_Config
 
-// User configurable options: board, ethernet, hw_id, and model E_SERIES/F_SERIES
+// User configurable options: board, ethernet, hw_id, and model *_SERIES
 
 // Define one of these options below
 #define P1P2_ESP_INTERFACE_250   // define this for regular operation of P1P2-ESP-Interface (ESP8266 + ATmega328P using 250kBaud)
@@ -52,9 +53,9 @@
                         //   1 for P1P2-ESP-Interface v1.1, October 2022, ISPAVR over BB SPI, ADC
                         //   (Note: if INIT_HW_ID is 1, BSP with modified library for ESP8266AVRISP library is required for updating firmware of ATmega328P)
 
-// define only one of E_SERIES and F_SERIES:
-//#define E_SERIES // for Daikin E* heat pumps
-//#define F_SERIES // for Daikin F* VRV systems
+// define only one of H_SERIES and MHI_SERIES:
+//#define H_SERIES // for Hitachi H-link systems
+//#define MHI_SERIES // for Mitsubishi Heavy Industry systems
 
 // Other options below should be OK
 
@@ -113,9 +114,9 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.31"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.31"
-#define HA_SW "0.9.31"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.31MHI"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.31MHI"
+#define HA_SW "0.9.31MHI"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
@@ -214,10 +215,9 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #define RX_BUFFER_SIZE 2048 // to avoid serial buffer overruns (512 is too small)
 #define MQTT_MIN_FREE_MEMORY 6000 // Must likely be more than 4kB, MQTT messages will not be transmitted if available memory is below this value
 #define MQTT_QOS 0 // QOS = 1 is too slow
-#define SERIAL_MAGICSTRING "1P2P" // Serial input of ATmega should start with SERIAL_MAGICSTRING, otherwise lines line is ignored by P1P2Monitor
-#define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
-#define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is checked when reading or added when writing
-#define SPRINT_VALUE_LEN 800 // max message length for informational and debugging output over P1P2/S, telnet, or serial
+#define SERIAL_MAGICSTRING "1P2P" // Each serial input line of ATmega should start with SERIAL_MAGICSTRING, otherwise it is ignored by P1P2Monitor
+#define CS_GEN 1        // Checksum on/off
+#define SPRINT_VALUE_LEN 1000 // max message length for informational and debugging output over P1P2/S, telnet, or serial
 #define MQTT_KEY_LEN 100
 #ifdef SAVESCHEDULE
 #define MQTT_VALUE_LEN 630 // max length: Program 6* (6+8)*6*7+3*7+2 = 611
@@ -226,7 +226,7 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #endif
 #define MAX_COMMAND_LENGTH 252 // B command can be long
 #define RB 1000     // max size of readBuffer (serial input from Arduino) (was 400, changed for long-scope-mode to 1000)
-#define HB 33      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
+#define HB 65      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
 #define MQTT_RB 1024 // size of ring buffer for MQTT_INPUT_HEXDATA/MQTT_INPUT_BINDATA
 
 #define REBOOT_REASON_NOTSTORED 0xFE

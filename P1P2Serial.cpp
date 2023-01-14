@@ -1,8 +1,9 @@
 /* P1P2Serial: Library for reading/writing Daikin/Rotex P1P2 protocol
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
+ * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20230114 v0.9.31 MHI
  * 20221028 v0.9.23 ADC code
  * 20220918 v0.9.22 scopemode also for writes, focused on actual errors, fake error generation for test purposes, removing OLDP1P2LIB
  * 20220830 v0.9.18 version alignment with example programs (last version supporting OLDP1P2LIB)
@@ -401,7 +402,7 @@ static volatile int32_t time_millisec = 0;
 
 void P1P2Serial::begin(uint32_t baud, bool use_ADC /* = false */, uint8_t ADC_pin0 /* = 0 */, uint8_t ADC_pin1 /* = 1 */)
 {
-  uint32_t cycles_per_bit = ((ALTSS_BASE_FREQ + baud / 2) / baud); // 833 cycles at 16MHz
+  uint32_t cycles_per_bit = ((ALTSS_BASE_FREQ + baud / 2) / baud); // 833 cycles at 8MHz
 
   Rticks_per_bit = cycles_per_bit;
   Rticks_per_semibit = Rticks_per_bit / 2;
@@ -610,6 +611,7 @@ ISR(MS_TIMER_COMP_vect)
 /****************************************/
 
 static uint16_t tx_setdelay = 0;
+static volatile uint8_t mhiConvert = 1;
 
 void P1P2Serial::setDelay(uint16_t t)
 // Input parameter: 0 <= t <= 65535
@@ -655,6 +657,19 @@ uint8_t tx_rx_readbackerror_fake;
 #endif /* GENERATE_FAKE_ERRORS */
 
 void P1P2Serial::write(uint8_t b)
+{ 
+  if (mhiConvert) {
+    writebyte(~(1<< (b & 0x07)));
+    b >>= 3;
+    writebyte(~(1<< (b & 0x07)));
+    b >>= 3;
+    writebyte(~(1<< (b & 0x07)));
+  } else {
+    writebyte(b);
+  }
+}
+
+void P1P2Serial::writebyte(uint8_t b)
 {
   uint8_t intr_state, head;
 
@@ -690,8 +705,9 @@ void P1P2Serial::write(uint8_t b)
   SREG = intr_state;
 }
 
-static uint16_t startbit_delta;
-static uint8_t Echo = 1;
+static volatile uint16_t startbit_delta;
+static volatile uint8_t Echo = 1;
+static volatile uint8_t Allow = ALLOW_PAUSE_BETWEEN_BYTES;
 
 ISR(COMPARE_W_INTERRUPT)
 {
@@ -914,7 +930,7 @@ void P1P2Serial::flushOutput(void)
 
 #define SUPPRESS_OSCILLATION
 //Use this to ignore edges that are very near previous edges to avoid detection of oscillating edges
-//Does not seem necessary
+//Does not seem necessary for Daikin
 
 #ifdef SW_SCOPE
 void P1P2Serial::setScope(byte b)
@@ -924,6 +940,23 @@ void P1P2Serial::setScope(byte b)
   sw_scope_next = b;
 }
 #endif /* SW_SCOPE */
+
+void P1P2Serial::setMHI(uint8_t b)
+// Set whether to do 3byte-1byte conversion upon read/write
+// default: 0
+{
+  mhiConvert = b;
+}
+
+void P1P2Serial::setAllow(uint8_t b)
+// Set max extra time between bytes
+// default: ALLOW_PAUSE_BETWEEN_BYTES
+// max 76
+// min 0
+// unit: bit times
+{
+  Allow = b;
+}
 
 void P1P2Serial::setEcho(uint8_t b)
 // Set echo mode (verify and read back written data) on or off
@@ -1023,7 +1056,7 @@ ISR(CAPTURE_INTERRUPT)
 ISR(COMPARE_R_INTERRUPT)
 // The COMPARE_R_INTERRUPT routine is called during every data bit (state=2..9) or parity bit (state=10), unless there is a falling edge for that bit,
 // and also during stop bit (state=11)
-// It is also called during the latest potential location of the next start bit (with state==1, taking ALLOW_PAUSE_BETWEEN_BYTES into account),
+// It is also called during the latest potential location of the next start bit (with state==1, taking Allow into account),
 // but only if no start bit has been detected, otherwise this interrupt will be cancelled.
 // this allows detection of an end of communication block.
 {
@@ -1052,7 +1085,7 @@ ISR(COMPARE_R_INTERRUPT)
   } else if (state == 11) {
     // state = 11: we are in stop bit; where W should not be hampered by our lengthy activity of finishing up
     // we do most of the work here but have to leave some for the next start pulse routine (via rx_buffer_head2)
-    SET_COMPARE_R(rx_target + Rticks_per_bit * (1 + ALLOW_PAUSE_BETWEEN_BYTES));
+    SET_COMPARE_R(rx_target + Rticks_per_bit * (1 + Allow));
     rx_state = 1;
     head = rx_buffer_head + 1;
     if (head >= RX_BUFFER_SIZE) head = 0;
@@ -1117,15 +1150,25 @@ errorbuf_t P1P2Serial::read_error(void)
 {
   uint8_t head, tail;
   errorbuf_t out;
-
   head = rx_buffer_head;
   tail = rx_buffer_tail;
   if (head == tail) return 0;
   if (++tail >= RX_BUFFER_SIZE) tail = 0;
-  return error_buffer[tail];
+  if (mhiConvert) {
+    out = error_buffer[tail];
+    if (head == tail) return out; // TODO signal incomplete trio
+    if (++tail >= RX_BUFFER_SIZE) tail = 0;
+    out |= error_buffer[tail];
+    if (head == tail) return out; // TODO signal incomplete trio
+    if (++tail >= RX_BUFFER_SIZE) tail = 0;
+    out |= error_buffer[tail];
+    return out;
+  } else {
+    return error_buffer[tail];
+  }
 }
 
-uint8_t  P1P2Serial::read(void)
+uint8_t  P1P2Serial::readbyte(void)
 // should only be called if available()==1; otherwise, returns 0
 {
   uint8_t head, tail, out;
@@ -1137,6 +1180,32 @@ uint8_t  P1P2Serial::read(void)
   out = rx_buffer[tail];
   rx_buffer_tail = tail;
   return out;
+}
+
+uint8_t  P1P2Serial::read(void)
+// many thanks to HamdiOlgun for reverse engineering byte encoding in MHI protocol (https://community.openhab.org/t/mitsubishi-heavy-x-y-line-protocol/82898/9)
+// currently no error checking done here (not for short message, not for wrong input format, not for 9th bit being 0) // TODO
+{
+  if (mhiConvert) {
+    uint8_t b = ~readbyte();
+    uint8_t out = 0x00;
+    if (b & 0xF0) out += 0x04;
+    if (b & 0xCC) out += 0x02;
+    if (b & 0xAA) out += 0x01;
+    if (!available()) return out;
+    b = ~readbyte();
+    if (b & 0xF0) out += 0x20;
+    if (b & 0xCC) out += 0x10;
+    if (b & 0xAA) out += 0x08;
+    if (!available()) return out;
+    b = ~readbyte();
+    // if (b & 0xF0) error, should be 0
+    if (b & 0xCC) out += 0x80;
+    if (b & 0xAA) out += 0x40;
+    return out;
+  } else {
+    return readbyte();
+  }
 }
 
 bool P1P2Serial::available(void)
@@ -1167,7 +1236,7 @@ void P1P2Serial::flushInput(void)
   rx_buffer_head = rx_buffer_tail;
 }
 
-uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* errorbuf, uint8_t maxlen, uint8_t crc_gen, uint8_t crc_feed)
+uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* errorbuf, uint8_t maxlen, uint8_t cs_gen)
 {
 // Reads one packet (in blocking mode)
 // To avoid blocking, only call this function if packetavailable()
@@ -1177,10 +1246,11 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* e
 // reading continues in case of error
 // stores maximum of maxlen bytes of error codes into errorbuf (unless errorbuf = NULL),
 // returns timing information (pause on bus before this package) in parameter delta
-// If crc_gen is not zero, verifies last byte as CRC byte; CRC byte is also stored and is counted in return value if space is available
+// If cs_gen is not zero, verifies last byte as checksum (sum % 256) byte; checksum byte is also stored and is counted in return value if space is available
   uint8_t EOP = 0;
   uint8_t bytecnt = 0;
-  uint8_t crc = crc_feed;
+  uint8_t mhicnt = 0;
+  uint8_t cs = 0;
 
   while (!EOP) {
     if (available()) {
@@ -1194,24 +1264,21 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* e
         }
       }
       if (!bytecnt) delta = read_delta();
-      uint8_t c = read();
-      if ((EOP == 0) || (crc_gen == 0)) {
+      uint8_t c = read(); // TODO
+      if ((EOP == 0) || (cs_gen == 0)) {
         if (bytecnt < maxlen) {
           readbuf[bytecnt] = c;
         }
-        if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
-          crc = (((crc ^ c) & 0x01) ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
-          c >>= 1;
-        }
+        if (cs_gen != 0) cs += c;
       } else {
-        // EOP, crc in use, check crc
+        // EOP, cs in use, check cs
         if (bytecnt < maxlen) {
           readbuf[bytecnt] = c;
-          if (c != crc) {
+          if (c != cs) {
             if (bytecnt < maxlen) {
-              errorbuf[bytecnt] |= ERROR_CRC;
+              errorbuf[bytecnt] |= ERROR_CS;
             } else {
-              errorbuf[maxlen - 1] |= ERROR_CRC;
+              errorbuf[maxlen - 1] |= ERROR_CS;
             }
             DIGITAL_SET_LED_ERROR;
           }
@@ -1223,22 +1290,19 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* e
   return bytecnt;
 }
 
-void P1P2Serial::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen, uint8_t crc_feed)
+void P1P2Serial::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t cs_gen)
 {
 // Writes one packet of l bytes, t ms after last bus action;
-// If crc_gen is not zero, adds CRC byte to packet
+// If cs_gen is not zero, adds CS byte to packet
 // Note that t=0 or t=1 increases risk of bus collisions, don't use it if not needed (t<2 will be changed to t=2 in new library).
   setDelay(t);
-  uint8_t crc = crc_feed;
+  uint8_t cs = 0;
   for (uint8_t i = 0; i < l; i++) {
     uint8_t c = writebuf[i];
     write(c);
-    if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
-      crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
-      c >>= 1;
-    }
+    if (cs_gen != 0) cs += c;
   }
-  if (crc_gen) write(crc);
+  if (cs_gen) write(cs);
 }
 
 int32_t P1P2Serial::uptime_sec(void)

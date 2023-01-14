@@ -17,9 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
- * 20230108 v0.9.31 sensor prefix, +2 valves in HA, fix bit history for 0x30/0x31, +pseudo controlLevel
  * 20221228 v0.9.30 switch from modified ESP_telnet library to ESP_telnet v2.0.0
- * 20221211 v0.9.29 misc fixes, defrost E-series
  * 20221116 v0.9.28 reset-line behaviour, IPv4 EEPROM init
  * 20221112 v0.9.27 static IP support, fix to get Power_* also in HA
  * 20221109 v0.9.26 clarify WiFiManager screen, fix to accept 80-char user/password also in WiFiManager
@@ -200,8 +198,7 @@ AsyncMqttClient mqttClient;
 uint32_t maxLoopTime = 0;
 long int espUptime=0;
 bool shouldSaveConfig = false;
-static byte crc_gen = CRC_GEN;
-static byte crc_feed = CRC_FEED;
+static byte cs_gen = CS_GEN;
 
 #ifdef AVRISP
 const char* avrisp_host = "esp8266-avrisp";
@@ -245,11 +242,11 @@ void onTelnetConnect(String ip) {
   telnet.print(__DATE__);
   telnet.print(" ");
   telnet.print(__TIME__);
-#ifdef E_SERIES
-  telnet.println(" for E-Series");
+#ifdef H_SERIES
+  telnet.println(" for H-Series");
 #endif
-#ifdef F_SERIES
-  telnet.println(" for F-Series");
+#ifdef MHI_SERIES
+  telnet.println(" for MHI-Series");
 #endif
   telnet.println(F("(Use ^] + q  to disconnect.)"));
   telnetConnected = true;
@@ -374,11 +371,11 @@ uint32_t Sprint_buffer_overflow = 0;
 // Include Daikin product-dependent header file for parameter conversion
 // include here such that Sprint_P(PSTR()) is available in header file code
 
-#ifdef E_SERIES
-#include "P1P2_Daikin_ParameterConversion_EHYHB.h"
+#ifdef H_SERIES
+#include "P1P2_Daikin_ParameterConversion_H.h"
 #endif
-#ifdef F_SERIES
-#include "P1P2_Daikin_ParameterConversion_F.h"
+#ifdef MHI_SERIES
+#include "P1P2_Daikin_ParameterConversion_H.h" // for now same as H-link2
 #endif
 
 static byte throttle = 1;
@@ -479,7 +476,7 @@ static char* rb_buffer = readBuffer;
 static uint16_t serial_rb = 0;
 static int c;
 static byte ESP_serial_input_Errors_Data_Short = 0;
-static byte ESP_serial_input_Errors_CRC = 0;
+static byte ESP_serial_input_Errors_CS = 0;
 
 static uint32_t ATmega_uptime_prev = 0;
 static byte saveRebootReason = REBOOT_REASON_UNKNOWN;
@@ -779,11 +776,11 @@ void handleCommand(char* cmdString) {
                 case 'v':
                 case 'V': Sprint_P(true, true, true, PSTR(WELCOMESTRING));
                           Sprint_P(true, true, true, PSTR("* [ESP] Compiled %s %s"), __DATE__, __TIME__);
-#ifdef E_SERIES
-                          Sprint_P(true, true, true, PSTR("* [ESP] E-Series"));
+#ifdef H_SERIES
+                          Sprint_P(true, true, true, PSTR("* [ESP] H-Series"));
 #endif
-#ifdef F_SERIES
-                          Sprint_P(true, true, true, PSTR("* [ESP] F-Series"));
+#ifdef MHI_SERIES
+                          Sprint_P(true, true, true, PSTR("* [ESP] MHI-Series"));
 #endif
                           Sprint_P(true, true, true, PSTR("* [ESP] hw_identifier %i"), hwID);
                           if (mqttClient.connected()) {
@@ -815,19 +812,11 @@ void handleCommand(char* cmdString) {
                           }
                           break;
                 case 'g':
-                case 'G': if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
-                            crc_gen = temphex;
-                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_gen set to 0x%02X"), crc_gen);
+                case 'G': if (sscanf((const char*) (cmdString + 1), "%i", &temp) == 1) {
+                            cs_gen = temp ? 1 : 0;
+                            Sprint_P(true, true, true, PSTR("* [ESP] Checksum generation set to %i"), cs_gen);
                           } else {
-                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_gen 0x%02X"), crc_gen);
-                          }
-                          break;
-                case 'h':
-                case 'H': if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
-                            crc_feed = temphex;
-                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_feed set to 0x%02X"), crc_feed);
-                          } else {
-                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_feed 0x%02X"), crc_feed);
+                            Sprint_P(true, true, true, PSTR("* [ESP] Checksum generation %i"), cs_gen);
                           }
                           break;
                 default : break;
@@ -1364,11 +1353,11 @@ void setup() {
 
   if (mqttClient.connected()) {
     Sprint_P(true, true, true, PSTR(WELCOMESTRING));
-#ifdef E_SERIES
-    Sprint_P(true, true, true, PSTR("* [ESP] E-Series"));
+#ifdef H_SERIES
+    Sprint_P(true, true, true, PSTR("* [ESP] H-Series"));
 #endif
-#ifdef F_SERIES
-    Sprint_P(true, true, true, PSTR("* [ESP] F-Series"));
+#ifdef MHI_SERIES
+    Sprint_P(true, true, true, PSTR("* [ESP] MHI-Series"));
 #endif
     Sprint_P(true, true, true, PSTR("* [ESP] hw_identifier %i"), hwID);
     Sprint_P(true, true, true, PSTR("* [ESP] noWiFi %i"), noWiFi);
@@ -1556,22 +1545,19 @@ void process_for_mqtt_json(byte* rb, int n) {
 byte timeStamp = 10; // TODO change this for TIMESTRING
 
 void writePseudoPacket(byte* WB, byte rh)
-// rh is packet size (without CRC byte)
+// rh is packet size (without CS byte)
 {
   char pseudoWriteBuffer[RB];
   snprintf(pseudoWriteBuffer, 13, "R P         ");
 // if (outputMode & ??) add timestring TODO to pseudoWriteBuffer snprintf(pseudoWriteBuffer, 13, "R TIMESTRING P         ");
-  uint8_t crc = crc_feed;
+  uint8_t cs = 0;
   for (uint8_t i = 0; i < rh; i++) {
     uint8_t c = WB[i];
     snprintf(pseudoWriteBuffer + 2 + timeStamp + (i << 1), 3, "%02X", c);
-    if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
-      crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
-      c >>= 1;
-    }
+    if (cs_gen != 0) cs += c;
   }
-  WB[rh] = crc;
-  if (crc_gen) snprintf(pseudoWriteBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", crc);
+  WB[rh] = cs;
+  if (cs_gen) snprintf(pseudoWriteBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", cs);
 #if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
   if (outputMode & 0x0001) client_publish_mqtt(mqttHexdata, pseudoWriteBuffer);
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
@@ -1766,19 +1752,13 @@ void loop() {
               rbp += n;
             }
             if (rh == HB) Sprint_P(true, true, true, PSTR("* [MON] Buffer full, overflow not checked"));
-            if ((rh > 1) || (rh == 1) && !crc_gen) {
-              if (crc_gen) rh--;
-              // rh is packet length (not counting CRC byte readHex[rh])
-              uint8_t crc = crc_feed;
-              for (uint8_t i = 0; i < rh; i++) {
-                uint8_t c = readHex[i];
-                if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
-                  crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
-                  c >>= 1;
-                }
-              }
+            if ((rh > 1) || (rh == 1) && !cs_gen) {
+              if (cs_gen) rh--;
+              // rh is packet length (not counting CS byte readHex[rh])
+              uint8_t cs = 0;
+              for (uint8_t i = 0; i < rh; i++) cs += readHex[i];
 // if (outputMode & ??) add timestring TODO to readBuffer
-              if ((!crc_gen) || (crc == readHex[rh])) {
+              if ((!cs_gen) || (cs == readHex[rh])) {
 #if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
                 if (outputMode & 0x0001) client_publish_mqtt(mqttHexdata, readBuffer);
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
@@ -1805,8 +1785,8 @@ void loop() {
                   ATmega_uptime_prev = ATmega_uptime;
                 }
               } else {
-                Sprint_P(true, true, true, PSTR("* [MON] Serial input buffer overrun or CRC error in R data:%s expected 0x%02X"), readBuffer + 1, crc);
-                if (ESP_serial_input_Errors_CRC < 0xFF) ESP_serial_input_Errors_CRC++;
+                Sprint_P(true, true, true, PSTR("* [MON] Serial input buffer overrun or CS error in R data:%s expected 0x%02X"), readBuffer + 1, cs);
+                if (ESP_serial_input_Errors_CS < 0xFF) ESP_serial_input_Errors_CS++;
               }
             } else {
               Sprint_P(true, true, true, PSTR("* [MON] Not enough readable data in R line: ->%s<-"), readBuffer + 1);
@@ -1926,7 +1906,7 @@ void loop() {
       readHex[9]  = (Sprint_buffer_overflow >> 8) & 0xFF;
       readHex[10] = Sprint_buffer_overflow & 0xFF;
       readHex[11] = ESP_serial_input_Errors_Data_Short;
-      readHex[12] = ESP_serial_input_Errors_CRC;
+      readHex[12] = ESP_serial_input_Errors_CS;
       readHex[13] = (MQTT_waitCounter >> 24) & 0xFF;
       readHex[14] = (MQTT_waitCounter >> 16) & 0xFF;
       readHex[15] = (MQTT_waitCounter >> 8) & 0xFF;
