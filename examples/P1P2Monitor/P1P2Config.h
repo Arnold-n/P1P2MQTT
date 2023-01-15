@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20230115 v0.9.32 increased buffer size to 40 bytes (120 bus bytes)
  * 20230114 v0.9.31 MHI branch
  * 20221129 v0.9.28 option to insert message in 40F030 time slot for restart or user-defined write message
  * 20221102 v0.9.24 suppress repeated "too long" warnings
@@ -44,7 +45,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.31MHI"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.32MHI"
 
 #define INIT_MHI_FORMAT 1 // 1 for conversion from/to 3-bit-per-byte format with check-sum, 0 for raw data
 #define INIT_VERBOSE 3
@@ -63,7 +64,7 @@
 //
 // to reset EEPROM to settings in P1P2Config.h, either erase EEPROM, or change EEPROM_SIGNATURE in P1P2Config.h
 
-#define EEPROM_SIGNATURE "P1P2SIG01" // change this every time you wish to re-init EEPROM settings to the settings in P1P2Config.h
+#define EEPROM_SIGNATURE "P1P2SIG-MHI"      // change this every time you wish to re-init EEPROM settings to the settings in P1P2Config.h
 #define EEPROM_ADDRESS_MHI_FORMAT      0x00 // 1 byte for raw/MHI setting
 #define EEPROM_ADDRESS_ALLOW           0x01 // 1 byte for inter-byte pause allowance
 #define EEPROM_ADDRESS_VERBOSITY       0x02 // 1 byte for verbose
@@ -71,11 +72,11 @@
 #define EEPROM_ADDRESS_SIGNATURE       0x10 // should be highest, in view of unspecified strlen(EEPROM_SIGNATURE)
 
 // serial read buffer size for reading from serial port, max line length on serial input is 150 (2 characters per byte, plus some)
-#define RS_SIZE 150
-// P1/P2 write buffer size for writing to P1P2bus, max packet size is 32 (have not seen anytyhing over 24 (23+CRC))
-#define WB_SIZE 65
-// P1/P2 read buffer size to store raw data and error codes read from P1P2bus; 1 extra for reading back CRC byte; 24 might be enough
-#define RB_SIZE 65
+#define RS_SIZE 110
+// MHI: should be >22, tbd
+#define WB_SIZE 41
+// MHI: should be >22, tbd
+#define RB_SIZE 41
 
 #define INIT_ECHO 1         // defines whether written data is read back and verified against written data (advise to keep this 1)
 #define INIT_SCOPE 0        // defines whether scopemode, recording timing info, is on/off at start (advise to keep this 0)

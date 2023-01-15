@@ -86,8 +86,8 @@
                                     // if S_TIMER is undefined, the write budget (and error budget) will not increase over time TODO fix this
 // End of configuration options
 
-#define TX_BUFFER_SIZE 65  // write buffer size (1 more than max size needed)
-#define RX_BUFFER_SIZE 65  // read buffer (1 more than max size needed), should be <=254
+#define TX_BUFFER_SIZE 121 // write buffer size (1 more than max size needed)
+#define RX_BUFFER_SIZE 121 // read buffer (1 more than max size needed), should be <=254
 #define NO_HEAD2 0xFF
 
 
