@@ -1,5 +1,12 @@
 # Monitor data on your Mitsubishi X-Y Line protocol
 
+This branch for the Mitsubishi Heavy Industries (MHI) X-Y line protocol is a spin-off of the P1P2Serial project. Raw data can be monitored on the X-Y interface, which is HBS compatible.
+
+The software implements the conversion from 3-byte to 1-byte as described [here](https://community.openhab.org/t/mitsubishi-heavy-x-y-line-protocol/82898/8), many thanks to HamdiOlgun for reverse engineering the data encoding and checksum.
+
+
+In this stage, the interface only monitors raw bus traffic. Interpretation can be added when the protocol is further reverse-engineered, and monitored info can then easily be output over MQTT and integrated in Home Assistant.
+
 ## Warning
 
 This software comes without warranty. Any use is entirely at your own risk (CC BY-NC-ND 4.0 Section 5 applies, for earlier versions GPL sections 11 and 12 apply).
@@ -20,11 +27,6 @@ Shown is the new P1P2-ESP-interface v1.1 (more pictures [here](circuits/README.m
 - SPI interface option for W5500 ethernet adapter (using an enclosure extension, power consumption with adapter 60mA at 15V or 0.9W from P1/P2 bus), and
 - fits nicely in a small semi-transparant enclosure (50mm x 35mm x 20mm without ethernet, or 82mm x 35mm x 29mm with ethernet adapter).
 
-This interface was designed for Daikin systems. On Mitsibushi Heavy Industries systems, it can monitor the traffic on the X-Y line. The software implements the conversion from 3-byte to 1-byte as described [here](https://community.openhab.org/t/mitsubishi-heavy-x-y-line-protocol/82898/8), many thanks to HamdiOlgun for reverse engineering the data encoding and checksum.
-
-When the data in the packet is further reverse-engineered, the resulting information can easily be output over MQTT and integrated in Home Assistant.
-
-In this stage, the interface only observes raw bus traffic. Writing packets to the bus is possible but use with care!
 
 **How can you build or buy the required hardware?**
 
@@ -35,7 +37,6 @@ Buy P1P2-adapter (older design described below): I also sell the original MM1192
 Build P1P2-adapter yourself (MM1192/XL1192): schematics and pictures for the MM1192/XL1192-based P1P2-adapter (for use with the Arduino Uno) are [here](https://github.com/Arnold-n/P1P2Serial/tree/main/circuits). The MM1192 is available in traditional DIP format so you can build it on a breadboard. 
 
 Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. Be warned that it is difficult to solder: it's only available as a 4x4mm 0.5mm pitch TQFN-24 package. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power Daikin's P1/P2 bus may provide, perhaps max 60mA) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a [MAX22088-based design](https://github.com/rothn/P1P2Adapter) are made available by Nicholas Roth. His design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
-
 
 **Is it safe?**
 
