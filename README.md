@@ -1,5 +1,7 @@
 # Monitor and control your Daikin system via the room controller (P1/P2) interface!
 
+(also: [README for Hitachi H-link2](https://github.com/Arnold-n/P1P2Serial/blob/H-link/README.md) or [README for Mitsubishi Heavy Industries MHI X-Y protocol](https://github.com/Arnold-n/P1P2Serial/blob/MHI/README.md))
+
 Daikin (hybrid) heat pump systems are usually controlled by a room thermostat (and/or other controller) over a 2-wire interface, called P1/P2. This project enables to monitor (and, for some systems, control) your Daikin system from e.g. Home Assistant over MQTT via the P1/P2 thermostat wires, using the hard- and software of this project. For monitoring it is only eavesdropping on the regular communication between the main controller and the heat pump. For some models it provides control by acting as an "auxiliary controller" to the main thermostat, requesting the main controller to set certain system parameters on the Daikin system. Depending on your model it may be possible to switch the heat pump or DHW boiler on or off, switch between heating or cooling, set target temperatures, etcetera.
 
 ![Home assistant](images/homeassistant300.png)
@@ -32,7 +34,7 @@ If your system is supported, and you have your HA and MQTT server already runnin
 - connect to the WiFiManager AP to enter your WiFi SSID/password and MQTT address/port/user/password, and
 - see HA autodetect the P1P2 device with its sensors.
 
-With communication over MQTT, integration with Home Assistand will be(come) automatic, and interfacing to other systems (grafana, OpenHab, EmonCMS) should not be too much work.
+With communication over MQTT, integration with Home Assistant will be(come) automatic, and interfacing to other systems (grafana, OpenHab, EmonCMS) should not be too much work.
 
 By default, the interface only observes and attempts to interpret bus traffic. For several E-series models, especially hybrid models, it may also act as auxiliary controller to control parameter settings over MQTT. FDY(Q) systems are also supported. With your help we can add more models!
 
