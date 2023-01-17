@@ -317,7 +317,7 @@ void writePseudoPacket(byte* WB, byte rh)
   uint8_t crc = crc_feed;
   for (uint8_t i = 0; i < rh; i++) {
     uint8_t c = WB[i];
-    if (c <= 0x0F) Serial.print(F("0"));
+    if (c <= 0x0F) Serial.print('0');
     Serial.print(c, HEX);
     if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
       crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
@@ -325,7 +325,7 @@ void writePseudoPacket(byte* WB, byte rh)
     }
   }
   if (crc_gen) {
-    if (crc <= 0x0F) Serial.print(F("0"));
+    if (crc <= 0x0F) Serial.print('0');
     Serial.print(crc, HEX);
   }
   Serial.println();
@@ -439,6 +439,10 @@ void loop() {
 #ifdef E_SERIES
             case 'e':
             case 'E':
+                      if (!CONTROL_ID) {
+                        Serial.println(F("* Command requires operation as auxiliary controller (L1)"));
+                        break;
+                      }
                       if (wr_cnt) {
                         // previous write still being processed
                         Serial.println(F("* Previous parameter write action still busy"));
@@ -521,7 +525,11 @@ void loop() {
 #endif /* E_SERIES */
 #ifdef F_SERIES
             case 'f':
-            case 'F': if (wr_cnt) {
+            case 'F': if (!CONTROL_ID) {
+                        Serial.println(F("* Command requires operation as auxiliary controller (L1)"));
+                        break;
+                      }
+                      if (wr_cnt) {
                         // previous write still being processed
                         Serial.println(F("* Previous parameter write action still busy"));
                         break;
@@ -601,7 +609,7 @@ void loop() {
                         Serial.print(F("set to "));
                       }
                       Serial.print(F("0x"));
-                      if (crc_gen <= 0x0F) Serial.print(F("0"));
+                      if (crc_gen <= 0x0F) Serial.print('0');
                       Serial.println(crc_gen, HEX);
                       break;
             case 'h':
@@ -612,7 +620,7 @@ void loop() {
                         Serial.print(F("set to "));
                       }
                       Serial.print(F("0x"));
-                      if (crc_feed <= 0x0F) Serial.print(F("0"));
+                      if (crc_feed <= 0x0F) Serial.print('0');
                       Serial.println(crc_feed, HEX);
                       break;
             case 'v':
@@ -697,7 +705,7 @@ void loop() {
                       break;
             case 'w':
             case 'W': if (CONTROL_ID) {
-                        // insert message in time for 40F030 slot in L1 mode
+                        // in L1 mode, insert message in time allocaed for 40F030 slot
                         if (insertMessageCnt || restartDaikinCnt) {
                           Serial.println(F("* insertMessage (or restartDaikin) already scheduled"));
                           break;
@@ -721,6 +729,7 @@ void loop() {
                         }
                         break;
                       }
+                      // in L0 mode, just write packet
                       if (verbose) Serial.print(F("* Writing: "));
                       wb = 0;
                       while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
@@ -747,11 +756,10 @@ void loop() {
             case 'K': Serial.println(F("* Resetting ...."));
                       resetFunc(); //call reset
             case 'l': // set auxiliary controller function on/off; CONTROL_ID address is set automatically
-            case 'L': // 0 controller mode off, and store setting in EEPROM
-                      // 1 controller mode on, and store setting in EEPROM
+            case 'L': // 0 controller mode off, and store setting in EEPROM // 1 controller mode on, and store setting in EEPROM
                       // 2 controller mode off, do not store setting in EEPROM
                       // 3 controller mode on, do not store setting in EEPROM
-                      // 5 (for experimenting with F-series only) controller responds only to 00F030 message withan empty packet, but not to other 00F03x packets
+                      // 5 (for experimenting with F-series only) controller responds only to 00F030 message with an empty packet, but not to other 00F03x packets
                       // other values are treated as 0 and are reserved for further experimentation of control modes
                       if (scanint(RSp, temp) == 1) {
 #ifdef ENABLE_INSERT_MESSAGE
@@ -804,7 +812,7 @@ void loop() {
 #endif
                           } else {
                             Serial.println(F("* No free address for controller found (yet). Control functionality not enabled"));
-                            Serial.println(F("* You may wish to re-try in a few seconds (and perhaps switch auxiliary controllers off)"));
+                            Serial.println(F("* You may wish to re-try in a few seconds (and perhaps switch other auxiliary controllers off)"));
                           }
                         } else {
                           if (!CONTROL_ID) {
@@ -812,6 +820,11 @@ void loop() {
                             break;
                           } else {
                             CONTROL_ID = 0x00;
+                            setRequest35 = 0;
+                            setRequest36 = 0;
+                            setRequest3A = 0;
+                            setRequestDHW = 0;
+                            wr_cnt = 0;
                           }
                           if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
                         }
@@ -886,9 +899,9 @@ void loop() {
                         Serial.print(F("set to "));
                       }
                       Serial.print(F("0x"));
-                      if (setParam35 <= 0x000F) Serial.print(F("0"));
-                      if (setParam35 <= 0x00FF) Serial.print(F("0"));
-                      if (setParam35 <= 0x0FFF) Serial.print(F("0"));
+                      if (setParam35 <= 0x000F) Serial.print('0');
+                      if (setParam35 <= 0x00FF) Serial.print('0');
+                      if (setParam35 <= 0x0FFF) Serial.print('0');
                       Serial.println(setParam35, HEX);
                       break;
             case 'q': // select F036-parameter to write in r step below (default PARAM_TEMP in P1P2Config.h)
@@ -903,9 +916,9 @@ void loop() {
                         Serial.print(F("set to "));
                       }
                       Serial.print(F("0x"));
-                      if (setParam36 <= 0x000F) Serial.print(F("0"));
-                      if (setParam36 <= 0x00FF) Serial.print(F("0"));
-                      if (setParam36 <= 0x0FFF) Serial.print(F("0"));
+                      if (setParam36 <= 0x000F) Serial.print('0');
+                      if (setParam36 <= 0x00FF) Serial.print('0');
+                      if (setParam36 <= 0x0FFF) Serial.print('0');
                       Serial.println(setParam36, HEX);
                       break;
             case 'm': // select F03A-parameter to write in n step below (default PARAM_SYS in P1P2Config.h)
@@ -920,20 +933,24 @@ void loop() {
                         Serial.print(F("set to "));
                       }
                       Serial.print(F("0x"));
-                      if (setParam3A <= 0x000F) Serial.print(F("0"));
-                      if (setParam3A <= 0x00FF) Serial.print(F("0"));
-                      if (setParam3A <= 0x0FFF) Serial.print(F("0"));
+                      if (setParam3A <= 0x000F) Serial.print('0');
+                      if (setParam3A <= 0x00FF) Serial.print('0');
+                      if (setParam3A <= 0x0FFF) Serial.print('0');
                       Serial.println(setParam3A, HEX);
                       break;
 
             case 'z': // Z  report status of packet type 35 write action
             case 'Z': // Zx set value for parameter write (PARAM_HC_ONOFF/'p') in packet type 35 and initiate write action
+                      if (!CONTROL_ID) {
+                        Serial.println(F("* Command requires operation as auxiliary controller (L1)"));
+                        break;
+                      }
                       if (verbose) Serial.print(F("* Param35 "));
                       Serial.print(F("0x"));
-                      if (setParam35 <= 0x000F) Serial.print(F("0"));
-                      if (setParam35 <= 0x00FF) Serial.print(F("0"));
-                      if (setParam35 <= 0x0FFF) Serial.print(F("0"));
-                      Serial.println(setParam35, HEX);
+                      if (setParam35 <= 0x000F) Serial.print('0');
+                      if (setParam35 <= 0x00FF) Serial.print('0');
+                      if (setParam35 <= 0x0FFF) Serial.print('0');
+                      Serial.print(setParam35, HEX);
                       if (scanhex(RSp, temphex) == 1) {
                         if ((wr_pt == 0x35) && (wr_nr == setParam35) && wr_cnt) {
                           Serial.println(F(": write command ignored - E-write-request is pending"));
@@ -949,7 +966,7 @@ void loop() {
                           setValue35 = temphex;
                           if (!verbose) break;
                           Serial.print(F(" will be set to 0x"));
-                          if (setValue35 <= 0x000F) Serial.print(F("0"));
+                          if (setValue35 <= 0x0F) Serial.print('0');
                           Serial.println(setValue35, HEX);
                           break;
                         } else {
@@ -957,8 +974,9 @@ void loop() {
                           break;
                         }
                       } else if (setRequest35) {
-                        Serial.println(F(": 35-write-request to value 0x"));
-                        Serial.println(setValue35, HEX);
+                        Serial.print(F(": 35-write-request to value 0x"));
+                        if (setValue35 <= 0x0F) Serial.print('0');
+                        Serial.print(setValue35, HEX);
                         Serial.println(F(" pending"));
                       } else {
                         Serial.println(F(": no 35-write-request pending"));
@@ -966,11 +984,15 @@ void loop() {
                       break;
             case 'r': // R  report status of packet type 36 write action
             case 'R': // Rx set value for parameter write (PARAM_TEMP/'q') in packet type 36 and initiate write action
+                      if (!CONTROL_ID) {
+                        Serial.println(F("* Command requires operation as auxiliary controller (L1)"));
+                        break;
+                      }
                       if (verbose) Serial.print(F("* Param36 "));
                       Serial.print(F("0x"));
-                      if (setParam36 <= 0x000F) Serial.print(F("0"));
-                      if (setParam36 <= 0x00FF) Serial.print(F("0"));
-                      if (setParam36 <= 0x0FFF) Serial.print(F("0"));
+                      if (setParam36 <= 0x000F) Serial.print('0');
+                      if (setParam36 <= 0x00FF) Serial.print('0');
+                      if (setParam36 <= 0x0FFF) Serial.print('0');
                       Serial.println(setParam36, HEX);
                       if (scanhex(RSp, temphex) == 1) {
                         if ((wr_pt == 0x36) && (wr_nr == setParam36) && wr_cnt) {
@@ -983,9 +1005,9 @@ void loop() {
                           setValue36 = temphex;
                           if (!verbose) break;
                           Serial.print(F(" will be set to 0x"));
-                          if (setValue36 <= 0x000F) Serial.print(F("0"));
-                          if (setValue36 <= 0x00FF) Serial.print(F("0"));
-                          if (setValue36 <= 0x0FFF) Serial.print(F("0"));
+                          if (setValue36 <= 0x000F) Serial.print('0');
+                          if (setValue36 <= 0x00FF) Serial.print('0');
+                          if (setValue36 <= 0x0FFF) Serial.print('0');
                           Serial.println(setValue36, HEX);
                           break;
                         } else {
@@ -993,8 +1015,11 @@ void loop() {
                           break;
                         }
                       } else if (setRequest36) {
-                        Serial.println(F(": 36-write-request to value 0x"));
-                        Serial.println(setValue36, HEX);
+                        Serial.print(F(": 36-write-request to value 0x"));
+                        if (setValue36 <= 0x000F) Serial.print('0');
+                        if (setValue36 <= 0x00FF) Serial.print('0');
+                        if (setValue36 <= 0x0FFF) Serial.print('0');
+                        Serial.print(setValue36, HEX);
                         Serial.println(F(" still pending"));
                       } else {
                         Serial.println(F(": no 36-write-request pending"));
@@ -1002,11 +1027,15 @@ void loop() {
                       break;
             case 'n': // N  report status of packet type 3A write action
             case 'N': // Nx set value for parameter write (PARAMSYS/'m') in packet type 3A and initiate write action
+                      if (!CONTROL_ID) {
+                        Serial.println(F("* Command requires operation as auxiliary controller (L1)"));
+                        break;
+                      }
                       if (verbose) Serial.print(F("* Param3A "));
                       Serial.print(F("0x"));
-                      if (setParam3A <= 0x000F) Serial.print(F("0"));
-                      if (setParam3A <= 0x00FF) Serial.print(F("0"));
-                      if (setParam3A <= 0x0FFF) Serial.print(F("0"));
+                      if (setParam3A <= 0x000F) Serial.print('0');
+                      if (setParam3A <= 0x00FF) Serial.print('0');
+                      if (setParam3A <= 0x0FFF) Serial.print('0');
                       Serial.println(setParam3A, HEX);
                       if (scanhex(RSp, temphex) == 1) {
                         if ((wr_pt == 0x3A) && (wr_nr == setParam3A) && wr_cnt) {
@@ -1019,7 +1048,7 @@ void loop() {
                           setValue3A = temphex;
                           if (!verbose) break;
                           Serial.print(F(": will be set to 0x"));
-                          if (setValue3A <= 0x000F) Serial.print(F("0"));
+                          if (setValue3A <= 0x0F) Serial.print('0');
                           Serial.println(setValue3A, HEX);
                           break;
                         } else {
@@ -1027,8 +1056,9 @@ void loop() {
                           break;
                         }
                       } else if (setRequest3A) {
-                        Serial.println(F(": 3A-write-request to value 0x"));
-                        Serial.println(setValue3A, HEX);
+                        Serial.print(F(": 3A-write-request to value 0x"));
+                        if (setValue3A <= 0x0F) Serial.print('0');
+                        Serial.print(setValue3A, HEX);
                         Serial.println(F(" still pending"));
                       } else {
                         Serial.println(F(": no 3A-write-request pending"));
@@ -1036,11 +1066,12 @@ void loop() {
                       break;
             case 'y': // Y  report status of DHW write action (packet type 0x35)
             case 'Y': // Yx set value for DHW parameter write (defined by PARAM_DHW_ONOFF in P1P2Config.h, not reconfigurable) in packet type 35 and initiate write action
+                      if (!CONTROL_ID) Serial.println(F("* Command requires operation as auxiliary controller (L1)"));
                       if (verbose) Serial.print(F("* DHWparam35 "));
                       Serial.print(F("0x"));
-                      if (PARAM_DHW_ONOFF <= 0x000F) Serial.print(F("0"));
-                      if (PARAM_DHW_ONOFF <= 0x00FF) Serial.print(F("0"));
-                      if (PARAM_DHW_ONOFF <= 0x0FFF) Serial.print(F("0"));
+                      if (PARAM_DHW_ONOFF <= 0x000F) Serial.print('0');
+                      if (PARAM_DHW_ONOFF <= 0x00FF) Serial.print('0');
+                      if (PARAM_DHW_ONOFF <= 0x0FFF) Serial.print('0');
                       Serial.println(PARAM_DHW_ONOFF, HEX);
                       if (scanint(RSp, temp) == 1) {
                         if ((wr_pt == 0x35) && (wr_nr == PARAM_DHW_ONOFF) && wr_cnt) {
@@ -1057,16 +1088,17 @@ void loop() {
                           setStatusDHW = temp;
                           if (!verbose) break;
                           Serial.print(F(" will be set to 0x"));
-                          if (setStatusDHW <= 0x000F) Serial.print(F("0"));
+                          if (setStatusDHW <= 0x000F) Serial.print('0');
                           Serial.println(setStatusDHW);
                           break;
                         } else {
                           Serial.println(F("* Currently no write budget left"));
                           break;
                         }
-                      } else if (setRequest35) {
-                        Serial.println(F(": DHW-write-request to value 0x"));
-                        Serial.println(setValue35, HEX);
+                      } else if (setRequestDHW) {
+                        Serial.print(F(": DHW-write-request to value 0x"));
+                        if (setStatusDHW <= 0x0F) Serial.print('0');
+                        Serial.print(setStatusDHW, HEX);
                         Serial.println(F(" still pending"));
                       } else {
                         Serial.println(F(": no DHW-write-request pending"));
@@ -1100,10 +1132,6 @@ void loop() {
     pseudo0E++;
     pseudo0F++;
     upt_prev_pseudo = upt;
-
-
-
-
   }
   if (upt >= upt_prev_write + TIME_WRITE_PERMISSION) {
     if (writePermission < MAX_WRITE_PERMISSION) writePermission++;
@@ -1267,6 +1295,11 @@ void loop() {
           Serial.println(F("* Warning: Upon ATmega restart auxiliary controller functionality and counter request functionality will remain switched off"));
           EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
           EEPROM_update(EEPROM_ADDRESS_COUNTER_STATUS, counterRepeatingRequest);
+          setRequest35 = 0;
+          setRequest36 = 0;
+          setRequest3A = 0;
+          setRequestDHW = 0;
+          wr_cnt = 0;
         }
       }
     }
@@ -1337,14 +1370,19 @@ void loop() {
         if ((delta < F03XDELAY - 2) && (delta < F030DELAY - 2)) {
           FxAbsentCnt[RB[1] & 0x01] = 0;
           if (RB[1] == CONTROL_ID) {
-            // this should only happen if an auxiliary controller is connected if/after CONTROL_ID is set, either because
+            // this should only happen if another auxiliary controller is connected if/after CONTROL_ID is set, either because
             //    -CONTROL_ID_DEFAULT is set and conflicts with auxiliary controller, or
-            //    -because an auxiliary controller has been connected after CONTROL_ID has been manually set
+            //    -because another auxiliary controller has been connected after CONTROL_ID has been manually set
             Serial.print(F("* Warning: another auxiliary controller is answering to address 0x"));
             Serial.print(RB[1], HEX);
             Serial.println(F(" detected"));
             CONTROL_ID = CONTROL_ID_NONE;
             EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+            setRequest35 = 0;
+            setRequest36 = 0;
+            setRequest3A = 0;
+            setRequestDHW = 0;
+            wr_cnt = 0;
           }
         }
       } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30) && !F030forcounter) {
@@ -1438,6 +1476,8 @@ void loop() {
                         break;
             case 0x32 : // in: 19 byte: out 19 byte, out is copy in
                         for (w = 3; w < n; w++) WB[w] = RB[w];
+                        // on one system, response is all-zero, so consider to change to all-zero response:
+                        // for (w = 3; w < n; w++) WB[w] = 0x00;
                         wr = 1;
                         break;
             case 0x33 : // not seen, no response
@@ -1456,9 +1496,9 @@ void loop() {
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         // change bytes for triggering 35request
                         w = 3;
-                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = (wr_val & 0xFF); wr_cnt--; wr_req = 1; }
-                        if (setRequestDHW) { WB[w++] = PARAM_DHW_ONOFF & 0xff; WB[w++] = PARAM_DHW_ONOFF >> 8; WB[w++] = setStatusDHW; setRequestDHW = 0; }
-                        if (setRequest35)  { WB[w++] = setParam35  & 0xff; WB[w++] = setParam35  >> 8; WB[w++] = setValue35;   setRequest35 = 0; }
+                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = (wr_val & 0xFF); wr_cnt--; wr_req = 1; Serial.println("* Executing E command"); }
+                        if (setRequestDHW) { WB[w++] = PARAM_DHW_ONOFF & 0xff; WB[w++] = PARAM_DHW_ONOFF >> 8; WB[w++] = setStatusDHW; setRequestDHW = 0; Serial.println("* Executing Y command"); }
+                        if (setRequest35)  { WB[w++] = setParam35  & 0xff; WB[w++] = setParam35  >> 8; WB[w++] = setValue35;   setRequest35 = 0; Serial.println("* Executing Z command"); }
                         // feedback no longer supported:
                         // for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == setParam35) Value35 = RB[w+2];
                         // for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == PARAM_DHW_ONOFF) DHWstatus = RB[w+2];
@@ -1469,8 +1509,8 @@ void loop() {
                         // write bytes for parameter setParam36 to value set36status if setRequest36
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
-                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; wr_cnt--; wr_req = 1; }
-                        if (setRequest36) { WB[w++] = setParam36 & 0xff; WB[w++] = (setParam36 >> 8) & 0xff; WB[w++] = setValue36 & 0xff; WB[w++] = (setValue36 >> 8) & 0xff; setRequest36 = 0; }
+                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; wr_cnt--; wr_req = 1; Serial.println("* Executing E command"); }
+                        if (setRequest36) { WB[w++] = setParam36 & 0xff; WB[w++] = (setParam36 >> 8) & 0xff; WB[w++] = setValue36 & 0xff; WB[w++] = (setValue36 >> 8) & 0xff; setRequest36 = 0; Serial.println("* Executing R command"); }
                         // check if set36status has been changed by main controller; removed this part as it is not the most reliable confirmation method
                         // for (w = 3; w < n; w+=4) if (((RB[w+1] << 8) | RB[w]) == setParam36) Value36 = RB[w+2] | (RB[w+3] << 8);
                         wr = 1;
@@ -1481,7 +1521,7 @@ void loop() {
                         // seen in EHYHBX08AAV3
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
-                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; wr_cnt--; wr_req = 1; }
+                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; wr_cnt--; wr_req = 1; Serial.println("* Executing E command"); }
                         wr = 1;
                         break;
             case 0x38 : // in: 21 byte; out 21 byte; 4-byte parameters; reply with FF
@@ -1492,13 +1532,13 @@ void loop() {
                         // A parameter consists of 6 bytes: 2 bytes for param nr, and 4 bytes for value
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
-                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; WB[w++] = (wr_val >> 24) & 0xFF; wr_cnt--; wr_req = 1; };
+                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; WB[w++] = (wr_val >> 24) & 0xFF; wr_cnt--; wr_req = 1; Serial.println("* Executing E command"); };
                         wr = 1;
                         break;
             case 0x39 : // in: 21 byte; out 21 byte; 4-byte parameters; reply with FF
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
-                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; WB[w++] = (wr_val >> 24) & 0xFF; wr_cnt--; wr_req = 1;}
+                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; WB[w++] = (wr_val >> 24) & 0xFF; wr_cnt--; wr_req = 1;Serial.println("* Executing E command"); }
                         wr = 1;
                         break;
             case 0x3A : // in: 21 byte; out 21 byte; 1-byte parameters reply with FF
@@ -1507,8 +1547,8 @@ void loop() {
                         // change bytes for triggering 3Arequest
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
-                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = (wr_val & 0xFF); wr_cnt--; wr_req = 1;}
-                        if (setRequest3A)  { WB[w++] = setParam3A  & 0xff; WB[w++] = setParam3A  >> 8; WB[w++] = setValue3A;   setRequest3A = 0; }
+                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = (wr_val & 0xFF); wr_cnt--; wr_req = 1;Serial.println("* Executing E command"); }
+                        if (setRequest3A)  { WB[w++] = setParam3A  & 0xff; WB[w++] = setParam3A  >> 8; WB[w++] = setValue3A;   setRequest3A = 0; Serial.println("* Executing N command"); }
                         // feedback no longer supported:
                         // for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == setParam3A) Value3A = RB[w+2];
                         wr = 1;
@@ -1519,13 +1559,13 @@ void loop() {
                         // seen in EHYHBX08AAV3
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
-                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; wr_cnt--; wr_req = 1; }
+                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; wr_cnt--; wr_req = 1; Serial.println("* Executing E command"); }
                         wr = 1;
                         break;
             case 0x3C : // in: 23 byte; out 23 byte; 3-byte parameters; reply with FF
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
-                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; wr_cnt--; wr_req = 1; }
+                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; wr_cnt--; wr_req = 1; Serial.println("* Executing E command"); }
                         wr = 1;
                         break;
             case 0x3D : // in: 21 byte; out: 21 byte; 4-byte parameters; reply with FF
@@ -1535,7 +1575,7 @@ void loop() {
                         // seen in EHYHBX08AAV3
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
-                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; WB[w++] = (wr_val >> 24) & 0xFF; wr_cnt--; wr_req = 1; }
+                        if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; WB[w++] = (wr_val >> 16) & 0xFF; WB[w++] = (wr_val >> 24) & 0xFF; wr_cnt--; wr_req = 1; Serial.println("* Executing E command"); }
                         wr = 1;
                         break;
             case 0x3E : // schedule related packet
@@ -1648,7 +1688,7 @@ void loop() {
               WB[18] = 0;                      // puzzle: initially 0, then 2, then 1 ????
               WB[19] = 0x00;
               if (wr_cnt && (wr_pt == RB[2])) {
-                if ((wr_nr == 0) && (WB[wr_nr + 3] == 0x00) && (wr_val)) WB[16] |= 0x20; // chnage payload byte 13 from C0 to E0, only if payload byte 0 is set to 1 here
+                if ((wr_nr == 0) && (WB[wr_nr + 3] == 0x00) && (wr_val)) WB[16] |= 0x20; // change payload byte 13 from C0 to E0, only if payload byte 0 is set to 1 here
                 WB[wr_nr + 3] = wr_val;
                 wr_cnt--;
               }
@@ -1723,10 +1763,10 @@ void loop() {
       // 3nd-12th characters show length of bus pause (max "R T 65.535: ")
       Serial.print(F("T "));
       if (delta < 10000) Serial.print(F(" "));
-      if (delta < 1000) Serial.print(F("0")); else { Serial.print(delta / 1000); delta %= 1000; };
+      if (delta < 1000) Serial.print('0'); else { Serial.print(delta / 1000); delta %= 1000; };
       Serial.print(F("."));
-      if (delta < 100) Serial.print(F("0"));
-      if (delta < 10) Serial.print(F("0"));
+      if (delta < 100) Serial.print('0');
+      if (delta < 10) Serial.print('0');
       Serial.print(delta);
       Serial.print(F(": "));
     }
@@ -1770,7 +1810,7 @@ void loop() {
         if (crc_gen && (verbose == 1) && (i == nread - 1)) {
           Serial.print(F(" CRC="));
         }
-        if (c < 0x10) Serial.print(F("0"));
+        if (c < 0x10) Serial.print('0');
         Serial.print(c, HEX);
         if (verbose && (EB[i] & ERROR_OR)) {
           // buffer overrun detected (overrun is after, not before, the read byte)

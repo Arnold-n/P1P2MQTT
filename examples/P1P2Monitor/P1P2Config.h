@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20230117 v0.9.32 check CONTROL_ID for write commands
  * 20230108 v0.9.31 fix nr_param check
  * 20221224 v0.9.30 expand F series write possibilities
  * 20221211 v0.9.29 add control_ID in bool in pseudopacket, fix 3+4-byte writes, FXMQ support
@@ -61,7 +62,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.31"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.32"
 
 #define INIT_VERBOSE 3
 // Set verbosity level
