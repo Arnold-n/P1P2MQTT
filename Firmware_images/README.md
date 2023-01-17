@@ -2,31 +2,35 @@
 
 ## P1P2Monitor firmware for ATmega328 on P1P2-ESP-Interface
 
-These images are for the P1P2-ESP-interface v1.0 and v1.1. They do not work on the Arduino Uno.
+These images are for the P1P2-ESP-interface (P1P2MQTT bridge) v1.0 and v1.1. They do not work on the Arduino Uno.
 
-P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and FDY/FDYQ F-series. Monitoring is also available for certain F-series models.
+P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and FDY/FDYQ/FXMQ F-series. Monitoring is also available for certain F-series models.
 
-[P1P2Monitor v0.9.24 for Daikin E-series](P1P2Monitor-0.9.24-Eseries.ino.hex)
+[P1P2Monitor v0.9.32 for Daikin E-series](P1P2Monitor_P1P2MQTT-bridge_E_series-v0.9.32.ino.hex)
 
-[P1P2Monitor v0.9.24 for Daikin E-series](P1P2Monitor-0.9.24-Fseries.ino.hex)
+[P1P2Monitor v0.9.32 for Daikin FDY](P1P2Monitor_P1P2MQTT-bridge_FDY-v0.9.32.ino.hex)
+
+[P1P2Monitor v0.9.32 for Daikin FDYQ](P1P2Monitor_P1P2MQTT-bridge_FDYQ_series-v0.9.32.ino.hex)
+
+[P1P2Monitor v0.9.32 for Daikin FXMQ](P1P2Monitor_P1P2MQTT-bridge_FXMQ_series-v0.9.32.ino.hex)
 
 To install (Linux CLI):
 
 ```
-avrdude -c avrisp -p atmega328p  -P net:<IPv4>:328 -e -Uflash:w:P1P2Monitor-0.9.24-Eseries.ino.hex:i
+avrdude -c avrisp -p atmega328p  -P net:<IPv4>:328 -e -Uflash:w:<hex-file>:i
 ```
 
 To install (Windows CLI, using avrdude 7.0 for Windows):
 
 ```
-avrdude.exe -c avrisp -p m328p  -P net:<IPv4>:328 -e -Uflash:w:P1P2Monitor-0.9.24-Eseries.ino.hex:i
+avrdude.exe -c avrisp -p m328p  -P net:<IPv4>:328 -e -Uflash:w:<hex-file>:i
 ```
 
 ## P1P2-bridge-esp8266 firmware for P1P2-ESP-Interface (4MB ESP8266)
 
-[P1P2-bridge-esp8266 0.9.24 (P1P2-ESP-Interface version) for Daikin E-series](P1P2-bridge-esp8266-0.9.24-Eseries-P1P2-ESP-interface.ino.bin)
+[P1P2-bridge-esp8266 0.9.31 (P1P2-ESP-Interface version) for Daikin E-series](P1P2-bridge-esp8266-0.9.31-Eseries.ino.bin)
 
-[P1P2-bridge-esp8266 0.9.24 (P1P2-ESP-Interface version) for Daikin F-series](P1P2-bridge-esp8266-0.9.24-Fseries-P1P2-ESP-interface.ino.bin)
+[P1P2-bridge-esp8266 0.9.31 (P1P2-ESP-Interface version) for Daikin F-series](P1P2-bridge-esp8266-0.9.31-Fseries.ino.bin)
 
 Note to P1P2-ESP-interface v1.0 users: please do not erase the flash area of the ESP8266 when flashing these images, and if you do, you will need to reset the hardware identifier back to 0 using the 'B' command (or you will not be able to flash the ATmega328P).
 
