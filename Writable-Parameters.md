@@ -1,4 +1,4 @@
-** Writable parameters Altherma 3 **
+# Writable parameters Altherma 3
 
 On Daikin Altherma 3 systems parameters are communicated between the main controller and auxiliary controller in packet types 35, 36, and 3A. Packet types 35 and 3A are used to communicate 8-bit values and packet type 36 is used to communicate 16-bit values.
 
@@ -83,10 +83,10 @@ Some other parameters:
 
 Many thanks to Budulinek for finding some of these parameters. More writable parameters can be found in Budulinek's [documentation](https://github.com/budulinek/Daikin-P1P2---UDP-Gateway/blob/main/Payload-data-write.md).
 
-** Writable parameters Altherma 2 **
+# Writable parameters Altherma 2
 
 TBD
 
-** Writable parameters VRV / Sky air systems **
+# Writable parameters VRV / Sky air systems
 
 TBD
