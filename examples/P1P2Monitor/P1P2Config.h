@@ -22,7 +22,7 @@
  */
 
 #define EEPROM_SUPPORT   // adds EEPROM support to store verbose, counterrepeatingrequest, and CONTROL_ID
-#define PSEUDO_PACKETS   // adds pseudopacket to serial output with ATmega status info for P1P2-bridge-esp8266
+//#define PSEUDO_PACKETS   // adds pseudopacket to serial output with ATmega status info for P1P2-bridge-esp8266
 
 // Define serial speed
 // Use 115200 for Arduino Uno/Mega2560 (serial over USB)

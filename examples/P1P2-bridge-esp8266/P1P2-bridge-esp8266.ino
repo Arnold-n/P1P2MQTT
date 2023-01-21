@@ -1487,11 +1487,11 @@ void process_for_mqtt_json(byte* rb, int n) {
   char mqtt_key[MQTT_KEY_LEN + MQTT_KEY_PREFIXLEN]; // = mqttKeyPrefix;
   if (!mqttConnected) Mqtt_disconnectSkippedPackets++;
   if (mqttConnected || MQTT_DISCONNECT_CONTINUE) {
-    if (n == 3) bytes2keyvalue(rb[0], rb[2], EMPTY_PAYLOAD, rb + 3, mqtt_key, mqtt_value);
-    for (byte i = 3; i < n; i++) {
+//    if (n == 3) bytes2keyvalue(rb[0], rb[2], EMPTY_PAYLOAD, rb + 3, mqtt_key, mqtt_value);
+    for (byte i = 1; i < n; i++) {
       if (!--throttle) {
         throttle = throttleValue;
-        int kvrbyte = bytes2keyvalue(rb[0], rb[2], i - 3, rb + 3, mqtt_key, mqtt_value);
+        int kvrbyte = bytes2keyvalue(rb[0], i - 1, rb + 1, mqtt_key, mqtt_value);
         // returns 0 if byte does not trigger any output
         // returns 1 if new mqtt_key,mqtt_value should be output
         // returns 8 if byte should be treated per bit
@@ -1513,7 +1513,7 @@ void process_for_mqtt_json(byte* rb, int n) {
             Sprint_P(true, true, true, PSTR("* [ESP] Warning: kvrbyte > 9 Src 0x%02X Tp 0x%02X Byte %i"),rb[0], rb[2], i);
           }
           for (byte j = 0; j < kvrbyte; j++) {
-            int kvr = (kvrbyte == 8) ? bits2keyvalue(rb[0], rb[2], i - 3, rb + 3, mqtt_key, mqtt_value, j) : kvrbyte;
+            int kvr = (kvrbyte == 8) ? bits2keyvalue(rb[0], i - 1, rb + 1, mqtt_key, mqtt_value, j) : kvrbyte;
             if (kvr) {
               if (outputMode & 0x0002) client_publish_mqtt(mqtt_key, mqtt_value);
               if (outputMode & 0x0020) client_publish_telnet(mqtt_key, mqtt_value);
@@ -1768,14 +1768,7 @@ void loop() {
                 if ((outputMode & 0x0800) && (mqttConnected)) mqttClient.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) readHex, rh + 1);
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
                 if (outputMode & 0x0666) process_for_mqtt_json(readHex, rh);
-#ifdef PSEUDO_PACKETS
-                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0D)) pseudo0D = 9; // Insert pseudo packet 40000D in output serial after 00000D
-                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) pseudo0F = 9; // Insert pseudo packet 40000F in output serial after 00000F
-#endif
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0E)) {
-#ifdef PSEUDO_PACKETS
-                  pseudo0E = 9; // Insert pseudo packet 40000E in output serial after 00000E
-#endif
                   uint32_t ATmega_uptime = (readHex[3] << 24) || (readHex[4] << 16) || (readHex[5] << 8) || readHex[6];
                   if (ATmega_uptime < ATmega_uptime_prev) {
                     // unexpected ATmega reboot detected, flush ATmega's serial input
@@ -1827,98 +1820,5 @@ void loop() {
     } else {
       // wait for more serial input
     }
-#ifdef PSEUDO_PACKETS
-    if (pseudo0D > 5) {
-      pseudo0D = 0;
-      readHex[0] = 0x40;
-      readHex[1] = 0x00;
-#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
-      readHex[2] = 0x09;
-#else
-      readHex[2] = 0x0D;
-#endif
-      readHex[3] = Compile_Options;
-      readHex[4] = (Mqtt_msgSkipNotConnected >> 8) & 0xFF;
-      readHex[5] = Mqtt_msgSkipNotConnected & 0xFF;
-      readHex[6]  = (mqttPublished >> 24) & 0xFF;
-      readHex[7]  = (mqttPublished >> 16) & 0xFF;
-      readHex[8]  = (mqttPublished >> 8) & 0xFF;
-      readHex[9]  = mqttPublished & 0xFF;
-      readHex[10] = (Mqtt_disconnectTime >> 8) & 0xFF;
-      readHex[11] = Mqtt_disconnectTime & 0xFF;
-      readHex[12] = WiFi.RSSI() & 0xFF;
-      readHex[13] = WiFi.status() & 0xFF;
-      readHex[14] = saveRebootReason;
-      readHex[15] = (outputMode >> 24) & 0xFF;
-      readHex[16] = (outputMode >> 16) & 0xFF;
-      readHex[17] = (outputMode >> 8) & 0xFF;
-      readHex[18] = outputMode & 0xFF;
-      for (int i = 19; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
-      writePseudoPacket(readHex, 23);
-    }
-    if (pseudo0E > 5) {
-      pseudo0E = 0;
-      readHex[0]  = 0x40;
-      readHex[1]  = 0x00;
-#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
-      readHex[2] = 0x0A;
-#else
-      readHex[2] = 0x0E;
-#endif
-      readHex[3]  = (espUptime >> 24) & 0xFF;
-      readHex[4]  = (espUptime >> 16) & 0xFF;
-      readHex[5]  = (espUptime >> 8) & 0xFF;
-      readHex[6]  = espUptime & 0xFF;
-      readHex[7]  = (Mqtt_acknowledged >> 24) & 0xFF;
-      readHex[8]  = (Mqtt_acknowledged >> 16) & 0xFF;
-      readHex[9]  = (Mqtt_acknowledged >> 8) & 0xFF;
-      readHex[10] = Mqtt_acknowledged & 0xFF;
-      readHex[11] = (Mqtt_gap >> 24) & 0xFF;
-      readHex[12] = (Mqtt_gap >> 16) & 0xFF;
-      readHex[13] = (Mqtt_gap >> 8) & 0xFF;
-      readHex[14] = Mqtt_gap & 0xFF;
-      readHex[15] = (MQTT_MIN_FREE_MEMORY >> 8) & 0xFF;
-      readHex[16] = MQTT_MIN_FREE_MEMORY & 0xFF;
-      readHex[17] = hwID;              // previously 16-bit outputMode;
-      readHex[18] = ethernetConnected; // previously 16-bit outputMode;
-      readHex[19] = (maxLoopTime >> 24) & 0xFF;
-      readHex[20] = (maxLoopTime >> 16) & 0xFF;
-      readHex[21] = (maxLoopTime >> 8) & 0xFF;
-      readHex[22] = maxLoopTime & 0xFF;
-      writePseudoPacket(readHex, 23);
-    }
-    if (pseudo0F > 5) {
-      pseudo0F = 0;
-      readHex[0] = 0x40;
-      readHex[1] = 0x00;
-#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
-      readHex[2] = 0x0B;
-#else
-      readHex[2] = 0x0F;
-#endif
-      readHex[3]  = telnetConnected;
-      readHex[4]  = outputFilter;
-      uint16_t m1 = ESP.getMaxFreeBlockSize();
-      readHex[5]  = (m1 >> 8) & 0xFF;
-      readHex[6]  = m1 & 0xFF;
-      readHex[7]  = (Mqtt_disconnectTimeTotal >> 8) & 0xFF;
-      readHex[8]  = Mqtt_disconnectTimeTotal & 0xFF;
-      readHex[9]  = (Sprint_buffer_overflow >> 8) & 0xFF;
-      readHex[10] = Sprint_buffer_overflow & 0xFF;
-      readHex[11] = ESP_serial_input_Errors_Data_Short;
-      readHex[12] = ESP_serial_input_Errors_CS;
-      readHex[13] = (MQTT_waitCounter >> 24) & 0xFF;
-      readHex[14] = (MQTT_waitCounter >> 16) & 0xFF;
-      readHex[15] = (MQTT_waitCounter >> 8) & 0xFF;
-      readHex[16] = MQTT_waitCounter & 0xFF;
-      readHex[17] = (Mqtt_disconnects >> 8) & 0xFF;
-      readHex[18] = Mqtt_disconnects & 0xFF;
-      readHex[19] = (Mqtt_disconnectSkippedPackets >> 8) & 0xFF;
-      readHex[20] = Mqtt_disconnectSkippedPackets & 0xFF;
-      readHex[21] = (Mqtt_msgSkipLowMem >> 8) & 0xFF;
-      readHex[22] = Mqtt_msgSkipLowMem & 0xFF;
-      writePseudoPacket(readHex, 23);
-    }
-#endif
   }
 }

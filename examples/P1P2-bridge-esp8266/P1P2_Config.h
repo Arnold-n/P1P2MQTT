@@ -7,6 +7,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230121 v0.9.32 MHI data analysis output attempt 2
  * 20230114 v0.9.31 MHI
  * 20221228 v0.9.30 switch from modified ESP_telnet library to ESP_telnet v2.0.0
  * 20221116 v0.9.28 reset-line behaviour, IPv4 EEPROM init
@@ -114,9 +115,9 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.31MHI"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.31MHI"
-#define HA_SW "0.9.31MHI"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.32MHI_2"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.32MHI_2"
+#define HA_SW "0.9.32MHI_2"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
@@ -129,8 +130,6 @@
                // the telnet library provides no authentication for telnet
                // Unfortunately telnet output is synchronized, which may trigger some issues only when telnet is being used
                // undefine on open networks or if you experience problems
-
-#define PSEUDO_PACKETS // define to have P1P2-bridge-esp8266 output additional P1P2-like packets with internal state information
 
 // home assistant (including MQTT discovery)
 #define HA_PREFIX "homeassistant/sensor"   // homeassistant MQTT discovery prefix
@@ -189,7 +188,7 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #ifdef ESP01S_MQTT
 #define INIT_OUTPUTMODE 0x1C003
 #else
-#define INIT_OUTPUTMODE 0x13003 // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
+#define INIT_OUTPUTMODE 0x1303B // normally 13003, but 1303B for initial MHI analysis // outputmode determines output content and channels, can be changed run-time using 'J'/'j' command
 #endif
                                // outputmode is sum of:
                                // 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx
