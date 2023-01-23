@@ -371,11 +371,8 @@ uint32_t Sprint_buffer_overflow = 0;
 // Include Daikin product-dependent header file for parameter conversion
 // include here such that Sprint_P(PSTR()) is available in header file code
 
-#ifdef H_SERIES
-#include "P1P2_Daikin_ParameterConversion_H.h"
-#endif
 #ifdef MHI_SERIES
-#include "P1P2_Daikin_ParameterConversion_H.h" // for now same as H-link2
+#include "P1P2_Daikin_ParameterConversion_MHI.h"
 #endif
 
 static byte throttle = 1;
