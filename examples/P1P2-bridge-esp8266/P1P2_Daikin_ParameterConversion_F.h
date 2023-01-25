@@ -746,6 +746,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
 #include "P1P2_pseudo.h"
     default : UNKNOWN_BYTE // unknown PacketByte
   }
+  return 0;
 }
 
 byte bits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte j) {
