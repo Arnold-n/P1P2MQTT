@@ -1,5 +1,9 @@
 # Firmware images for P1P2-ESP-Interface
 
+The P1P2MQTT bridge (previously P1P2-ESP-interface) has 2 CPUs:
+ - ATmega328P running P1P2Monitor
+ - ESP8266 running P1P2-bridge-esp8266 (software will later be renamed by P1P2MQTT)
+
 ## P1P2Monitor firmware for ATmega328 on P1P2-ESP-Interface
 
 These images are for the P1P2-ESP-interface (P1P2MQTT bridge) v1.0 and v1.1. They do not work on the Arduino Uno.
@@ -26,7 +30,7 @@ To install (Windows CLI, using avrdude 7.0 for Windows):
 avrdude.exe -c avrisp -p m328p  -P net:<IPv4>:328 -e -Uflash:w:<hex-file>:i
 ```
 
-## P1P2-bridge-esp8266 firmware for P1P2-ESP-Interface (4MB ESP8266)
+## P1P2-bridge-esp8266 firmware for ESP8266 on P1P2-ESP-Interface
 
 [P1P2-bridge-esp8266 0.9.31 (P1P2-ESP-Interface version) for Daikin E-series](P1P2-bridge-esp8266-0.9.31-Eseries.ino.bin)
 
