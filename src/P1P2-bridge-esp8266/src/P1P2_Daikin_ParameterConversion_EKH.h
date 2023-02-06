@@ -39,8 +39,8 @@
 // The core of the translation is formed by large nested switch statements.
 // Many of the macro's include break statements and make the core more readable.
 
-#ifndef P1P2_Daikin_ParameterConversion_EHYHB
-#define P1P2_Daikin_ParameterConversion_EHYHB
+#ifndef P1P2_Daikin_ParameterConversion_EKH
+#define P1P2_Daikin_ParameterConversion_EKH
 
 #include "P1P2Serial_ADC.h"
 #include "P1P2_Config.h"
