@@ -10,7 +10,6 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
- * 20230108 v0.9.31 sensor prefix, use 4th IPv4 byte for HA MQTT discovery, fix bit history for 0x30/0x31; added pseudo controlLevel
  * 20221108 v0.9.25 ADC support
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
  * 20220904 v0.9.20 new file for F-series VRV reporting in MQTT for 2 models
@@ -83,13 +82,13 @@ int TimeStringCnt = 0;  // reset when TimeString is changed, for use in P1P2Time
 byte maxOutputFilter = 0;
 
 #ifdef SAVEPACKETS
-#define PCKTP_START  0x08 // 0x08-0x11, 0x18 mapped to 0x12, 0x20 mapped to 0x13, 0x30-3F mapped to 0x14-0x23, 0x80 mapped to 0x24 // 0x37 zone name/0xC1 service mode subtype would require special coding, leave it out for now
+#define PCKTP_START  0x08 // 0x08-0x11, 0x18 mapped to 0x12, 0x20 mapped to 0x13, 0x30 mapped to 0x14, 0x30-3F mapped to 0x15-0x24, 0x80 mapped to 0x25 // 0x37 zone name/0xC1 service mode subtype would require special coding, leave it out for now
 #define PCKTP_ARR_SZ 29
 //byte packetsrc                                      = { {00                                                                                               }, {40                                                                                               }}
 //byte packettype                                     = { {08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80 }, { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F, 80 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  20,  20,  20,   0,  20,  20,  20,  20,  10,   7,   1,  20,   0,   0,   0,   0,   0,   0,   0,  20,  12,  11,  20,  12,   0,   0,   0,  10 }, {  0,  20,  20,  20,   0,  20,  20,  20,  20,  12,   0,  20,   0,   0,   0,   0,   0,   0,   0,   0,  20,   4,   7,  19,   2,   0,   0,   0, 10 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 150, 157, 158, 178, 178, 178, 178, 178, 178, 178, 178, 198, 210, 221, 241, 253, 253, 253, 253 }, {263, 263, 283, 303, 323, 323, 343, 363, 383, 403, 415, 415, 435, 435, 435, 435, 435, 435, 435, 435, 435, 455, 459, 466, 485, 487, 487, 487, 497 /*, sizeValSeen = 497 */ }};
-#define sizeValSeen 497
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  20,  20,  20,   0,  20,  20,  20,  20,  10,   7,   1,  20,   0,   0,   0,   0,   0,   0,   0,  20,  11,   0,  20,  12,   0,   0,   0,  10 }, {  0,  20,  20,  20,   0,  20,  20,  20,  20,   8,   0,  20,   0,   0,   0,   0,   0,   0,   0,   0,  20,   4,   0,  19,   2,   0,   0,   0, 10 }};
+const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 150, 157, 158, 178, 178, 178, 178, 178, 178, 178, 178, 198, 209, 209, 229, 241, 241, 241, 241 }, {251, 251, 271, 291, 311, 311, 331, 351, 371, 391, 399, 399, 419, 419, 419, 419, 419, 419, 419, 419, 419, 439, 443, 443, 462, 464, 464, 464, 474 /*, sizeValSeen = 474 */ }};
+#define sizeValSeen 474
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #endif /* SAVEPACKETS */
@@ -100,6 +99,23 @@ char ha_mqttKey[HA_KEY_LEN];
 char ha_mqttValue[HA_VALUE_LEN];
 static byte uom = 0;
 static byte stateclass = 0;
+
+#define HA_KEY snprintf_P(ha_mqttKey, HA_KEY_LEN, PSTR("%s/%s/%c%c_%s/config"), HA_PREFIX, HA_DEVICE_ID, mqtt_key[-4], mqtt_key[-2], mqtt_key);
+#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",%s\"uniq_id\":\"%c%c_%s%s\",%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
+  /* name */         mqtt_key[-4], mqtt_key[-2], mqtt_key, \
+  /* stat_t */       mqtt_key - MQTT_KEY_PREFIXLEN,\
+  /* state_class */  ((stateclass == 2) ? "\"state_class\":\"total_increasing\"," : ((stateclass == 1) ? "\"state_class\":\"measurement\"," : "")),\
+  /* uniq_id */      mqtt_key[-4], mqtt_key[-2], mqtt_key, HA_POSTFIX, \
+  /* dev_cla */      ((stateclass == 2) ? "\"dev_cla\":\"energy\"," : ""),\
+  /* unit_of_meas */ ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"°C\"," : ""))))))))),\
+  /* ic */ ((uom == 9) ? "\"ic\":\"mdi:counter\"," : ((uom == 8) ? "\"ic\":\"mdi:memory\"," : ((uom == 7) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 6) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 5) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 4) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 3) ? "\"ic\":\"mdi:water-boiler\"," : ((uom == 2) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 1) ? "\"ic\":\"mdi:coolant-temperature\"," : ""))))))))),\
+  /* device */       \
+    /* name */         HA_DEVICE_NAME,\
+    /* ids */\
+      /* id */         HA_DEVICE_ID,\
+    /* mf */           HA_MF,\
+    /* mdl */          HA_DEVICE_MODEL,\
+    /* sw */           HA_SW);
 
 bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte length, bool saveSeen) {
 // returns true if a packet parameter is observed for the first time ((and publishes it for homeassistant if haConfig==true)
@@ -462,8 +478,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    9 : KEY("Unknown_000010_9");                               HACONFIG;                                                             VALUE_u8;
         case   10 : KEY("Unknown_000010_10");                              HACONFIG;                                                             VALUE_u8;
         case   11 : KEY("Unknown_000010_11");                              HACONFIG;                                                             VALUE_u8;
-        case   12 : KEY("Unknown_000010_12");                              HACONFIG;                                                             VALUE_u8;
-        case   13 : KEY("System_status");                                  HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case   12 : KEY("Unknown_000010_12");                              HACONFIG; CAT_SETTING;                                                VALUE_u8;
+        case   13 : KEY("System_status");                                  HACONFIG;                                                             VALUE_u8;
         case   14 : KEY("Unknown_000010_14");                              HACONFIG;                                                             VALUE_u8;
         case   15 : KEY("Unknown_000010_15");                              HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
@@ -742,8 +758,102 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       default   :               UNKNOWN_BYTE;
     }
-// PSEUDO_PACKETS
-#include "P1P2_pseudo.h"
+#ifdef PSEUDO_PACKETS
+// ATmega/ESP pseudopackets
+    case 0x09 :                                                            CAT_PSEUDO2;
+    case 0x0D :                                                            CAT_PSEUDO;
+                switch (packetSrc) {
+//#define ADC_AVG_SHIFT 4     // P1P2Serial sums 16 = 2^ADC_AVG_SHIFT samples before doing min/max check
+//#define ADC_CNT_SHIFT 4     // P1P2Serial sums 16384 = 2^(16-ADC_CNT_SHIFT) samples to V0avg/V1avg
+      case 0x00 : switch (payloadIndex) {
+        case    1 : if (hwID) { KEY("V_bus_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 180k/10k resistor divider, 1.1V range
+        case    3 : if (hwID) { KEY("V_bus_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
+        case    7 : if (hwID) { KEY("V_bus_ATmega_ADC_avg"); VALUE_F_L(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4); };
+        case    9 : if (hwID) { KEY("V_3V3_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 34k3/10k resistor divider, 1.1V range
+        case   11 : if (hwID) { KEY("V_3V3_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
+        case   15 : if (hwID) { KEY("V_3V3_ATmega_ADC_avg"); VALUE_F_L(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4); };
+        default   : return 0;
+      }
+      case 0x40 : switch (payloadIndex) {
+        case    0 : KEY("ESP_Compile_Options");                                                                                                  VALUE_u8hex;
+        case    2 : KEY("MQTT_messages_skipped_not_connected");            HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
+        case    6 : KEY("MQTT_messages_published");                    /*  HACONFIG; HAEVENTS;    */                                             VALUE_u32_LE;
+        case    8 : KEY("MQTT_disconnected_time");                         HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
+        case    9 : KEY("WiFi_RSSI");                                      HACONFIG;                                                             VALUE_s8_ratelimited;
+        case   10 : KEY("WiFi_status");                                    HACONFIG;                                                             VALUE_u8;
+        case   11 : KEY("ESP_reboot_reason");                              HACONFIG;                                                             VALUE_u8hex;
+        case   15 : KEY("ESP_Output_Mode");                                HACONFIG;                                                             VALUE_u32hex_LE;
+        default   : return 0;
+      }
+      default   : return 0;
+    }
+    case 0x0A :                                                            CAT_PSEUDO2;
+    case 0x0E :                                                            CAT_PSEUDO;
+                switch (packetSrc) {
+      case 0x00 : switch (payloadIndex) {
+        case    3 : KEY("ATmega_Uptime");                                  HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE_uptime;
+        case    7 : KEY("CPU_Frequency");                                                                                                        VALUE_u32_LE;
+        case    8 : KEY("Writes_Refused");                                 HACONFIG;                                                             VALUE_u8;
+        case    9 : KEY("Counter_Request_Repeat");                         HACONFIG;                                                             VALUE_u8;
+        case   10 : KEY("Counter_Request_Counter");                                                      maxOutputFilter = 2;                    VALUE_u8;
+        case   11 : KEY("Error_Oversized_Packet_Count");                   HACONFIG;                                                             VALUE_u8;
+        case   12 : KEY("Parameter_Write_Request");                                                                                              VALUE_u8;
+        case   13 : KEY("Parameter_Write_Packet_Type");                                                                                          VALUE_u8hex;
+        case   15 : KEY("Parameter_Write_Nr");                                                                                                   VALUE_u16hex_LE;
+        case   19 : KEY("Parameter_Write_Value");                                                                                                VALUE_u32_LE;
+        default   : return 0;
+      }
+      case 0x40 : switch (payloadIndex) {
+        case    3 : KEY("ESP_Uptime");                                     HACONFIG; HASECONDS;          maxOutputFilter = 2;                    VALUE_u32_LE_uptime;
+        case    7 : KEY("MQTT_Acknowledged");                                                                                                    VALUE_u32_LE;
+        case   11 : KEY("MQTT_Gaps");                                                                                                            VALUE_u32_LE;
+        case   13 : KEY("MQTT_Min_Memory_Size");                           HACONFIG; HABYTES;                                                    VALUE_u16_LE;
+        case   15 : KEY("ESP_Output_Mode_old");                                                                                                  VALUE_u16hex_LE;
+        case   19 : KEY("ESP_Max_Loop_Time");                              HACONFIG; HAMILLISECONDS                                              VALUE_u32_LE;
+        default   : return 0;
+      }
+      default   : return 0;
+    }
+    case 0x0B :                                                            CAT_PSEUDO2;
+    case 0x0F :                                                            CAT_PSEUDO;
+                switch (packetSrc) {
+      case 0x00 : switch (payloadIndex) {
+        case    0 : KEY("Compile_Options_ATmega");                                                                                               VALUE_u8hex;
+        case    1 : KEY("Verbose");                                        HACONFIG;                                                             VALUE_u8;
+        case    2 : KEY("Reboot_MCUSR");                                   HACONFIG;                                                             VALUE_u8hex;
+        case    3 : KEY("Write_Budget");                                   HACONFIG;                                                             VALUE_u8;
+        case    4 : KEY("Error_Budget");                                   HACONFIG;                                                             VALUE_u8;
+        case    6 : KEY("Counter_Parameter_Writes");             parameterWritesDone = FN_u16_LE(&payload[payloadIndex]);
+                                                                           HACONFIG;                                                             VALUE_u16_LE;
+        case    8 : KEY("Delay_Packet_Write");                                                                                                   VALUE_u16_LE;
+        case   10 : KEY("Delay_Packet_Write_Timeout");                                                                                           VALUE_u16_LE;
+        case   11 : KEY("P1P2_ESP_Interface_hwID");                                                                                              VALUE_u8hex;
+        case   12 : KEY("Control_ID_EEPROM");                                                                                                    VALUE_u8hex;
+        case   13 : KEY("Verbose_EEPROM");                                                                                                       VALUE_u8;
+        case   14 : KEY("Counter_Request_Repeat_EEPROM");                                                                                        VALUE_u8;
+        case   15 : KEY("EEPROM_Signature_Match");                                                                                               VALUE_u8;
+        case   17 : KEY("Error_Read_Count");                               HACONFIG;                                                             VALUE_u8;
+        case   18 : KEY("Error_Read_Type");                                HACONFIG;                                                             VALUE_u8;
+        case   19 : KEY("Control_ID");                                     HACONFIG;                                                             VALUE_u8hex;
+        default   : return 0;
+      }
+      case 0x40 : switch (payloadIndex) {
+        case    0 : KEY("ESP_telnet_connected");                           HACONFIG;                                                             VALUE_u8;
+        case    1 : KEY("ESP_Output_Filter");                                                                                                    VALUE_u8;
+        case    3 : KEY("ESP_Mem_free");                                   HACONFIG; HABYTES;                                                    VALUE_u16_LE;
+        case    5 : KEY("MQTT_disconnected_time_total");                   HACONFIG; HASECONDS;                                                  VALUE_u16_LE;
+        case    7 : KEY("Sprint_buffer_overflow");                                                                                               VALUE_u16_LE;
+        case    8 : KEY("ESP_serial_input_Errors_Data_Short");;            HACONFIG;                                                             VALUE_u8;
+        case    9 : KEY("ESP_serial_input_Errors_CRC");                    HACONFIG;                                                             VALUE_u8;
+        case   13 : KEY("MQTT_Wait_Counter");                              HACONFIG; HAEVENTS;                                                   VALUE_u32_LE;
+        case   15 : KEY("MQTT_disconnects");                               HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
+        case   17 : KEY("MQTT_disconnected_skipped_packets");              HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
+        case   19 : KEY("MQTT_messages_skipped_low_mem");                  HACONFIG; HAEVENTS;                                                   VALUE_u16_LE;
+        default   : return 0;
+      }
+      default   : return 0;
+    }
+#endif /* PSEUDO_PACKETS */
     default : UNKNOWN_BYTE // unknown PacketByte
   }
 }
