@@ -10,7 +10,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
- * 20230211 v0.9.33 0xA3 thermistor read-out F-series
+ * 20230211 v0.9.33a 0xA3 thermistor read-out F-series
  * 20230108 v0.9.31 sensor prefix, use 4th IPv4 byte for HA MQTT discovery, fix bit history for 0x30/0x31; added pseudo controlLevel
  * 20221108 v0.9.25 ADC support
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
@@ -84,13 +84,13 @@ int TimeStringCnt = 0;  // reset when TimeString is changed, for use in P1P2Time
 byte maxOutputFilter = 0;
 
 #ifdef SAVEPACKETS
-#define PCKTP_START  0x08 // 0x08-0x11, 0x18 mapped to 0x12, 0x20 mapped to 0x13, 0x30-3F mapped to 0x14-0x23, 0x80 mapped to 0x24 // 0x37 zone name/0xC1 service mode subtype would require special coding, leave it out for now
-#define PCKTP_ARR_SZ 29
+#define PCKTP_START  0x08 // 0x08-0x11, 0x18 mapped to 0x12, 0x20 mapped to 0x13, 0x30-3F mapped to 0x14-0x23, 0x80 mapped to 0x24, 0xA3 mapped to 0x25 // 0x37 zone name/0xC1 service mode subtype would require special coding, leave it out for now
+#define PCKTP_ARR_SZ 30
 //byte packetsrc                                      = { {00                                                                                               }, {40                                                                                               }}
-//byte packettype                                     = { {08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80 }, { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F, 80 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  20,  20,  20,   0,  20,  20,  20,  20,  10,   7,   1,  20,   0,   0,   0,   0,   0,   0,   0,  20,  12,  11,  20,  12,   0,   0,   0,  10 }, {  0,  20,  20,  20,   0,  20,  20,  20,  20,  12,   0,  20,   0,   0,   0,   0,   0,   0,   0,   0,  20,   4,   7,  19,   2,   0,   0,   0, 10 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 150, 157, 158, 178, 178, 178, 178, 178, 178, 178, 178, 198, 210, 221, 241, 253, 253, 253, 253 }, {263, 263, 283, 303, 323, 323, 343, 363, 383, 403, 415, 415, 435, 435, 435, 435, 435, 435, 435, 435, 435, 455, 459, 466, 485, 487, 487, 487, 497 /*, sizeValSeen = 497 */ }};
-#define sizeValSeen 497
+//byte packettype                                     = { {08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80,  A3 }, { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80,  A3 }}
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  20,  20,  20,   0,  20,  20,  20,  20,  10,   7,   1,  20,   0,   0,   0,   0,   0,   0,   0,  20,  12,  11,  20,  12,   0,   0,   0,  10,   0 }, {  0,  20,  20,  20,   0,  20,  20,  20,  20,  12,   0,  20,   0,   0,   0,   0,   0,   0,   0,   0,  20,   4,   7,  19,   2,   0,   0,   0,  10,  19 }};
+const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 150, 157, 158, 178, 178, 178, 178, 178, 178, 178, 178, 198, 210, 221, 241, 253, 253, 253, 253, 263 }, {263, 263, 283, 303, 323, 323, 343, 363, 383, 403, 415, 415, 435, 435, 435, 435, 435, 435, 435, 435, 435, 455, 459, 466, 485, 487, 487, 487, 487, 497 /*, sizeValSeen = 516 */ }};
+#define sizeValSeen 516
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #endif /* SAVEPACKETS */
@@ -118,6 +118,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
     case          0x20 : pti = 0x13 - PCKTP_START; break;              // 11
     case 0x30 ... 0x3F : pti = packetType - 36; break;                 // 12 .. 27
     case          0x80 : pti = 28; break;                              // 28
+    case          0xA3 : pti = 29; break;                              // 29
     default            : /* pti = 0xFF;*/ newByte = 1; break;          // or newByte = 0;?
   }
   if (payloadIndex == EMPTY_PAYLOAD) {
