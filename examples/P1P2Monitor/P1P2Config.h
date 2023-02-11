@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20230211 v0.9.33 added ENABLE_INSERT_MESSAGE_3x, user with care!
  * 20230117 v0.9.32 check CONTROL_ID for write commands
  * 20230108 v0.9.31 fix nr_param check
  * 20221224 v0.9.30 expand F series write possibilities
@@ -62,7 +63,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.32"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.33"
 
 #define INIT_VERBOSE 3
 // Set verbosity level
@@ -149,7 +150,8 @@
 #define F03XDELAY  30   // Time delay for in ms auxiliary controller simulation, should preferably be a bit larger than any regular response from auxiliary controllers (which is typically 25 ms)
 #define F0THRESHOLD 5   // Number of 00Fx30 messages to remain unanswered before we feel safe to act as auxiliary controller
 
-#define ENABLE_INSERT_MESSAGE // enables L99 to restart Daikin system and enables W command to insert messages in 40F030 slot during L1 operation, use with care!
+#define ENABLE_INSERT_MESSAGE // enables L99 to restart Daikin system and enables W command to insert messages in 40F030 (3x if ENABLE_INSERT_ME$SAGE_3x also defined) slot during L1 operation, use with care!
+#define ENABLE_INSERT_MESSAGE_3x // enables L99 to restart Daikin system and enables W command to insert messages in 40F03x slot during L1 operation, use with even more care!
 #define F030DELAY_INSERT 5    // Time delay for inserted message, should preferably be less than 7, but enough to transmit reliably
 #define RESTART_NR_MESSAGES 1 // nr of restart messages to be sent (should be 1, perhaps 2, not more)
 #define RESTART_PACKET_TYPE 0x12

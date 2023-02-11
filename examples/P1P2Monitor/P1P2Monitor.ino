@@ -705,7 +705,7 @@ void loop() {
                       break;
             case 'w':
             case 'W': if (CONTROL_ID) {
-                        // in L1 mode, insert message in time allocaed for 40F030 slot
+                        // in L1/L5 mode, insert message in time allocaed for 40F030 slot
                         if (insertMessageCnt || restartDaikinCnt) {
                           Serial.println(F("* insertMessage (or restartDaikin) already scheduled"));
                           break;
@@ -760,6 +760,7 @@ void loop() {
                       // 2 controller mode off, do not store setting in EEPROM
                       // 3 controller mode on, do not store setting in EEPROM
                       // 5 (for experimenting with F-series only) controller responds only to 00F030 message with an empty packet, but not to other 00F03x packets
+                      // 99 restart Daikin
                       // other values are treated as 0 and are reserved for further experimentation of control modes
                       if (scanint(RSp, temp) == 1) {
 #ifdef ENABLE_INSERT_MESSAGE
@@ -1413,7 +1414,11 @@ void loop() {
         // act as auxiliary controller:
         if ((CONTROL_ID && (FxAbsentCnt[CONTROL_ID & 0x01] == F0THRESHOLD) && (RB[1] == CONTROL_ID))
 #ifdef ENABLE_INSERT_MESSAGE
-            || ((insertMessageCnt || restartDaikinCnt) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30))
+            || ((insertMessageCnt || restartDaikinCnt) && (RB[0] == 0x00) && (RB[1] == 0xF0) 
+#ifndef ENABLE_INSERT_MESSAGE_3x
+                                                                                             && (RB[2] == 0x30)
+#endif
+                                                                                                               )
 #endif
                                                                                                      ) {
           WB[0] = 0x40;

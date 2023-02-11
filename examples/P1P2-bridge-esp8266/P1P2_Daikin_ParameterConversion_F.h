@@ -10,6 +10,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230211 v0.9.33 0xA3 thermistor read-out F-series
  * 20230108 v0.9.31 sensor prefix, use 4th IPv4 byte for HA MQTT discovery, fix bit history for 0x30/0x31; added pseudo controlLevel
  * 20221108 v0.9.25 ADC support
  * 20220918 v0.9.22 degree symbol, hwID, 32-bit outputMode
@@ -308,7 +309,8 @@ uint8_t value_trg(byte packetSrc, byte packetType, byte payloadIndex, byte* payl
 
 // 16 bit fixed point reals
 
-float FN_f8_8(uint8_t *b)            { return (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
+float FN_f8_8(uint8_t *b)            { return                    (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
+float FN_s_f8_8(uint8_t *b)          { return (b[-2] ? -1 : 1) * (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
 
 uint8_t value_f8_8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
   if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1)) return 0;
@@ -316,6 +318,16 @@ uint8_t value_f8_8(byte packetSrc, byte packetType, byte payloadIndex, byte* pay
   dtostrf(FN_f8_8(&payload[payloadIndex]), 1, 2, mqtt_value);
 #else
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", FN_f8_8(&payload[payloadIndex]));
+#endif
+  return 1;
+}
+
+uint8_t value_s_f8_8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 3, 1)) return 0;
+#ifdef __AVR__
+  dtostrf(FN_s_f8_8(&payload[payloadIndex]), 1, 2, mqtt_value);
+#else
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", FN_s_f8_8(&payload[payloadIndex]));
 #endif
   return 1;
 }
@@ -364,6 +376,7 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 // VALUE_u8_add2k:      for 1-byte value (2000+payload[i]) (for year value)
 // VALUE_s4abs1c:        for 1-byte value -10..10 where bit 4 is sign and bit 0..3 is value
 // VALUE_f8_8           for 2-byte float in f8_8 format (see protocol description)
+// VALUE_s_f8_8         for 2-byte float in f8_8 format (see protocol description) with leading sign (0x40=negative)
 // VALUE_f8s8           for 2-byte float in f8s8 format (see protocol description)
 // VALUE_u16div10       for 2-byte integer to be divided by 10 (used for flow in 0.1m/s)
 // VALUE_F(value)       for self-calculated float parameter value
@@ -393,6 +406,7 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 #define VALUE_u16div10_LE_changed(ch)  { ch = value_u16div10_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); return ch; }
 
 #define VALUE_f8_8              { return        value_f8_8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
+#define VALUE_s_f8_8              { return      value_s_f8_8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_f8_8_changed(ch)  { ch = value_f8_8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); return ch; }
 
 #define VALUE_f8s8              { return        value_f8s8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
@@ -446,6 +460,41 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
 
   switch (packetType) {
     // Restart packet types 00-05 (restart procedure 00-05 followed by 20, 60-9F, A1, B1, B8, 21)
+    // Thermistor package
+    // 0DAC = 13 // other 085F
+    // 145A = 20 // other 2A98
+    case 0xA3 :
+                switch (packetSrc) {
+      case 0x00 : return 0;
+      case 0x40 : switch (payloadIndex) {
+        case    0 :
+        case    3 :
+        case    6 :
+        case    9 :
+        case   12 :
+        case   15 :
+        case    1 :
+        case    4 :
+        case    7 :
+        case   10 :
+        case   13 :
+        case   16 : return 0;
+        case    2 : if (payload[payloadIndex - 2] & 0x80) return 0;
+                    KEY("Th1");                                            HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_s_f8_8;
+        case    5 : if (payload[payloadIndex - 2] & 0x80) return 0;
+                    KEY("Th2");                                            HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_s_f8_8;
+        case    8 : if (payload[payloadIndex - 2] & 0x80) return 0;
+                    KEY("Th3");                                            HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_s_f8_8;
+        case   11 : if (payload[payloadIndex - 2] & 0x80) return 0;
+                    KEY("Th4");                                            HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_s_f8_8;
+        case   14 : if (payload[payloadIndex - 2] & 0x80) return 0;
+                    KEY("Th5");                                            HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_s_f8_8;
+        case   17 : if (payload[payloadIndex - 2] & 0x80) return 0;
+                    KEY("Th6");                                            HACONFIG; CAT_TEMP;    HATEMP;                                        VALUE_s_f8_8;
+        default   : UNKNOWN_BYTE;
+      }
+      default   :               UNKNOWN_BYTE;
+    }
     // Main package communication packet types 10-16
     case 0x10 :
                 switch (packetSrc) {
