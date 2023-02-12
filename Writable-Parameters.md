@@ -55,6 +55,9 @@ Parameter in packet type 36 for setting DHW setpoint
 Parameter in packet type 36 for setting heating temperature setpoint (only in fixed LWT mode)
 - 0x06 (works on EHBH16CAV3 and EHYHBX08AAV3)
 
+Parameter in packet type 36 for setting cooling temperature setpoint (only in fixed LWT mode)
+- 0x07 (works on EHVX08S26CB9W, likely on others too)
+
 Example commands to set fixed LWT mode main zone temperature setpoint
 - E36 6 015E sets LWT setpoint to 0x015E = 350 = 35.0 C
 - E36 6 01C2 sets LWT setpoint to 0x01C2 = 450 = 45.0 C

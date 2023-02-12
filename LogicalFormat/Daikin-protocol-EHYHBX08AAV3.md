@@ -254,14 +254,14 @@ Header: 000014
 
 | Byte(:bit) | Hex value observed | Description                      | Data type
 |:-----------|:-------------------|:---------------------------------|:-
-|   0-1      | 27 00              | Target temperature Heating Main Zone  | f8.8 or f8/8?
-|   2-3      | 27 00              | Cooling, perhaps target temperature main zone | f8.8 or f8/8?
-|   4-5      | 12 00              | Target temperature Heating, Additional Zone??  | f8.8 or f8/8?
-|   6-7      | 12 00              | Cooling, perhaps target temperature additional zone?? | f8.8 or f8/8?
-|     8      | 00-0A,10-1A        | Target deviation/delta main zone           | s-abs4
-|     9      | 00?/02/05          | ? changes based on schedules     | flag8
-|   10       | 00                 | Target deviation/delta additional zone     | s-abs4
-|   11       | 00                 | ?
+|   0-1      | 27 00              | LWT setpoint Heating Main zone   | f8.8 or f8/8?
+|   2-3      | 12 00              | LWT setpoint Cooling Main zone   | f8.8 or f8/8?
+|   4-5      | 27 00              | LWT setpoint Heating Add zone    | f8.8 or f8/8?
+|   6-7      | 12 00              | LWT setpoint Cooling Add zone    | f8.8 or f8/8?
+|     8      | 00-0A,10-1A        | LWT deviation Heating Main zone  | s-abs4
+|     9      | 00-0A,10-1A        | LWT deviation Cooling Main zone  | s-abs4
+|    10      | 00-0A,10-1A        | LWT deviation Heating Add zone   | s-abs4
+|    11      | 00-0A,10-1A        | LWT deviation Cooling Add zone   | s-abs4
 |   12       | 00/37              | first package 37 instead of 00   | u8
 |   13-14    | 00                 | ?
 
@@ -272,8 +272,8 @@ Header: 400014
 | Byte(:bit) | Hex value observed | Description               | Data type
 |:-----------|:-------------------|:--------------------------|:-
 |     0-14   | XX                 | echo of 000014-{00-14}    |
-|   15-16    | 1C-24 00-09        | Target temperature LWT main zone in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8?
-|   17-18    | 1C-24 00-09        | Target temperature LWT add zone  in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8?
+|   15-16    | 1C-24 00-09        | Target LWT Main zone in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8?
+|   17-18    | 1C-24 00-09        | Target LWT Add zone  in 0.1 degree (based on outside temperature in 0.5 degree resolution)| f8/8?
 
 ## Packet type 15 - temperatures, operating mode
 

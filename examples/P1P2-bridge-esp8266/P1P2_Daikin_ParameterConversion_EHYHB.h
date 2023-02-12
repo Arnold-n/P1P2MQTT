@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230212 v0.9.33a LWT setpoints added/renamed
  * 20230108 v0.9.31 sensor prefix, +2 valves in HA, fix bit history for 0x30/0x31, +pseudo controlLevel
  * 20221211 v0.9.29 defrost, DHW->gasboiler
  * 20221112 v0.9.27 fix to get Power_* also in HA
@@ -1174,16 +1175,17 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0003 : PARAM_KEY("Target_Temperature_DHW_1");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0
         case 0x0004 : PARAM_KEY("Target_Temperature_DHW_2");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
         case 0x0005 : PARAM_KEY("Unknown_Pulse_Q");                                                 CAT_UNKNOWN;                                 PARAM_VALUE_u16div10_and_u16hex_LE;   // 0xFE69 pulse /0xFe68  regular value ??0 / B8 related ??
-        case 0x0006 : PARAM_KEY("Target_Temperature_LWT_Zone_Main_Abs");                              CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
-        case 0x0007 : PARAM_KEY("Temperature_Unknown_Q7");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  19.0? (min/max cooling?)
-        case 0x0008 : PARAM_KEY("Temperature_LWT_Deviation_Heating_WD_Zone_Main");                          CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-8
-        case 0x0009 : PARAM_KEY("Temperature_LWT_Deviation_Cooling_WD_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ;
-        case 0x000A : PARAM_KEY("Target_Temperature_LWT_Zone_Main");                              CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // (in 0.5 C)
-        case 0x000B : PARAM_KEY("Target_Temperature_LWT_Zone_Add");                                 CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
-        case 0x000C : PARAM_KEY("Target_Temperature_Q0C");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 22.0
-        case 0x000D : PARAM_KEY("Temperature_LWT_Deviation_Heating_WD_Zone_Add");                           CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-10
-        //? case 0x000E : PARAM_KEY("Temperature_LWT_Deviation_Cooling_WD_Zone_Add");                           CAT_SETTING;                                 PARAM_VALUE_s16div10_LE ; // 0x14-0x00-10
-        case 0x000F : PARAM_KEY("Target_Temperature_Q20");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0  (25.0?)
+        case 0x0006 : PARAM_KEY("Target_Setpoint_LWT_Heating_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
+        case 0x0007 : PARAM_KEY("Target_Setpoint_LWT_Cooling_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
+        case 0x0008 : PARAM_KEY("Deviation_LWT_Heating_Zone_Main");                                 CAT_SETTING;                                 PARAM_VALUE_s16div10_LE;
+        case 0x0009 : PARAM_KEY("Deviation_LWT_Cooling_Zone_Main");                                 CAT_SETTING;                                 PARAM_VALUE_s16div10_LE;
+        case 0x000A : PARAM_KEY("Target_LWT_Zone_Main");                                            CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // (in 0.5 C)
+        case 0x000B : PARAM_KEY("Target_Setpoint_LWT_Heating_Zone_Add");                             CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
+        case 0x000C : PARAM_KEY("Target_Setpoint_LWT_Cooling_Zone_Add");                             CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
+        case 0x000D : PARAM_KEY("Deviation_LWT_Heating_Zone_Add");                                  CAT_SETTING;                                 PARAM_VALUE_s16div10_LE;
+        case 0x000E : PARAM_KEY("Deviation_LWT_Cooling_Zone_Add");                                  CAT_SETTING;                                 PARAM_VALUE_s16div10_LE;
+        case 0x000F : PARAM_KEY("Target_LWT_Zone_Add");                                             CAT_TEMP;                                    PARAM_VALUE_u16div10_LE;
+
         case 0x0010 : PARAM_KEY("Target_Temperature_Q10");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 30.0
         case 0x0011 : PARAM_KEY("Temperature_Outside_1");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // Tempout1  in 0.5 C // ~ 0x11-0x40-5
         case 0x0012 : PARAM_KEY("Temperature_Outside_2");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // Tempout2 in 0.1 C
@@ -1757,34 +1759,47 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       default   : UNKNOWN_BYTE;
     }
     case 0x14 :
-                                                                           CAT_SETTING; // PacketType14 system settings and operation
+                                                                           CAT_SETTING; // PacketType14 temperature setpoints and targets
                 switch (packetSrc) {
       case 0x00 :
                   switch (payloadIndex) {
-         case   1 : KEY("Target_Temperature_Heating_Zone_Main_Abs");             HACONFIG; HATEMP; VALUE_f8_8; // or f8s8?
-//       case   3 : KEY("Target_Temperature_Cooling_Zone_Main_Abs"); // guess
-//       case   5 : KEY("Target_Temperature_Heating_Zone_Add_Abs");  // guess
-//       case   7 : KEY("Target_Temperature_Cooling_Zone_Add_Abs");  // guess
-
-
-
-        case    8 : KEY("Target_Temperature_Deviation_Zone_Main");                                                                               VALUE_s4abs1c;
-        case   10 : KEY("Target_Temperature_Deviation_Zone_Add");                                                                                VALUE_s4abs1c;
+        case    0 : return 0;
+        case    1 : KEY("Temperature_Setpoint_LWT_Heating_Zone_Main");                              HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8?
+        case    2 : return 0;
+        case    3 : KEY("Temperature_Setpoint_LWT_Cooling_Zone_Main");                              HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8?
+        case    4 : return 0;
+        case    5 : KEY("Temperature_Setpoint_LWT_Heating_Zone_Add");                               HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8?
+        case    6 : return 0;
+        case    7 : KEY("Temperature_Setpoint_LWT_Cooling_Zone_Add");                               HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8?
+        case    8 : KEY("Deviation_LWT_Heating_Zone_Main");                                                                                      VALUE_s4abs1c;
+        case    9 : KEY("Deviation_LWT_Cooling_Zone_Main");                                                                                      VALUE_s4abs1c; // guess
+        case   10 : KEY("Deviation_LWT_Heating_Zone_Add");                                                                                       VALUE_s4abs1c;
+        case   11 : KEY("Deviation_LWT_Cooling_Zone_Add");                                                                                       VALUE_s4abs1c; // guess
+        case   12 : // first package 37 instead of 00
+        case   13 :
+        case   14 :
         default :   UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
-        case    1 : KEY("Target_Temperature_Heating_Zone_Main_Abs");             HACONFIG; HATEMP; VALUE_f8_8; // or f8s8?
-//      case    3 : KEY("Target_Temperature_Cooling_Zone_Main_Abs"); // guess
-//      case    5 : KEY("Target_Temperature_Heating_Zone_Add_Abs"); // guess
-//      case    7 : KEY("Target_Temperature_Cooling_Zone_Add_Abs"); // guess
-        case    8 : KEY("Target_Temperature_Deviation_Zone_Main");                                                                               VALUE_s4abs1c;
-        case    9 : // 3 or 5 , delta?, caused by schedule ? (exactly 23:00)
-                    return 0;
-        case   10 : KEY("Target_Temperature_Deviation_Zone_Add");                                                                                VALUE_s4abs1c;
+        case    0 : return 0;                                                     // no need to output to HA if duplicate from above
+        case    1 : KEY("Temperature_Setpoint_LWT_Heating_Zone_Main");
+        case    2 : return 0;
+        case    3 : KEY("Temperature_Setpoint_LWT_Cooling_Zone_Main");
+        case    4 : return 0;
+        case    5 : KEY("Temperature_Setpoint_LWT_Heating_Zone_Add");
+        case    6 : return 0;
+        case    7 : KEY("Temperature_Setpoint_LWT_Cooling_Zone_Add");
+        case    8 : KEY("Deviation_LWT_Heating_Zone_Main");
+        case    9 : KEY("Deviation_LWT_Cooling_Zone_Main");
+        case   10 : KEY("Deviation_LWT_Heating_Zone_Add");
+        case   11 : KEY("Deviation_LWT_Cooling_Zone_Add");
+        case   12 :
+        case   13 :
+        case   14 : UNKNOWN_BYTE;
         case   15 : return 0;
-        case   16 : KEY("Target_Temperature_Zone_Main");                  HACONFIG; HATEMP;                                                      VALUE_f8s8; // TODO check s8/_8 temp in basic packet
+        case   16 : KEY("Target_LWT_Zone_Main");                                                    HACONFIG; HATEMP; CAT_TEMP;                  VALUE_f8s8; // TODO check s8/_8 temp in basic packet
         case   17 : return 0;
-        case   18 : KEY("Target_Temperature_Zone_Add");                                                                                          VALUE_f8_8;
+        case   18 : KEY("Target_LWT_Zone_Add");                                                     HACONFIG; HATEMP; CAT_TEMP;                  VALUE_f8_8;
         default :   UNKNOWN_BYTE;
       }
       default   :   UNKNOWN_BYTE;
