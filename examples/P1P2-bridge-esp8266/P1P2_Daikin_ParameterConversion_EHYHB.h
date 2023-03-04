@@ -121,22 +121,22 @@ bool scheduleMemSeen[2][SCHEDULE_MEM_SIZE] = {}; // 2 * 1166 = 2332 bytes
 #ifdef SAVEPACKETS
 #ifdef PSEUDO_PACKETS
 #define PCKTP_START  0x08
-#define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 mapped to 0x16
+#define PCKTP_END    0x16 // 0x08-0x16, 0x30 mapped to 0x17 and 0x31 mapped to 0x18
 #define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 3)
-//byte packetsrc                                      = { {00                                                                 }, {  40                                                                       }}
-//byte packettype                                     = { {08, 09, 0A, 0B,  0C,  0D, 0E, 0F, 10,  11,  12,  13,  14,  15,  30,  31 }, {  08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  30,  31 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,  20, 20, 20, 20,   8,  15,   3,  15,   6,   2,   6 }, {   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0,   0 }}; /* sizeValSeen=354 */
-#define sizeValSeen 354
+//byte packetsrc                                      = { {00                                                                           }, {  40                                                                                 }}
+//byte packettype                                     = { {08, 09, 0A, 0B,  0C,  0D, 0E, 0F, 10,  11,  12,  13,  14,  15,  16,  30,  31 }, {  08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  16,  30,  31 }}
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,  20, 20, 20, 20,   8,  15,   3,  15,   6,  16,   2,   6 }, {   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  16,  19,   9,   9,   0,   0 }}; /* sizeValSeen=384 */
+#define sizeValSeen 384
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #else /* PSEUDO_PACKETS */
 #define PCKTP_START  0x10
-#define PCKTP_END    0x15 // 0x10-0x15 and 0x31 mapped to 0x16
+#define PCKTP_END    0x16 // 0x10-0x16, 0x30 mapped to 0x17 and 0x31 mapped to 0x18
 #define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 2)
-//byte packetsrc                                  = { {00, 00, 00, 00, 00, 00, 00 }, {40, 40,  40,  40,  40,  40,  40 }}
-//byte packettype                                 = { {10, 11, 12, 13, 14, 15, 31 }, {10, 11,  12,  13,  14,  15,  31 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ] = { {20,  8, 15,  3, 15, 6,   6 }, {20, 20,  20,  14,  19,   6,   0 }}; /* sizeValSeen=172 */
-#define sizeValSeen 172
+//byte packetsrc                                  = { {00                                 }, {40                                        }}
+//byte packettype                                 = { {10, 11, 12, 13, 14, 15, 16, 30, 31 }, {10, 11,  12,  13,  14,  15,  16,  30,  31 }}
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ] = { {20,  8, 15,  3, 15,  6, 16,  2,  6 }, {20, 20,  20,  16,  19,   9,   9,   0,   0 }}; /* sizeValSeen=204 */
+#define sizeValSeen 204
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #endif /* PSEUDO_PACKETS */
