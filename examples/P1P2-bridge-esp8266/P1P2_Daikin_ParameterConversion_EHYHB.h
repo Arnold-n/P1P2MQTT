@@ -125,8 +125,7 @@ bool scheduleMemSeen[2][SCHEDULE_MEM_SIZE] = {}; // 2 * 1166 = 2332 bytes
 #define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 3)
 //byte packetsrc                                      = { {00                                                                 }, {  40                                                                       }}
 //byte packettype                                     = { {08, 09, 0A, 0B,  0C,  0D, 0E, 0F, 10,  11,  12,  13,  14,  15,  30,  31 }, {  08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  30,  31 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,  20, 20, 20, 20,   8,  15,   3,  15,   6,   2,   6 }, {   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0,   0 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,   0, 20, 40, 60,  80,  88, 103, 106, 121, 127, 129 }, { 135, 135, 155, 175, 195, 195, 215, 235, 255, 275, 295, 315, 329, 348, 354, 354 /* , sizeValSeen=354 */ }};
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,  20, 20, 20, 20,   8,  15,   3,  15,   6,   2,   6 }, {   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0,   0 }}; /* sizeValSeen=354 */
 #define sizeValSeen 354
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
@@ -136,8 +135,7 @@ byte payloadByteSeen[sizeValSeen] = { 0 };
 #define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 2)
 //byte packetsrc                                  = { {00, 00, 00, 00, 00, 00, 00 }, {40, 40,  40,  40,  40,  40,  40 }}
 //byte packettype                                 = { {10, 11, 12, 13, 14, 15, 31 }, {10, 11,  12,  13,  14,  15,  31 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ] = { {20,  8, 15,  3, 15, 6,   6 }, {20, 20,  20,  14,  19,   6,   0 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ] = { { 0, 20, 28, 43, 46, 61, 67 }, {73, 93, 113, 133, 147, 166, 172 /*, sizeValSeen=172 */}};
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ] = { {20,  8, 15,  3, 15, 6,   6 }, {20, 20,  20,  14,  19,   6,   0 }}; /* sizeValSeen=172 */
 #define sizeValSeen 172
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
@@ -167,6 +165,12 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
   bool newByte = (outputFilter == 0);
   byte pts = (packetSrc >> 6) & 0x01;
   byte pti = packetType - PCKTP_START;
+  uint32_t bytestart = 0;
+  for (byte i = 0; i <= pts; i++) {
+    for (byte j = 0; j <= pti; j++) {
+      bytestart += nr_bytes[i][j];
+    }
+  }
   if (packetType == 0x30) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x30 also covered, treat it as PCKTP_END + 1 (0x16)
   if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 2; // hack to get 0x31 also covered, treat it as PCKTP_END + 2 (0x17)
   if (payloadIndex == EMPTY_PAYLOAD) {
@@ -208,7 +212,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
   } else {
     bool pubHA = false;
     for (byte i = payloadIndex + 1 - length; i <= payloadIndex; i++) {
-      uint16_t pi2 = bytestart[pts][pti] + i;
+      uint16_t pi2 = bytestart + i;
       if (pi2 >= sizeValSeen) {
         pi2 = 0;
         Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
@@ -252,6 +256,12 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
   bool newBit = (outputFilter == 0);
   byte pts = (packetSrc >> 6);
   byte pti = packetType - PCKTP_START;
+  uint32_t bytestart = 0;
+  for (byte i = 0; i <= pts; i++) {
+    for (byte j = 0; j <= pti; j++) {
+      bytestart += nr_bytes[i][j];
+    }
+  }
   if (packetType == 0x30) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x31 also covered
   if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 2; // hack to get 0x31 also covered
   if (payloadIndex == EMPTY_PAYLOAD) {
@@ -267,7 +277,7 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
     // Warning: payloadIndex > expected
     newBit = 1;
   } else {
-    uint16_t pi2 = bytestart[pts][pti] + payloadIndex; // no multiplication, bit-wise only for u8 type
+    uint16_t pi2 = bytestart + payloadIndex; // no multiplication, bit-wise only for u8 type
     if (pi2 >= sizeValSeen) {
       pi2 = 0;
       Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
