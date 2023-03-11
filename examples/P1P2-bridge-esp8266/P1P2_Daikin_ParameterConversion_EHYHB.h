@@ -167,7 +167,8 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
   byte pti = packetType - PCKTP_START;
   uint32_t bytestart = 0;
   for (byte i = 0; i <= pts; i++) {
-    for (byte j = 0; j <= pti; j++) {
+    for (byte j = 0; j < (PCKTP_END - PCKTP_START + 1); j++) {
+      if (i == pts && j == pti) break;
       bytestart += nr_bytes[i][j];
     }
   }
@@ -258,7 +259,8 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
   byte pti = packetType - PCKTP_START;
   uint32_t bytestart = 0;
   for (byte i = 0; i <= pts; i++) {
-    for (byte j = 0; j <= pti; j++) {
+    for (byte j = 0; j < (PCKTP_END - PCKTP_START + 1); j++) {
+      if (i == pts && j == pti) break;
       bytestart += nr_bytes[i][j];
     }
   }
