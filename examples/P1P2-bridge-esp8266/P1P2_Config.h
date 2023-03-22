@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230322 v0.9.34 AP timeout
  * 20230211 v0.9.33a 0xA3 thermistor read-out F-series
  * 20230117 v0.9.32 centralize pseudopacket handling
  * 20230108 v0.9.31 sensor prefix, +2 valves in HA, fix bit history for 0x30/0x31, +pseudo controlLevel
@@ -45,6 +46,9 @@
 // Setting option NOWIFI to 1 (can be changed via 7th parameter of 'B' command) prevents WiFi use
 // Only useful if ethernet adapter is installed, to prevent use of WiFi as fall-back when ethernet fails
 #define INIT_NOWIFI 0
+
+// Define timeout for AP, to restart ESP after power outage when AP starts if WiFi is not immediately available
+#define WIFIPORTAL_TIMEOUT 180
 
 // Define P1P2-ESP-Interface version, set during EEPROM initialization only (can be changed with 6th parameter of 'B' command)
 // To avoid erasing the ESP EEPROM and overwriting the hw-identifier, use "Sketch Only" when flashing over USB
@@ -115,9 +119,9 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.33a"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.33a"
-#define HA_SW "0.9.33a"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.34"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.34"
+#define HA_SW "0.9.34"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works

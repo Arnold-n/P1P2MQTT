@@ -17,6 +17,7 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20230322 v0.9.34 AP timeout
  * 20230108 v0.9.31 sensor prefix, +2 valves in HA, fix bit history for 0x30/0x31, +pseudo controlLevel
  * 20221228 v0.9.30 switch from modified ESP_telnet library to ESP_telnet v2.0.0
  * 20221211 v0.9.29 misc fixes, defrost E-series
@@ -1189,6 +1190,9 @@ void setup() {
     // and goes into a blocking loop awaiting configuration.
     // First parameter is name of access point, second is the password.
     Serial.println(F("* [ESP] Trying autoconnect"));
+#ifdef WIFIPORTAL_TIMEOUT
+    wifiManager.setConfigPortalTimeout(WIFIPORTAL_TIMEOUT);
+#endif
     if (!wifiManager.autoConnect(WIFIMAN_SSID, WIFIMAN_PASSWORD)) {
       Serial_println(F("* [ESP] Failed to connect and hit timeout, resetting"));
       // Reset and try again
