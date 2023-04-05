@@ -67,8 +67,8 @@ Parameter in packet type 36 for setting main zone heating temperature deviation 
 
 Example commands to set WD-LWT mode curve deviation
 - E36 8 0 sets deviation to +0 C
-- E36 8 1 sets deviation to +1 C
-- E36 8 FFFF sets deviation to -1 C
+- E36 8 A sets deviation to +1 C
+- E36 8 FFF6 sets deviation to -1 C
 
 Parameter in packet type 36 for setting main zone cooling temperature deviation (only in weather-dependent LWT mode)
 - 0x09 (works on EHYHBX08AAV3)
