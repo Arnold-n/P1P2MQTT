@@ -508,7 +508,7 @@ uint8_t value_trg(byte packetSrc, byte packetType, byte payloadIndex, byte* payl
 
 // 16 bit fixed point reals
 
-float FN_f8_8(uint8_t *b)            { return (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
+float FN_f8_8(uint8_t *b)            { return (((int8_t) b[0]) + (b[-1] * 1.0 / 256)); }
 
 uint8_t value_f8_8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
   if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1)) return 0;
@@ -1169,7 +1169,7 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
       case 0x00 :
       case 0x40 :
                   switch (paramNr) {
-        case 0x0000 : PARAM_KEY("Target_Temperature_Room");                                         CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 0x0000 = 0x10-0x_0-(7/8)
+        case 0x0000 : PARAM_KEY("Target_Temperature_DHW");                                         CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 0x0000 = 0x10-0x_0-(7/8)
         case 0x0001 : PARAM_KEY("Temperature_Unknown_Q1");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  15.0? (min/max heating?)
         case 0x0002 : PARAM_KEY("Temperature_Room_1");                                              CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // Temproom1 (reported by main controller)
         case 0x0003 : PARAM_KEY("Target_Temperature_DHW_1");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0
@@ -1544,7 +1544,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           default   : UNKNOWN_BIT;
         }
         case    7 : return 0;
-        case    8 : KEY("Target_Temperature_Room");                        HACONFIG; HATEMP;                                                     VALUE_f8s8;
+        case    8 : KEY("DHW_Setpoint_Response");                        HACONFIG; HATEMP;                                                     VALUE_f8s8;
         case    9 : BITBASIS_UNKNOWN;
         case   10 : switch (bitNr) {
           case    8 : BITBASIS;
@@ -1586,10 +1586,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           default   : UNKNOWN_BIT;
         }
         case    4 : return 0;
-        case    5 : KEY("DHW_Setpoint_Response");                          HACONFIG; HATEMP;                                                     VALUE_f8s8; // 8 or 16 bit?
+        case    5 : KEY("Target_Temperature_Leaving_Water");                 HACONFIG; HATEMP;                                                   VALUE_f8s8; // 8 or 16 bit?
         case    6 : BITBASIS_UNKNOWN;
         case    8 : return 0;
-        case    9 : KEY("Target_Temperature_Room");                                                                                              VALUE_f8s8;
+        case    9 : KEY("DHW_Setpoint_Response");                                                                                                VALUE_f8s8;
         case   11 : switch (bitNr) {
           case    8 : BITBASIS;
           case    2 : KEY("Quiet_Mode");                                                                                                         VALUE_flag8;
@@ -1598,6 +1598,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   12 : KEY("ErrorCode1");                                                                                                           VALUE_u8hex; // coding mechanism unknown. 024D2C = HJ-11 08B908 = 89-2 08B90C = 89-3
         case   13 : KEY("ErrorCode2");                                                                                                           VALUE_u8hex;
         case   14 : KEY("ErrorSubCode");                                                                                                         VALUE_u8hex; // >>2 for Subcode, and what are 2 lsbits ??
+        case   15 : KEY("Temperature_Outside");                            CAT_TEMP; HACONFIG; HATEMP;                                           VALUE_f8_8;
         case   17 : switch (bitNr) {
           case    8 : BITBASIS;
           case    1 : KEY("Defrost_Operation");                            HACONFIG;                                                             VALUE_flag8;
@@ -1632,15 +1633,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    1 : KEY("Temperature_Leaving_Water");                      HACONFIG; HATEMP;
                     LWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(LWT_changed);
         case    2 : return 0;                         // Domestic hot water temperature (on some models)
-        case    3 : KEY("Temperature_DHW_Tank");                            HACONFIG; HATEMP; VALUE_f8_8;                                        VALUE_f8_8;   // DHW tank, unconnected on EHYHBX08AAV3?, then reading -40
-        case    4 : return 0;                         // Outside air temperature (low res)
-        case    5 : KEY("Temperature_Outside_1");                          HACONFIG; HATEMP;                                                     VALUE_f8_8;
+        case    3 : KEY("Temperature_DHW_Tank");                           HACONFIG; HATEMP; VALUE_f8_8;                                         VALUE_f8_8;   // DHW tank, unconnected on EHYHBX08AAV3?, then reading -40
+        case    4 : return 0;
+        case    5 : KEY("Temperature_HP2Gas_Water");                       HACONFIG; HATEMP;                                                     VALUE_f8_8;
         case    6 : return 0;
         case    7 : // UOM("C");
                     KEY("Temperature_Return_Water");                       HACONFIG; HATEMP;
                     RWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(RWT_changed);
         case    8 : return 0;
-        case    9 : KEY("Temperature_HP2Gas_Water");                       HACONFIG;HATEMP;  // Leaving water temperature on the heat exchanger
+        case    9 : KEY("Temperature_Leaving_Water");                      HACONFIG;HATEMP;  // Leaving water temperature after backup heater
                     MWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(MWT_changed);
         case   10 : return 0;                         // Refrigerant temperature
         case   11 : KEY("Temperature_Refrigerant_1");                      HACONFIG;  HATEMP;                                                    VALUE_f8_8;
