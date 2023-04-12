@@ -80,9 +80,13 @@ byte maxOutputFilter = 0;
 #define PCKTP_END    0x0F // assume first byte of MHI packet is source identifier: 00, 80, 0C, mapped to 10, 11, 12
 #define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 4)
 //byte packettype                                  = {00,  0C,  80} // TODO map 00  01-7F or 00-7F?
-const PROGMEM uint32_t nr_bytes [PCKTP_ARR_SZ]     = {40,  40,  40};
-const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = { 0,  40,  80 /* , sizeValSeen=120 */ };
-#define sizeValSeen 340
+// map 00-01 to 00-01
+// map 02-07 to 02
+// map 80-81 to 03-04
+// 16 bytes each
+const PROGMEM uint32_t nr_bytes [PCKTP_ARR_SZ]     = {16,  16,  16,  16,  16 };
+const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = { 0,  16,  32,  48,  64  /* , sizeValSeen=80 */ };
+#define sizeValSeen 80
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #endif /* SAVEPACKETS */
@@ -104,8 +108,10 @@ bool newPayloadBytesVal(byte packetSrc, byte payloadIndex, byte* payload, char* 
   switch (packetSrc) {
     // MHI packets
     case 0x00 : pti = 0x00; break;
-    case 0x01 ... 0x7F : pti = 0x01; break;
-    case 0x80 : pti = 0x02; break;
+    case 0x01 : pti = 0x01; break;
+    case 0x02 ... 0x07 : pti = 0x02; break;
+    case 0x80 : pti = 0x03; break;
+    case 0x81 : pti = 0x04; break;
     default : pti = 0xFF; break;
   }
   if (pti == 0xFF) {
@@ -167,8 +173,10 @@ bool newPayloadBitVal(byte packetSrc, byte payloadIndex, byte* payload, char* mq
   switch (packetSrc) {
     // MHI packets
     case 0x00 : pti = 0x00; break;
-    case 0x01 ... 0x7F : pti = 0x01; break;
-    case 0x80 : pti = 0x02; break;
+    case 0x01 : pti = 0x01; break;
+    case 0x02 ... 0x07 : pti = 0x02; break;
+    case 0x80 : pti = 0x03; break;
+    case 0x81 : pti = 0x04; break;
     default : pti = 0xFF; break;
   }
   if (bitNr > 7) {
@@ -408,8 +416,25 @@ uint8_t value_f(byte packetSrc, byte payloadIndex, byte* payload, char* mqtt_key
 
 uint8_t value_s(byte packetSrc, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, int v, int length = 0) {
   if (length && (!newPayloadBytesVal(packetSrc, payloadIndex, payload, mqtt_key, haConfig, length, 1))) return 0;
-  if (!length) newPayloadBytesVal(packetSrc, payloadIndex, payload, mqtt_key, haConfig, 1, 1);
+  if (!length) newPayloadBytesVal(packetSrc, payloadIndex, payload, mqtt_key, haConfig, 1, 1); // TODO check or document why no return 0 for length = 0
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", v);
+  return (outputFilter > maxOutputFilter ? 0 : 1);
+}
+
+uint8_t value_mode(byte packetSrc, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, int v) {
+// UGLY TODO
+  bool n2 = newPayloadBitVal(packetSrc, payloadIndex, payload, mqtt_key, haConfig, 2);
+  bool n3 = newPayloadBitVal(packetSrc, payloadIndex, payload, mqtt_key, haConfig, 3);
+  bool n4 = newPayloadBitVal(packetSrc, payloadIndex, payload, mqtt_key, haConfig, 4);
+  if (!(n2 || n3 || n4)) return 0;
+  switch (v) {
+    case  0 : snprintf(mqtt_value, MQTT_VALUE_LEN, "Auto"); break;
+    case  1 : snprintf(mqtt_value, MQTT_VALUE_LEN, "Dry"); break;
+    case  2 : snprintf(mqtt_value, MQTT_VALUE_LEN, "Cool"); break;
+    case  3 : snprintf(mqtt_value, MQTT_VALUE_LEN, "Fan"); break;
+    case  4 : snprintf(mqtt_value, MQTT_VALUE_LEN, "Heat"); break;
+    default : snprintf(mqtt_value, MQTT_VALUE_LEN, "?"); break;
+  }
   return (outputFilter > maxOutputFilter ? 0 : 1);
 }
 
@@ -436,6 +461,7 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 // VALUE_f8s8           for 2-byte float in f8s8 format (see protocol description)
 // VALUE_u16div10       for 2-byte integer to be divided by 10 (used for flow in 0.1m/s)
 // VALUE_F(value)       for self-calculated float parameter value
+// VALUE_I(value, l)    for self-calculated l-byte long signed integer parameter value
 // VALUE_u32hex         for 4-byte hex value (used for sw version)
 // VALUE_header         for empty payload string
 // TERMINATEJSON        returns 9 to signal end of package, signal for json string termination
@@ -471,6 +497,7 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 #define VALUE_F(v)              { return           value_f(packetSrc, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v); }
 #define VALUE_F_L(v, l)         { return           value_f(packetSrc, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v, l); }
 #define VALUE_S_L(v, l)         { return           value_s(packetSrc, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v, l); }
+#define VALUE_mode(v)           { return        value_mode(packetSrc, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v); }
 #define VALUE_timeString(s)     { return  value_timeString(mqtt_value, s); }
 
 #define UNKNOWN_BYTE            { CAT_UNKNOWN; return unknownByte(packetSrc, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
@@ -512,31 +539,60 @@ byte bytesbits2keyvalue(byte packetSrc, byte payloadIndex, byte* payload, char* 
     payloadPointer = (payloadIndex == EMPTY_PAYLOAD ? 0 : &payload[payloadIndex]);
   };
 
-  SRC(0);
-
+  switch (packetSrc) {
+    case 0x00          : SRC(0); break; // internal unit
+    case 0x01          : SRC(1); break; // internal unit
+    case 0x80          : SRC(2); break; // internal unit
+    case 0x81          : SRC(3); break; // external unit
+    case 0x02 ... 0x07 : SRC(4); break; // RC (02..07 is sequence counter?)
+    default            : SRC(9); break; // unknown ?
+  }
 
   // P1/P2: Main/Peripheral; peripheral-address; packet-type
   // MHI:   address;         data
   // pseudo: FF              00                  08..0F
-//  if ((packetSrc >= 0x00) && (packetSrc <= 0x7F)) packetSrc = 0x01;
+  //  if ((packetSrc >= 0x00) && (packetSrc <= 0x7F)) packetSrc = 0x01;
   switch (packetSrc) {
-    case 0x00 :
-    case 0x01 ... 0x07 :
-    case 0x10 ... 0x7F : switch (payloadIndex) {
+    case 0x00 ... 0x01 : // internal unit
+    case 0x80 ... 0x81 : // external unit
+    case 0x02 ... 0x07 : CAT_SETTING; // RC
+                         switch (payloadIndex) {
+      case  0 : KEY("Byte1-status");                                                                                               VALUE_u8hex;
+      case  1 : switch (bitNr) { // Mode (Swing, Mode, Power)
+        case  8 : BITBASIS;
+        case  6 : KEY("Swing_OnOff");                                                                                              VALUE_flag8;
+        case  3 ... 4 : return 0;
+        case  2 : KEY("Mode");                                                                                                     VALUE_mode((payloadByte & 0x1C) >> 2); // 000 = Auto / 001 = Dry / 010 = Cool / 011 = Fan / 100 = Heat
+        case  0 : KEY("Power_OnOff");                                                                                              VALUE_flag8;
+        default : UNKNOWN_BIT;
+
+      }
+      case  2 : CAT_SETTING;
+                switch (bitNr) { // Fan_Speed (Vane, Speed)
+        case  8 : BITBASIS;
+        case  5 : return 0;
+        case  4 : KEY("Vane");                                                                                                     VALUE_S_L(((payloadByte & 0x30) >> 4) + 1, 1); // 00 = 1 .. 11 = 4
+        case  1 ... 2 : return 0;
+        case  0 : KEY("Fan_Speed");                                                                                                VALUE_S_L((payloadByte & 0x07) + 1, 1);
+        default : UNKNOWN_BIT;
+      }
+      case  3 : KEY("Set_Temp");                         CAT_SETTING;                                                              VALUE_F_L((payloadByte - 0x80) * 0.5, 1); // OK, aligned with RC. 
+      case  4 : KEY("RC_Indoor_Temp");                   CAT_TEMP;                                                                 VALUE_F_L((payloadByte - 0x3D) * 0.25, 1);
+      case  5 : KEY("Byte6-status");                                                                                               VALUE_u8hex;
+      case  6 : KEY("Byte7-status");                                                                                               VALUE_u8hex;
+      case  7 : KEY("RC_Mode");                                                                                                    VALUE_u8hex; // 80 in standard mode, 40 when loading or showing I/U data; C0 when loading or showing O/U data
+      case  8 : KEY("Byte9-status");                                                                                               VALUE_u8hex;
+      case  9 : KEY("Byte10-defrost");                                                                                             VALUE_u8hex;
+      case 10 : KEY("Byte11-status");                                                                                              VALUE_u8hex;
+      case 11 : KEY("Byte12-status");                                                                                              VALUE_u8hex;
+      case 12 : KEY("Byte13-status");                                                                                              VALUE_u8hex;
+      case 14 : return 0; // frame CRC TODO
+      default : UNKNOWN_BYTE;
+    }
+    default   : switch (payloadIndex) {
       case 14 : return 0; // CRC
       default : UNKNOWN_BYTE;
     }
-    case 0x80 :
-                switch (payloadIndex) {
-      case  1 : KEY("Mode");                                                                                                       VALUE_u8hex;
-      case  2 : KEY("Fan_Speed");                                                                                                  VALUE_u8hex;
-      case  3 : KEY("Set_Temp");                                                                                                   VALUE_F((payloadByte - 0x80) * 0.5);
-      case  4 : KEY("RC_Indoor_Temp");                                                                                             VALUE_F((payloadByte - 0x6B) * 0.5);
-      case 14 : return 0; // CRC
-      default : UNKNOWN_BYTE;
-    }
-// no pseudo messages #include "P1P2_pseudo.h"
-    default : UNKNOWN_BYTE // unknown PacketByte
   }
 }
 
