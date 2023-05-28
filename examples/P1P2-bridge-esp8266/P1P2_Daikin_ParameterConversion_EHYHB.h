@@ -157,9 +157,28 @@ char ha_mqttValue[HA_VALUE_LEN];
 static byte uom = 0;
 static byte stateclass = 0;
 
-bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte length, bool saveSeen) {
+#define HYSTERESIS_TYPE_F8_8 1
+#define HYSTERESIS_TYPE_F8S8 2
+#define HYSTERESIS_TYPE_U16DIV10 3
+#define HYSTERESIS_TYPE_S16DIV10 4
+// #define HYSTERESIS_TYPE_S_F8_8 5 // F-series
+#define HYSTERESIS_TYPE_U16 5
+#define HYSTERESIS_TYPE_U32 6
+#define HYSTERESIS_SIZE_F8_8 25     // 25/256 ~ 0.1
+#define HYSTERESIS_SIZE_F8S8 1      //  1/10  = 0.1
+#define HYSTERESIS_SIZE_U16DIV10 1  //  1/10  = 0.1
+#define HYSTERESIS_SIZE_S16DIV10 1  //  1/10  = 0.1
+// #define HYSTERESIS_TYPE_S_F_S8 2 // F-series
+
+
+uint16_t FN_u16_LE(uint8_t *b)          { return (                (((uint16_t) b[-1]) << 8) | (b[0]));}
+uint32_t FN_u24_LE(uint8_t *b)          { return (((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
+uint32_t FN_u32_LE(uint8_t *b)          { return (((uint32_t) b[-3] << 24) | ((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
+
+bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte length, bool saveSeen, byte applyHysteresisType = 0, uint16_t applyHysteresis = 0) {
 // returns true if a packet parameter is observed for the first time ((and publishes it for homeassistant if haConfig==true)
 // if (outputFilter <= maxOutputFilter), it detects if a parameter has changed, and returns true if changed (or if outputFilter==0)
+// hysteresis: if (applyHysteresisType), returns true if changed beyond applyHysteresis (assumes f8_8/f8s8/u16div10/s16div10 data format), and if hysteresis difference is not met, does not save new value
 // Also, if saveSeen==true, the new value is saved
 // In BITBASIS calls, saveSeen should be false such that data can be handled again on bit-basis
 //
@@ -207,8 +226,44 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
     return 0;
   } else {
     bool pubHA = false;
+    bool skipHysteresis = false;
+    uint16_t pi2base = bytestart[pts][pti];
+    if (applyHysteresisType && (pi2base < sizeValSeen) && payloadByteSeen[pi2base + payloadIndex - 1] && payloadByteSeen[pi2base + payloadIndex]) {
+      if (applyHysteresisType == HYSTERESIS_TYPE_F8_8) {
+        int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 256 + payloadByteVal[pi2base + payloadIndex];
+        int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 256 + payload[payloadIndex];
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_F8S8) {
+        int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
+        int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_U16DIV10) {
+        uint16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
+        uint16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_S16DIV10) {
+        int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
+        int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_U16) {
+        uint16_t oldValue = FN_u16_LE(&payloadByteVal[pi2base + payloadIndex]);
+        uint16_t newValue = FN_u16_LE(&payload[payloadIndex]);
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_U32) {
+        uint32_t oldValue = FN_u32_LE(&payloadByteVal[pi2base + payloadIndex]);
+        uint32_t newValue = FN_u32_LE(&payload[payloadIndex]);
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+// F-series
+//      } else if (applyHysteresisType == HYSTERESIS_TYPE_S_F8_8) {
+//        int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 256 + payloadByteVal[pi2base + payloadIndex];
+//        if (payloadByteVal[pi2base + payloadIndex - 2]) oldValue = -oldValue;
+//        int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 256 + payload[payloadIndex];
+//        if (payload[payloadIndex - 2]) newValue = -newValue;
+//        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      }
+    }
     for (byte i = payloadIndex + 1 - length; i <= payloadIndex; i++) {
-      uint16_t pi2 = bytestart[pts][pti] + i;
+      uint16_t pi2 = pi2base + i;
       if (pi2 >= sizeValSeen) {
         pi2 = 0;
         Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
@@ -217,8 +272,8 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       if (payloadByteSeen[pi2]) {
         // this byte or at least some bits have been seen and saved before.
         if (payloadByteVal[pi2] != payload[i]) {
-          newByte = (outputFilter <= maxOutputFilter);
-          if (saveSeen) payloadByteVal[pi2] = payload[i];
+          newByte = (outputFilter <= maxOutputFilter) && !skipHysteresis;
+          if (saveSeen && !skipHysteresis) payloadByteVal[pi2] = payload[i];
         } // else payloadByteVal seen and not changed
       } else {
         // first time for this byte
@@ -303,7 +358,7 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
 #endif /* SAVEPACKETS */
 }
 
-bool newParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte paramValLength) {
+bool newParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte paramValLength, byte applyHysteresisType = 0, byte applyHysteresis = 0) {
 // returns whether paramNr in paramPacketType has new value paramValue
 // (also returns true if outputFilter==0)
 // and stores new paramVal
@@ -326,10 +381,20 @@ bool newParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte pay
     newParam = 1;
   } else {
     if (paramSeen[pts][ptbs]) {
-      for (byte i = payloadIndex + 1 - paramValLength; i <= payloadIndex - (paramPacketType == 0x39 ? 3 : 0); i++) {
+      bool skipHysteresis = false;
+      if (applyHysteresisType == HYSTERESIS_TYPE_U16DIV10) {
+        uint16_t oldValue = paramVal[pts][ptbv]       | (paramVal[pts][ptbv + 1] << 8);
+        uint16_t newValue = payload[payloadIndex - 1] | (payload[payloadIndex] << 8);
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_S16DIV10) {
+        int16_t oldValue = paramVal[pts][ptbv]       | (paramVal[pts][ptbv + 1] << 8);
+        int16_t newValue = payload[payloadIndex - 1] | (payload[payloadIndex] << 8);
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      }
+      for (byte i = payloadIndex + 1 - paramValLength; i <= payloadIndex - (paramPacketType == 0x39 ? 3 : 0); i++) {        // 0x39 is field settings so only first byte changes
         if (paramVal[pts][ptbv] != payload[i]) {
-          newParam = (outputFilter < maxOutputFilter);
-          paramVal[pts][ptbv] = payload[i];
+          newParam = (outputFilter < maxOutputFilter) && !skipHysteresis;
+          if (!skipHysteresis) paramVal[pts][ptbv] = payload[i];
         } // else this byte of paramValue seen and not changed
         ptbv++;
       }
@@ -385,10 +450,6 @@ uint8_t value_u32hex_LE(byte packetSrc, byte packetType, byte payloadIndex, byte
 }
 
 // unsigned integers, LE
-
-uint16_t FN_u16_LE(uint8_t *b)          { return (                (((uint16_t) b[-1]) << 8) | (b[0]));}
-uint32_t FN_u24_LE(uint8_t *b)          { return (((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
-uint32_t FN_u32_LE(uint8_t *b)          { return (((uint32_t) b[-3] << 24) | ((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
 
 uint8_t value_u8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
   if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1)) return 0;
@@ -492,7 +553,7 @@ uint8_t value_s4abs1c(byte packetSrc, byte packetType, byte payloadIndex, byte* 
 float FN_u16div10_LE(uint8_t *b)     { if (b[-1] == 0xFF) return 0; else return (b[0] * 0.1 + b[-1] * 25.6);}
 
 uint8_t value_u16div10_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
-  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1)) return 0;
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1, HYSTERESIS_TYPE_U16DIV10, HYSTERESIS_SIZE_U16DIV10)) return 0;
 #ifdef __AVR__
   dtostrf(FN_u16div10_LE(&payload[payloadIndex]), 1, 1, mqtt_value);
 #else
@@ -511,11 +572,11 @@ uint8_t value_trg(byte packetSrc, byte packetType, byte payloadIndex, byte* payl
 float FN_f8_8(uint8_t *b)            { return (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
 
 uint8_t value_f8_8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
-  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1)) return 0;
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1, HYSTERESIS_TYPE_F8_8, HYSTERESIS_SIZE_F8_8)) return 0;
 #ifdef __AVR__
-  dtostrf(FN_f8_8(&payload[payloadIndex]), 1, 2, mqtt_value);
+  dtostrf(FN_f8_8(&payload[payloadIndex]), 1, 1, mqtt_value);
 #else
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", FN_f8_8(&payload[payloadIndex]));
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", FN_f8_8(&payload[payloadIndex]));
 #endif
   return 1;
 }
@@ -523,23 +584,23 @@ uint8_t value_f8_8(byte packetSrc, byte packetType, byte payloadIndex, byte* pay
 float FN_f8s8(uint8_t *b)            { return ((float)(int8_t) b[-1]) + ((float) b[0]) /  10;}
 
 uint8_t value_f8s8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
-  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1)) return 0;
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1, HYSTERESIS_TYPE_F8S8, HYSTERESIS_SIZE_F8S8)) return 0;
 #ifdef __AVR__
   dtostrf(FN_f8s8(&payload[payloadIndex]), 1, 1, mqtt_value);
 #else
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", FN_f8s8(&payload[payloadIndex]));
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", FN_f8s8(&payload[payloadIndex]));
 #endif
   return 1;
 }
 
 // change to Watt ?
-uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, float v, int length = 0) {
-  if (length && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1))) return 0;
+uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, float v, int length = 0, byte thresholdType = 0, uint16_t thresholdSize = 0) {
+  if (length && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1, thresholdType, thresholdSize))) return 0;
   if (!length) newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1);
 #ifdef __AVR__
-  dtostrf(v, 1, 3, mqtt_value);
+  dtostrf(v, 1, 2, mqtt_value);
 #else
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", v);
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.2f", v);
 #endif
   return (outputFilter > maxOutputFilter ? 0 : 1);
 }
@@ -634,11 +695,11 @@ uint8_t param_value_s_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, 
   return 1;
 }
 
-// u16div10, s16div10 LE
+// u16div10, s16div10 BE
 
-uint8_t param_value_u16div10_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
+uint8_t param_value_u16div10_BE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
 // assuming paramValLength = 2
-  if (!newParamVal(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, haConfig, paramValLength)) return 0;
+  if (!newParamVal(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, haConfig, paramValLength, HYSTERESIS_TYPE_U16DIV10, HYSTERESIS_SIZE_U16DIV10)) return 0;
   uint16_t v = (payload[payloadIndex] << 8) | payload[payloadIndex - 1];
 #ifdef __AVR__
   dtostrf(v * 0.1, 1, 1, mqtt_value);
@@ -648,9 +709,9 @@ uint8_t param_value_u16div10_LE(byte paramSrc, byte paramPacketType, uint16_t pa
   return 1;
 }
 
-uint8_t param_value_s16div10_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
+uint8_t param_value_s16div10_BE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
 // assuming paramValLength = 2
-  if (!newParamVal(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, haConfig, paramValLength)) return 0;
+  if (!newParamVal(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, haConfig, paramValLength, HYSTERESIS_TYPE_S16DIV10, HYSTERESIS_SIZE_S16DIV10)) return 0;
   int16_t v = (payload[payloadIndex] << 8) | payload[payloadIndex - 1];
 #ifdef __AVR__
   dtostrf(v * 0.1, 1, 1, mqtt_value);
@@ -662,7 +723,7 @@ uint8_t param_value_s16div10_LE(byte paramSrc, byte paramPacketType, uint16_t pa
 
 // u16div10_and_u16hex, BE, useful for reverse engineering parameters
 
-uint8_t param_value_u16div10_and_u16hex_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
+uint8_t param_value_u16div10_and_u16hex_BE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
 // assuming paramValLength = 2
   if (!newParamVal(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, haConfig, paramValLength)) return 0;
   uint16_t v = (payload[payloadIndex] << 8) | payload[payloadIndex - 1];
@@ -676,8 +737,9 @@ uint8_t param_value_u16div10_and_u16hex_LE(byte paramSrc, byte paramPacketType, 
   return 1;
 }
 
-// misc, hex output, LE (should we prefer to use BE?)
+// misc, hex output, LE (switching to BE)
 
+/*
 byte unknownParam_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
   if (!outputUnknown || !newParamVal(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, haConfig, paramValLength)) return 0;
   snprintf(mqtt_key, MQTT_KEY_LEN, "ParamSrc_0x%02X_Type_0x%02X_Nr_0x%04X", paramSrc, paramPacketType, paramNr);
@@ -698,6 +760,20 @@ byte param_value_hex_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, b
     case 2 : snprintf(mqtt_value, MQTT_VALUE_LEN, "\"0x%02X%02X\"", payload[payloadIndex - 1], payload[payloadIndex]); break;
     case 3 : snprintf(mqtt_value, MQTT_VALUE_LEN, "\"0x%02X%02X%02X\"", payload[payloadIndex - 2], payload[payloadIndex - 1], payload[payloadIndex]); break;
     case 4 : snprintf(mqtt_value, MQTT_VALUE_LEN, "\"0x%02X%02X%02X%02X\"", payload[payloadIndex - 3], payload[payloadIndex - 2], payload[payloadIndex - 1], payload[payloadIndex]); break;
+  }
+  return 1;
+}
+*/
+
+byte unknownParam_BE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte paramValLength) {
+  if (!outputUnknown || !newParamVal(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, haConfig, paramValLength)) return 0;
+  snprintf(mqtt_key, MQTT_KEY_LEN, "ParamSrc_0x%02X_Type_0x%02X_Nr_0x%04X", paramSrc, paramPacketType, paramNr);
+  switch (paramValLength) {
+    case 1 : snprintf(mqtt_value, MQTT_VALUE_LEN, "\"0x%02X\"", payload[payloadIndex]); break;
+    case 2 : snprintf(mqtt_value, MQTT_VALUE_LEN, "\"0x%02X%02X\"", payload[payloadIndex], payload[payloadIndex - 1]); break;
+    case 3 : snprintf(mqtt_value, MQTT_VALUE_LEN, "\"0x%02X%02X%02X\"", payload[payloadIndex], payload[payloadIndex - 1], payload[payloadIndex - 2]); break;
+    case 4 : snprintf(mqtt_value, MQTT_VALUE_LEN, "\"0x%02X%02X%02X%02X\"", payload[payloadIndex], payload[payloadIndex - 1], payload[payloadIndex - 2], payload[payloadIndex - 3]); break;
+    default : return 0;
   }
   return 1;
 }
@@ -1001,6 +1077,7 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define VALUE_f8s8              { return        value_f8s8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_F(v)              { return           value_f(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v); }
 #define VALUE_F_L(v, l)         { return           value_f(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v, l); }
+#define VALUE_F_L_thr(v, l, tt, tv) { return       value_f(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v, l, tt, tv); }
 #define VALUE_S_L(v, l)         { return           value_s(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v, l); }
 #define VALUE_timeString(s)     { return  value_timeString(mqtt_value, s); }
 
@@ -1021,8 +1098,8 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define PARAM_VALUE_s16_BE     { return      param_value_s_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_s24_BE     { return      param_value_s_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_s32_BE     { return      param_value_s_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
-#define PARAM_VALUE_u16div10_LE { return param_value_u16div10_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
-#define PARAM_VALUE_s16div10_LE { return param_value_s16div10_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
+#define PARAM_VALUE_u16div10_BE { return param_value_u16div10_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
+#define PARAM_VALUE_s16div10_BE { return param_value_s16div10_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u8hex       { return      param_value_hex_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u16hex_LE   { return      param_value_hex_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u16hex_BE   { return      param_value_hex_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
@@ -1030,12 +1107,12 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define PARAM_VALUE_u32hex_LE   { return      param_value_hex_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_FIELD_SETTING           { return param_field_setting(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig/*, cat*/); }
 
-#define PARAM_VALUE_u16div10_and_u16hex_LE { return param_value_u16div10_and_u16hex_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
+#define PARAM_VALUE_u16div10_and_u16hex_BE { return param_value_u16div10_and_u16hex_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 
-#define UNKNOWN_PARAM8          { CAT_UNKNOWN; return unknownParam_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
-#define UNKNOWN_PARAM16         { CAT_UNKNOWN; return unknownParam_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
-#define UNKNOWN_PARAM24         { CAT_UNKNOWN; return unknownParam_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
-#define UNKNOWN_PARAM32         { CAT_UNKNOWN; return unknownParam_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
+#define UNKNOWN_PARAM8          { CAT_UNKNOWN; return unknownParam_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
+#define UNKNOWN_PARAM16         { CAT_UNKNOWN; return unknownParam_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
+#define UNKNOWN_PARAM24         { CAT_UNKNOWN; return unknownParam_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
+#define UNKNOWN_PARAM32         { CAT_UNKNOWN; return unknownParam_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 
 #define HANDLE_PARAM(paramValLength)     { return handleParam(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, /*cat,*/ paramValLength); }
 
@@ -1169,38 +1246,38 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
       case 0x00 :
       case 0x40 :
                   switch (paramNr) {
-        case 0x0000 : PARAM_KEY("Target_Temperature_Room");                                         CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 0x0000 = 0x10-0x_0-(7/8)
-        case 0x0001 : PARAM_KEY("Temperature_Unknown_Q1");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; //  15.0? (min/max heating?)
-        case 0x0002 : PARAM_KEY("Temperature_Room_1");                                              CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // Temproom1 (reported by main controller)
-        case 0x0003 : PARAM_KEY("Target_Temperature_DHW_1");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0
-        case 0x0004 : PARAM_KEY("Target_Temperature_DHW_2");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
-        case 0x0005 : PARAM_KEY("Unknown_Pulse_Q");                                                 CAT_UNKNOWN;                                 PARAM_VALUE_u16div10_and_u16hex_LE;   // 0xFE69 pulse /0xFe68  regular value ??0 / B8 related ??
-        case 0x0006 : PARAM_KEY("Target_Setpoint_LWT_Heating_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
-        case 0x0007 : PARAM_KEY("Target_Setpoint_LWT_Cooling_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
-        case 0x0008 : PARAM_KEY("Deviation_LWT_Heating_Zone_Main");                                 CAT_SETTING;                                 PARAM_VALUE_s16div10_LE;
-        case 0x0009 : PARAM_KEY("Deviation_LWT_Cooling_Zone_Main");                                 CAT_SETTING;                                 PARAM_VALUE_s16div10_LE;
-        case 0x000A : PARAM_KEY("Target_LWT_Zone_Main");                                            CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // (in 0.5 C)
-        case 0x000B : PARAM_KEY("Target_Setpoint_LWT_Heating_Zone_Add");                             CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
-        case 0x000C : PARAM_KEY("Target_Setpoint_LWT_Cooling_Zone_Add");                             CAT_SETTING;                                 PARAM_VALUE_u16div10_LE;
-        case 0x000D : PARAM_KEY("Deviation_LWT_Heating_Zone_Add");                                  CAT_SETTING;                                 PARAM_VALUE_s16div10_LE;
-        case 0x000E : PARAM_KEY("Deviation_LWT_Cooling_Zone_Add");                                  CAT_SETTING;                                 PARAM_VALUE_s16div10_LE;
-        case 0x000F : PARAM_KEY("Target_LWT_Zone_Add");                                             CAT_TEMP;                                    PARAM_VALUE_u16div10_LE;
+        case 0x0000 : PARAM_KEY("Target_Temperature_Room");                                         CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; // 0x0000 = 0x10-0x_0-(7/8)
+        case 0x0001 : PARAM_KEY("Temperature_Unknown_Q1");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; //  15.0? (min/max heating?)
+        case 0x0002 : PARAM_KEY("Temperature_Room_1");                                              CAT_TEMP;                                    PARAM_VALUE_u16div10_BE; // Temproom1 (reported by main controller)
+        case 0x0003 : PARAM_KEY("Target_Temperature_DHW_1");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; // = 0x13-0x40-0
+        case 0x0004 : PARAM_KEY("Target_Temperature_DHW_2");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
+        case 0x0005 : PARAM_KEY("Unknown_Pulse_Q");                                                 CAT_UNKNOWN;                                 PARAM_VALUE_u16div10_and_u16hex_BE;   // 0xFE69 pulse /0xFe68  regular value ??0 / B8 related ??
+        case 0x0006 : PARAM_KEY("Target_Setpoint_LWT_Heating_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
+        case 0x0007 : PARAM_KEY("Target_Setpoint_LWT_Cooling_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
+        case 0x0008 : PARAM_KEY("Deviation_LWT_Heating_Zone_Main");                                 CAT_SETTING;                                 PARAM_VALUE_s16div10_BE;
+        case 0x0009 : PARAM_KEY("Deviation_LWT_Cooling_Zone_Main");                                 CAT_SETTING;                                 PARAM_VALUE_s16div10_BE;
+        case 0x000A : PARAM_KEY("Target_LWT_Zone_Main");                                            CAT_TEMP;                                    PARAM_VALUE_u16div10_BE; // (in 0.5 C)
+        case 0x000B : PARAM_KEY("Target_Setpoint_LWT_Heating_Zone_Add");                             CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
+        case 0x000C : PARAM_KEY("Target_Setpoint_LWT_Cooling_Zone_Add");                             CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
+        case 0x000D : PARAM_KEY("Deviation_LWT_Heating_Zone_Add");                                  CAT_SETTING;                                 PARAM_VALUE_s16div10_BE;
+        case 0x000E : PARAM_KEY("Deviation_LWT_Cooling_Zone_Add");                                  CAT_SETTING;                                 PARAM_VALUE_s16div10_BE;
+        case 0x000F : PARAM_KEY("Target_LWT_Zone_Add");                                             CAT_TEMP;                                    PARAM_VALUE_u16div10_BE;
 
-        case 0x0010 : PARAM_KEY("Target_Temperature_Q10");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // 30.0
-        case 0x0011 : PARAM_KEY("Temperature_Outside_1");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // Tempout1  in 0.5 C // ~ 0x11-0x40-5
-        case 0x0012 : PARAM_KEY("Temperature_Outside_2");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // Tempout2 in 0.1 C
-        case 0x0013 : PARAM_KEY("Temperature_Room_2");                                              CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // Temproom2 (copied by Daikin system with minor delay)
-        case 0x0014 : PARAM_KEY("Temperature_RWT");                                                 CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // TempRWT rounded down/different calculus (/255?)?
-        case 0x0015 : PARAM_KEY("Temperature_MWT");                                                 CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // TempMWT
-        case 0x0016 : PARAM_KEY("Temperature_LWT");                                                 CAT_TEMP;                                    PARAM_VALUE_u16div10_LE; // TempLWT rounded DOWN (or different calculus than /256; perhaps /255?)
-        case 0x0017 : PARAM_KEY("Temperature_Refrigerant_1");                                       CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // TempRefr1
-        case 0x0018 : PARAM_KEY("Temperature_Refrigerant_2");                                       CAT_TEMP;                                    PARAM_VALUE_s16div10_LE; // TempRefr2
-        case 0x0027 : PARAM_KEY("Target_Temperature_DHW_3");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_LE; // = 0x13-0x40-0 ??
+        case 0x0010 : PARAM_KEY("Target_Temperature_Q10");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; // 30.0
+        case 0x0011 : PARAM_KEY("Temperature_Outside_1");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_BE; // Tempout1  in 0.5 C // ~ 0x11-0x40-5
+        case 0x0012 : PARAM_KEY("Temperature_Outside_2");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_BE; // Tempout2 in 0.1 C
+        case 0x0013 : PARAM_KEY("Temperature_Room_2");                                              CAT_TEMP;                                    PARAM_VALUE_u16div10_BE; // Temproom2 (copied by Daikin system with minor delay)
+        case 0x0014 : PARAM_KEY("Temperature_RWT");                                                 CAT_TEMP;                                    PARAM_VALUE_u16div10_BE; // TempRWT rounded down/different calculus (/255?)?
+        case 0x0015 : PARAM_KEY("Temperature_MWT");                                                 CAT_TEMP;                                    PARAM_VALUE_u16div10_BE; // TempMWT
+        case 0x0016 : PARAM_KEY("Temperature_LWT");                                                 CAT_TEMP;                                    PARAM_VALUE_u16div10_BE; // TempLWT rounded DOWN (or different calculus than /256; perhaps /255?)
+        case 0x0017 : PARAM_KEY("Temperature_Refrigerant_1");                                       CAT_TEMP;                                    PARAM_VALUE_s16div10_BE; // TempRefr1
+        case 0x0018 : PARAM_KEY("Temperature_Refrigerant_2");                                       CAT_TEMP;                                    PARAM_VALUE_s16div10_BE; // TempRefr2
+        case 0x0027 : PARAM_KEY("Target_Temperature_DHW_3");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; // = 0x13-0x40-0 ??
 // 0x13-0x40-[1-7] unknown;  = 0x0028-0x0029 ?
-        case 0x002A : PARAM_KEY("Flow");                                                            CAT_MEASUREMENT;                             PARAM_VALUE_u16div10_LE; // Flow  0x13-0x40-9
+        case 0x002A : PARAM_KEY("Flow");                                                            CAT_MEASUREMENT;                             PARAM_VALUE_u16div10_BE; // Flow  0x13-0x40-9
         case 0x002B : PARAM_KEY("SW_Version_Outside_Unit");                                         CAT_SETTING;                                 PARAM_VALUE_u16hex_BE    ; // Flow // 943F (LSB versus MSB?)
         case 0x002C : PARAM_KEY("SW_Version_Inside_Unit");                                          CAT_SETTING;                                 PARAM_VALUE_u16hex_BE   ; // Flow // 0439 //SW_Version 0x3F943904 0x13-0x40-13
-        case 0x002D : PARAM_KEY("Unknown_P36_002D");                                                CAT_SETTING;                                 PARAM_VALUE_u16hex_LE; // no Temp. value 0016 or 040C. Schedule related ?
+        case 0x002D : PARAM_KEY("Unknown_P36_002D");                                                CAT_SETTING;                                 PARAM_VALUE_u16hex_BE; // no Temp. value 0016 or 040C. Schedule related ?
         case 0xFFFF : return 0;
         default     : UNKNOWN_PARAM16;
         }

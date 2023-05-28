@@ -5,6 +5,8 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230526 v0.9.36 remove several pseudo parameters from HA, unless j-mask includes 0x20000, and adds thresholds to reduce traffic
+ * 20230422 v0.9.35 (version skipped)
  * 20230322 v0.9.34 AP timeout
  * 20230211 v0.9.33a 0xA3 thermistor read-out F-series
  * 20230117 v0.9.32 centralize pseudopacket handling
@@ -119,9 +121,9 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.34"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.34"
-#define HA_SW "0.9.34"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.36"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.36"
+#define HA_SW "0.9.36"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works

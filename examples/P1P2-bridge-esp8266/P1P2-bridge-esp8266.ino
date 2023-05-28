@@ -746,6 +746,7 @@ void handleCommand(char* cmdString) {
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x4000 to use P1P2/R/xxx as input (requires MQTT_INPUT_HEXDATA)"), (outputMode >> 14) & 0x01);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)"), (outputMode >> 15) & 0x01);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x10000 to include non-HACONFIG parameters in P1P2/P/# "), (outputMode >> 16) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x20000 to add all pseudo parameters to HA in P1P2/P/# "), (outputMode >> 17) & 0x01);
               }
               break;
     case 's': // OutputFilter

@@ -102,9 +102,27 @@ char ha_mqttValue[HA_VALUE_LEN];
 static byte uom = 0;
 static byte stateclass = 0;
 
-bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte length, bool saveSeen) {
+#define HYSTERESIS_TYPE_F8_8 1
+#define HYSTERESIS_TYPE_F8S8 2
+#define HYSTERESIS_TYPE_U16DIV10 3
+//#define HYSTERESIS_TYPE_S16DIV10 4 // E-series
+#define HYSTERESIS_TYPE_S_F8_8 5
+#define HYSTERESIS_TYPE_U16 5
+#define HYSTERESIS_TYPE_U32 6
+#define HYSTERESIS_SIZE_F8_8 25     // 25/256 ~ 0.1
+#define HYSTERESIS_SIZE_F8S8 1      //  1/10  = 0.1
+#define HYSTERESIS_SIZE_U16DIV10 1  //  1/10  = 0.1
+//#define HYSTERESIS_SIZE_S16DIV10 1  //  1/10  = 0.1
+#define HYSTERESIS_SIZE_S_F8_8 2
+
+uint16_t FN_u16_LE(uint8_t *b)          { return (                (((uint16_t) b[-1]) << 8) | (b[0]));}
+uint32_t FN_u24_LE(uint8_t *b)          { return (((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
+uint32_t FN_u32_LE(uint8_t *b)          { return (((uint32_t) b[-3] << 24) | ((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
+
+bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte length, bool saveSeen, byte applyHysteresisType = 0, uint16_t applyHysteresis = 0) {
 // returns true if a packet parameter is observed for the first time ((and publishes it for homeassistant if haConfig==true)
 // if (outputFilter <= maxOutputFilter), it detects if a parameter has changed, and returns true if changed (or if outputFilter==0)
+// hysteresis: if (applyHysteresisType), returns true if changed beyond applyHysteresis (assumes f8_8/s_f8_8/f8s8/u16div10 data format), and if hysteresis difference is not met, does not save new value
 // Also, if saveSeen==true, the new value is saved
 //
 #ifdef SAVEPACKETS
@@ -134,8 +152,44 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       return 0;
     } else {
       bool pubHA = false;
+      bool skipHysteresis = false;
+      uint16_t pi2base = bytestart[pts][pti];
+      if (applyHysteresisType && (pi2base < sizeValSeen) && payloadByteSeen[pi2base + payloadIndex - 1] && payloadByteSeen[pi2base + payloadIndex]) {
+        if (applyHysteresisType == HYSTERESIS_TYPE_F8_8) {
+          int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 256 + payloadByteVal[pi2base + payloadIndex];
+          int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 256 + payload[payloadIndex];
+          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+        } else if (applyHysteresisType == HYSTERESIS_TYPE_F8S8) {
+          int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
+          int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
+          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+        } else if (applyHysteresisType == HYSTERESIS_TYPE_U16DIV10) {
+          uint16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
+          uint16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
+          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+// E-series
+//        } else if (applyHysteresisType == HYSTERESIS_TYPE_S16DIV10) {
+//          int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
+//          int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
+//          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+        } else if (applyHysteresisType == HYSTERESIS_TYPE_U16) {
+          uint16_t oldValue = FN_u16_LE(&payloadByteVal[pi2base + payloadIndex]);
+          uint16_t newValue = FN_u16_LE(&payload[payloadIndex]);
+          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+        } else if (applyHysteresisType == HYSTERESIS_TYPE_U32) {
+          uint32_t oldValue = FN_u32_LE(&payloadByteVal[pi2base + payloadIndex]);
+          uint32_t newValue = FN_u32_LE(&payload[payloadIndex]);
+          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+        } else if (applyHysteresisType == HYSTERESIS_TYPE_S_F8_8) {
+          int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 256 + payloadByteVal[pi2base + payloadIndex];
+          if (payloadByteVal[pi2base + payloadIndex - 2]) oldValue = -oldValue;
+          int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 256 + payload[payloadIndex];
+          if (payload[payloadIndex - 2]) newValue = -newValue;
+          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+        }
+      }
       for (byte i = payloadIndex + 1 - length; i <= payloadIndex; i++) {
-        uint16_t pi2 = bytestart[pts][pti] + i;
+        uint16_t pi2 = pi2base + i;
         if (pi2 >= sizeValSeen) {
           pi2 = 0;
           Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
@@ -144,8 +198,8 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
         if (payloadByteSeen[pi2]) {
           // this byte or at least some bits have been seen and saved before.
           if (payloadByteVal[pi2] != payload[i]) {
-            newByte = (outputFilter <= maxOutputFilter);
-            if (saveSeen) payloadByteVal[pi2] = payload[i];
+            newByte = (outputFilter <= maxOutputFilter) && !skipHysteresis;
+            if (saveSeen && !skipHysteresis) payloadByteVal[pi2] = payload[i];
           } // else payloadByteVal seen and not changed
         } else {
           // first time for this byte
@@ -203,10 +257,6 @@ uint8_t value_u32hex_LE(byte packetSrc, byte packetType, byte payloadIndex, byte
 }
 
 // unsigned integers, LE
-
-uint16_t FN_u16_LE(uint8_t *b)          { return (                (((uint16_t) b[-1]) << 8) | (b[0]));}
-uint32_t FN_u24_LE(uint8_t *b)          { return (((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
-uint32_t FN_u32_LE(uint8_t *b)          { return (((uint32_t) b[-3] << 24) | ((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
 
 uint8_t value_u8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
   if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1)) return 0;
@@ -294,7 +344,7 @@ uint8_t value_s4abs1c(byte packetSrc, byte packetType, byte payloadIndex, byte* 
 float FN_u16div10_LE(uint8_t *b)     { if (b[-1] == 0xFF) return 0; else return (b[0] * 0.1 + b[-1] * 25.6);}
 
 uint8_t value_u16div10_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
-  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1)) return 0;
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1, HYSTERESIS_TYPE_U16DIV10, HYSTERESIS_SIZE_U16DIV10)) return 0;
 #ifdef __AVR__
   dtostrf(FN_u16div10_LE(&payload[payloadIndex]), 1, 1, mqtt_value);
 #else
@@ -314,21 +364,21 @@ float FN_f8_8(uint8_t *b)            { return                    (((int8_t) b[-1
 float FN_s_f8_8(uint8_t *b)          { return (b[-2] ? -1 : 1) * (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
 
 uint8_t value_f8_8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
-  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1)) return 0;
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1, HYSTERESIS_TYPE_F8_8, HYSTERESIS_SIZE_F8_8)) return 0;
 #ifdef __AVR__
-  dtostrf(FN_f8_8(&payload[payloadIndex]), 1, 2, mqtt_value);
+  dtostrf(FN_f8_8(&payload[payloadIndex]), 1, 1, mqtt_value);
 #else
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", FN_f8_8(&payload[payloadIndex]));
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", FN_f8_8(&payload[payloadIndex]));
 #endif
   return 1;
 }
 
 uint8_t value_s_f8_8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
-  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 3, 1)) return 0;
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 3, 1, HYSTERESIS_TYPE_S_F8_8, HYSTERESIS_SIZE_S_F8_8)) return 0;
 #ifdef __AVR__
-  dtostrf(FN_s_f8_8(&payload[payloadIndex]), 1, 2, mqtt_value);
+  dtostrf(FN_s_f8_8(&payload[payloadIndex]), 1, 1, mqtt_value);
 #else
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", FN_s_f8_8(&payload[payloadIndex]));
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", FN_s_f8_8(&payload[payloadIndex]));
 #endif
   return 1;
 }
@@ -336,22 +386,22 @@ uint8_t value_s_f8_8(byte packetSrc, byte packetType, byte payloadIndex, byte* p
 float FN_f8s8(uint8_t *b)            { return ((float)(int8_t) b[-1]) + ((float) b[0]) /  10;}
 
 uint8_t value_f8s8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
-  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1)) return 0;
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1, HYSTERESIS_TYPE_F8S8, HYSTERESIS_SIZE_F8S8)) return 0;
 #ifdef __AVR__
   dtostrf(FN_f8s8(&payload[payloadIndex]), 1, 1, mqtt_value);
 #else
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", FN_f8s8(&payload[payloadIndex]));
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", FN_f8s8(&payload[payloadIndex]));
 #endif
   return 1;
 }
 
 // change to Watt ?
-uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, float v, int length = 0) {
-  if (length && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1))) return 0;
+uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, float v, int length = 0, byte thresholdType = 0, uint16_t thresholdSize = 0) {
+  if (length && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1, thresholdType, thresholdSize))) return 0;
 #ifdef __AVR__
-  dtostrf(v, 1, 3, mqtt_value);
+  dtostrf(v, 1, 2, mqtt_value);
 #else
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", v);
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.2f", v);
 #endif
   return (outputFilter > maxOutputFilter ? 0 : 1);
 }
@@ -413,6 +463,7 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 #define VALUE_f8s8              { return        value_f8s8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_F(v)              { return           value_f(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v); }
 #define VALUE_F_L(v, l)         { return           value_f(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v, l); }
+#define VALUE_F_L_thr(v, l, tt, tv) { return           value_f(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v, l, tt, tv); }
 #define VALUE_S_L(v, l)         { return           value_s(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, v, l); }
 #define VALUE_timeString(s)     { return  value_timeString(mqtt_value, s); }
 
