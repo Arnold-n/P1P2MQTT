@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20230604 v0.9.37 Support for V1.2 hardware
  * 20221028 v0.9.23 ADC code
  * 20220918 v0.9.22 scopemode also for writes, focused on actual errors, fake error generation for test purposes, removing OLDP1P2LIB
  * 20220830 v0.9.18 version alignment with example programs (last version supporting OLDP1P2LIB)
@@ -59,6 +60,8 @@
  *
  */
 
+// TODO: fix LED code for Arduino targets
+
 #include "P1P2Serial.h"
 
 // New library version 0.9.14 rewritten for quick and more predictable interrupt handling.
@@ -112,9 +115,8 @@
 
 // use LED_BUILTIN on PB7 on ATmega2560
 #define LED_ERROR                       LED_BUILTIN
-#define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTB |= 0x80) : (PORTB &= 0x7F))
-#define DIGITAL_SET_LED_ERROR           (PORTB |= 0x80)
 #define DIGITAL_RESET_LED_ERROR         (PORTB &= 0x7F)
+#define DIGITAL_SET_LED_ERROR           (PORTB |= 0x80)
 
 #elif ((defined __AVR_ATmega328P__) || (defined __AVR_ATmega328PB__))
 
@@ -167,22 +169,30 @@
 #define DIGITAL_SET_LED_ERROR           (PORTD |= 0x08)
 #define DIGITAL_RESET_LED_ERROR         (PORTD &= 0xF7)
 #define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTD |= 0x08) : (PORTD &= 0xF7))
+
 #endif /* F_CPU */
 
 // 4 leds:        on   P1P2-ESP-interface   /   Arduino ATmega250     / Arduino Uno
 // LED_POWER (white) on     PC2             /         pin 35          /    pin A2
 // LED_READ  (green) on     PD6             /          n/a            /    pin  6
-// LED_WRITE (blue) on      PD5             /          n/a            /    pin  5
-// LED_ERROR (red) on       PD3             /      LED_BUILTIN        /  LED_BUILTIN
+// LED_WRITE (blue) on      PD5 (*)         /          n/a            /    pin  5
+// LED_ERROR (red) on       PD3 (*)         /      LED_BUILTIN        /  LED_BUILTIN
+// (*) in v1.2 LEDs inverted logic: to 3V3 instead of to GND
 
 #define LED_POWER PC2
 #define LED_READ PD6
 #define LED_WRITE PD5
 #define DIGITAL_SET_LED_POWER           (PORTC |= 0x04)
-#define DIGITAL_SET_LED_READ            (PORTD |= 0x40)
-#define DIGITAL_RESET_LED_READ          (PORTD &= 0xBF)
-#define DIGITAL_SET_LED_WRITE           (PORTD |= 0x20)
-#define DIGITAL_RESET_LED_WRITE         (PORTD &= 0xDF)
+#define DIGITAL_RESET_LED_POWER         (PORTC &= 0xFB)
+#define DIGITAL_WRITE_LED_POWER(val)    ((val) ? (DIGITAL_SET_LED_POWER) : (DIGITAL_RESET_LED_POWER))
+
+#define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (DIGITAL_SET_LED_ERROR) : (DIGITAL_RESET_LED_ERROR))
+
+// v1.2 uses LEDs to 3V3 instead of to GND for R,W
+#define DIGITAL_SET_LED_READ            { if (_ledRW_reverse) { PORTD &= 0xBF;} else { PORTD |= 0x40;}}
+#define DIGITAL_RESET_LED_READ          { if (_ledRW_reverse) { PORTD |= 0x40;} else { PORTD &= 0xBF;}}
+#define DIGITAL_SET_LED_WRITE           { if (_ledRW_reverse) { PORTD &= 0xDF;} else { PORTD |= 0x20;}}
+#define DIGITAL_RESET_LED_WRITE         { if (_ledRW_reverse) { PORTD |= 0x20;} else { PORTD &= 0xDF;}}
 
 // timer2 for milliseconds, timer0 for seconds
 #if F_CPU == 16000000L
@@ -235,7 +245,7 @@ bool fakeError(byte x)
 
 volatile uint16_t irq_start_time = 0, irq_start = 0, irq_w = 0, irq_r = 0, irq_time = 0, irq_lapsed_w = 0, irq_lapsed_r = 0;
 volatile uint8_t irq_ovf = 0, irq_busy = 0;
-// assume 8MHz: TODO >> 3 or >> 4
+// assume 8MHz: TODO for 16MHz, use >> 4
 //
 #define IRQ_START { irq_start_time = GET_TIMER_W_COUNT(); }
 #define IRQ_STOP  { irq_time += (GET_TIMER_W_COUNT() - irq_start_time) >> 3; }
@@ -266,6 +276,7 @@ volatile uint8_t irq_ovf = 0, irq_busy = 0;
 /************************/
 
 static bool _use_ADC = false;
+static bool _ledRW_reverse = false;
 static byte ADMUX0 = 0;
 static byte ADMUX1 = 0;
 static uint16_t V0min = 0x3FF << ADC_AVG_SHIFT;
@@ -283,8 +294,7 @@ static uint32_t V1sum0 = 0x00;
 static uint32_t V1sum = 0x00;
 
 // hard-coded for 8 MHz ATmega328P
-//
-//
+
 #define ADC_TRIGGER                     (ADCSRA = 0xDE)  // set ADSC to 1
 #define ADC_INTERRUPT                   ADC_vect
 #define ADC_VALUE                       (ADCL + (ADCH << 8))
@@ -356,6 +366,18 @@ void P1P2Serial::ADC_results(uint16_t &V0_min, uint16_t &V0_max, uint32_t &V0_av
 }
 
 /****************************************/
+/**          LED routines (v1.2)       **/
+/****************************************/
+
+void P1P2Serial::ledPower(bool ledOn) {
+  DIGITAL_WRITE_LED_POWER(ledOn);
+}
+
+void P1P2Serial::ledError(bool ledOn) {
+  DIGITAL_WRITE_LED_ERROR(ledOn);
+}
+
+/****************************************/
 /**          Initialization            **/
 /****************************************/
 
@@ -399,7 +421,7 @@ static volatile int32_t time_millisec = 0;
 #define INPUT_PULLUP INPUT
 #endif /* INPUT_PULLUP */
 
-void P1P2Serial::begin(uint32_t baud, bool use_ADC /* = false */, uint8_t ADC_pin0 /* = 0 */, uint8_t ADC_pin1 /* = 1 */)
+void P1P2Serial::begin(uint32_t baud, bool use_ADC /* = false */, uint8_t ADC_pin0 /* = 0 */, uint8_t ADC_pin1 /* = 1 */, bool ledRW_reverse /* = false */)
 {
   uint32_t cycles_per_bit = ((ALTSS_BASE_FREQ + baud / 2) / baud); // 833 cycles at 16MHz
 
@@ -416,6 +438,7 @@ void P1P2Serial::begin(uint32_t baud, bool use_ADC /* = false */, uint8_t ADC_pi
   pinMode(LED_WRITE, OUTPUT);
   pinMode(LED_ERROR, OUTPUT);
 
+  _ledRW_reverse = ledRW_reverse;
   DIGITAL_SET_LED_POWER;
   DIGITAL_SET_LED_READ;
   DIGITAL_SET_LED_WRITE;
@@ -713,6 +736,7 @@ ISR(COMPARE_W_INTERRUPT)
   uint16_t get_compare_w = GET_COMPARE_W();
   uint16_t set_compare_w;
 
+  DIGITAL_RESET_LED_ERROR;
   if (state < 20) {
     set_compare_w = get_compare_w + Wticks_per_semibit;
     SET_COMPARE_W(set_compare_w);

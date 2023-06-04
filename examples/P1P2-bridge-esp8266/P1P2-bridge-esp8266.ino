@@ -17,6 +17,9 @@
  * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20230604 v0.9.37 support for P1P2MQTT bridge v1.2; separate hwID for ESP and ATmega
+ * 20230526 v0.9.36 threshold
+ * 20230423 v0.9.35 (skipped)
  * 20230322 v0.9.34 AP timeout
  * 20230108 v0.9.31 sensor prefix, +2 valves in HA, fix bit history for 0x30/0x31, +pseudo controlLevel
  * 20221228 v0.9.30 switch from modified ESP_telnet library to ESP_telnet v2.0.0
@@ -96,7 +99,7 @@ typedef struct EEPROMSettingsNew {
   byte outputFilter;
   byte mqttInputByte4;
   // EEPROM values added for EEPROM_SIGNATURE_NEW
-  byte hwID;
+  byte ESPhwID;
   byte EEPROM_version;
   byte noWiFi;
   byte useStaticIP;
@@ -119,16 +122,19 @@ static uint32_t noWiFi = INIT_NOWIFI;
 static uint32_t useStaticIP = INIT_USE_STATIC_IP;
 static uint32_t useSensorPrefixHA = INIT_USE_SENSOR_PREFIX_HA;
 
+#define ATMEGA_SERIAL_ENABLE 15 // required for v1.2
+
 #ifdef ETHERNET
 // Connections W5500: Arduino Mega pins 50 (MISO), 51 (MOSI), 52 (SCK), and 10 (SS) (https://www.arduino.cc/en/Reference/Ethernet)
 //                       Pin 53 (hardware SS) is not used but must be kept as output. In addition, connect RST, GND, and 5V.
 
 // W5500:
-// MISO GPIO12 pin 6 // PB4 //
-// MOSI GPIO13 pin 7 // PB3 //
-// CLK  GPIO14 pin 5 // PB5 //
-// ~RST GPIO16 pin 4 // PD7 //
-// SCS  GPIO4  pin 19// PB2 //
+// MISO GPIO12 pin 6
+// MOSI GPIO13 pin 7
+// CLK  GPIO14 pin 5
+// ~RST GPIO16 pin 4
+// SCS  GPIO4  pin 19
+
 // #define _ASYNC_MQTT_LOGLEVEL_               1
 #define ETH_CS_PIN        4  // GPIO4
 #define ETH_RESET_PIN     16 // GPIO16
@@ -212,7 +218,7 @@ ESP8266AVRISP* avrprog;
 
 static byte outputFilter = INIT_OUTPUTFILTER;
 static uint32_t outputMode = INIT_OUTPUTMODE;
-static uint32_t hwID = INIT_HW_ID;
+static uint32_t ESPhwID = INIT_ESP_HW_ID;
 #define outputUnknown (outputMode & 0x0008)
 
 const byte Compile_Options = 0 // multi-line statement
@@ -462,8 +468,6 @@ void ATmega_dummy_for_serial() {
   Serial.println(F("* Dummy line 1."));
   Serial.print(F(SERIAL_MAGICSTRING));
   Serial.println(F("* Dummy line 2."));
-  Serial.print(F(SERIAL_MAGICSTRING));
-  Serial.println('V');
 }
 
 bool MQTT_commandReceived = false;
@@ -524,15 +528,15 @@ void handleCommand(char* cmdString) {
               ATmega_uptime_prev = 0;
               break;
     case 'b': // display or set MQTT settings
-    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s %i %i %i %i", &EEPROM_state.EEPROMnew.mqttServer, &EEPROM_state.EEPROMnew.mqttPort, &EEPROM_state.EEPROMnew.mqttUser, &EEPROM_state.EEPROMnew.mqttPassword, &mqttInputByte4, &hwID, &noWiFi, &useSensorPrefixHA)) > 0) {
+    case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s %i %i %i %i", &EEPROM_state.EEPROMnew.mqttServer, &EEPROM_state.EEPROMnew.mqttPort, &EEPROM_state.EEPROMnew.mqttUser, &EEPROM_state.EEPROMnew.mqttPassword, &mqttInputByte4, &ESPhwID, &noWiFi, &useSensorPrefixHA)) > 0) {
                 Sprint_P(true, true, true, PSTR("* [ESP] Writing new MQTT settings to EEPROM"));
                 if (n > 4) EEPROM_state.EEPROMnew.mqttInputByte4 = mqttInputByte4;
-                if ((n > 5) && (hwID != EEPROM_state.EEPROMnew.hwID)) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to change hwID"));
+                if ((n > 5) && (ESPhwID != EEPROM_state.EEPROMnew.ESPhwID)) {
+                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to change ESPhwID"));
 #ifdef REBOOT_REASON
                   EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
 #endif /* REBOOT_REASON */
-                  EEPROM_state.EEPROMnew.hwID = hwID;
+                  EEPROM_state.EEPROMnew.ESPhwID = ESPhwID;
                 }
                 if ((n > 6) && (EEPROM_state.EEPROMnew.noWiFi != noWiFi)) {
                   Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to change noWiFi"));
@@ -577,9 +581,9 @@ void handleCommand(char* cmdString) {
                 Sprint_P(true, true, true, PSTR("* [ESP] mqttInputByte4 is %i"), EEPROM_state.EEPROMnew.mqttInputByte4);
               }
               if (n > 5) {
-                Sprint_P(true, true, true, PSTR("* [ESP] hwID set to %i"), EEPROM_state.EEPROMnew.hwID);
+                Sprint_P(true, true, true, PSTR("* [ESP] ESPhwID set to %i"), EEPROM_state.EEPROMnew.ESPhwID);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] hwID %i"), EEPROM_state.EEPROMnew.hwID);
+                Sprint_P(true, true, true, PSTR("* [ESP] ESPhwID %i"), EEPROM_state.EEPROMnew.ESPhwID);
               }
               if (n > 6) {
                 Sprint_P(true, true, true, PSTR("* [ESP] noWiFi set to %i"), EEPROM_state.EEPROMnew.noWiFi);
@@ -787,7 +791,7 @@ void handleCommand(char* cmdString) {
 #ifdef F_SERIES
                           Sprint_P(true, true, true, PSTR("* [ESP] F-Series"));
 #endif
-                          Sprint_P(true, true, true, PSTR("* [ESP] hw_identifier %i"), hwID);
+                          Sprint_P(true, true, true, PSTR("* [ESP] ESP_hw_identifier %i"), ESPhwID);
                           if (mqttClient.connected()) {
                             Sprint_P(true, true, true, PSTR("* [ESP] Connected to MQTT server"));
                           } else {
@@ -805,7 +809,7 @@ void handleCommand(char* cmdString) {
                           Sprint_P(true, true, true, PSTR("* [ESP] EEPROM version = %i"), EEPROM_state.EEPROMnew.EEPROM_version);
                           if (sscanf((const char*) (cmdString + 1), "%2x", &temp) == 1) {
                             if (temp < 2) {
-                              Sprint_P(true, true, true, PSTR("* [ESP] Warning: verbose < 2 or >4 not supported by P1P2-bridge-esp8266, changing to verbosity mode 3"));
+                              Sprint_P(true, true, true, PSTR("* [ESP] Warning: verbose < 2 not supported by P1P2-bridge-esp8266, changing to verbosity mode 3"));
                               cmdString[1] = '3';
                               cmdString[2] = '\n';
                             }
@@ -835,11 +839,17 @@ void handleCommand(char* cmdString) {
                 default : break;
               }
               // fallthrough for v/g/h commands handled both by P1P2-bridge-esp8266 and P1P2Monitor
-              // 'c' 'C' 'p' 'P' 'e' 'E' 't' 'T" 'o' 'O" 'u' 'U" 'x' 'X" 'w' 'W" 'k' 'K' 'l' 'L' 'q' 'Q' 'm' 'M' 'z' 'Z' 'r' 'R' 'n' 'N' 'y' 'Y' handled by P1P2Monitor
-              // (reserved 'f' 'F") 
+              // 'c' 'C' 'p' 'P' 'e' 'E' 'f' 'F' 't' 'T" 'o' 'O" 'u' 'U" 'x' 'X" 'w' 'W" 'k' 'K' 'l' 'L' 'q' 'Q' 'm' 'M' 'z' 'Z' 'r' 'R' 'n' 'N' 'y' 'Y' handled by P1P2Monitor
     default : Sprint_P(true, true, true, PSTR("* [ESP] To ATmega: ->%s<-"), cmdString);
+              if ((cmdString[0] == 'k') || (cmdString[0] == 'K')) {
+              }
               Serial.print(F(SERIAL_MAGICSTRING));
               Serial.println((char *) cmdString);
+              if ((cmdString[0] == 'k') || (cmdString[0] == 'K')) {
+                delay(200);
+                ATmega_dummy_for_serial();
+                ATmega_uptime_prev = 0;
+              }
               break;
   }
 }
@@ -998,7 +1008,7 @@ void setup() {
     EEPROM_state.EEPROMnew.outputMode = INIT_OUTPUTMODE;
     EEPROM_state.EEPROMnew.outputFilter = INIT_OUTPUTFILTER;
     EEPROM_state.EEPROMnew.mqttInputByte4 = 0;
-    EEPROM_state.EEPROMnew.hwID = 0;
+    EEPROM_state.EEPROMnew.ESPhwID = 0;
     EEPROM_state.EEPROMnew.EEPROM_version = 0;
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
@@ -1020,7 +1030,7 @@ void setup() {
     EEPROM_state.EEPROMnew.outputMode = INIT_OUTPUTMODE;
     EEPROM_state.EEPROMnew.outputFilter = INIT_OUTPUTFILTER;
     EEPROM_state.EEPROMnew.mqttInputByte4 = 0;
-    EEPROM_state.EEPROMnew.hwID = 0;
+    EEPROM_state.EEPROMnew.ESPhwID = 0;
     EEPROM_state.EEPROMnew.EEPROM_version = 0;
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
@@ -1035,8 +1045,8 @@ void setup() {
 
   Serial_println(F("* [ESP] Check for old3 signature"));
   if (!strcmp(EEPROM_state.EEPROMnew.signature, EEPROM_SIGNATURE_OLD3)) {
-    Serial_println(F("* [ESP] Old3 signature match, need to upgrade signature and set hwID and EEPROM_version to 0"));
-    // EEPROM_state.EEPROMnew.hwID = 0; // was 0 already
+    Serial_println(F("* [ESP] Old3 signature match, need to upgrade signature and set ESPhwID and EEPROM_version to 0"));
+    // EEPROM_state.EEPROMnew.ESPhwID = 0; // was 0 already
     // EEPROM_state.EEPROMnew.EEPROM_version = 0; //was 0 already
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
@@ -1060,7 +1070,7 @@ void setup() {
     EEPROM_state.EEPROMnew.outputMode = INIT_OUTPUTMODE;
     EEPROM_state.EEPROMnew.outputFilter = INIT_OUTPUTFILTER;
     EEPROM_state.EEPROMnew.mqttInputByte4 = 0;
-    EEPROM_state.EEPROMnew.hwID = INIT_HW_ID;
+    EEPROM_state.EEPROMnew.ESPhwID = INIT_ESP_HW_ID;
     EEPROM_state.EEPROMnew.EEPROM_version = 0; // use counter instead of new signature in future
     EEPROM_state.EEPROMnew.noWiFi = INIT_NOWIFI;
     EEPROM_state.EEPROMnew.useStaticIP = INIT_USE_STATIC_IP;
@@ -1363,7 +1373,7 @@ void setup() {
 
   outputFilter = EEPROM_state.EEPROMnew.outputFilter;
   outputMode = EEPROM_state.EEPROMnew.outputMode;
-  hwID = EEPROM_state.EEPROMnew.hwID;
+  ESPhwID = EEPROM_state.EEPROMnew.ESPhwID;
   noWiFi = EEPROM_state.EEPROMnew.noWiFi;
   useStaticIP = EEPROM_state.EEPROMnew.useStaticIP;
 
@@ -1375,7 +1385,7 @@ void setup() {
 #ifdef F_SERIES
     Sprint_P(true, true, true, PSTR("* [ESP] F-Series"));
 #endif
-    Sprint_P(true, true, true, PSTR("* [ESP] hw_identifier %i"), hwID);
+    Sprint_P(true, true, true, PSTR("* [ESP] ESP_hw_identifier %i"), ESPhwID);
     Sprint_P(true, true, true, PSTR("* [ESP] noWiFi %i"), noWiFi);
     Sprint_P(true, true, true, PSTR("* [ESP] useStaticIP %i"), useStaticIP);
     Sprint_P(true, true, true, PSTR("* [ESP] Connected to MQTT server"));
@@ -1467,7 +1477,7 @@ void setup() {
 // AVRISP
   // set RESET_PIN high, to prevent ESP8266AVRISP from resetting ATmega328P
   digitalWrite(RESET_PIN, HIGH);
-  avrprog = new ESP8266AVRISP(avrisp_port, RESET_PIN, hwID ? SPI_SPEED_1 : SPI_SPEED_0);
+  avrprog = new ESP8266AVRISP(avrisp_port, RESET_PIN, ESPhwID ? SPI_SPEED_1 : SPI_SPEED_0);
   // set RESET_PIN back to INPUT mode
   pinMode(RESET_PIN, INPUT);
   MDNS.begin(avrisp_host);
@@ -1476,6 +1486,9 @@ void setup() {
   // listen for avrdudes
   avrprog->begin();
 #endif
+// Allow ATmega to enable serial input/output
+  digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
+  pinMode(ATMEGA_SERIAL_ENABLE, OUTPUT);
 
   prevMillis = millis();
 
@@ -1656,9 +1669,27 @@ void loop() {
   AVRISPState_t new_state = avrprog->update();
   if (last_state != new_state) {
     switch (new_state) {
-      case AVRISP_STATE_IDLE:    Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] now idle"));           pinMode(RESET_PIN, INPUT); delay (200); ATmega_dummy_for_serial(); break;
-      case AVRISP_STATE_PENDING: Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] connection pending")); pinMode(RESET_PIN, OUTPUT); break;
-      case AVRISP_STATE_ACTIVE:  Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] programming mode"));   pinMode(RESET_PIN, OUTPUT); break;
+      case AVRISP_STATE_IDLE:    Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] now idle"));
+                                 digitalWrite(RESET_PIN, LOW);
+                                 pinMode(RESET_PIN, OUTPUT);
+                                 delay(1);
+                                 pinMode(RESET_PIN, INPUT);
+                                 digitalWrite(RESET_PIN, HIGH);
+                                 // enable ATmega to determine PB5=GPIO14/GPIO15 for v1.0/v1.1
+                                 delay(1);
+                                 // enable ATmega serial output on v1.2
+                                 pinMode(ATMEGA_SERIAL_ENABLE, OUTPUT); // not really needed
+                                 digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
+                                 delay(100);
+                                 ATmega_dummy_for_serial();
+                                 ATmega_uptime_prev = 0;
+                                 break;
+      case AVRISP_STATE_PENDING: Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] connection pending"));
+                                 pinMode(RESET_PIN, OUTPUT);
+                                 break;
+      case AVRISP_STATE_ACTIVE:  Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] programming mode"));
+                                 pinMode(RESET_PIN, OUTPUT);
+                                 break;
     }
     last_state = new_state;
   }
@@ -1741,6 +1772,8 @@ void loop() {
     // ((c == '\n' and serial_rb > 0))  and/or  serial_rb == RB)  or  c == -1
     if (c >= 0) {
       if ((c == '\n') && (serial_rb < RB)) {
+
+
         // c == '\n'
         *rb_buffer = '\0';
         // Remove \r before \n in DOS input
@@ -1749,10 +1782,10 @@ void loop() {
           *(--rb_buffer) = '\0';
         }
         if (ignoreremainder == 2) {
-          Sprint_P(true, true, true, PSTR("* [MON] First ATmega input line ignored %s"), readBuffer);
+          Sprint_P(true, true, true, PSTR("* [ESP] First line from ATmega ignored %s"), readBuffer);
           ignoreremainder = 0;
         } else if (ignoreremainder == 1) {
-          Sprint_P(true, true, true, PSTR("* [MON] Line too long, last part: ->%s<-"), readBuffer);
+          Sprint_P(true, true, true, PSTR("* [ESP] Line from ATmega too long, last part: ->%s<-"), readBuffer);
           ignoreremainder = 0;
         } else {
           if (readBuffer[0] == 'R') {
@@ -1840,10 +1873,10 @@ void loop() {
         char lst = *(rb_buffer - 1);
         *(rb_buffer - 1) = '\0';
         if (c != '\n') {
-          Sprint_P(true, true, true, PSTR("* [MON] Line too long, ignored, ignoring remainder: ->%s%c%c<-"), readBuffer, lst, c);
+          Sprint_P(true, true, true, PSTR("* [MON] Line from ATmega too long, ignored, ignoring remainder: ->%s<-->%c<-->%c<-"), readBuffer, lst, c);
           ignoreremainder = 1;
         } else {
-          Sprint_P(true, true, true, PSTR("* [MON] Line too long, terminated, ignored: ->%s<-->%c<-"), readBuffer, lst);
+          Sprint_P(true, true, true, PSTR("* [MON] Line from ATmega too long, terminated, ignored: ->%s<-->%c<-"), readBuffer, lst);
           ignoreremainder = 0;
         }
       }
@@ -1904,7 +1937,7 @@ void loop() {
       readHex[14] = Mqtt_gap & 0xFF;
       readHex[15] = (MQTT_MIN_FREE_MEMORY >> 8) & 0xFF;
       readHex[16] = MQTT_MIN_FREE_MEMORY & 0xFF;
-      readHex[17] = hwID;              // previously 16-bit outputMode;
+      readHex[17] = ESPhwID;           // previously 16-bit outputMode;
       readHex[18] = ethernetConnected; // previously 16-bit outputMode;
       readHex[19] = (maxLoopTime >> 24) & 0xFF;
       readHex[20] = (maxLoopTime >> 16) & 0xFF;

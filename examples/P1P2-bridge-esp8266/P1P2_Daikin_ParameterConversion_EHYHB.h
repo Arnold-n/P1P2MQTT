@@ -5,6 +5,9 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230604 v0.9.37 add heating/cooling/auto setting report
+ * 20230526 v0.9.36 threshold
+ * 20230423 v0.9.35 (skipped)
  * 20230212 v0.9.33a LWT setpoints added/renamed
  * 20230108 v0.9.31 sensor prefix, +2 valves in HA, fix bit history for 0x30/0x31, +pseudo controlLevel
  * 20221211 v0.9.29 defrost, DHW->gasboiler
@@ -1622,7 +1625,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         }
         case    7 : return 0;
         case    8 : KEY("Target_Temperature_Room");                        HACONFIG; HATEMP;                                                     VALUE_f8s8;
-        case    9 : BITBASIS_UNKNOWN;
+        case    9 : switch (bitNr) {
+          case    8 : BITBASIS;
+          case    5 : KEY("Heating_Cooling_Auto");                         HACONFIG;                                                             VALUE_flag8;
+          default   : UNKNOWN_BIT;
+        }
         case   10 : switch (bitNr) {
           case    8 : BITBASIS;
           case    2 : KEY("Quiet_Mode");                                   HACONFIG;                                                             VALUE_flag8;
@@ -1643,7 +1650,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       case 0x40 : switch (payloadIndex) {
         case    0 : switch (bitNr) {
           case  8 : BITBASIS;
-          case  0 :   KEY("Heating_OnOff_1");                                                                                                    VALUE_flag8;
+          case  0 :   KEY("Heating_OnOff_1");                             HACONFIG;                                                              VALUE_flag8;
+          case  1 :   KEY("Cooling_OnOff_1");                             HACONFIG;                                                              VALUE_flag8;
           default :   UNKNOWN_BIT;
         }
         case    1 :             BITBASIS_UNKNOWN;

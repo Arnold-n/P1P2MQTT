@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230604 v0.9.37 support for P1P2MQTT bridge v1.2
  * 20230526 v0.9.36 remove several pseudo parameters from HA, unless j-mask includes 0x20000, and adds thresholds to reduce traffic
  * 20230422 v0.9.35 (version skipped)
  * 20230322 v0.9.34 AP timeout
@@ -54,11 +55,12 @@
 
 // Define P1P2-ESP-Interface version, set during EEPROM initialization only (can be changed with 6th parameter of 'B' command)
 // To avoid erasing the ESP EEPROM and overwriting the hw-identifier, use "Sketch Only" when flashing over USB
-#define INIT_HW_ID 1    // hardware identifier for P1P2-ESP-Interface, valid values are
-                        //   0 for Arduino Uno/ESP combi-board, for ESP01_R, ESP01_RX (INIT_HW_ID is redefined below for these boards)
-                        //   0 for P1P2-ESP-Interface v1.0, August 2022, ISPAVR over HSPI
-                        //   1 for P1P2-ESP-Interface v1.1, October 2022, ISPAVR over BB SPI, ADC
-                        //   (Note: if INIT_HW_ID is 1, BSP with modified library for ESP8266AVRISP library is required for updating firmware of ATmega328P)
+#define INIT_ESP_HW_ID 1 // hardware identifier for ESP side of P1P2-ESP-Interface, valid values are
+                         //   0 for Arduino Uno/ESP combi-board, for ESP01_R, ESP01_RX (INIT_ESP_HW_ID is redefined below for these boards)
+                         //   0 for P1P2-ESP-Interface v1.0, August 2022, ISPAVR over HSPI
+                         //   1 for P1P2-ESP-Interface v1.1, October 2022, ISPAVR over BB SPI, ADC (+ not used: serial suppression signal)
+                         //   1 for P1P2-ESP-Interface v1.2, October 2022, ISPAVR over BB SPI, ADC, serial suppression signal
+                         //   (Note: if INIT_ESP_HW_ID is 1, BSP with modified library for ESP8266AVRISP library is required for updating firmware of ATmega328P)
 
 // define only one of E_SERIES and F_SERIES:
 //#define E_SERIES // for Daikin E* heat pumps
@@ -74,8 +76,8 @@
 #define SERIAL_MAGICSTRING "1P2P" // Each serial communication line to ATmega must start with SERIAL_MAGICSTRING, otherwise line is ignored
 // ETHERNET must be defined if a W5500 adapter is used for ethernet (option for P1P2-ESP-Interface v1.1); otherwise ETHERNET is still optional, but please
 // note that if W5500 adapter is absent, a BSP with modified w5500 library is required to avoid a WDT reboot when constructor hangs
-// INIT_HW_ID = 0 does not require ethernet or BSP modification
-#if INIT_HW_ID > 0
+// INIT_ESP_HW_ID = 0 does not require ethernet or BSP modification
+#if INIT_ESP_HW_ID > 0
 #define ETHERNET
 #endif
 #endif
@@ -93,8 +95,8 @@
 #define SERIALSPEED 250000
 #define SERIAL_MAGICSTRING "1P2P" // Each serial communication line to ATmega must start with SERIAL_MAGICSTRING, otherwise line is ignored
 // no ethernet, no ESP8266 BSP modification needed
-#undef INIT_HW_ID
-#define INIT_HW_ID 0
+#undef INIT_ESP_HW_ID
+#define INIT_ESP_HW_ID 0
 #endif
 
 #ifdef ESP01S_MQTT
@@ -106,24 +108,24 @@
 // the defined R/X topics is used for processing (subject to (outputMode & 0x4000) and (outputMode & 0x8000) respectively):
 // The 4th IPv4 byte of the topic to subscribe to can be set using 5th parameter in the 'B' command.
 // no ethernet, no ESP8266 BSP modification needed
-#undef INIT_HW_ID
-#define INIT_HW_ID 0
+#undef INIT_ESP_HW_ID
+#define INIT_ESP_HW_ID 0
 #endif
 
 #ifdef ESP01S_RX
 #define SERIALSPEED 250000
 // no ethernet, no ESP8266 BSP modification needed
-#undef INIT_HW_ID
-#define INIT_HW_ID 0
+#undef INIT_ESP_HW_ID
+#define INIT_ESP_HW_ID 0
 #endif
 
 #define SAVEPARAMS
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.36"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.36"
-#define HA_SW "0.9.36"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.37"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.37"
+#define HA_SW "0.9.37"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works

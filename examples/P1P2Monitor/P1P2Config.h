@@ -2,7 +2,9 @@
  *
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
- * 20230211 v0.9.33 added ENABLE_INSERT_MESSAGE_3x, user with care!
+ * 20230604 v0.9.37 support for ATmega serial enable/disable via PD4, required for P1P2MQTT bridge v1.2
+ * 20230423 v0.9.35 (skipped)
+ * 20230211 v0.9.33 added ENABLE_INSERT_MESSAGE_3x, use with care!
  * 20230117 v0.9.32 check CONTROL_ID for write commands
  * 20230108 v0.9.31 fix nr_param check
  * 20221224 v0.9.30 expand F series write possibilities
@@ -22,18 +24,11 @@
  *
  */
 
-// json/MQTT support has been removed, as it is better to do so on a separate CPU
-// Code/data size on an ATmega328P:
+#define MONITORCONTROL   // enables P1P2 bus writing (as auxiliary controller and/or for requesting counters)
+#define EEPROM_SUPPORT   // adds EEPROM support to store verbose, counterrepeatingrequest, and CONTROL_ID
+#define PSEUDO_PACKETS   // adds pseudopacket to serial output with ATmega status info for P1P2-bridge-esp8266
 
-                         // prog-size data-size    Function
-                         //      kB        kB
-                         //    16.3       0.9      Basic functionality
-#define MONITORCONTROL   //     2.6       0        enables P1P2 bus writing (as auxiliary controller and/or for requesting counters)
-#define EEPROM_SUPPORT   //     0.5       0        adds EEPROM support to store verbose, counterrepeatingrequest, and CONTROL_ID
-#define PSEUDO_PACKETS   //     0.9       0        adds pseudopacket to serial output with ATmega status info for P1P2-bridge-esp8266
-
-                         // ------------------
-                         //    20.3       0.9      ATmega328P/Arduino Uno
+//#include "Arduino.h"
 
 // Define serial speed
 // Use 115200 for Arduino Uno/Mega2560 (serial over USB)
@@ -63,7 +58,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.33"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.37"
 
 #define INIT_VERBOSE 3
 // Set verbosity level

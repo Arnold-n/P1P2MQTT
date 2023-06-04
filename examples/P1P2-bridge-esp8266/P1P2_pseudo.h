@@ -1,3 +1,13 @@
+/* P1P2_pseudo.h
+ *
+ * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
+ *
+ * Version history
+ * 20230604 v0.9.37 ESPhwID name change
+ * 20230526 v0.9.36 replace Vbus avg/min/max by Vbus avg/diff
+ *
+ */
+
 #ifdef PSEUDO_PACKETS
 #define HAPCONFIG { haConfig = (outputMode >> 17) & 0x01; uom = 0; stateclass = 0;}; // HAPCONFIG requires j-mask to be 0x20000 otherwise pseudo parameters will not be visible in HA
 // ATmega/ESP pseudopackets
@@ -12,18 +22,18 @@
                   switch (payloadIndex) {
         case   16 : KEY("ATmega_controlLevel");                                                          maxOutputFilter = 9;                    VALUE_u8;
         case   17 : KEY("ATmega_controlLevel_bin");                                                      maxOutputFilter = 9;                    VALUE_u8;
-//      case    1 : if (hwID) { KEY("V_bus_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 180k/10k resistor divider, 1.1V range
-//      case    3 : if (hwID) { KEY("V_bus_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
+//      case    1 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 180k/10k resistor divider, 1.1V range
+//      case    3 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
 // threshold 128 (*256)= 0.16V
-        case    3 : if (hwID) { KEY("V_bus_ATmega_ADC_diff"); VALUE_F_L_thr((FN_u16_LE(&payload[payloadIndex - 0]) -
+        case    3 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_diff"); VALUE_F_L_thr((FN_u16_LE(&payload[payloadIndex - 0]) -
                                                                          FN_u16_LE(&payload[payloadIndex - 2])) * (20.9 / 1023 / (1 << ADC_AVG_SHIFT)), 2, HYSTERESIS_TYPE_U16, 128); };
-        case    7 : if (hwID) { KEY("V_bus_ATmega_ADC_avg"); VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 32768); };
-//      case    9 : if (hwID) { KEY("V_3V3_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 34k3/10k resistor divider, 1.1V range
-//      case   11 : if (hwID) { KEY("V_3V3_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
+        case    7 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_avg"); VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 32768); };
+//      case    9 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 34k3/10k resistor divider, 1.1V range
+//      case   11 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
 // threshold 200 (*256) = 0.04V
-        case   11 : if (hwID) { KEY("V_3V3_ATmega_ADC_diff"); VALUE_F_L_thr((FN_u16_LE(&payload[payloadIndex - 0]) -
+        case   11 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_diff"); VALUE_F_L_thr((FN_u16_LE(&payload[payloadIndex - 0]) -
                                                                          FN_u16_LE(&payload[payloadIndex - 2])) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2, HYSTERESIS_TYPE_U16, 200); };
-        case   15 : if (hwID) { KEY("V_3V3_ATmega_ADC_avg"); VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 51200); };
+        case   15 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_avg"); VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 51200); };
         default   : return 0;
       }
       case 0x40 : switch (payloadIndex) {
