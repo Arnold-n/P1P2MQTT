@@ -1,12 +1,22 @@
-# Monitor and control your Daikin system via the room controller (P1/P2 2-wire) interface!
+# Monitor and control your Daikin system via the room controller (P1/P2 2-wire) interface / monitor your Hitachi H-link2 or MHI X-Y interface
 
-(also: [README for Hitachi H-link2](https://github.com/Arnold-n/P1P2Serial/blob/H-link/README.md) or [README for Mitsubishi Heavy Industries MHI X-Y protocol](https://github.com/Arnold-n/P1P2Serial/blob/MHI/README.md))
+Initial support for Hitachi H-link2 (limited monitoring only) is now integrated into the main branch. For MHI, see [README for Mitsubishi Heavy Industries MHI X-Y protocol](https://github.com/Arnold-n/P1P2Serial/blob/MHI/README.md).
+
+## Daikin P1/P2
 
 Daikin (hybrid) heat pump systems are usually controlled by a room thermostat (and/or other controller) over a 2-wire HBS interface, called P1/P2, which combines data and power. This project enables to monitor (and, for some systems, control) your Daikin system from e.g. Home Assistant over MQTT via the P1/P2 thermostat wires, using the hard- and software of this project. For monitoring it is only eavesdropping on the regular communication between the main controller and the heat pump. For some models it provides control by acting as an "auxiliary controller" to the main thermostat, requesting the main controller to set certain system parameters on the Daikin system. Depending on your model it may be possible to switch the heat pump or DHW boiler on or off, switch between heating or cooling, set target temperatures, etcetera.
 
 ![Home assistant](images/homeassistant300.png)
 
 I hope this project is valuable for you, so that you can help reduce CO2 emissions. You can support this project by sharing your experiences and log files, buying an interface, sponsoring this project or [buying me a coffee](https://www.buymeacoffee.com/arnoldniessen). It helps to bring functionality to other models.
+
+## Hitachi H-link2
+
+Raw data can be monitored on the Hitachi H-link2 interface (between indoor unit and thermostat/controller), and some parameters can be decoded.
+
+Some H-link2 systems have bus power, others do not. The H-link2 interface is sometimes called H-link, but there is also an older H-link interface which is not HBS compatible.
+
+Early experiments are currently done on Hitachi systems with the code in this branch to reverse engineer the protocol. Code to read data from a Hitachi Yutaki S80 Combi heat pump is available [here](https://github.com/hankerspace/HLinkSniffer).
 
 ## Warnings
 
@@ -60,9 +70,9 @@ By default, the interface only observes and attempts to interpret bus traffic. F
 
 **How can you build or buy one?**
 
-Buy new complete stand-alone P1P2-ESP-interface): I have a number of factory-assembled PCBs available (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, optionally with ethernet, documented and tested, this is the 2nd version, shown above, v1.1, of October 2022). Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
+Buy new complete stand-alone P1P2-ESP-interface): I have a number of factory-assembled PCBs available (with ATmega328P and ESP12F, bus-powered, with enclosure, soldered, pre-programmed, optionally with ethernet, with an option for an external power supply, documented and tested; currently available is version 3, v1.2, which is similar to v1.1 shown above). Please let me know if you are interested: my e-mail address can be found on line 3 of [P1P2Serial.cpp](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Serial.cpp).
 
-Buy P1P2-adapter (older design described below): I also sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno.
+Buy P1P2-adapter (older design described below): I also sell the original MM1192/XL1192-based 0.5"x2" P1P2-adapter which is a HAT for the Arduino Uno (currently out of stock though).
 
 Build P1P2-adapter yourself (MM1192/XL1192): schematics and pictures for the MM1192/XL1192-based P1P2-adapter (for use with the Arduino Uno) are [here](https://github.com/Arnold-n/P1P2Serial/tree/main/circuits). The MM1192 is available in traditional DIP format so you can build it on a breadboard. 
 
@@ -93,6 +103,10 @@ There is a large variation in the P1/P2 logical protocol implementation of vario
 As we have no access to Daikin's documentation, we do not know which systems are supported. Various users have reported success in basic control functions. In my hybrid system I can control almost all parameters. It is logical to assume that devices supported by commercial auxiliary controllers (Daikin LAN adapter, Zennio KLIC-DA KNX interface, Coolmaster) could be supported by this project.
 
 We have limited experience with VRV-based systems (systems with multiple indoor ceiling units), of which model numbers start with an "F". These models also use the P1/P2 bus to the controller, with a similar protocol for basic communication. Some systems (FDY, FDYQ, FXMS) can be controlled, for others we may need to adapt the reply mechanism.
+
+**Which Hitachi systems are supported?**
+
+We will document more on which systems are supported when early users report more experiences. On one Hitachi system monitoring of air inlet/outlet, outdoor temperature, gas pipe temperature, compressor temperature and frequency, valve settings, and more can be monitored.
 
 **COP calculation, defrost energy losses**
 
