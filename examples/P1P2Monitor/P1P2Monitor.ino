@@ -37,6 +37,7 @@
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20230604 v0.9.38 H-link2 support added to main branch
  * 20230604 v0.9.37 support for ATmega serial enable/disable via PD4, required for P1P2MQTT bridge v1.2
  * 20230108 v0.9.31 fix nr_param check
  * 20221224 v0.9.30 expand F series write possibilities
@@ -93,6 +94,9 @@
  * -continue control operating (L1) immediately after reset/brown-out, but not immediately after power-up reset
  */
 
+// TODO rewrite pseudopacket triggering and identification mechanism
+// TODO simplify verbosity modes
+
 #include "P1P2Config.h"
 #include <P1P2Serial.h>
 
@@ -101,8 +105,9 @@
 static byte verbose = INIT_VERBOSE;
 static byte readErrors = 0;
 static byte readErrorLast = 0;
-static byte writeRefused = 0;
 static byte errorsLargePacket = 0;
+static byte writeRefused = 0;
+#ifdef EF_SERIES
 static byte controlLevel = 1; // for F-series L5 mode
 #ifdef ENABLE_INSERT_MESSAGE
 static byte restartDaikinCnt = 0;
@@ -110,7 +115,8 @@ static byte restartDaikinReady = 0;
 static byte insertMessageCnt = 0;
 static byte insertMessage[RB_SIZE];
 static byte insertMessageLength = 0;
-#endif
+#endif /* ENABLE_INSERT_MESSAGE */
+#endif /* EF_SERIES */
 
 const byte Compile_Options = 0 // multi-line statement
 #ifdef MONITORCONTROL
@@ -134,6 +140,9 @@ const byte Compile_Options = 0 // multi-line statement
 #ifdef F_SERIES
 +0x40
 #endif
+#ifdef H_SERIES
++0x80
+#endif
 ;
 
 #ifdef EEPROM_SUPPORT
@@ -149,8 +158,10 @@ void initEEPROM() {
   if (!sigMatch) {
     if (verbose) Serial.println(F("* EEPROM sig mismatch, initializing EEPROM"));
     for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) EEPROM.update(EEPROM_ADDRESS_SIGNATURE + i, EEPROM_SIGNATURE[i]); // no '\0', not needed
-    EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID_DEFAULT);
-    EEPROM.update(EEPROM_ADDRESS_COUNTER_STATUS, COUNTERREPEATINGREQUEST);
+#ifdef EF_SERIES
+    EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID_DEFAULT); // Daikin specific
+    EEPROM.update(EEPROM_ADDRESS_COUNTER_STATUS, COUNTERREPEATINGREQUEST); // Daikin specific
+#endif /* EF_SERIES */
     EEPROM.update(EEPROM_ADDRESS_VERBOSITY, INIT_VERBOSE);
   }
 }
@@ -164,13 +175,17 @@ P1P2Serial P1P2Serial;
 static uint16_t sd = INIT_SD;           // delay setting for each packet written upon manual instruction (changed to 50ms which seems to be a bit safer than 0)
 static uint16_t sdto = INIT_SDTO;       // time-out delay (applies both to manual instructed writes and controller writes)
 static byte echo = INIT_ECHO;           // echo setting (whether written data is read back)
+static byte allow = ALLOW_PAUSE_BETWEEN_BYTES;
 static byte scope = INIT_SCOPE;         // scope setting (to log timing info)
+#ifdef EF_SERIES
 static uint8_t CONTROL_ID = CONTROL_ID_DEFAULT;
+#endif /* EF_SERIES */
 static byte counterRequest = 0;
 static byte counterRepeatingRequest = 0;
 
 byte save_MCUSR;
 
+#ifdef E_SERIES
 byte setRequestDHW = 0;
 byte setStatusDHW = 0;
 
@@ -185,18 +200,22 @@ uint16_t setValue36 = 0;
 uint16_t setParam3A = PARAM_SYS;
 byte setRequest3A = 0;
 byte setValue3A = 0;
+#endif /* E_SERIES */
 
+#ifdef EF_SERIES
 uint8_t wr_cnt = 0;
 uint8_t wr_req = 0;
 uint8_t wr_pt = 0;
 uint16_t wr_nr = 0;
 uint32_t wr_val = 0;
+#endif /* EF_SERIES */
 
 byte Tmin = 0;
 byte Tminprev = 61;
 int32_t upt_prev_pseudo = 0;
 int32_t upt_prev_write = 0;
 int32_t upt_prev_error = 0;
+#ifdef EF_SERIES
 uint8_t writePermission = INIT_WRITE_PERMISSION;
 uint8_t errorsPermitted = INIT_ERRORS_PERMITTED;
 uint16_t parameterWritesDone = 0;
@@ -206,6 +225,7 @@ uint16_t parameterWritesDone = 0;
 static int8_t FxAbsentCnt[2] = { -1, -1};
 static int8_t FxAbsentCntInclOwn[2] = { -1, -1};
 static byte Fx30ReplyDelay[2] = { 0, 0 };
+#endif /* #F_SERIES */
 
 static char RS[RS_SIZE];
 static byte WB[WB_SIZE];
@@ -227,7 +247,6 @@ static byte ATmegaHwID = 0;
 uint16_t testADC = 0;
 
 void printWelcomeString(void) {
-  Serial.println(F("*"));
   Serial.println(F(WELCOMESTRING));
   Serial.print(F("* Compiled "));
   Serial.print(F(__DATE__));
@@ -250,6 +269,9 @@ void printWelcomeString(void) {
 #ifdef F_SERIES
   Serial.print(F(" F-series"));
 #endif /* F_SERIES */
+#ifdef H_SERIES
+  Serial.print(F(" H-series"));
+#endif /* H_SERIES */
   Serial.println();
   Serial.print(F("* Reset cause: MCUSR="));
   Serial.print(save_MCUSR);
@@ -259,29 +281,31 @@ void printWelcomeString(void) {
   Serial.println();
   Serial.print(F("* P1P2-ESP-interface ATmegaHwID v1."));
   Serial.println(ATmegaHwID);
+#ifdef EF_SERIES
   Serial.print(F("* Control_ID=0x"));
   Serial.println(CONTROL_ID, HEX);
-  Serial.print(F("* Verbosity="));
-  Serial.println(verbose);
+  Serial.print(F("* CONTROL_ID_DEFAULT=0x"));
+  Serial.println(CONTROL_ID_DEFAULT, HEX);
   Serial.print(F("* Counterrepeatingrequest="));
   Serial.println(counterRepeatingRequest);
+  Serial.print(F("* F030DELAY="));
+  Serial.println(F030DELAY);
+  Serial.print(F("* F03XDELAY="));
+  Serial.println(F03XDELAY);
+#endif /* EF_SERIES */
+  Serial.print(F("* Verbosity="));
+  Serial.println(verbose);
 // Initial parameters
   Serial.print(F("* CPU_SPEED="));
   Serial.println(F_CPU);
   Serial.print(F("* SERIALSPEED="));
   Serial.println(SERIALSPEED);
-  Serial.print(F("* CONTROL_ID_DEFAULT=0x"));
-  Serial.println(CONTROL_ID_DEFAULT, HEX);
 #ifdef KLICDA
 #ifdef KLICDA_DELAY
   Serial.print(F("* KLICDA_DELAY="));
   Serial.println(KLICDA_DELAY);
 #endif /* KLICDA_DELAY */
 #endif /* KLICDA */
-  Serial.print(F("* F030DELAY="));
-  Serial.println(F030DELAY);
-  Serial.print(F("* F03XDELAY="));
-  Serial.println(F03XDELAY);
 }
 
 #define ADC_busy (0x40 & ADCSRA)
@@ -290,11 +314,7 @@ void printWelcomeString(void) {
 void setup() {
   save_MCUSR = MCUSR;
   MCUSR = 0;
-  // ATmegaHwID
-  // 0 v1.0 no ADC
-  // 1 v1.1 use ADC6 and ADC7
-  // 2 v1.2 use ADC0 and ADC1, reverse R,W LEDs
-  // test if hardware is v1.2?
+// test if hardware is v1.2?
 #define V12_TESTPIN_IN  PD4
 #define V12_TESTPIN_OUT PD3
   pinMode(V12_TESTPIN_IN, INPUT_PULLUP);
@@ -309,7 +329,7 @@ void setup() {
   if ((readBackLow == false) && (readBackHigh == false))  ATmegaHwID = 0xFF; // should never happen
 
   if (!ATmegaHwID) {
-    // if not v1.2, check if we have ADC support (v1.1: yes, v1.0: no)
+    // check if we have ADC support
     DIDR0 = 0x03;
     ADCSRB = 0x00; // ACME disabled, free running mode, conversions will be triggered by ADSC
     PORTC |= 0x03; // set pull-up  on ADC1 (used for v1.2, unused for v1.0/v1.1)
@@ -330,13 +350,18 @@ void setup() {
 // start Serial
   Serial.begin(SERIALSPEED);
   while (!Serial);      // wait for Arduino Serial Monitor to open
+  printWelcomeString();
 #ifdef EEPROM_SUPPORT
   initEEPROM();
+#ifdef EF_SERIES
   CONTROL_ID = EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
-  verbose    = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);
   counterRepeatingRequest = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
+#endif /* EF_SERIES */
+  verbose    = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);
 #endif /* EEPROM_SUPPORT */
-  printWelcomeString();
+  // 0 v1.0 no ADC
+  // 1 v1.1 use ADC6 and ADC7
+  // 2 v1.2 use ADC0 and ADC1, reverse R,W LEDs
   P1P2Serial.begin(9600, ATmegaHwID ? true : false, (ATmegaHwID == 1) ? 6 : 0, (ATmegaHwID == 1) ? 7 : 1,  (ATmegaHwID == 2));
   P1P2Serial.setEcho(echo);
 #ifdef SW_SCOPE
@@ -380,11 +405,13 @@ void writePseudoPacket(byte* WB, byte rh)
   Serial.println();
 }
 
+#ifdef E_SERIES
 #define PARAM_TP_START      0x35
 #define PARAM_TP_END        0x3D
 #define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1)
 const uint32_t nr_params[PARAM_ARR_SZ] = { 0x014A, 0x002D, 0x0001, 0x001F, 0x00F0, 0x006C, 0x00AF, 0x0002, 0x0020 }; // number of parameters observed
 //byte packettype                      = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
+#endif /* E_SERIES */
 
 void(* resetFunc) (void) = 0; // declare reset function at address 0
 
@@ -406,7 +433,7 @@ void loop() {
   static byte ignoreremainder = 2; // ignore first line from serial input to avoid misreading a partial message just after reboot
   static bool reportedTooLong = 0;
 
-  // if GPIO0 = PB4 = L, do nothing, and disable serial input/output, to enable ESP programming
+// if GPIO0 = PB4 = L, do nothing, and disable serial input/output, to enable ESP programming
 // MISO GPIO0  pin 18 // PB4 // pull-up   // P=Power // white // DS18B20                                            V10/V11
 // MOSI GPIO2  pin 17 // PB3 // pull-up   // R=Read  // green // low-during-programming // blue-LED on ESP12F       V12/V13
 // CLK  GPIO15 pin 16 // PB5 // pull-down // W=Write // blue                                                        V14/V15
@@ -768,9 +795,10 @@ void loop() {
                         Serial_print(F("set to "));
                       }
                       Serial_println(scope);
-                      scope_budget = 200;
+                      scope_budget = 200; // TODO document implicit reset of budget
                       break;
 #endif
+#ifndef H_SERIES
             case 'x':
             case 'X': if (verbose) Serial_print(F("* Echo "));
                       if (scanint(RSp, temp) == 1) {
@@ -782,8 +810,23 @@ void loop() {
                       }
                       Serial_println(echo);
                       break;
+#else /* H_SERIES */
+            case 'x':
+            case 'X': if (verbose) Serial_print(F("* Allow (bits pause) "));
+                      if (scanint(RSp, temp) == 1) {
+                        allow = temp;
+                        if (allow > 76) allow = 76;
+                        P1P2Serial.setAllow(allow);
+                        if (!verbose) break;
+                        Serial_print(F("set to "));
+                      }
+                      Serial_println(allow);
+                      break;
+#endif /* H_SERIES */
             case 'w':
-            case 'W': if (CONTROL_ID) {
+            case 'W':
+#ifdef EF_SERIES
+                      if (CONTROL_ID) {
                         // in L1/L5 mode, insert message in time allocaed for 40F030 slot
                         if (insertMessageCnt || restartDaikinCnt) {
                           Serial_println(F("* insertMessage (or restartDaikin) already scheduled"));
@@ -808,7 +851,8 @@ void loop() {
                         }
                         break;
                       }
-                      // in L0 mode, just write packet
+#endif /* EF_SERIES */
+                      // in L0 mode, or for H-link2, just write packet
                       if (verbose) Serial_print(F("* Writing: "));
                       wb = 0;
                       while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
@@ -835,7 +879,8 @@ void loop() {
             case 'K': Serial_println(F("* Resetting ATmega ...."));
                       resetFunc(); // call reset
                       break;
-            case 'l': // set auxiliary controller function on/off; CONTROL_ID address is set automatically
+#ifdef EF_SERIES
+            case 'l': // set auxiliary controller function on/off; CONTROL_ID address is set automatically; Daikin-specific
             case 'L': // 0 controller mode off, and store setting in EEPROM // 1 controller mode on, and store setting in EEPROM
                       // 2 controller mode off, do not store setting in EEPROM
                       // 3 controller mode on, do not store setting in EEPROM
@@ -861,14 +906,13 @@ void loop() {
                           Serial_println(F("* Scheduling attempt to restart Daikin"));
                           break;
                         }
-#endif
+#endif /* ENABLE_INSERT_MESSAGE */
 #ifdef E_SERIES
                         if (temp > 3) temp = 0;
-#endif
+#endif /* E_SERIES */
 #ifdef F_SERIES
                         if ((temp > 5) || (temp == 4)) temp = 0;
-#endif
-#ifdef MONITORCONTROL
+#endif /* F_SERIES */
                         byte setMode = temp & 0x01;
                         if (setMode) {
                           if (errorsPermitted < MIN_ERRORS_PERMITTED) {
@@ -891,7 +935,7 @@ void loop() {
                             Serial_println(F("* Control_ID 0xF1 supported, no auxiliary controller found for 0xF1, switching control functionality on 0xF1 on"));
                             CONTROL_ID = 0xF1;
                             if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
-#endif
+#endif /* E_SERIES */
                           } else {
                             Serial_println(F("* No free address for controller found (yet). Control functionality not enabled"));
                             Serial_println(F("* You may wish to re-try in a few seconds (and perhaps switch other auxiliary controllers off)"));
@@ -902,10 +946,12 @@ void loop() {
                             break;
                           } else {
                             CONTROL_ID = 0x00;
+#ifdef E_SERIES
                             setRequest35 = 0;
                             setRequest36 = 0;
                             setRequest3A = 0;
                             setRequestDHW = 0;
+#endif /* E_SERIES */
                             wr_cnt = 0;
                           }
                           if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
@@ -915,12 +961,12 @@ void loop() {
                         if (CONTROL_ID <= 0x0F) Serial_print("0");
                         Serial_println(CONTROL_ID, HEX);
                         break;
-#endif /* MONITORCONTROL */
                       }
                       if (verbose) Serial_print(F("* Control_id is 0x"));
                       if (CONTROL_ID <= 0x0F) Serial_print("0");
                       Serial_println(CONTROL_ID, HEX);
                       break;
+#endif /* EF_SERIES */
 #ifdef E_SERIES
             case 'c': // set counterRequest cycle (once or repetitive)
             case 'C': if (scanint(RSp, temp) == 1) {
@@ -1216,6 +1262,7 @@ void loop() {
     pseudo0F++;
     upt_prev_pseudo = upt;
   }
+#ifdef EF_SERIES
   if (upt >= upt_prev_write + TIME_WRITE_PERMISSION) {
     if (writePermission < MAX_WRITE_PERMISSION) writePermission++;
     upt_prev_write += TIME_WRITE_PERMISSION;
@@ -1224,6 +1271,7 @@ void loop() {
     if (errorsPermitted < MAX_ERRORS_PERMITTED) errorsPermitted++;
     upt_prev_error += TIME_ERRORS_PERMITTED;
   }
+#endif /* EF_SERIES */
   while (P1P2Serial.packetavailable()) {
     uint16_t delta;
     errorbuf_t readError = 0;
@@ -1243,8 +1291,12 @@ void loop() {
 #define FREQ_DIV 3 // 8 MHz
 #endif
 
-    if (scope && ((readError && (scope_budget > 5)) || (((RB[0] == 0x40) && (RB[1] == 0xF0)) && (scope_budget > 50)) || (scope_budget > 150))) {
+    if (scope
+#ifdef EF_SERIES
+              && ((readError && (scope_budget > 5)) || (((RB[0] == 0x40) && (RB[1] == 0xF0)) && (scope_budget > 50)) || (scope_budget > 150))
       // always keep scope write budget for 40F0 and expecially for readErrors
+#endif /* EF_SERIES */
+                                                                                                                                             ) {
       if (sws_cnt || (sws_event[SWS_MAX - 1] != SWS_EVENT_LOOP)) {
         scope_budget -= 5;
         if (readError) {
@@ -1334,7 +1386,7 @@ void loop() {
     }
     if (++scope_budget > 200) scope_budget = 200;
     sws_block = 0; // release SW_SCOPE for next log operation
-#endif
+#endif /* SW_SCOPE */
 #ifdef MEASURE_LOAD
     if (irq_r) {
       uint8_t irq_busy_c1 = irq_busy;
@@ -1360,12 +1412,13 @@ void loop() {
         Serial_println(100.0 * irq_w_c / irq_lapsed_w_c);
       }
     }
-#endif
-    if ((readError & ERROR_REAL_MASK) && upt) { // don't count errors while upt == 0
+#endif /* MEASURE_LOAD */
+    if ((readError & ERROR_COUNT_MASK) && upt) { // don't count errors while upt == 0  // don't count  PE and UC errors for H-link2
       if (readErrors < 0xFF) {
         readErrors++;
         readErrorLast = readError;
       }
+#ifdef EF_SERIES
       if (errorsPermitted) {
         errorsPermitted--;
         if (!errorsPermitted) {
@@ -1378,13 +1431,16 @@ void loop() {
           Serial_println(F("* Warning: Upon ATmega restart auxiliary controller functionality and counter request functionality will remain switched off"));
           EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
           EEPROM_update(EEPROM_ADDRESS_COUNTER_STATUS, counterRepeatingRequest);
+#ifdef E_SERIES
           setRequest35 = 0;
           setRequest36 = 0;
           setRequest3A = 0;
           setRequestDHW = 0;
+#endif /* E_SERIES */
           wr_cnt = 0;
         }
       }
+#endif /* EF_SERIES */
     }
 #ifdef MONITORCONTROL
     if (!readError) {
@@ -1461,10 +1517,12 @@ void loop() {
             Serial_println(F(" detected"));
             CONTROL_ID = CONTROL_ID_NONE;
             EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+#ifdef E_SERIES
             setRequest35 = 0;
             setRequest36 = 0;
             setRequest3A = 0;
             setRequestDHW = 0;
+#endif /* E_SERIES */
             wr_cnt = 0;
           }
         }
@@ -1499,9 +1557,9 @@ void loop() {
             || ((insertMessageCnt || restartDaikinCnt) && (RB[0] == 0x00) && (RB[1] == 0xF0)
 #ifndef ENABLE_INSERT_MESSAGE_3x
                                                                                              && (RB[2] == 0x30)
-#endif
+#endif /* ENABLE_INSERT_MESSAGE_3x */
                                                                                                                )
-#endif
+#endif /* ENABLE_INSERT_MESSAGE */
                                                                                                      ) {
           WB[0] = 0x40;
           WB[1] = RB[1];
@@ -1841,12 +1899,26 @@ void loop() {
     if ((RB[0] == 0x80) && (RB[1] == 0x00) && (RB[2] == 0x18)) pseudo0F = 5; // Insert one pseudo packet 00000F in output serial after 800018
 #endif /* F_SERIES */
 #endif /* PSEUDO_PACKETS */
+
+#ifdef H_SERIES
+// for H-link2, split reporting errors (if any) and data (always)
+    uint16_t delta2 = delta;
+#endif /* H_SERIES */
+
+
+
+
     if (readError) {
+      // error, so output data on line starting with E
       Serial_print(F("E "));
+#ifndef H_SERIES
     } else {
+      // no error, so output data on line starting with R, unless H_SERIES, which does this in separate code segment below
       if (verbose && (verbose < 4)) Serial_print(F("R "));
     }
     if (((verbose & 0x01) == 1) || readError) {
+#endif /* H_SERIES */
+
       // 3nd-12th characters show length of bus pause (max "R T 65.535: ")
       Serial_print(F("T "));
       if (delta < 10000) Serial_print(F(" "));
@@ -1856,8 +1928,10 @@ void loop() {
       if (delta < 10) Serial_print('0');
       Serial_print(delta);
       Serial_print(F(": "));
+#ifndef H_SERIES
     }
     if ((verbose < 4) || readError) {
+#endif /* H_SERIES */
       for (int i = 0; i < nread; i++) {
         if (verbose && (EB[i] & ERROR_SB)) {
           // collision suspicion due to data verification error in reading back written data
@@ -1875,6 +1949,12 @@ void loop() {
           // parity error detected
           Serial_print(F("-PE:"));
         }
+#ifdef H_SERIES
+        if (verbose && (EB[i] & SIGNAL_UC)) {
+          // 11/12 bit uncertainty detected
+          Serial_print(F("-UC:"));
+        }
+#endif /* H_SERIES */
 #ifdef GENERATE_FAKE_ERRORS
         if (verbose && (EB[i] & (ERROR_SB << 8))) {
           // collision suspicion due to data verification error in reading back written data
@@ -1892,7 +1972,7 @@ void loop() {
           // parity error detected
           Serial_print(F("-pe:"));
         }
-#endif
+#endif /* GENERATE_FAKE_ERRORS */
         byte c = RB[i];
         if (crc_gen && (verbose == 1) && (i == nread - 1)) {
           Serial_print(F(" CRC="));
@@ -1908,7 +1988,12 @@ void loop() {
           Serial_print(F(" CRC error"));
         }
       }
-      if (readError) {
+
+      if (readError
+#ifdef H_SERIES
+                    & 0xBB
+#endif /* H_SERIES */
+                          ) {
         Serial_print(F(" readError=0x"));
         if (readError < 0x10) Serial_print('0');
         if (readError < 0x100) Serial_print('0');
@@ -1917,7 +2002,46 @@ void loop() {
       }
       Serial_println();
     }
+
+#ifdef H_SERIES
+    delta = delta2;
+    if (!(readError & 0xBB)) {
+      if (verbose && (verbose < 4)) Serial_print(F("R "));
+      if ((verbose & 0x01) == 1)  {
+        // 3nd-12th characters show length of bus pause (max "R T 65.535: ")
+        Serial_print(F("T "));
+        if (delta < 10000) Serial_print(F(" "));
+        if (delta < 1000) Serial_print(F("0")); else { Serial_print(delta / 1000); delta %= 1000; };
+        Serial_print(F("."));
+        if (delta < 100) Serial_print(F("0"));
+        if (delta < 10) Serial_print(F("0"));
+        Serial_print(delta);
+        Serial_print(F(": "));
+      }
+      if (verbose < 4) {
+        for (int i = 0; i < nread; i++) {
+          byte c = RB[i];
+          if (crc_gen && (verbose == 1) && (i == nread - 1)) {
+            Serial_print(F(" CRC="));
+          }
+          if (c < 0x10) Serial_print(F("0"));
+          Serial_print(c, HEX);
+        }
+        Serial_println();
+      }
+    }
+#endif /* H_SERIES */
+
+
+
+
+
   }
+
+
+
+
+
 #ifdef PSEUDO_PACKETS
   if (pseudo0D > 4) {
     pseudo0D = 0;
@@ -1951,8 +2075,13 @@ void loop() {
     } else {
       for (int i = 3; i <= 18; i++) WB[i]  = 0x00;
     }
+#ifdef EF_SERIES
     WB[19] = controlLevel;
     WB[20] = CONTROL_ID ? controlLevel : 0; // auxiliary control mode fully on; is 1 for control modes 1 and 3
+#else /* EF_SERIES */
+    WB[19] = 0x00;
+    WB[20] = 0x00;
+#endif /* EF_SERIES */
     WB[21] = 0x00;
     WB[22] = 0x00;
     if (!suppressSerial & (verbose < 4)) writePseudoPacket(WB, 23);
@@ -1974,6 +2103,7 @@ void loop() {
     WB[12] = counterRepeatingRequest;
     WB[13] = counterRequest;
     WB[14] = errorsLargePacket;
+#ifdef EF_SERIES
     WB[15] = wr_cnt;
     WB[16] = wr_pt;
     WB[17] = wr_nr >> 8;
@@ -1983,6 +2113,17 @@ void loop() {
     WB[21] = 0xFF & (wr_val >> 8);
     WB[22] = 0xFF & wr_val;
     if (!suppressSerial & (verbose < 4)) writePseudoPacket(WB, 23);
+#else /* EF_SERIES */
+    WB[15] = 0x00;
+    WB[16] = 0x00;
+    WB[17] = 0x00;
+    WB[18] = 0x00;
+    WB[19] = 0x00;
+    WB[20] = 0x00;
+    WB[21] = 0x00;
+    WB[22] = 0x00;
+    if (verbose < 4) writePseudoPacket(WB, 23);
+#endif /* EF_SERIES */
   }
   if (pseudo0F > 4) {
     bool sigMatch = 1;
@@ -1993,31 +2134,50 @@ void loop() {
     WB[3]  = Compile_Options;
     WB[4]  = verbose;
     WB[5]  = save_MCUSR;
+#ifdef EF_SERIES
     WB[6]  = writePermission;
     WB[7]  = errorsPermitted;
     WB[8]  = (parameterWritesDone >> 8) & 0xFF;
     WB[9]  = parameterWritesDone & 0xFF;
+#else /* EF_SERIES */
+    WB[6]  = 0x00;
+    WB[7]  = 0x00;
+    WB[8]  = 0x00;
+    WB[9]  = 0x00;
+#endif /* EF_SERIES */
     WB[10] = (sd >> 8) & 0xFF;
     WB[11] = sd & 0xFF;
     WB[12] = (sdto >> 8) & 0xFF;
     WB[13] = sdto & 0xFF;
     WB[14] = ATmegaHwID;
 #ifdef EEPROM_SUPPORT
+#ifdef EF_SERIES
     WB[15] = EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
+#else /* EF_SERIES */
+    WB[15] = 0x00; // EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
+#endif /* EF_SERIES */
     WB[16] = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);
+#ifdef EF_SERIES
     WB[17] = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
+#else /* EF_SERIES */
+    WB[17] = 0x00; // EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
+#endif /* EF_SERIES */
     for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) sigMatch &= (EEPROM.read(EEPROM_ADDRESS_SIGNATURE + i) == EEPROM_SIGNATURE[i]);
     WB[18] = sigMatch;
-#else
+#else /* EEPROM_SUPPORT */
     WB[15] = 0x00;
     WB[16] = 0x00;
     WB[17] = 0x00;
     WB[18] = 0x00;
-#endif
+#endif /* EEPROM_SUPPORT */
     WB[19] = scope;
     WB[20] = readErrors;
     WB[21] = readErrorLast;
+#ifdef EF_SERIES
     WB[22] = CONTROL_ID;
+#else /* EF_SERIES */
+    WB[22] = 0x00;
+#endif /* EF_SERIES */
     if (!suppressSerial & (verbose < 4)) writePseudoPacket(WB, 23);
   }
 #endif /* PSEUDO_PACKETS */

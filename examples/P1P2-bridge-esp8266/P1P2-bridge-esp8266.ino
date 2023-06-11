@@ -14,9 +14,10 @@
  * WiFiManager 0.16.0 by tzapu (installed using Arduino IDE)
  * AsyncMqttClient 0.9.0 by Marvin Roger obtained with git clone or as ZIP from https://github.com/marvinroger/async-mqtt-client
  * ESPAsyncTCP 2.0.1 by Phil Bowles obtained with git clone or as ZIP from https://github.com/philbowles/ESPAsyncTCP/
- * ESP_Telnet 1.3.1 by  Lennart Hennigs (installed using Arduino IDE)
+ * ESP_Telnet 2.0.0 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20230611 v0.9.38 H-link data support
  * 20230604 v0.9.37 support for P1P2MQTT bridge v1.2; separate hwID for ESP and ATmega
  * 20230526 v0.9.36 threshold
  * 20230423 v0.9.35 (skipped)
@@ -254,10 +255,16 @@ void onTelnetConnect(String ip) {
   telnet.print(__TIME__);
 #ifdef E_SERIES
   telnet.println(" for E-Series");
-#endif
+#endif /* E_SERIES */
 #ifdef F_SERIES
   telnet.println(" for F-Series");
-#endif
+#endif /* F_SERIES */
+#ifdef H_SERIES
+  telnet.println(" for H-Series");
+#endif /* H_SERIES */
+#ifdef MHI_SERIES
+  telnet.println(" for MHI-Series");
+#endif /* MHI_SERIES */
   telnet.println(F("(Use ^] + q  to disconnect.)"));
   telnetConnected = true;
 }
@@ -368,7 +375,7 @@ uint32_t Sprint_buffer_overflow = 0;
   /* state_class */  ((stateclass == 2) ? "\"state_class\":\"total_increasing\"," : ((stateclass == 1) ? "\"state_class\":\"measurement\"," : "")),\
   /* uniq_id */      mqtt_key[-4], mqtt_key[-2], mqtt_key, haPostfix, \
   /* dev_cla */      ((stateclass == 2) ? "\"dev_cla\":\"energy\"," : ""),\
-  /* unit_of_meas */ ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"°C\"," : ""))))))))),\
+  /* unit_of_meas */ ((uom == 12) ? "\"unit_of_meas\":\"%\"," :  ((uom == 11) ? "\"unit_of_meas\":\"Hz\"," :  ((uom == 10) ? "\"unit_of_meas\":\"A\"," :  ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"°C\"," : "")))))))))))),\
   /* ic */ ((uom == 9) ? "\"ic\":\"mdi:counter\"," : ((uom == 8) ? "\"ic\":\"mdi:memory\"," : ((uom == 7) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 6) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 5) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 4) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 3) ? "\"ic\":\"mdi:water-boiler\"," : ((uom == 2) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 1) ? "\"ic\":\"mdi:coolant-temperature\"," : ""))))))))),\
   /* device */       \
     /* name */         haDeviceName,\
@@ -383,10 +390,16 @@ uint32_t Sprint_buffer_overflow = 0;
 
 #ifdef E_SERIES
 #include "P1P2_Daikin_ParameterConversion_EHYHB.h"
-#endif
+#endif /* E_SERIES */
 #ifdef F_SERIES
 #include "P1P2_Daikin_ParameterConversion_F.h"
-#endif
+#endif /* F_SERIES */
+#ifdef H_SERIES
+#include "P1P2_Hitachi_ParameterConversion_HLINK2.h"
+#endif /* H_SERIES */
+#ifdef MHI_SERIES
+#include "P1P2_Hitachi_ParameterConversion_HLINK2.h" // for now TODO
+#endif /* MHI_SERIES */
 
 static byte throttle = 1;
 static byte throttleValue = THROTTLE_VALUE;
@@ -787,10 +800,16 @@ void handleCommand(char* cmdString) {
                           Sprint_P(true, true, true, PSTR("* [ESP] Compiled %s %s"), __DATE__, __TIME__);
 #ifdef E_SERIES
                           Sprint_P(true, true, true, PSTR("* [ESP] E-Series"));
-#endif
+#endif /* E_SERIES */
 #ifdef F_SERIES
                           Sprint_P(true, true, true, PSTR("* [ESP] F-Series"));
-#endif
+#endif /* F_SERIES */
+#ifdef H_SERIES
+                          Sprint_P(true, true, true, PSTR("* [ESP] H-Series"));
+#endif /* H_SERIES */
+#ifdef MHI_SERIES
+                          Sprint_P(true, true, true, PSTR("* [ESP] MHI-Series"));
+#endif /* MHI_SERIES */
                           Sprint_P(true, true, true, PSTR("* [ESP] ESP_hw_identifier %i"), ESPhwID);
                           if (mqttClient.connected()) {
                             Sprint_P(true, true, true, PSTR("* [ESP] Connected to MQTT server"));
@@ -839,10 +858,8 @@ void handleCommand(char* cmdString) {
                 default : break;
               }
               // fallthrough for v/g/h commands handled both by P1P2-bridge-esp8266 and P1P2Monitor
-              // 'c' 'C' 'p' 'P' 'e' 'E' 'f' 'F' 't' 'T" 'o' 'O" 'u' 'U" 'x' 'X" 'w' 'W" 'k' 'K' 'l' 'L' 'q' 'Q' 'm' 'M' 'z' 'Z' 'r' 'R' 'n' 'N' 'y' 'Y' handled by P1P2Monitor
+              // 'c' 'C' 'p' 'P' 'e' 'E' 'f' 'F' 't' 'T" 'o' 'O" 'u' 'U" 'x' 'X" 'w' 'W" 'k' 'K' 'l' 'L' 'q' 'Q' 'm' 'M' 'z' 'Z' 'r' 'R' 'n' 'N' 'y' 'Y' handled by P1P2Monitor (except for 'f' 'F" for H-link)
     default : Sprint_P(true, true, true, PSTR("* [ESP] To ATmega: ->%s<-"), cmdString);
-              if ((cmdString[0] == 'k') || (cmdString[0] == 'K')) {
-              }
               Serial.print(F(SERIAL_MAGICSTRING));
               Serial.println((char *) cmdString);
               if ((cmdString[0] == 'k') || (cmdString[0] == 'K')) {
@@ -1203,7 +1220,7 @@ void setup() {
     Serial.println(F("* [ESP] Trying autoconnect"));
 #ifdef WIFIPORTAL_TIMEOUT
     wifiManager.setConfigPortalTimeout(WIFIPORTAL_TIMEOUT);
-#endif
+#endif /* WIFIPORTAL_TIMEOUT */
     if (!wifiManager.autoConnect(WIFIMAN_SSID, WIFIMAN_PASSWORD)) {
       Serial_println(F("* [ESP] Failed to connect and hit timeout, resetting"));
       // Reset and try again
@@ -1381,10 +1398,16 @@ void setup() {
     Sprint_P(true, true, true, PSTR(WELCOMESTRING));
 #ifdef E_SERIES
     Sprint_P(true, true, true, PSTR("* [ESP] E-Series"));
-#endif
+#endif /* E_SERIES */
 #ifdef F_SERIES
     Sprint_P(true, true, true, PSTR("* [ESP] F-Series"));
-#endif
+#endif /* F_SERIES */
+#ifdef H_SERIES
+    Sprint_P(true, true, true, PSTR("* [ESP] H-Series"));
+#endif /* H_SERIES */
+#ifdef MHI_SERIES
+    Sprint_P(true, true, true, PSTR("* [ESP] MHI-Series"));
+#endif /* MHI_SERIES */
     Sprint_P(true, true, true, PSTR("* [ESP] ESP_hw_identifier %i"), ESPhwID);
     Sprint_P(true, true, true, PSTR("* [ESP] noWiFi %i"), noWiFi);
     Sprint_P(true, true, true, PSTR("* [ESP] useStaticIP %i"), useStaticIP);
@@ -1516,7 +1539,9 @@ void process_for_mqtt_json(byte* rb, int n) {
   char mqtt_key[MQTT_KEY_LEN + MQTT_KEY_PREFIXLEN]; // = mqttKeyPrefix;
   if (!mqttConnected) Mqtt_disconnectSkippedPackets++;
   if (mqttConnected || MQTT_DISCONNECT_CONTINUE) {
+#ifdef EF_SERIES
     if (n == 3) bytes2keyvalue(rb[0], rb[2], EMPTY_PAYLOAD, rb + 3, mqtt_key, mqtt_value);
+#endif /* EF_SERIES */
     for (byte i = 3; i < n; i++) {
       if (!--throttle) {
         throttle = throttleValue;
@@ -1772,8 +1797,6 @@ void loop() {
     // ((c == '\n' and serial_rb > 0))  and/or  serial_rb == RB)  or  c == -1
     if (c >= 0) {
       if ((c == '\n') && (serial_rb < RB)) {
-
-
         // c == '\n'
         *rb_buffer = '\0';
         // Remove \r before \n in DOS input

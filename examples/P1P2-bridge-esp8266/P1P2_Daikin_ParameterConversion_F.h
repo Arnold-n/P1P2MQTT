@@ -3,9 +3,9 @@
  * First attempt for product-dependent code for
  * - FDYQ180MV1
  * - FDY125LV1
- * and perhaps usefule other F-series models
+ * and perhaps useful for other F-series models
  *
- * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
+ * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *

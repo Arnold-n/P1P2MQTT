@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20230604 v0.9.38 H-link branch merged into main branch
  * 20230604 v0.9.37 Support for V1.2 hardware
  * 20221028 v0.9.23 ADC code
  * 20220918 v0.9.22 scopemode also for writes, focused on actual errors, fake error generation for test purposes, removing OLDP1P2LIB
@@ -72,22 +73,33 @@
 #define SW_SCOPE                    // records timing info of P1/P2 bus falling edges of start of the packets
 //#define GENERATE_FAKE_ERRORS        // disable this for real use!! // only for NEWLIB, and on 8MHz this may add to the CPU load
 #define SWS_FAKE_ERR_CNT 3000       // one fake error generated (per error type) per SWS_FAKE_ERR_CNT checks
-#define ALLOW_PAUSE_BETWEEN_BYTES 9 // If there is a pause between bytes on the bus which is longer than a 1/4 bit time,
-                                    //   P1P2Serial signals an end-of-packet.
-                                    // Daikin devices do not add a pause between bytes, but some other controllers do, like the KLIC-DA from Zennios.
+#ifdef HHH
+#define ALLOW_PAUSE_BETWEEN_BYTES 20 // If there is a pause between bytes on the bus which is longer than a 1/4 bit time,
+#else /* HHH */
+#define ALLOW_PAUSE_BETWEEN_BYTES 9
+#endif /* HHH */
+                                    // If there is a pause between bytes on the bus which is longer than a 1/4 bit time,
+                                    // P1P2Serial signals an end-of-packet.
+                                    // Daikin devices do not add any pause between bytes, but some other controllers do, like the KLIC-DA from Zennios, and H-link2 devices.
+                                    // so maximum pause between bytes is set to ~9 bits which seems to work for KLIC-DA devices or 20 for H-link2 interfaces
                                     // To avoid end-of-packet detection due to such an inter-byte pause, a pause between bytes of at most
                                     // ALLOW_PAUSE_BETWEEN_BYTES bit lengths is accepted; ALLOW_PAUSE_BETWEEN_BYTES should be less than
                                     //  (65536 / Rticks_per_bit) - 2; for 16MHz at most ~37 (not sure if this value is still correct)
-                                    // For KLICDA devices a value of 9 bit lengths seems to work.
+                                    //  (65536 / Rticks_per_bit) - 2; for  8MHz at most ~76 (not sure if this value is still correct)
 #define S_TIMER                     // support for uptime_sec() in new library, but monopolizes TIMER0, so millis() cannot be used.
                                     // if undefined, TIMER0 is not used, and millis() can be used
                                     // if S_TIMER is undefined, the write budget (and error budget) will not increase over time TODO fix this
 // End of configuration options
 
+#ifdef HHH
+// H-link uses larger packets
+#define TX_BUFFER_SIZE 65  // write buffer size (1 more than max size needed)
+#define RX_BUFFER_SIZE 65  // read buffer (1 more than max size needed), should be <=254
+#else /* HHH */
 #define TX_BUFFER_SIZE 25  // write buffer size (1 more than max size needed)
 #define RX_BUFFER_SIZE 25  // read buffer (1 more than max size needed), should be <=254
+#endif /* HHH */
 #define NO_HEAD2 0xFF
-
 
 #define ALTSS_BASE_FREQ F_CPU
 
@@ -103,14 +115,21 @@
 
 // read errors
 #define ERROR_PE                  0x04 // parity error
+#define SIGNAL_UC                 0x40 // double start bit uncertainty (only for H-link interface)
 
 // read + read-back-verify errors
 #define ERROR_OR                  0x08 // read buffer overrun
 #define ERROR_CRC                 0x10 // CRC error
-                                       // 0x20, 0x40, available for other errors
+                                       // 0x20, available for other errors
 #define SIGNAL_EOP                0x80 // signaling end of packet, this is not an error flag
 
-#define ERROR_REAL_MASK           0x7F // Error mask to remove SIGNAL_EOP and fake errors
+#define ERROR_REAL_MASK           0x3F // Error mask to remove SIGNAL_EOP (,SIGNAL_UC for H-link) and fake errors
+#ifndef HHH
+#define ERROR_COUNT_MASK          0x3F // Error mask for error count
+#else /* HHH */
+#define ERROR_COUNT_MASK          0x3B // Error mask for error count (H-link2: excluding PE errors)
+#endif /* HHH */
+
 #ifdef GENERATE_FAKE_ERRORS
 #define ERROR_FLAGS               0xFF7F
 #else /* GENERATE_FAKE_ERRORS */
@@ -185,6 +204,7 @@ public:
         static void setScope(byte b);
 #endif /* SW_SCOPE */
 	static void setEcho(uint8_t b);
+        static void setAllow(uint8_t b);
 	uint16_t readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* errorbuf, uint8_t maxlen, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
 	void writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc_gen = 0, uint8_t crc_feed = 0);
         int32_t uptime_sec(void);

@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20230611 v0.9.38 H-link2 branch merged into main branch
  * 20230604 v0.9.37 support for ATmega serial enable/disable via PD4, required for P1P2MQTT bridge v1.2
  * 20230423 v0.9.35 (skipped)
  * 20230211 v0.9.33 added ENABLE_INSERT_MESSAGE_3x, use with care!
@@ -24,7 +25,6 @@
  *
  */
 
-#define MONITORCONTROL   // enables P1P2 bus writing (as auxiliary controller and/or for requesting counters)
 #define EEPROM_SUPPORT   // adds EEPROM support to store verbose, counterrepeatingrequest, and CONTROL_ID
 #define PSEUDO_PACKETS   // adds pseudopacket to serial output with ATmega status info for P1P2-bridge-esp8266
 
@@ -36,12 +36,18 @@
 //
 #define COMBIBOARD // define this for Uno+ESP combiboard, determines SERIALSPEED (250k instead of 115k2) and SERIAL_MAGICSTRING. Ignored if F_CPU=8MHz (as used in P1P2-ESP-Interface)
 
-// define only one of E_SERIES and F_SERIES:
+// define only one of E_SERIES and F_SERIES and H_SERIES:
 //#define E_SERIES // for Daikin E* heat pumps
 //#define F_SERIES // for Daikin F* VRV systems, defining this enables "L5" and a reply to (only) 00F030; for experimenting with particular models and "L1" mode, uncomment line for your model:
+//#define H_SERIES // for H-link2 systems
 //#define FDY
 //#define FDYQ
 //#define FXMQ
+
+#if (defined E_SERIES || defined F_SERIES)
+#define EF_SERIES
+#define MONITORCONTROL   // enables P1P2 bus writing (as auxiliary controller and/or for requesting counters)
+#endif /* (defined E_SERIES || defined F_SERIES) */
 
 #if F_CPU > 8000000L
 // Assume Arduino Uno (or Mega) hardware; use 115200 Baud for USB or 250000 Baud for combi-board
@@ -58,7 +64,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.37"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.38"
 
 #define INIT_VERBOSE 3
 // Set verbosity level
@@ -69,6 +75,7 @@
 //                   (format: 10-character "T 65.535: " for real packets and "P         " for pseudopackets)
 // verbose = 4: no raw/pseudopacket data output, only maximal reporting
 
+#ifdef EF_SERIES
 #define COUNTERREPEATINGREQUEST 0 // Change this to 1 to trigger a counter request cycle at the start of each minute
                                   //   By default this works only as, and only if there is no other, first auxiliary controller (F0)
 				  //   The counter request is done after the (unanswered) 00F030*, unless KLICDA is defined
@@ -94,24 +101,27 @@
                                              // If CONTROL_ID_DEFAULT is set to CONTROL_ID_0 (or _1) P1P2Monitor
                                              // will start to act as an auxiliary controller if no other controller is detected.
 
+#endif /* EF_SERIES */
+
 // EEPROM saves state of
-// -CONTROL_ID (whether P1P2Monitor acts as auxiliary controller, and which one)
-// -counterrepeatingrequest (whether P1P2Monitor repeatedly requests counters)
+// -CONTROL_ID (whether P1P2Monitor acts as auxiliary controller, and which one) (not for H-link2)
+// -counterrepeatingrequest (whether P1P2Monitor repeatedly requests counters) (not for H-link2)
 // -verbose (verbosity level)
 //
 // to reset EEPROM to settings in P1P2Config.h, either erase EEPROM, or change EEPROM_SIGNATURE in P1P2Config.h
-
 #define EEPROM_SIGNATURE "P1P2SIG01" // change this every time you wish to re-init EEPROM settings to the settings in P1P2Config.h
-#define EEPROM_ADDRESS_CONTROL_ID      0x00 // 1 byte for CONTROL_ID
-#define EEPROM_ADDRESS_COUNTER_STATUS  0x01 // 1 byte for counterrepeatingreques
+#define EEPROM_ADDRESS_CONTROL_ID      0x00 // 1 byte for CONTROL_ID (Daikin-specific)
+#define EEPROM_ADDRESS_COUNTER_STATUS  0x01 // 1 byte for counterrepeatingrequest (Daikin-specific)
 #define EEPROM_ADDRESS_VERBOSITY       0x02 // 1 byte for verbose
                                             // 0x03 .. 0x0F reserved
 #define EEPROM_ADDRESS_SIGNATURE       0x10 // should be highest, in view of unspecified strlen(EEPROM_SIGNATURE)
 
+#ifdef EF_SERIES
 // Write budget: thottle parameter writes to limit flash memory wear
 #define TIME_WRITE_PERMISSION 3600 // on avg max one write per 3600s allowed
 #define MAX_WRITE_PERMISSION   100 // budget never higher than 100 (don't allow to burn more than 100 writes at once) // 8-bit, so max 254; 255 is "infinity" (i.e. no budget limit)
 #define INIT_WRITE_PERMISSION   10 // initial write budget upon boot (255 = unlimited; recommended: 10)
+#define WR_CNT 1                   // number of write repetitions for writing a paramter. 1 should work reliably, no real need for higher value
 
 // Error budget: P1P2Monitor should not see any errors except upon start falling into a packet
 // so if P1P2Monitor sees see too many errors, it stops writing
@@ -123,12 +133,19 @@
 
 // serial read buffer size for reading from serial port, max line length on serial input is 99 (3 characters per byte, plus 'W" and '\r\n')
 #define RS_SIZE 99
-// P1/P2 write buffer size for writing to P1P2bus, max packet size is 32 (have not seen anytyhing over 24 (23+CRC))
-#define WB_SIZE 32
+// P1/P2 write buffer size for writing to P1P2bus, max packet size is 24 (have not seen anytyhing over 24 (23+CRC))
+#define WB_SIZE 25
 // P1/P2 read buffer size to store raw data and error codes read from P1P2bus; 1 extra for reading back CRC byte; 24 might be enough
 #define RB_SIZE 33
+#endif /* EF_SERIES */
 
-#define WR_CNT 1            // number of write repetitions for writing a paramter. 1 should work reliably, no real need for higher value
+#ifdef H_SERIES
+// serial read buffer size for reading from serial port, max line length on serial input is 150 (2 characters per byte, plus some)
+#define RS_SIZE 150
+// read/write buffer size for writing to P1P2bus, max packet size is 64
+#define WB_SIZE 65
+#define RB_SIZE 65
+#endif /* H_SERIES */
 
 #define INIT_ECHO 1         // defines whether written data is read back and verified against written data (advise to keep this 1)
 #define INIT_SCOPE 0        // defines whether scopemode, recording timing info, is on/off at start (advise to keep this 0)
@@ -137,9 +154,14 @@
 #define INIT_SDTO 2500    // (uint16_t) time-out delay in ms (applies both to manual instructed writes and controller writes)
 
 // CRC settings, values can be changed via serial port
+#ifdef EF_SERIES
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
+#else /* EF_SERIES */
+#define CRC_GEN 0x00    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
+#endif /* EF_SERIES */
 #define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is checked when reading or added when writing
 
+#ifdef EF_SERIES
 // auxiliary controller timings
 #define F030DELAY 100   // Time delay for in ms auxiliary controller simulation, should be larger than any response of other auxiliary controllers (which is typically 25-80 ms)
 #define F03XDELAY  30   // Time delay for in ms auxiliary controller simulation, should preferably be a bit larger than any regular response from auxiliary controllers (which is typically 25 ms)
@@ -183,3 +205,4 @@
 // Parameters in packet type 3A (8-bit value) are used for various system settings
 // such as holiday, schedule, cooling/heating
 #define PARAM_SYS 0x005B // holiday schedule on/off
+#endif /* EF_SERIES */

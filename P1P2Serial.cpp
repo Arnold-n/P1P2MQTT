@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20230604 v0.9.38 H-link branch merged into main branch
  * 20230604 v0.9.37 Support for V1.2 hardware
  * 20221028 v0.9.23 ADC code
  * 20220918 v0.9.22 scopemode also for writes, focused on actual errors, fake error generation for test purposes, removing OLDP1P2LIB
@@ -116,6 +117,7 @@
 // use LED_BUILTIN on PB7 on ATmega2560
 #define LED_ERROR                       LED_BUILTIN
 #define DIGITAL_RESET_LED_ERROR         (PORTB &= 0x7F)
+#define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTB |= 0x80) : (PORTB &= 0x7F))
 #define DIGITAL_SET_LED_ERROR           (PORTB |= 0x80)
 
 #elif ((defined __AVR_ATmega328P__) || (defined __AVR_ATmega328PB__))
@@ -169,7 +171,6 @@
 #define DIGITAL_SET_LED_ERROR           (PORTD |= 0x08)
 #define DIGITAL_RESET_LED_ERROR         (PORTD &= 0xF7)
 #define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTD |= 0x08) : (PORTD &= 0xF7))
-
 #endif /* F_CPU */
 
 // 4 leds:        on   P1P2-ESP-interface   /   Arduino ATmega250     / Arduino Uno
@@ -423,7 +424,7 @@ static volatile int32_t time_millisec = 0;
 
 void P1P2Serial::begin(uint32_t baud, bool use_ADC /* = false */, uint8_t ADC_pin0 /* = 0 */, uint8_t ADC_pin1 /* = 1 */, bool ledRW_reverse /* = false */)
 {
-  uint32_t cycles_per_bit = ((ALTSS_BASE_FREQ + baud / 2) / baud); // 833 cycles at 16MHz
+  uint32_t cycles_per_bit = ((ALTSS_BASE_FREQ + baud / 2) / baud); // 833 cycles at 8MHz
 
   Rticks_per_bit = cycles_per_bit;
   Rticks_per_semibit = Rticks_per_bit / 2;
@@ -713,8 +714,9 @@ void P1P2Serial::write(uint8_t b)
   SREG = intr_state;
 }
 
-static uint16_t startbit_delta;
-static uint8_t Echo = 1;
+static volatile uint16_t startbit_delta;
+static volatile uint8_t Echo = 1;
+static volatile uint8_t Allow = ALLOW_PAUSE_BETWEEN_BYTES;
 
 ISR(COMPARE_W_INTERRUPT)
 {
@@ -805,6 +807,8 @@ ISR(COMPARE_W_INTERRUPT)
       }
       // verify
       // state is even, check bit data (part 2), should be 1, otherwise suspect bus collission
+#ifndef H_SERIES
+      // for H-link, this results in bus collision errors being detected, as second bit data is not consistently 1, so omit this check on H_SERIES
       if (!bit_input) {
         tx_rx_readbackerror |= ERROR_BC;
         SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_BC);
@@ -815,6 +819,7 @@ ISR(COMPARE_W_INTERRUPT)
         SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_BC_FAKE);
       }
 #endif /* GENERATE_FAKE_ERRORS */
+#endif /* H_SERIES */
       tx_bit = bit;
     }
 
@@ -937,8 +942,8 @@ void P1P2Serial::flushOutput(void)
 /****************************************/
 
 #define SUPPRESS_OSCILLATION
-//Use this to ignore edges that are very near previous edges to avoid detection of oscillating edges
-//Does not seem necessary
+// Use this to ignore edges that are very near previous edges to avoid detection of oscillating edges
+// Does not seem necessary for Daikin, but seems necessary for strange (double-freq) start pulse by some H-link2 devices
 
 #ifdef SW_SCOPE
 void P1P2Serial::setScope(byte b)
@@ -948,6 +953,16 @@ void P1P2Serial::setScope(byte b)
   sw_scope_next = b;
 }
 #endif /* SW_SCOPE */
+
+void P1P2Serial::setAllow(uint8_t b)
+// Set max extra time between bytes
+// default: ALLOW_PAUSE_BETWEEN_BYTES
+// max 150
+// min 0
+// unit: bit times
+{
+  Allow = b;
+}
 
 void P1P2Serial::setEcho(uint8_t b)
 // Set echo mode (verify and read back written data) on or off
@@ -959,20 +974,31 @@ void P1P2Serial::setEcho(uint8_t b)
 }
 
 static uint16_t prev_edge_capture;  // previous capture of edge
+#ifdef H_SERIES
+static byte firstbyteUncertainty = 0; // 1 signals 11/12 bit uncertainty
+#endif /* H_SERIES */
 
 ISR(CAPTURE_INTERRUPT)
 {
-  IRQ_START;
 // called upon each edge during writes if in scopemode
 // and
 // called upon each falling edge detected during reads
+// Daikin/other except H-link2:
 // state = 0: at falling edge of start pulse, after pause
 // state = 1: at falling edge of start pulse shortly after previous byte (so: store previously received byte)
 // state = 2..10: nr of data/parity bit of this falling edge
+//
+// H-link2:
+// state = 2: data bit OR second start bit
+// state = 3..9: data bits
+// state = 10: data bit OR parity bit
+// state = 11: parity bit OR stop bit
+// state = 12: should not happen (flag with UC|PE)
   uint8_t state, head;
   uint16_t capture;
   uint16_t offset_overflow;
 
+  IRQ_START;
   capture = GET_INPUT_CAPTURE();
   uint16_t sws_count_temp = GET_TIMER_R_COUNT();
   state = rx_state;
@@ -997,46 +1023,91 @@ ISR(CAPTURE_INTERRUPT)
 #endif /* SUPPRESS_OSCILLATION */
     }
   }
-  if (state < 2) {
-    // this is first falling edge, it must be start pulse. First confirm received byte, if any (!NO_HEAD2), without SIGNAL_EOP
-    if (rx_buffer_head2 != NO_HEAD2) {
-      rx_buffer_head = rx_buffer_head2;
-      rx_buffer_head2 = NO_HEAD2;
-    }
-    startbit_delta = time_msec;
-    // time_msec = 0; // to prevent a write start to reduce bus collision risk, not needed as MS_TIMER is disabled anyway
-    DISABLE_MS_TIMER();
-    // rx_target set to middle of first data bit
-    rx_target = capture + Rticks_per_bit_and_semibit;
-    rx_state = 2;
-    rx_paritycheck = 0;
-    SET_COMPARE_R(rx_target);
-    ENABLE_INT_COMPARE_R(); // only needed in state = 0 but doesn't hurt to do it in state = 1
+  switch (state) {
+    case  0     :
+    case  1     :
+#ifdef H_SERIES
+                  firstbyteUncertainty = SIGNAL_UC;
+#endif /* H_SERIES */
+                  // this is first falling edge, it must be start pulse. First confirm received byte, if any (!NO_HEAD2), without SIGNAL_EOP
+                  if (rx_buffer_head2 != NO_HEAD2) {
+                    rx_buffer_head = rx_buffer_head2;
+                    rx_buffer_head2 = NO_HEAD2;
+                  }
+                  startbit_delta = time_msec;
+                  // time_msec = 0; // to prevent a write start to reduce bus collision risk, not needed as MS_TIMER is disabled anyway
+                  DISABLE_MS_TIMER();
+                  // rx_target set to middle of first data bit
+                  rx_target = capture + Rticks_per_bit_and_semibit;
+                  rx_state = 2;
+                  rx_paritycheck = 0;
+                  SET_COMPARE_R(rx_target);
+                  ENABLE_INT_COMPARE_R(); // only needed in state = 0 but doesn't hurt to do it in state = 1
 #ifdef SW_SCOPE
-    // if P1P2Monitor is ready reading data (sws_block = 0), start new log operation
-    if ((state == 0) && !sws_block) {
-      sw_scope = sw_scope_next;
-      if (sw_scope) SW_SCOPE_START_LOG;
-    }
+                  // if P1P2Monitor is ready reading data (sws_block = 0), start new log operation
+                  if ((state == 0) && !sws_block) {
+                    sw_scope = sw_scope_next;
+                    if (sw_scope) SW_SCOPE_START_LOG;
+                  }
 #endif /* SW_SCOPE */
-  } else {
-    // state=2..9: we received a data bit; perform a shift
-    // state=10: parity bit
-    // as (data or parity) bit is 0, no need to modify rx_paritycheck
-    if (state < 10) {
-      rx_byte >>= 1;
-      rx_target += Rticks_per_bit; // set target time to (one semibit after) next possible falling edge
-      SET_COMPARE_R(rx_target);
-      CLEAR_COMPARE_R_FLAG();
-      rx_state = state + 1;
-    } else if (state == 10) {
-      rx_target += Rticks_per_bit; // set target time to (one semibit after) next possible falling edge = in stopbit
-      SET_COMPARE_R(rx_target);    // this is the only COMPARE_R_INTERRUPT which is never cancelled
-      CLEAR_COMPARE_R_FLAG();
-      rx_state = 11;
-    } else {
-      // state = 11: we received falling edge during stop bit before COMPARE_R_INTERRUPT ran. Should not happen.
-    }
+                  break;
+    case 2 ... 9: // data bits (except for H-link2 and state=2, in which case this is a 0 data bit OR a 2nd 0 start bit,
+                  //            for now assume it is data bit and correct later if assumption is wrong)
+                  rx_byte >>= 1;
+                  rx_target += Rticks_per_bit; // set target time to (one semibit after) next possible falling edge
+                  SET_COMPARE_R(rx_target);
+                  CLEAR_COMPARE_R_FLAG();
+                  rx_state = state + 1;
+                  break;
+    case 10     : // state=10: parity bit (in case of H-link2: parity bit OR data bit)
+#ifdef H_SERIES
+                  if (firstbyteUncertainty) {
+                    // not sure yet regular 11-bit or double-start-bit pattern; we can shift one more time, shifting 0 out of rx_byte
+                    rx_byte >>= 1;
+                  }
+#endif
+                  // as (data or parity) bit is 0, no need to modify rx_paritycheck
+                  rx_target += Rticks_per_bit; // set target time to (one semibit after) next possible falling edge = in stopbit
+                  SET_COMPARE_R(rx_target);    // for non-HLink-2, this COMPARE_R_INTERRUPT is never supposed to be cancelled
+                  CLEAR_COMPARE_R_FLAG();
+                  rx_state = 11;
+                  break;
+#ifdef H_SERIES
+    case 11     : // only here for 0 parity bit of double-start-bit pattern
+                  firstbyteUncertainty = 0; // double-start-bit-pattern, OK, no need to shift back
+                  rx_target += Rticks_per_bit + Rticks_per_bit; // set target time to (one semibit after) next possible falling edge (= stop bit, so no edge)
+                  SET_COMPARE_R(rx_target); // this COMPARE_R_INTERRUPT never supposed to be cancelled
+                  CLEAR_COMPARE_R_FLAG();
+                  rx_state = 12;
+                  break;
+    case 12     : // should not happen, but record byte nevertheless... unless only here for 0 parity bit of double-start-bit pattern or in bounce case
+                  SET_COMPARE_R(rx_target + Rticks_per_bit * (1 + Allow));
+                  CLEAR_COMPARE_R_FLAG();
+                  rx_state = 1;
+                  head = rx_buffer_head + 1;
+                  if (head >= RX_BUFFER_SIZE) head = 0;
+                  if (head != rx_buffer_tail) {
+                    rx_buffer[head] = 0xFF;
+                    delta_buffer[head] = startbit_delta; // time from previous byte
+                    error_buffer[head] = firstbyteUncertainty;
+                    if (firstbyteUncertainty) error_buffer[head] |= ERROR_PE; // signal "should not happen"
+                    DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
+                    rx_buffer_head2 = head;
+                  } else {
+                    // signal buffer overrun for *previous* byte
+                    error_buffer[rx_buffer_head] |= ERROR_OR;
+                    DIGITAL_SET_LED_ERROR;
+                    rx_buffer_head2 = rx_buffer_head; // so SIGNAL_EOP can be added
+                  }
+                  firstbyteUncertainty = 0;
+                  PRESET_ENABLE_MS_TIMER();
+                  break;
+#else /* H_SERIES */
+    case 11     : // state = 11: we received falling edge during stop bit before COMPARE_R_INTERRUPT ran. Should not happen.
+                  break;
+#endif /* H_SERIES */
+    default     : // Should not happen.
+                  break;
   }
   // log falling edge during reading
   SW_SCOPE_LOG_EVENT(capture, SWS_EVENT_EDGE_FALLING_R | state);
@@ -1047,9 +1118,16 @@ ISR(CAPTURE_INTERRUPT)
 ISR(COMPARE_R_INTERRUPT)
 // The COMPARE_R_INTERRUPT routine is called during every data bit (state=2..9) or parity bit (state=10), unless there is a falling edge for that bit,
 // and also during stop bit (state=11)
-// It is also called during the latest potential location of the next start bit (with state==1, taking ALLOW_PAUSE_BETWEEN_BYTES into account),
+// It is also called during the latest potential location of the next start bit (with state==1, taking Allow into account),
 // but only if no start bit has been detected, otherwise this interrupt will be cancelled.
 // this allows detection of an end of communication block.
+//
+// H-link2:
+// state = 2: data bit OR second start bit
+// state = 3..9: data bits
+// state = 10: data bit OR parity bit
+// state = 11: parity bit OR stop bit
+// state = 12: stop bit
 {
   IRQ_START;
 
@@ -1060,63 +1138,108 @@ ISR(COMPARE_R_INTERRUPT)
   uint8_t head;
   uint8_t state;
   state = rx_state;
-  if (state == 1) {
-    // no new start bit detected within expected time frame; thus pause in received data detected; register SIGNAL_EOP and quit rx mode
-    DISABLE_INT_COMPARE_R();
-    rx_state = 0;
-    if (rx_buffer_head2 != NO_HEAD2) {
-      rx_buffer_head = rx_buffer_head2;
-      error_buffer[rx_buffer_head] |= SIGNAL_EOP;
-      rx_buffer_head2 = NO_HEAD2;
-    }
-    DIGITAL_RESET_LED_READ;
-    IRQ_STOP;
-    IRQ_END_R;
-    return;
-  } else if (state == 11) {
-    // state = 11: we are in stop bit; where W should not be hampered by our lengthy activity of finishing up
-    // we do most of the work here but have to leave some for the next start pulse routine (via rx_buffer_head2)
-    SET_COMPARE_R(rx_target + Rticks_per_bit * (1 + ALLOW_PAUSE_BETWEEN_BYTES));
-    rx_state = 1;
-    head = rx_buffer_head + 1;
-    if (head >= RX_BUFFER_SIZE) head = 0;
-    if (head != rx_buffer_tail) {
-      rx_buffer[head] = rx_byte;
-      delta_buffer[head] = startbit_delta; // time from previous byte
-      error_buffer[head] = 0;
+#ifdef H_SERIES
+  uint8_t stopBit = 1;
+#endif /* H_SERIES */
+  switch (state) {
+    case  1     : // no new start bit detected within expected time frame; thus pause in received data detected; register SIGNAL_EOP and quit rx mode
+                  DISABLE_INT_COMPARE_R();
+                  rx_state = 0;
+                  if (rx_buffer_head2 != NO_HEAD2) {
+                    rx_buffer_head = rx_buffer_head2;
+                    error_buffer[rx_buffer_head] |= SIGNAL_EOP;
+                    rx_buffer_head2 = NO_HEAD2;
+                  }
+                  DIGITAL_RESET_LED_READ;
+                  IRQ_STOP;
+                  IRQ_END_R;
+                  return;
+    case 2      : // state = 2: we received a 1 data bit; for H-link2, signal that this cannot be 2nd startbit
+#ifdef H_SERIES
+                  firstbyteUncertainty = 0;
+#endif /* H_SERIES */
+                  // fallthrough
+    case 3 ... 9: // state = 2 or 3..9: we received a 1 data bit.
+                  rx_byte = (rx_byte >> 1) | 0x80;
+                  rx_paritycheck ^= 0x80;
+                  rx_state = state + 1;
+                  rx_target += Rticks_per_bit;
+                  SET_COMPARE_R(rx_target);
+                  break;
+    case 10     : // state = 10: we received a 1 parity bit (or, in case of H-link2, a 1 parity bit or a 1 data bit)
+#ifdef H_SERIES
+                  if (firstbyteUncertainty) {
+                    // not sure yet regular 11-bit or double-start-bit pattern; we can shift one more time, shifting 0 out of rx_byte
+                    rx_byte = (rx_byte >> 1) | 0x80; // if 11-bit pattern, this may push 0 out and 1-paritybit in
+                  }
+#endif /* H_SERIES */
+                  rx_paritycheck ^= 0x80;
+                  rx_state = 11;
+                  rx_target += Rticks_per_bit; // this could be reduced to +semibit if needed timingwise
+                  SET_COMPARE_R(rx_target);
+                  DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
+                  break;
+    case 11     : // state = 11: we are in stop bit; where W should not be hampered by our lengthy activity of finishing up
+                  // For H-link2, this can still be 1 parity bit for 12-bit pattern
+#ifdef H_SERIES
+                  if (firstbyteUncertainty) {
+                    if (rx_paritycheck) {
+                      // OK, this is assumed to be 12-bit pattern parity bit, not stop bit
+                      rx_paritycheck ^= 0x80;
+                      stopBit = 0;
+                    } else {
+                      // OK, this is assumed to be stop bit already, shift back, set stop bit
+                      rx_byte <<= 1; // should shift back for 11-bit pattern to avoid parity error
+                      // already stopBit = 1;
+                    }
+                  }
+                  // fall-through
+    case 12     : // stop bit
+#endif /* H_SERIES */
+                  // for non-Hlink-2, this is still "case 11" !
+                  // we do most of the work here but have to leave some for the next start pulse routine (via rx_buffer_head2)
+#ifndef H_SERIES
+                  SET_COMPARE_R(rx_target + Rticks_per_bit * (1 + Allow));
+#else /* H_SERIES */
+                  SET_COMPARE_R(rx_target + Rticks_per_bit * (1 + (stopBit ? 0 : 1) + Allow));
+#endif /* H_SERIES */
+                  rx_state = 1;
+                  head = rx_buffer_head + 1;
+                  if (head >= RX_BUFFER_SIZE) head = 0;
+                  if (head != rx_buffer_tail) {
+                    rx_buffer[head] = rx_byte;
+                    delta_buffer[head] = startbit_delta; // time from previous byte
+#ifndef H_SERIES
+                    error_buffer[head] = 0;
+#else /* H_SERIES */
+                    error_buffer[head] = firstbyteUncertainty;
+#endif /* H_SERIES */
 #ifdef GENERATE_FAKE_ERRORS
-      if (fakeError(FAKE_ERROR_PE)) {
-        error_buffer[head] |= (ERROR_PE << 8);
-        SW_SCOPE_LOG_ERROR(capture, SWS_EVENT_ERR_PE_FAKE);
-      }
+                    if (fakeError(FAKE_ERROR_PE)) {
+                      error_buffer[head] |= (ERROR_PE << 8);
+                      SW_SCOPE_LOG_ERROR(capture, SWS_EVENT_ERR_PE_FAKE);
+                    }
 #endif /* GENERATE_FAKE_ERRORS */
-      if (rx_paritycheck) {
-        error_buffer[head] |= ERROR_PE;
-        SW_SCOPE_LOG_ERROR(capture, SWS_EVENT_ERR_PE);
-      }
-      DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
-      rx_buffer_head2 = head;
-    } else {
-      // signal buffer overrun for *previous* byte
-      error_buffer[rx_buffer_head] |= ERROR_OR;
-      DIGITAL_SET_LED_ERROR;
-      rx_buffer_head2 = rx_buffer_head; // so SIGNAL_EOP can be added
-    }
-    PRESET_ENABLE_MS_TIMER();
-  } else if (state == 10) {
-    // state = 10: we received a 1 parity bit
-    rx_paritycheck ^= 0x80;
-    rx_state = 11;
-    rx_target += Rticks_per_bit; // this could be reduced to +semibit if needed timingwise
-    SET_COMPARE_R(rx_target);
-    DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
-  } else /* if (state < 10) */ {
-    // state = 2..9: we received a 1 data bit.
-    rx_byte = (rx_byte >> 1) | 0x80;
-    rx_paritycheck ^= 0x80;
-    rx_state = state + 1;
-    rx_target += Rticks_per_bit;
-    SET_COMPARE_R(rx_target);
+                    if (rx_paritycheck) {
+                      error_buffer[head] |= ERROR_PE;
+                      SW_SCOPE_LOG_ERROR(capture, SWS_EVENT_ERR_PE);
+                    }
+                    DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
+                    rx_buffer_head2 = head;
+                  } else {
+                    // signal buffer overrun for *previous* byte
+                    error_buffer[rx_buffer_head] |= ERROR_OR;
+                    DIGITAL_SET_LED_ERROR;
+                    rx_buffer_head2 = rx_buffer_head; // so SIGNAL_EOP can be added
+                  }
+#ifdef H_SERIES
+                  firstbyteUncertainty = 0;
+#endif /* H_SERIES */
+                  PRESET_ENABLE_MS_TIMER();
+                  break;
+    case 0      :
+    default     : // Should not happen;
+                  break;
   }
   SW_SCOPE_LOG_EVENT(sws_count_temp, SWS_EVENT_SIGNAL_HIGH_R | state);
   IRQ_STOP;
@@ -1205,8 +1328,15 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* e
   uint8_t EOP = 0;
   uint8_t bytecnt = 0;
   uint8_t crc = crc_feed;
+#ifdef H_SERIES
+  uint8_t expectedLength = 0xFF; // split H-link2 packets based on 3rd byte
+#endif /* H_SERIES */
 
+#ifndef H_SERIES
   while (!EOP) {
+#else /* H_SERIES */
+  while (!EOP && (expectedLength > bytecnt)) {
+#endif /* H_SERIES */
     if (available()) {
       errorbuf_t error = read_error();
       EOP = (error & SIGNAL_EOP);
@@ -1242,6 +1372,9 @@ uint16_t P1P2Serial::readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* e
         }
       }
       bytecnt++;
+#ifdef H_SERIES
+      if (bytecnt == 3) expectedLength = readbuf[2];
+#endif /* H_SERIES */
     }
   }
   return bytecnt;

@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230611 v0.9.38 H-link2 branch merge into main
  * 20230604 v0.9.37 support for P1P2MQTT bridge v1.2
  * 20230526 v0.9.36 remove several pseudo parameters from HA, unless j-mask includes 0x20000, and adds thresholds to reduce traffic
  * 20230422 v0.9.35 (version skipped)
@@ -30,21 +31,24 @@
  * 20220808 v0.9.15 extended verbosity command, unique OTA hostname, minor fixes
  * 20220802 v0.9.14 AVRISP, wifimanager, mqtt settings, EEPROM, telnet, outputMode, outputFilter, ...
  * ..
- *  
  */
 
 #ifndef P1P2_Config
 #define P1P2_Config
 
-// User configurable options: board, ethernet, hw_id, and model E_SERIES/F_SERIES
+// User configurable options: board, ethernet, hw_id, and model *_SERIES
 
 // Define one of these options below
 #define P1P2_ESP_INTERFACE_250   // define this for regular operation of P1P2-ESP-Interface (ESP8266 + ATmega328P using 250kBaud)
-//#define P1P2_ESP_INTERFACE_115 // define this for debugging P1P2-ESP-Interface, using 115.2kBaud for serial output debugging 
+//#define P1P2_ESP_INTERFACE_115 // define this for debugging P1P2-ESP-Interface, using 115.2kBaud for serial output debugging
 //                               // (in this case DO NOT connect to P1/P2), but power with 3V3 via ESP01-connector *or* with 16V DC power supply on P1/P2
 //#define ARDUINO_COMBIBOARD     // define this for Arduino/ESP8266 combi-board, using 250kBaud between ESP8266 and ATmega238P
 //#define ESP01S_MQTT            // define this for P1/P2 data input from P1P2/R MQTT topic, using 115.2kBaud for debugging over USB
 //#define ESP01S_RX              // define this for P1P2 data input over 250kBaud serial, for debugging over MQTT
+
+#if (defined E_SERIES || defined F_SERIES)
+#define EF_SERIES
+#endif /* (defined E_SERIES || defined F_SERIES) */
 
 // Setting option NOWIFI to 1 (can be changed via 7th parameter of 'B' command) prevents WiFi use
 // Only useful if ethernet adapter is installed, to prevent use of WiFi as fall-back when ethernet fails
@@ -62,9 +66,11 @@
                          //   1 for P1P2-ESP-Interface v1.2, October 2022, ISPAVR over BB SPI, ADC, serial suppression signal
                          //   (Note: if INIT_ESP_HW_ID is 1, BSP with modified library for ESP8266AVRISP library is required for updating firmware of ATmega328P)
 
-// define only one of E_SERIES and F_SERIES:
+// define only one of *_SERIES:
 //#define E_SERIES // for Daikin E* heat pumps
 //#define F_SERIES // for Daikin F* VRV systems
+//#define H_SERIES // for Hitachi H-link systems
+//#define MHI_SERIES // for Mitsubishi Heavy Industry systems
 
 // Other options below should be OK
 
@@ -79,8 +85,8 @@
 // INIT_ESP_HW_ID = 0 does not require ethernet or BSP modification
 #if INIT_ESP_HW_ID > 0
 #define ETHERNET
-#endif
-#endif
+#endif /* INIT_ESP_HW_ID */
+#endif /* P1P2_ESP_INTERFACE_250 */
 
 #ifdef P1P2_ESP_INTERFACE_115
 #define SERIALSPEED 115200 // for debugging, do not connect interface to P1/P2 when doing this
@@ -108,24 +114,34 @@
 // the defined R/X topics is used for processing (subject to (outputMode & 0x4000) and (outputMode & 0x8000) respectively):
 // The 4th IPv4 byte of the topic to subscribe to can be set using 5th parameter in the 'B' command.
 // no ethernet, no ESP8266 BSP modification needed
+#ifndef H_SERIES
 #undef INIT_ESP_HW_ID
 #define INIT_ESP_HW_ID 0
+#else /* H_SERIES */
+#undef INIT_HW_ID
+#define INIT_HW_ID 0
+#endif /* H_SERIES */
 #endif
 
 #ifdef ESP01S_RX
 #define SERIALSPEED 250000
 // no ethernet, no ESP8266 BSP modification needed
+#ifndef H_SERIES
 #undef INIT_ESP_HW_ID
 #define INIT_ESP_HW_ID 0
+#else /* H_SERIES */
+#undef INIT_HW_ID
+#define INIT_HW_ID 0
+#endif /* H_SERIES */
 #endif
 
 #define SAVEPARAMS
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.37"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.37"
-#define HA_SW "0.9.37"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.38"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.38"
+#define HA_SW "0.9.38"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
@@ -176,8 +192,13 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #define MQTT_KEY_PREFIXLEN 15 // length of mqttKeyPrefix (excl '\0')
 
 // To avoid Mqtt/CPU overload and message loss, throttle mqt traffic after reboot
+#ifndef H_SERIES
 #define THROTTLE_VALUE 5 // start with 20% parameter coverage, increasing in (THROTTLE_VALUE-1)*(THROTTLE_STEP) seconds to 100%
 #define THROTTLE_STEP 4  // in seconds
+#else /* H_SERIES */
+#define THROTTLE_VALUE 15 // start with 6% parameter coverage, increasing in (THROTTLE_VALUE-1)*(THROTTLE_STEP) seconds to 100%
+#define THROTTLE_STEP 10  // in seconds
+#endif /* H_SERIES */
 
 // #define MQTT_PUBLISH_NONHA 1 // this is now online configuration option as (outputMode & 0x10000)
 
@@ -225,9 +246,17 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #define MQTT_MIN_FREE_MEMORY 6000 // Must likely be more than 4kB, MQTT messages will not be transmitted if available memory is below this value
 #define MQTT_QOS 0 // QOS = 1 is too slow
 #define SERIAL_MAGICSTRING "1P2P" // Serial input of ATmega should start with SERIAL_MAGICSTRING, otherwise lines line is ignored by P1P2Monitor
+#ifndef H_SERIES
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
+#else /* H_SERIES */
+#define CRC_GEN 0x00    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
+#endif /* H_SERIES */
 #define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is checked when reading or added when writing
+#ifndef H_SERIES
 #define SPRINT_VALUE_LEN 800 // max message length for informational and debugging output over P1P2/S, telnet, or serial
+#else /* H_SERIES */
+#define SPRINT_VALUE_LEN 1000 // max message length for informational and debugging output over P1P2/S, telnet, or serial
+#endif /* H_SERIES */
 #define MQTT_KEY_LEN 100
 #ifdef SAVESCHEDULE
 #define MQTT_VALUE_LEN 630 // max length: Program 6* (6+8)*6*7+3*7+2 = 611
@@ -236,7 +265,11 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #endif
 #define MAX_COMMAND_LENGTH 252 // B command can be long
 #define RB 1000     // max size of readBuffer (serial input from Arduino) (was 400, changed for long-scope-mode to 1000)
+#ifndef H_SERIES
 #define HB 33      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
+#else /* H_SERIES */
+#define HB 65      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
+#endif /* H_SERIES */
 #define MQTT_RB 1024 // size of ring buffer for MQTT_INPUT_HEXDATA/MQTT_INPUT_BINDATA
 
 #define REBOOT_REASON_NOTSTORED 0xFE
