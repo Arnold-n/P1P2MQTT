@@ -158,10 +158,8 @@ void initEEPROM() {
   if (!sigMatch) {
     if (verbose) Serial.println(F("* EEPROM sig mismatch, initializing EEPROM"));
     for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) EEPROM.update(EEPROM_ADDRESS_SIGNATURE + i, EEPROM_SIGNATURE[i]); // no '\0', not needed
-#ifdef EF_SERIES
     EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID_DEFAULT); // Daikin specific
     EEPROM.update(EEPROM_ADDRESS_COUNTER_STATUS, COUNTERREPEATINGREQUEST); // Daikin specific
-#endif /* EF_SERIES */
     EEPROM.update(EEPROM_ADDRESS_VERBOSITY, INIT_VERBOSE);
   }
 }

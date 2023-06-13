@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20230611 v0.9.39 do init Daikin fields in H-link2 version too
  * 20230611 v0.9.38 H-link2 branch merged into main branch
  * 20230604 v0.9.37 support for ATmega serial enable/disable via PD4, required for P1P2MQTT bridge v1.2
  * 20230423 v0.9.35 (skipped)
@@ -64,7 +65,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.38"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.39"
 
 #define INIT_VERBOSE 3
 // Set verbosity level
@@ -75,7 +76,6 @@
 //                   (format: 10-character "T 65.535: " for real packets and "P         " for pseudopackets)
 // verbose = 4: no raw/pseudopacket data output, only maximal reporting
 
-#ifdef EF_SERIES
 #define COUNTERREPEATINGREQUEST 0 // Change this to 1 to trigger a counter request cycle at the start of each minute
                                   //   By default this works only as, and only if there is no other, first auxiliary controller (F0)
 				  //   The counter request is done after the (unanswered) 00F030*, unless KLICDA is defined
@@ -100,8 +100,6 @@
 #define CONTROL_ID_DEFAULT CONTROL_ID_NONE   // by default, P1P2Monitor passively monitors.
                                              // If CONTROL_ID_DEFAULT is set to CONTROL_ID_0 (or _1) P1P2Monitor
                                              // will start to act as an auxiliary controller if no other controller is detected.
-
-#endif /* EF_SERIES */
 
 // EEPROM saves state of
 // -CONTROL_ID (whether P1P2Monitor acts as auxiliary controller, and which one) (not for H-link2)
