@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20230618 v0.9.39 H-link fix buf size
  * 20230604 v0.9.38 H-link branch merged into main branch
  * 20230604 v0.9.37 Support for V1.2 hardware
  * 20221028 v0.9.23 ADC code
@@ -73,11 +74,11 @@
 #define SW_SCOPE                    // records timing info of P1/P2 bus falling edges of start of the packets
 //#define GENERATE_FAKE_ERRORS        // disable this for real use!! // only for NEWLIB, and on 8MHz this may add to the CPU load
 #define SWS_FAKE_ERR_CNT 3000       // one fake error generated (per error type) per SWS_FAKE_ERR_CNT checks
-#ifdef HHH
+#ifdef H_SERIES
 #define ALLOW_PAUSE_BETWEEN_BYTES 20 // If there is a pause between bytes on the bus which is longer than a 1/4 bit time,
-#else /* HHH */
+#else /* H_SERIES */
 #define ALLOW_PAUSE_BETWEEN_BYTES 9
-#endif /* HHH */
+#endif /* H_SERIES */
                                     // If there is a pause between bytes on the bus which is longer than a 1/4 bit time,
                                     // P1P2Serial signals an end-of-packet.
                                     // Daikin devices do not add any pause between bytes, but some other controllers do, like the KLIC-DA from Zennios, and H-link2 devices.
@@ -91,14 +92,14 @@
                                     // if S_TIMER is undefined, the write budget (and error budget) will not increase over time TODO fix this
 // End of configuration options
 
-#ifdef HHH
+#ifdef H_SERIES
 // H-link uses larger packets
 #define TX_BUFFER_SIZE 65  // write buffer size (1 more than max size needed)
 #define RX_BUFFER_SIZE 65  // read buffer (1 more than max size needed), should be <=254
-#else /* HHH */
+#else /* H_SERIES */
 #define TX_BUFFER_SIZE 25  // write buffer size (1 more than max size needed)
 #define RX_BUFFER_SIZE 25  // read buffer (1 more than max size needed), should be <=254
-#endif /* HHH */
+#endif /* H_SERIES */
 #define NO_HEAD2 0xFF
 
 #define ALTSS_BASE_FREQ F_CPU
@@ -124,11 +125,11 @@
 #define SIGNAL_EOP                0x80 // signaling end of packet, this is not an error flag
 
 #define ERROR_REAL_MASK           0x3F // Error mask to remove SIGNAL_EOP (,SIGNAL_UC for H-link) and fake errors
-#ifndef HHH
+#ifndef H_SERIES
 #define ERROR_COUNT_MASK          0x3F // Error mask for error count
-#else /* HHH */
+#else /* H_SERIES */
 #define ERROR_COUNT_MASK          0x3B // Error mask for error count (H-link2: excluding PE errors)
-#endif /* HHH */
+#endif /* H_SERIES */
 
 #ifdef GENERATE_FAKE_ERRORS
 #define ERROR_FLAGS               0xFF7F
