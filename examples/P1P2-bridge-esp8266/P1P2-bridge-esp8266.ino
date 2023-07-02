@@ -56,6 +56,13 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <EEPROM.h>
+#include <time.h>
+#include <TZ.h>
+
+//const char* MY_TZ[2] = {TZ_Europe_Amsterdam, TZ_Europe_London};
+const char* MY_TZ[2] = { "CET-1CEST,M3.5.0/02,M10.5.0/03"   , "GMT0BST,M3.5.0/1,M10.5.0" };
+time_t now;
+tm tm;
 
 #ifdef AVRISP
 #include <SPI.h>
@@ -400,6 +407,9 @@ uint32_t Sprint_buffer_overflow = 0;
 #ifdef MHI_SERIES
 #include "P1P2_Hitachi_ParameterConversion_HLINK2.h" // for now TODO
 #endif /* MHI_SERIES */
+#ifdef T_SERIES
+#include "P1P2_Hitachi_ParameterConversion_HLINK2.h" // for now TODO
+#endif /* T_SERIES */
 
 static byte throttle = 1;
 static byte throttleValue = THROTTLE_VALUE;
@@ -1144,10 +1154,9 @@ void setup() {
     local_ip = eth.localIP();
     Serial.print(F("* [ESP] Connected to ethernet, IP address: "));
     Serial.println(local_ip);
-  } else {
-#else
-  {
+  } else
 #endif
+  {
     // WiFiManager setup
     // Set config save notify callback
     wifiManager.setSaveConfigCallback(WiFiManagerSaveConfigCallback);
@@ -1528,6 +1537,7 @@ void setup() {
   }
   delay(1000);
   mqttSetupReady = true;
+  configTime(MY_TZ[0], MY_NTP_SERVER);
 }
 
 static int jsonTerm = 1; // indicates whether json output was terminated
@@ -1596,14 +1606,15 @@ void process_for_mqtt_json(byte* rb, int n) {
   }
 }
 
-byte timeStamp = 10; // TODO change this for TIMESTRING
+byte timeStamp = 30; // TODO
 
 void writePseudoPacket(byte* WB, byte rh)
 // rh is packet size (without CRC byte)
 {
   char pseudoWriteBuffer[RB];
-  snprintf(pseudoWriteBuffer, 13, "R P         ");
-// if (outputMode & ??) add timestring TODO to pseudoWriteBuffer snprintf(pseudoWriteBuffer, 13, "R TIMESTRING P         ");
+  time(&now);
+  localtime_r(&now, &tm);
+  snprintf(pseudoWriteBuffer, 33, "R %04i-%02i-%02i_%02i:%02i:%02i P         ", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
   uint8_t crc = crc_feed;
   for (uint8_t i = 0; i < rh; i++) {
     uint8_t c = WB[i];
@@ -1663,7 +1674,9 @@ void loop() {
         // alternative, more info: Sprint_P(true, true, false, PSTR("* [ESP] %d RSSI %d heap %d maxfreeblocksize %d Uptime %li disconnects %d WiFi %d ethernet %d status %d"), espUptime, WiFi.RSSI(), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(), espUptime, Mqtt_disconnects, WiFi.isConnected(), eth.connected(), eth.status());
       if (espUptime >= espUptime_telnet + 10) {
         espUptime_telnet = espUptime_telnet + 10;
-        Sprint_P(false, false, true, PSTR("* [ESP] Uptime %li"), espUptime);
+        time(&now);
+        localtime_r(&now, &tm);
+        Sprint_P(false, false, true, PSTR("* [ESP] Uptime %li at %04i%02i%02i_%02i:%02i:%02i"), espUptime, tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
       }
       if (!mqttClient.connected()) Sprint_P(true, false, true, PSTR("* [ESP] MQTT is disconnected (%i s total %i s)"), Mqtt_disconnectTime, Mqtt_disconnectTimeTotal);
       pseudo0D++;
@@ -1724,7 +1737,7 @@ void loop() {
 #endif /* AVRISP */
 
   // network and mqtt connection check
-  // if (WiFi.isConnected() || eth.connected()) { // TODO this does not work. eth.connected() becomes true after 4 minutes even if there is no ethernet cable attached
+  // if (WiFi.isConnected() || eth.connected()) {//} // TODO this does not work. eth.connected() becomes true after 4 minutes even if there is no ethernet cable attached
                                                   // TODO and eth.connected() remains true even after disconnecting the ethernet cable (and perhaps also after 'D1' soft ESP.reset()
   // ethernetConnected = ???;                     // TODO try to update ethernetConnected based on actual ethernet status
   if (WiFi.isConnected() || ethernetConnected) {  // TODO for now: use initial ethernet connection status instead (ethernet cable disconnect is thus not detected)
@@ -1758,7 +1771,7 @@ void loop() {
   if (!OTAbusy)  {
     // Non-blocking serial input
     // serial_rb is number of char received and stored in RB
-    // rb_buffer = readBuffer + serial_rb
+    // rb_buffer = readBuffer + serial_rb // +20 for timestamp
     // ignore first line and too-long lines
     // readBuffer does not include '\n' but may include '\r' if Windows provides serial input
     if (MQTT_commandReceived) {
@@ -1782,13 +1795,31 @@ void loop() {
 #if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
     while (((c = MQTT_readBuffer_readChar()) >= 0) && (c != '\n') && (serial_rb < RB)) {
       *rb_buffer++ = (char) c;
-      serial_rb++;
+      if (serial_rb) {
+        serial_rb++;
+      } else {
+        // add timestamp TZ
+        time(&now);
+        localtime_r(&now, &tm);
+        snprintf(&readBuffer[1], 22, " %04i-%02i-%02i_%02i:%02i:%02i ", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+        serial_rb += 21;
+        rb_buffer += 20;
+      }
     }
 #else
     if (!ignoreSerial) {
-       while (((c = Serial.read()) >= 0) && (c != '\n') && (serial_rb < RB)) {
+      while (((c = Serial.read()) >= 0) && (c != '\n') && (serial_rb < RB)) {
         *rb_buffer++ = (char) c;
-        serial_rb++;
+        if (serial_rb) {
+          serial_rb++;
+        } else {
+          // add timestamp TZ
+          time(&now);
+          localtime_r(&now, &tm);
+          snprintf(&readBuffer[1], 22, " %04i-%02i-%02i_%02i:%02i:%02i ", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+          serial_rb += 21;
+          rb_buffer += 20;
+        }
       }
     } else {
       c = -1;
@@ -1812,17 +1843,17 @@ void loop() {
           ignoreremainder = 0;
         } else {
           if (readBuffer[0] == 'R') {
-            int rbp = 1;
+            int rbp = 21; // TODO +20 added
             int n, rbtemp;
             byte rh = 0;
-            if ((serial_rb > 12) && ((readBuffer[2] == 'T') || (readBuffer[2] == 'P') || (readBuffer[2] == 'X'))) {
+            if ((serial_rb > 32) && ((readBuffer[22] == 'T') || (readBuffer[22] == 'P') || (readBuffer[22] == 'X'))) { // TODO +20 -> 32
               // skip 10-character time stamp
-              rbp = 12;
-              timeStamp = 10;
+              rbp = 32;
+              timeStamp = 30; // TODO ????
             } else {
-              timeStamp = 0;
+              timeStamp = 20; // TODO ???
             }
-            while ((rh < HB) && (sscanf(readBuffer + rbp, "%2x%n", &rbtemp, &n) == 1)) {
+            while ((rh < HB) && (sscanf(readBuffer + rbp, "%2x%n", &rbtemp, &n) == 1)) { // TODO
               readHex[rh++] = rbtemp;
               rbp += n;
             }
@@ -1841,10 +1872,10 @@ void loop() {
 // if (outputMode & ??) add timestring TODO to readBuffer
               if ((!crc_gen) || (crc == readHex[rh])) {
 #if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
-                if (outputMode & 0x0001) client_publish_mqtt(mqttHexdata, readBuffer);
+                if (outputMode & 0x0001) client_publish_mqtt(mqttHexdata, readBuffer); // TODO
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
-                if (outputMode & 0x0010) client_publish_telnet(mqttHexdata, readBuffer);
-                if (outputMode & 0x0100) client_publish_serial(mqttHexdata, readBuffer);
+                if (outputMode & 0x0010) client_publish_telnet(mqttHexdata, readBuffer); // TODO
+                if (outputMode & 0x0100) client_publish_serial(mqttHexdata, readBuffer); // TODO
 #if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
                 if ((outputMode & 0x0800) && (mqttConnected)) mqttClient.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) readHex, rh + 1);
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
@@ -1866,45 +1897,45 @@ void loop() {
                   ATmega_uptime_prev = ATmega_uptime;
                 }
               } else {
-                Sprint_P(true, true, true, PSTR("* [MON] Serial input buffer overrun or CRC error in R data:%s expected 0x%02X"), readBuffer + 1, crc);
+                Sprint_P(true, true, true, PSTR("* [MON] Serial input buffer overrun or CRC error in R data:%s expected 0x%02X"), readBuffer + 1, crc); // TODO
                 if (ESP_serial_input_Errors_CRC < 0xFF) ESP_serial_input_Errors_CRC++;
               }
             } else {
-              Sprint_P(true, true, true, PSTR("* [MON] Not enough readable data in R line: ->%s<-"), readBuffer + 1);
+              Sprint_P(true, true, true, PSTR("* [MON] Not enough readable data in R line: ->%s<-"), readBuffer + 1); // TODO
               if (ESP_serial_input_Errors_Data_Short < 0xFF) ESP_serial_input_Errors_Data_Short++;
             }
-          } else if ((readBuffer[0] == 'C') || (readBuffer[0] == 'c')) {
+          } else if ((readBuffer[0] == 'C') || (readBuffer[0] == 'c')) { // TODO
             // timing info
             if (outputMode & 0x1000) {
-              client_publish_mqtt(mqttHexdata, readBuffer);
-              client_publish_telnet(mqttHexdata, readBuffer);
+              client_publish_mqtt(mqttHexdata, readBuffer); // TODO
+              client_publish_telnet(mqttHexdata, readBuffer); // TODO
             }
-          } else if (readBuffer[0] == 'E') {
+          } else if (readBuffer[0] == 'E') { // TODO
             // data with errors
-            readBuffer[0] = '*'; // backwards output report compatibility
-            Sprint_P(true, true, true, PSTR("* [MON]%s"), readBuffer + 1);
-            if (outputMode & 0x2000) client_publish_mqtt(mqttHexdata, readBuffer);
-          } else if (readBuffer[0] == '*') {
-            Sprint_P(true, true, true, PSTR("* [MON]%s"), readBuffer + 1);
+            readBuffer[0] = '*'; // backwards output report compatibility // TODO
+            Sprint_P(true, true, true, PSTR("* [MON]%s"), readBuffer + 1); // TODO
+            if (outputMode & 0x2000) client_publish_mqtt(mqttHexdata, readBuffer); // TODO
+          } else if (readBuffer[0] == '*') { // TODO
+            Sprint_P(true, true, true, PSTR("* [MON]%s"), readBuffer + 1); // TODO
           } else {
-            Sprint_P(true, true, true, PSTR("* [MON]:%s"), readBuffer);
+            Sprint_P(true, true, true, PSTR("* [MON]:%s"), readBuffer); // TODO
             if (ESP_serial_input_Errors_Data_Short < 0xFF) ESP_serial_input_Errors_Data_Short++;
           }
         }
       } else {
-        //  (c != '\n' ||  serial_rb == RB)
+        //  (c != '\n' ||  serial_rb == RB) // TODO
         char lst = *(rb_buffer - 1);
         *(rb_buffer - 1) = '\0';
         if (c != '\n') {
-          Sprint_P(true, true, true, PSTR("* [MON] Line from ATmega too long, ignored, ignoring remainder: ->%s<-->%c<-->%c<-"), readBuffer, lst, c);
+          Sprint_P(true, true, true, PSTR("* [MON] Line from ATmega too long, ignored, ignoring remainder: ->%s<-->%c<-->%c<-"), readBuffer, lst, c); // TODO
           ignoreremainder = 1;
         } else {
-          Sprint_P(true, true, true, PSTR("* [MON] Line from ATmega too long, terminated, ignored: ->%s<-->%c<-"), readBuffer, lst);
+          Sprint_P(true, true, true, PSTR("* [MON] Line from ATmega too long, terminated, ignored: ->%s<-->%c<-"), readBuffer, lst); // TODO
           ignoreremainder = 0;
         }
       }
-      rb_buffer = readBuffer;
-      serial_rb = 0;
+      rb_buffer = readBuffer; // TODO
+      serial_rb = 0; // TODO
     } else {
       // wait for more serial input
     }

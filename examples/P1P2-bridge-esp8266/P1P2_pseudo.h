@@ -15,6 +15,7 @@
     case 0x0C : return 0;
     case 0x09 :                                                            CAT_PSEUDO2;
     case 0x0D :                                                            CAT_PSEUDO;
+                haConfig = 0;
                 switch (packetSrc) {
 //#define ADC_AVG_SHIFT 4     // P1P2Serial sums 16 = 2^ADC_AVG_SHIFT samples before doing min/max check
 //#define ADC_CNT_SHIFT 4     // P1P2Serial sums 16384 = 2^(16-ADC_CNT_SHIFT) samples to V0avg/V1avg
@@ -27,13 +28,13 @@
 // threshold 128 (*256)= 0.16V
         case    3 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_diff"); VALUE_F_L_thr((FN_u16_LE(&payload[payloadIndex - 0]) -
                                                                          FN_u16_LE(&payload[payloadIndex - 2])) * (20.9 / 1023 / (1 << ADC_AVG_SHIFT)), 2, HYSTERESIS_TYPE_U16, 128); };
-        case    7 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_avg"); VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 32768); };
+        case    7 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_avg"); HAPCONFIG; VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 32768); };
 //      case    9 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 34k3/10k resistor divider, 1.1V range
 //      case   11 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
 // threshold 200 (*256) = 0.04V
         case   11 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_diff"); VALUE_F_L_thr((FN_u16_LE(&payload[payloadIndex - 0]) -
                                                                          FN_u16_LE(&payload[payloadIndex - 2])) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2, HYSTERESIS_TYPE_U16, 200); };
-        case   15 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_avg"); VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 51200); };
+        case   15 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_avg"); HAPCONFIG; VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 51200); };
         default   : return 0;
       }
       case 0x40 : switch (payloadIndex) {
@@ -51,6 +52,7 @@
     }
     case 0x0A :                                                            CAT_PSEUDO2;
     case 0x0E :                                                            CAT_PSEUDO;
+                haConfig = 0;
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    3 : KEY("ATmega_Uptime");                                  HAPCONFIG; HASECONDS;         maxOutputFilter = 2;                    VALUE_u32_LE_uptime;
@@ -79,6 +81,7 @@
     }
     case 0x0B :                                                            CAT_PSEUDO2;
     case 0x0F :                                                            CAT_PSEUDO;
+                haConfig = 0;
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    0 : KEY("Compile_Options_ATmega");                                                                                               VALUE_u8hex;

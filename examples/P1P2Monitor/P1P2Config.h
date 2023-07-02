@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20230702 v0.9.40 increase Hitachi buffer size
  * 20230611 v0.9.39 do init Daikin fields in H-link2 version too
  * 20230611 v0.9.38 H-link2 branch merged into main branch
  * 20230604 v0.9.37 support for ATmega serial enable/disable via PD4, required for P1P2MQTT bridge v1.2
@@ -41,6 +42,7 @@
 //#define E_SERIES // for Daikin E* heat pumps
 //#define F_SERIES // for Daikin F* VRV systems, defining this enables "L5" and a reply to (only) 00F030; for experimenting with particular models and "L1" mode, uncomment line for your model:
 //#define H_SERIES // for H-link2 systems
+//#define T_SERIES // for Toshiba systems
 //#define FDY
 //#define FDYQ
 //#define FXMQ
@@ -49,6 +51,10 @@
 #define EF_SERIES
 #define MONITORCONTROL   // enables P1P2 bus writing (as auxiliary controller and/or for requesting counters)
 #endif /* (defined E_SERIES || defined F_SERIES) */
+
+#if (defined T_SERIES || defined H_SERIES)
+#define TH_SERIES
+#endif /* (defined T_SERIES || defined H_SERIES) */
 
 #if F_CPU > 8000000L
 // Assume Arduino Uno (or Mega) hardware; use 115200 Baud for USB or 250000 Baud for combi-board
@@ -65,7 +71,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "* P1P2Monitor-v0.9.39"
+#define WELCOMESTRING "* P1P2Monitor-v0.9.40"
 
 #define INIT_VERBOSE 3
 // Set verbosity level
@@ -137,7 +143,7 @@
 #define RB_SIZE 33
 #endif /* EF_SERIES */
 
-#ifdef H_SERIES
+#ifdef TH_SERIES
 // serial read buffer size for reading from serial port, max line length on serial input is 150 (2 characters per byte, plus some)
 #define RS_SIZE 150
 // read/write buffer size for writing to P1P2bus, max packet size is 64
@@ -155,7 +161,7 @@
 #ifdef EF_SERIES
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
 #else /* EF_SERIES */
-#define CRC_GEN 0x00    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
+#define CRC_GEN 0x00    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid; no CRC for Hitachi/Toshiba
 #endif /* EF_SERIES */
 #define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is checked when reading or added when writing
 

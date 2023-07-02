@@ -140,7 +140,7 @@ const byte Compile_Options = 0 // multi-line statement
 #ifdef F_SERIES
 +0x40
 #endif
-#ifdef H_SERIES
+#ifdef TH_SERIES // TODO make Compile_Options 16-bit
 +0x80
 #endif
 ;
@@ -270,6 +270,9 @@ void printWelcomeString(void) {
 #ifdef H_SERIES
   Serial.print(F(" H-series"));
 #endif /* H_SERIES */
+#ifdef T_SERIES
+  Serial.print(F(" T-series"));
+#endif /* T_SERIES */
   Serial.println();
   Serial.print(F("* Reset cause: MCUSR="));
   Serial.print(save_MCUSR);
@@ -796,7 +799,7 @@ void loop() {
                       scope_budget = 200; // TODO document implicit reset of budget
                       break;
 #endif
-#ifndef H_SERIES
+#ifndef TH_SERIES
             case 'x':
             case 'X': if (verbose) Serial_print(F("* Echo "));
                       if (scanint(RSp, temp) == 1) {
@@ -808,7 +811,7 @@ void loop() {
                       }
                       Serial_println(echo);
                       break;
-#else /* H_SERIES */
+#else /* TH_SERIES */
             case 'x':
             case 'X': if (verbose) Serial_print(F("* Allow (bits pause) "));
                       if (scanint(RSp, temp) == 1) {
@@ -820,7 +823,7 @@ void loop() {
                       }
                       Serial_println(allow);
                       break;
-#endif /* H_SERIES */
+#endif /* TH_SERIES */
             case 'w':
             case 'W':
 #ifdef EF_SERIES
@@ -1919,8 +1922,12 @@ void loop() {
 
       // 3nd-12th characters show length of bus pause (max "R T 65.535: ")
       Serial_print(F("T "));
-      if (delta < 10000) Serial_print(F(" "));
-      if (delta < 1000) Serial_print('0'); else { Serial_print(delta / 1000); delta %= 1000; };
+      if (delta < 10000) Serial_print(' ');
+      if (delta < 1000) {
+        Serial_print('0');
+      } else {
+        Serial_print(delta / 1000); delta %= 1000;
+      };
       Serial_print(F("."));
       if (delta < 100) Serial_print('0');
       if (delta < 10) Serial_print('0');
@@ -1929,6 +1936,8 @@ void loop() {
 #ifndef H_SERIES
     }
     if ((verbose < 4) || readError) {
+#else
+      byte cs = 0;
 #endif /* H_SERIES */
       for (int i = 0; i < nread; i++) {
         if (verbose && (EB[i] & ERROR_SB)) {
@@ -1981,12 +1990,23 @@ void loop() {
           // buffer overrun detected (overrun is after, not before, the read byte)
           Serial_print(F(":OR-"));
         }
+#ifdef H_SERIES
+        if (i) cs ^= c;
+#endif
         if (verbose && (EB[i] & ERROR_CRC)) {
           // CRC error detected in readpacket
           Serial_print(F(" CRC error"));
         }
       }
-
+#ifdef H_SERIES
+      Serial_print(F(" CS1=")); // checksum starting at byte 1 (which is usually 0)
+      if (cs < 0x10) Serial_print(F("0"));
+      Serial_print(cs, HEX);
+      cs ^= RB[1];
+      Serial_print(F(" CS2=")); // checksum starting at byte 2
+      if (cs < 0x10) Serial_print(F("0"));
+      Serial_print(cs, HEX);
+#endif
       if (readError
 #ifdef H_SERIES
                     & 0xBB
@@ -2008,8 +2028,13 @@ void loop() {
       if ((verbose & 0x01) == 1)  {
         // 3nd-12th characters show length of bus pause (max "R T 65.535: ")
         Serial_print(F("T "));
-        if (delta < 10000) Serial_print(F(" "));
-        if (delta < 1000) Serial_print(F("0")); else { Serial_print(delta / 1000); delta %= 1000; };
+        if (delta < 10000) Serial_print(' ');
+        if (delta < 1000) {
+          Serial_print(F("0"));
+        } else {
+          Serial_print(delta / 1000);
+          delta %= 1000;
+        };
         Serial_print(F("."));
         if (delta < 100) Serial_print(F("0"));
         if (delta < 10) Serial_print(F("0"));
@@ -2027,6 +2052,7 @@ void loop() {
         }
         Serial_println();
       }
+
     }
 #endif /* H_SERIES */
 

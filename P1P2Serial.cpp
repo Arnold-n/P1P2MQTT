@@ -1091,7 +1091,7 @@ ISR(CAPTURE_INTERRUPT)
                     delta_buffer[head] = startbit_delta; // time from previous byte
                     error_buffer[head] = firstbyteUncertainty;
                     if (firstbyteUncertainty) error_buffer[head] |= ERROR_PE; // signal "should not happen"
-                    DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
+                    // DIGITAL_WRITE_LED_ERROR(rx_paritycheck); // Suppress PE error detection to set LED_ERROR as some PE errors are to be expected
                     rx_buffer_head2 = head;
                   } else {
                     // signal buffer overrun for *previous* byte
@@ -1177,7 +1177,11 @@ ISR(COMPARE_R_INTERRUPT)
                   rx_state = 11;
                   rx_target += Rticks_per_bit; // this could be reduced to +semibit if needed timingwise
                   SET_COMPARE_R(rx_target);
+#ifdef H_SERIES
                   DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
+#else /* H_SERIES */
+                  // DIGITAL_WRITE_LED_ERROR(rx_paritycheck); // Suppress PE error detection to set LED_ERROR as some PE errors are to be expected
+#endif /* H_SERIES */
                   break;
     case 11     : // state = 11: we are in stop bit; where W should not be hampered by our lengthy activity of finishing up
                   // For H-link2, this can still be 1 parity bit for 12-bit pattern
@@ -1224,7 +1228,11 @@ ISR(COMPARE_R_INTERRUPT)
                       error_buffer[head] |= ERROR_PE;
                       SW_SCOPE_LOG_ERROR(capture, SWS_EVENT_ERR_PE);
                     }
+#ifdef H_SERIES
                     DIGITAL_WRITE_LED_ERROR(rx_paritycheck);
+#else /* H_SERIES */
+                    // DIGITAL_WRITE_LED_ERROR(rx_paritycheck); // Suppress PE error detection to set LED_ERROR as some PE errors are to be expected
+#endif /* H_SERIES */
                     rx_buffer_head2 = head;
                   } else {
                     // signal buffer overrun for *previous* byte

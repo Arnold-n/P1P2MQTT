@@ -86,12 +86,12 @@ byte maxOutputFilter = 0;
 
 #ifdef SAVEPACKETS
 #define PCKTP_START  0x08 // 0x08-0x11, 0x18 mapped to 0x12, 0x20 mapped to 0x13, 0x30-3F mapped to 0x14-0x23, 0x80 mapped to 0x24, 0xA3 mapped to 0x25 // 0x37 zone name/0xC1 service mode subtype would require special coding, leave it out for now
-#define PCKTP_ARR_SZ 30
+#define PCKTP_ARR_SZ 31
 //byte packetsrc                                      = { {00                                                                                               }, {40                                                                                               }}
-//byte packettype                                     = { {08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80,  A3 }, { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80,  A3 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  20,  20,  20,   0,  20,  20,  20,  20,  10,   7,   1,  20,   0,   0,   0,   0,   0,   0,   0,  20,  12,  11,  20,  12,   0,   0,   0,  10,   0 }, {  0,  20,  20,  20,   0,  20,  20,  20,  20,  12,   0,  20,   0,   0,   0,   0,   0,   0,   0,   0,  20,   4,   7,  19,   2,   0,   0,   0,  10,  19 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 150, 157, 158, 178, 178, 178, 178, 178, 178, 178, 178, 198, 210, 221, 241, 253, 253, 253, 253, 263 }, {263, 263, 283, 303, 323, 323, 343, 363, 383, 403, 415, 415, 435, 435, 435, 435, 435, 435, 435, 435, 435, 455, 459, 466, 485, 487, 487, 487, 487, 497 /*, sizeValSeen = 516 */ }};
-#define sizeValSeen 516
+//byte packettype                                     = { {08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  1F,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80,  A3 }, { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  18,  1F,  20,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80,  A3 }}
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  20,  20,  20,   0,  20,  20,  20,  20,  10,   7,   0,   1,  20,   0,   0,   0,   0,   0,   0,   0,  20,  12,  11,  20,  12,   0,   0,   0,  10,   0 }, {  0,  20,  20,  20,   0,  20,  20,  20,  20,  12,   0,  19,  20,   0,   0,   0,   0,   0,   0,   0,   0,  20,   4,   7,  19,   2,   0,   0,   0,  10,  19 }};
+const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 150, 157, 157, 158, 178, 178, 178, 178, 178, 178, 178, 178, 198, 210, 221, 241, 253, 253, 253, 253, 263 }, {263, 263, 283, 303, 323, 323, 343, 363, 383, 403, 415, 415, 434, 454, 454, 454, 454, 454, 454, 454, 454, 454, 474, 478, 485, 504, 506, 506, 506, 506, 516 /*, sizeValSeen = 535 */ }};
+#define sizeValSeen 535
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #endif /* SAVEPACKETS */
@@ -134,10 +134,11 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
   switch (packetType) {
     case 0x08 ... 0x11 : pti = packetType - PCKTP_START; break;        // 0 .. 9
     case          0x18 : pti = 0x12 - PCKTP_START; break;              // 10
-    case          0x20 : pti = 0x13 - PCKTP_START; break;              // 11
-    case 0x30 ... 0x3F : pti = packetType - 36; break;                 // 12 .. 27
-    case          0x80 : pti = 28; break;                              // 28
-    case          0xA3 : pti = 29; break;                              // 29
+    case          0x1F : pti = 0x13 - PCKTP_START; break;              // 10
+    case          0x20 : pti = 0x14 - PCKTP_START; break;              // 11
+    case 0x30 ... 0x3F : pti = packetType - 35; break;                 // 12 .. 27
+    case          0x80 : pti = 29; break;                              // 28
+    case          0xA3 : pti = 30; break;                              // 29
     default            : /* pti = 0xFF;*/ newByte = 1; break;          // or newByte = 0;?
   }
   if (payloadIndex == EMPTY_PAYLOAD) {
@@ -361,6 +362,18 @@ uint8_t value_trg(byte packetSrc, byte packetType, byte payloadIndex, byte* payl
 
 // 16 bit fixed point reals
 
+float FN_f8_8_BE(uint8_t *b)          { return                    (((int8_t) b[0]) + (b[-1] * 1.0 / 256)); }
+
+uint8_t value_f8_8_BE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 2, 1 /* , HYSTERESIS_TYPE_F8_8_BE, HYSTERESIS_SIZE_F8_8_BE TODO ?? */ )) return 0;
+#ifdef __AVR__
+  dtostrf(FN_f8_8_BE(&payload[payloadIndex]), 1, 1, mqtt_value);
+#else
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", FN_f8_8_BE(&payload[payloadIndex]));
+#endif
+  return 1;
+}
+
 float FN_f8_8(uint8_t *b)            { return                    (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
 float FN_s_f8_8(uint8_t *b)          { return (b[-2] ? -1 : 1) * (((int8_t) b[-1]) + (b[0] * 1.0 / 256)); }
 
@@ -428,6 +441,7 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 // VALUE_u8_add2k:      for 1-byte value (2000+payload[i]) (for year value)
 // VALUE_s4abs1c:        for 1-byte value -10..10 where bit 4 is sign and bit 0..3 is value
 // VALUE_f8_8           for 2-byte float in f8_8 format (see protocol description)
+// VALUE_f8_8_BE        for 2-byte float in f8_8 format (see protocol description) BE
 // VALUE_s_f8_8         for 2-byte float in f8_8 format (see protocol description) with leading sign (0x40=negative)
 // VALUE_f8s8           for 2-byte float in f8s8 format (see protocol description)
 // VALUE_u16div10       for 2-byte integer to be divided by 10 (used for flow in 0.1m/s)
@@ -458,6 +472,7 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 #define VALUE_u16div10_LE_changed(ch)  { ch = value_u16div10_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); return ch; }
 
 #define VALUE_f8_8              { return        value_f8_8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
+#define VALUE_f8_8_BE           { return        value_f8_8_BE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_s_f8_8              { return      value_s_f8_8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_f8_8_changed(ch)  { ch = value_f8_8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); return ch; }
 
@@ -624,6 +639,23 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    3 : KEY("Unknown_800018_3");                               HACONFIG;                                                             VALUE_u8;
         case    4 : KEY("Unknown_800018_4");                               HACONFIG;                                                             VALUE_u8;
         case    5 : KEY("Unknown_800018_5");                               HACONFIG;                                                             VALUE_u8;
+        default   : UNKNOWN_BYTE;
+      }
+      default   :               UNKNOWN_BYTE;
+    }
+    case 0x1F :
+                switch (packetSrc) {
+      case 0x40 : switch (payloadIndex) {
+        case    0 : KEY("Unknown_40001F_0_percQ");                         HACONFIG;                                                             VALUE_u8;
+        case    1 : return 0;
+        case    2 : KEY("Unknown_40001F_1-2_Temp1Q");                      HACONFIG;                                                             VALUE_f8_8_BE;
+        case    3 : return 0;
+        case    4 : KEY("Unknown_40001F_3-4_Temp2Q");                      HACONFIG;                                                             VALUE_f8_8_BE;
+        case    5 : KEY("Unknown_40001F_5_Temp3Q");                        HACONFIG;                                                             VALUE_u8;
+        case    6 : KEY("Unknown_40001F_6_sameas_5");                      HACONFIG;                                                             VALUE_u8;
+        case    7 : KEY("Unknown_40001F_7_CounterQ");                      HACONFIG;                                                             VALUE_u8;
+        case   11 : KEY("Unknown_00001F_11_Temp4Q");                       HACONFIG;                                                             VALUE_u8;
+        case   13 : KEY("Unknown_00001F_13_Temp5Q");                       HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       default   :               UNKNOWN_BYTE;

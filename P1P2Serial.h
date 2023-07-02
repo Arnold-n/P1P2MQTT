@@ -94,8 +94,11 @@
 
 #ifdef H_SERIES
 // H-link uses larger packets
-#define TX_BUFFER_SIZE 65  // write buffer size (1 more than max size needed)
-#define RX_BUFFER_SIZE 65  // read buffer (1 more than max size needed), should be <=254
+//#define TX_BUFFER_SIZE 65  // write buffer size (1 more than max size needed)
+//#define RX_BUFFER_SIZE 65  // read buffer (1 more than max size needed), should be <=254
+// increase RX_BUFFER_SIZE for two packets xx0029 without pause in between
+#define TX_BUFFER_SIZE 85  // write buffer size (1 more than max size needed)
+#define RX_BUFFER_SIZE 85  // read buffer (1 more than max size needed), should be <=254
 #else /* H_SERIES */
 #define TX_BUFFER_SIZE 25  // write buffer size (1 more than max size needed)
 #define RX_BUFFER_SIZE 25  // read buffer (1 more than max size needed), should be <=254

@@ -75,18 +75,54 @@
 byte maxOutputFilter = 0;
 
 #ifdef SAVEPACKETS
-#define PCKTP_START  0x08
-#define PCKTP_END    0x0F // 0x0D-0x15 and 0x31 mapped to 0x16
-#define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 6)
+
+// for Hitachi, use 1-dimensional arry nr_bytes[]
+// 0 .. 7 for pseudo packets 000008 - 00000F
+// 8 .. F for pseudo packets 400008 - 40000F
+// 
+// Hitachi type 1 
+// 10 21 00 0B
+// 11 21 00 12
+// 12 89 00 27
+// 13 89 00 2D
+// 14 41 00 18
+//    89 06
+//    21 06
+//    41 06
 //
-// packetType is actually packetLength for H-link, making this code ugly
+// Hitachi type 2 
+// 15 21 00 29 xx xx xx xx F1
+// 16 21 00 29 xx xx xx xx F2
+// 17 21 00 29 xx xx xx xx F3
+// 18 21 00 29 xx xx xx xx F4
+// 19 21 00 29 xx xx xx xx F5
+// 1A 89 00 17 xx xx xx xx E1
+// 1B 89 00 29 xx xx xx xx E2
+// 1C 89 00 29 xx xx xx xx E3
+// 1D 89 00 29 xx xx xx xx E4
+// 1E 89 00 29 xx xx xx xx E5
+// 
+// Hitachi type 3
 //
-//
-//byte packetsrc                                      = { {00                                (other-sources -> 00) }, {  40                                                                       }}
-//byte packettype                                     = { {08, 09, 0A, 0B,  0C,  0D, 0E, 0F, 0B, 12,  18,  27,  2D }, {  08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  0B,  12,  18,  27,  2D }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,  20, 20, 20,  8, 15,  21,  36,  42 }, {   0,  20,  20,  20,   0,  20,  20,  20,   0,   0,   0,   0,   0 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,   0, 20, 40, 60, 68,  83, 104, 140 }, { 182, 182, 202, 222, 242, 242, 262, 282, 302, 302, 302, 302, 302 /* , sizeValSeen=302 */ }};
-#define sizeValSeen 302
+// 15 21 00 29 xx xx xx xx F1
+// 16 21 00 29 xx xx xx xx F2
+// 17 21 00 29 xx xx xx xx F3
+// 18 21 00 29 xx xx xx xx F4
+// 19 21 00 29 xx xx xx xx F5 (not observed)
+// 1A 89 00 17 xx xx xx xx E1
+// 1B 89 00 29 xx xx xx xx E2
+// 1C 89 00 29 xx xx xx xx E3
+// 1D 89 00 29 xx xx xx xx E4
+// 1E 89 00 29 xx xx xx xx E5 (not observed)
+// 1F 41 00 29 xx xx xx xx E1
+// 20 8A 00 29 xx xx xx xx F1
+
+
+#define NR_BYTES_SZ 0x21
+//byte pti                                      =   0..F for pseudo                                                                  10-14                            15-1E                                             1F-20
+const PROGMEM uint32_t nr_bytes[NR_BYTES_SZ]  = {  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,      7,  14,  20,  35,  41,         37,  37,  37,  37,  37,  19,  37,  37,  37,  37,  37,  37 };
+const PROGMEM uint32_t bytestart[NR_BYTES_SZ] = {   0,  20,  40,  60,  80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300,    320, 327, 341, 361, 396,/*rst*/ 320, 357, 394, 431, 468, 505, 524, 561, 598, 635, 672, 709 /* , 746 */ };
+#define sizeValSeen 746
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #endif /* SAVEPACKETS */
@@ -123,34 +159,39 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
 #ifdef SAVEPACKETS
   bool newByte = (outputFilter == 0);
 
-  byte pts;
-  switch (packetSrc) {
-    // HLINK packets
-    case 0x00 : pts = 0x00; break;
-    case 0x40 : pts = 0x01; break;
-    case 0x89 : pts = 0x00; break;
-    case 0x21 : pts = 0x00; break;
-    case 0x41 : pts = 0x00; break;
-    default   : pts = 0x00; break;
-  }
-
   byte pti;
   switch (packetType) {
-    // HLINK packets
-    case 0x0C ... 0x0F : pti = packetType - PCKTP_START; break; // fails for 0x08 .. 0x0B (ESP01 copy), OK for now
-    case 0x0B : pti = 0x08; break;
-    case 0x12 : pti = 0x09; break;
-    case 0x18 : pti = 0x0A; break;
-    case 0x27 : pti = 0x0B; break;
-    case 0x2D : pti = 0x0C; break;
-    default   : pti = 0xFF; break;
+    // pseudo packets
+    case 0x08 ... 0x0F : pti = packetType - (packetSrc ? 0 : 8); break;
+    default: pti = 0xFF; break;
   }
+  byte payload7 = (packetType > 7) ? payload[4] : 0;
+  switch ((packetSrc << 8) | packetType) {
+    // HLINK packets jetblack
+    case 0x210B : pti = 0x10; break;
+    case 0x2112 : pti = 0x11; break;
+    case 0x4118 : pti = 0x12; break;
+    case 0x8927 : pti = 0x13; break;
+    case 0x892D : pti = 0x14; break;
+    // new in v0.9.39
+    case 0x2129 : pti = ((payload7 < 0xF1) || (payload7 > 0xF5)) ? 0xFF : 0x15 + (payload7 - 0xF1); break;
+    case 0x8917 : /* fall-through */
+    case 0x8929 : pti = ((payload7 < 0xE1) || (payload7 > 0xE5)) ? 0xFF : 0x15 + (payload7 - 0xE1); break;
+    // new in v0.9.39a
+    case 0x4129 : pti = 0x1F; break;
+    case 0x8A29 : pti = 0x20; break;
+    default     : break;
+  }
+
+
+  // Sprint_P(true, true, true, PSTR(" newpayloadbytesval pti=0x%02X packetSrc=0x%02X packetType=0x%02X payload7=0x%02X"), pti, packetSrc, packetType, payload7);
+
 
   if (pti == 0xFF) {
     newByte = 1;
-  } else if (payloadIndex > nr_bytes[pts][pti]) {
+  } else if (payloadIndex > nr_bytes[pti]) {
     // Warning: payloadIndex > expected
-    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
+    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pti], packetSrc, packetType);
     newByte = true;
   } else if (payloadIndex + 1 < length) {
     // Warning: payloadIndex + 1 < length
@@ -159,7 +200,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
   } else {
     bool pubHA = false;
     bool skipHysteresis = false;
-    uint16_t pi2base = bytestart[pts][pti];
+    uint16_t pi2base = bytestart[pti];
     if (applyHysteresisType && (pi2base < sizeValSeen) && payloadByteSeen[pi2base + payloadIndex - 1] && payloadByteSeen[pi2base + payloadIndex]) {
       if (applyHysteresisType == HYSTERESIS_TYPE_F8_8) {
         int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 256 + payloadByteVal[pi2base + payloadIndex];
@@ -238,42 +279,41 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
 // returns whether bit bitNr of byte payload[payloadIndex] has a new value (also returns true if byte has not been saved)
 #ifdef SAVEPACKETS
   bool newBit = (outputFilter == 0);
-
-  byte pts;
-  switch (packetSrc) {
-    // HLINK packets
-    case 0x00 : pts = 0x00; break;
-    case 0x40 : pts = 0x01; break;
-    case 0x89 : pts = 0x00; break;
-    case 0x21 : pts = 0x00; break;
-    case 0x41 : pts = 0x00; break;
-    default   : pts = 0x00; break;
-  }
-
   byte pti;
   switch (packetType) {
-    // HLINK packets
-    case 0x0C ... 0x0F : pti = packetType - PCKTP_START; break; // fails for 0x08 .. 0x0B (ESP01 copy), OK for now
-    case 0x0B : pti = 0x08; break;
-    case 0x12 : pti = 0x09; break;
-    case 0x18 : pti = 0x0A; break;
-    case 0x27 : pti = 0x0B; break;
-    case 0x2D : pti = 0x0C; break;
-    default   : pti = 0xFF; break;
+    // pseudo packets
+    case 0x08 ... 0x0F : pti = packetType - (packetSrc ? 0 : 8); break;
+    default: pti = 0xFF; break;
   }
-
+  byte payload7 = (payload[2] > 7) ? payload[7] : 0;
+  switch ((packetSrc << 8) | packetType) {
+    // HLINK packets jetblack
+    case 0x210B : pti = 0x10; break;
+    case 0x2112 : pti = 0x11; break;
+    case 0x4118 : pti = 0x12; break;
+    case 0x8927 : pti = 0x13; break;
+    case 0x892D : pti = 0x14; break;
+    // new in v0.9.39
+    case 0x2129 : pti = ((payload7 < 0xF1) || (payload7 > 0xF5)) ? 0xFF : 0x15 + (payload7 - 0xF1); break;
+    case 0x8917 : /* fall-through */
+    case 0x8929 : pti = ((payload7 < 0xE1) || (payload7 > 0xE5)) ? 0xFF : 0x15 + (payload7 - 0xE1); break;
+    // new in v0.9.39a
+    case 0x4129 : pti = 0x1F; break;
+    case 0x8A29 : pti = 0x20; break;
+    default     : break;
+  }
   if (bitNr > 7) {
     // Warning: bitNr > 7
     newBit = true;
   } else if (pti == 0xFF) {
     newBit = true;
-  } else if (payloadIndex > nr_bytes[pts][pti]) {
+  } else if (payloadIndex > nr_bytes[pti]) {
     // Warning: payloadIndex > expected
-    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
+    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pti], packetSrc, packetType);
     newBit = true;
   } else {
     bool pubHA = false;
-    uint16_t pi2 = bytestart[pts][pti] + payloadIndex; // no multiplication, bit-wise only for u8 type
+    uint16_t pi2 = bytestart[pti] + payloadIndex; // no multiplication, bit-wise only for u8 type
     if (pi2 >= sizeValSeen) {
       pi2 = 0;
       Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
@@ -607,6 +647,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
   switch (packetSrc) {
     case 0x21 : src = 2; break; // indoor unit info
     case 0x89 : src = 8; break; // IU and OU system info
+    case 0x8A : src = 7; break; // ?
     case 0x41 : src = 4; break; // sender is Hitachi remote control or Airzone
     case 0x00 : src = 0; break; // pseudopacket, ATmega
     case 0x40 : src = 1; break; // pseudopacket, ESP
@@ -621,577 +662,304 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
   // Remote control : PC-ARFP1E
   // year of fabrication : 2017
   // Airzone system easyzone with Hitachi RPI interface generation 2 (to be checked)
-
+  //
+  //
   HACONFIG;
-  switch (packetSrc)
-  {
-
-  // 0x89 : sender is certainly the indoor unit providing data from the system
-  //        including data from the outdoor unit
-  case 0x89:
-    switch (packetType)
-    {
-    case 0x2D: // type 1 of message, the most interesting
-      CAT_MEASUREMENT;
-      switch (payloadIndex)
-      {
-      // case 0x06 : KEY("Unknown-892D--06");                                      VALUE_s8; // useless
-      case 0x07:
-        KEY("IUAirInletTemperature");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_s8;
-      case 0x08:
-        KEY("IUAirOutletTemperature");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_s8;
-      case 0x09:
-        KEY("IULiquidPipeTemperature");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_s8;
-      case 0x0A:
-        KEY("IURemoteSensorAirTemperature");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_s8;
-      case 0x0B:
-        KEY("OutdoorAirTemperature");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_s8;
-      case 0x0C:
-        KEY("IUGasPipeTemperature");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_s8;
-      case 0x0D:
-        KEY("OUHeatExchangerTemperature1");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_s8;
-      case 0x0E:
-        KEY("OUHeatExchangerTemperature2");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_s8;
-      case 0x0F:
-        KEY("CompressorTemperature");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_s8;
-      case 0x10:
-        KEY("HighPressure");
-        CAT_MEASUREMENT;
-        VALUE_u8;
-      case 0x11:
-        KEY("LowPressure_x10");
-        CAT_MEASUREMENT;
-        VALUE_u8;
-      case 0x12:
-        KEY("TargetCompressorFrequency");
-        CAT_MEASUREMENT;
-        HAFREQ;
-        VALUE_u8;
-      case 0x13:
-        KEY("CompressorFrequency");
-        CAT_MEASUREMENT;
-        HAFREQ;
-        VALUE_u8;
-      case 0x14:
-        KEY("IUExpansionValve");
-        CAT_MEASUREMENT;
-        HAPERCENT;
-        VALUE_u8;
-      case 0x15:
-        KEY("OUExpansionValve");
-        CAT_MEASUREMENT;
-        HAPERCENT;
-        VALUE_u8;
-      // case 0x16 : KEY("Unknown-892D--16");                                        VALUE_u8; // useless
-      // case 0x17 : KEY("Unknown-892D--17");                                        VALUE_u8; // useless
-      case 0x18:
-        KEY("CompressorCurrent");
-        CAT_MEASUREMENT;
-        HACURRENT;
-        VALUE_u8; // ?
-        // case 0x19 : KEY("Unknown-892D--19");                                        VALUE_u8; // useless
-        // case 0x1A : KEY("Unknown-892D--1A");                                        VALUE_u8; // useless
-        // case 0x1B : KEY("Unknown-892D--1B");                                        VALUE_u8; // useless
-        // case 0x1C : KEY("Unknown-892D--1C");                                        VALUE_u8; // useless
-        // case 0x1D : KEY("Unknown-892D--1D");                                        VALUE_u8; // useless
-        // case 0x1E : KEY("Unknown-892D--1E");                                        VALUE_u8; // useless
-        // case 0x1F : KEY("Unknown-892D--1F");                                        VALUE_u8; // useless
-        // case 0x20 : KEY("Unknown-892D--20");                                        VALUE_u8; // useless
-
-      case 0x21:
-        switch (bitNr)
-        {
-        case 8:
-          BITBASIS;
-        case 0:
-          KEY("892D-21-0");
-          VALUE_flag8;
-        case 1:
-          KEY("892D-21-1-OUnitOn");
-          VALUE_flag8;
-        case 2:
-          KEY("892D-21-2");
-          VALUE_flag8;
-        case 3:
-          KEY("892D-21-3-CompressorOn");
-          VALUE_flag8;
-        case 4:
-          KEY("892D-21-4");
-          VALUE_flag8;
-        case 5:
-          KEY("892D-21-5");
-          VALUE_flag8;
-        case 6:
-          KEY("892D-21-6");
-          VALUE_flag8;
-        case 7:
-          KEY("892D-21-7-OUStarting");
-          VALUE_flag8;
-        default:
-          UNKNOWN_BIT;
+  switch (packetSrc) {
+    // 0x89 : sender is certainly the indoor unit providing data from the system
+    //        including data from the outdoor unit
+    case 0x89: switch (packetType) {
+      case 0x29: switch (payload[4])  { // payload[4] can be 0xE1..0xE5, currently decode only 0xE2
+        case 0xE2: switch (payloadIndex) {
+          case  6: KEY("OUExpansionValve");                                                           CAT_MEASUREMENT; HAPERCENT;                  VALUE_u8;
+          case  7: KEY("IUExpansionValve");                                                           CAT_MEASUREMENT; HAPERCENT;                  VALUE_u8;
+          case  8: KEY("TargetCompressorFrequency");                                                  CAT_MEASUREMENT; HAFREQ;                     VALUE_u8;
+          case  9: KEY("ControlCircuitRunStop");                                                      CAT_MEASUREMENT;                             VALUE_u8;
+          case 10: KEY("HeatpumpIntensity");                                                          CAT_MEASUREMENT;                             VALUE_u8;
+          case 14: KEY("IUAirInletTemperature");                                                      CAT_TEMP; HATEMP;                            VALUE_s8;
+          case 15: KEY("IUAirOutletTemperature");                                                     CAT_TEMP; HATEMP;                            VALUE_s8;
+          case 20: KEY("OUHeatExchangerTemperatureOutput");                                           CAT_TEMP; HATEMP;                            VALUE_s8;
+          case 21: KEY("IUGasPipeTemperature");                                                       CAT_TEMP; HATEMP;                            VALUE_s8;
+          case 22: KEY("IULiquidPipeTemperature");                                                    CAT_TEMP; HATEMP;                            VALUE_s8;
+          case 23: KEY("OutdoorAirTemperature");                                                      CAT_TEMP; HATEMP;                            VALUE_s8;
+          case 24: KEY("TempQ");                                                                      CAT_TEMP; HATEMP;                            VALUE_s8;
+          case 25: KEY("CompressorTemperature");                                                      CAT_TEMP; HATEMP;                            VALUE_s8;
+          case 26: KEY("TemperatureEvaporator");                                                      CAT_TEMP; HATEMP;                            VALUE_s8;
+          case 29: KEY("TemperatureSetting");                                                         CAT_SETTING; HATEMP;                         VALUE_s8;
+          case 37: return 0; // do not report checksum
+          default  : UNKNOWN_BYTE;
         }
-
-      case 0x22:
-        switch (bitNr)
-        {
-        case 8:
-          BITBASIS;
-        case 0:
-          KEY("892D-22-0");
-          VALUE_flag8;
-        case 1:
-          KEY("892D-22-1");
-          VALUE_flag8;
-        case 2:
-          KEY("892D-22-2");
-          VALUE_flag8;
-        case 3:
-          KEY("892D-22-3");
-          VALUE_flag8;
-        case 4:
-          KEY("892D-22-4");
-          VALUE_flag8;
-        case 5:
-          KEY("892D-22-5");
-          VALUE_flag8;
-        case 6:
-          KEY("892D-22-6");
-          VALUE_flag8;
-        case 7:
-          KEY("892D-22-7");
-          VALUE_flag8;
-        default:
-          UNKNOWN_BIT;
+        default: switch (payloadIndex) {
+          case 37: return 0; // do not report checksum
+          default  : UNKNOWN_BYTE;
         }
-
-        // case 0x23 : KEY("Unknown-892D--23");                                        VALUE_u8; // useless
-        // case 0x24 : KEY("Unknown-892D--24");                                        VALUE_u8; // useless
-        // case 0x25 : KEY("Unknown-892D--25");                                        VALUE_u8; // useless
-        // case 0x26 : KEY("Unknown-892D--26");                                        VALUE_u8; // useless
-        // case 0x27 : KEY("Unknown-892D--27");                                        VALUE_u8; // useless
-        // case 0x28 : KEY("Unknown-892D--28");                                        VALUE_u8; // useless
-
-      case 0x29:
-        return 0; // do not report checksum
-      default:
-        UNKNOWN_BYTE;
       }
-
-    case 0x27: // type 2 of message
-      CAT_MEASUREMENT;
-      switch (payloadIndex)
-      {
-        // case 0x06 : KEY("Unknown-8927--06");                                        VALUE_u8; // useless
-
-      case 0x07: // 8 bit byte : 65 HEAT, 64 HEAT STOP, 33 VENTIL, 67 DEFROST
-        switch (bitNr)
-        {
-        case 8:
-          BITBASIS;
-        case 0:
-          KEY("8927-07-0-OUnitOn");
-          VALUE_flag8;
-        case 1:
-          KEY("8927-07-1-DEFROST");
-          VALUE_flag8;
-        case 2:
-          KEY("8927-07-2");
-          VALUE_flag8;
-        case 3:
-          KEY("8927-07-3");
-          VALUE_flag8;
-        case 4:
-          KEY("8927-07-4");
-          VALUE_flag8;
-        case 5:
-          KEY("8927-07-5-VentilMode");
-          VALUE_flag8;
-        case 6:
-          KEY("8927-07-6-HeatMode");
-          VALUE_flag8;
-        case 7:
-          KEY("8927-07-7");
-          VALUE_flag8;
-        default:
-          UNKNOWN_BIT;
+      // type 1 of message has length 0x2D, the most interesting (jetblack system)
+      case 0x2D:
+                                                                                                    CAT_MEASUREMENT;
+                 switch (payloadIndex) {
+        // case 0x06 : KEY("Unknown-892D--06");                                                                                                                                                                                                 VALUE_s8; // useless
+        case 0x07: KEY("IUAirInletTemperature");                                                    CAT_TEMP; HATEMP;                            VALUE_s8;
+        case 0x08: KEY("IUAirOutletTemperature");                                                   CAT_TEMP; HATEMP;                            VALUE_s8;
+        case 0x09: KEY("IULiquidPipeTemperature");                                                  CAT_TEMP; HATEMP;                            VALUE_s8;
+        case 0x0A: KEY("IURemoteSensorAirTemperature");                                             CAT_TEMP; HATEMP;                            VALUE_s8;
+        case 0x0B: KEY("OutdoorAirTemperature");                                                    CAT_TEMP; HATEMP;                            VALUE_s8;
+        case 0x0C: KEY("IUGasPipeTemperature");                                                     CAT_TEMP; HATEMP;                            VALUE_s8;
+        case 0x0D: KEY("OUHeatExchangerTemperature1");                                              CAT_TEMP; HATEMP;                            VALUE_s8;
+        case 0x0E: KEY("OUHeatExchangerTemperature2");                                              CAT_TEMP; HATEMP;                            VALUE_s8;
+        case 0x0F: KEY("CompressorTemperature");                                                    CAT_TEMP; HATEMP;                            VALUE_s8;
+        case 0x10: KEY("HighPressure");                                                             CAT_MEASUREMENT;                             VALUE_u8;
+        case 0x11: KEY("LowPressure_x10");                                                          CAT_MEASUREMENT;                             VALUE_u8;
+        case 0x12: KEY("TargetCompressorFrequency");                                                CAT_MEASUREMENT; HAFREQ;                     VALUE_u8;
+        case 0x13: KEY("CompressorFrequency");                                                      CAT_MEASUREMENT; HAFREQ;                     VALUE_u8;
+        case 0x14: KEY("IUExpansionValve");                                                         CAT_MEASUREMENT; HAPERCENT;                  VALUE_u8;
+        case 0x15: KEY("OUExpansionValve");                                                         CAT_MEASUREMENT; HAPERCENT;                  VALUE_u8;
+        // case 0x16 : KEY("Unknown-892D--16");                                                                                                  VALUE_u8; // useless
+        // case 0x17 : KEY("Unknown-892D--17");                                                                                                  VALUE_u8; // useless
+        case 0x18: KEY("CompressorCurrent");                                                        CAT_MEASUREMENT; HACURRENT;                  VALUE_u8; // ?
+        // case 0x19 : KEY("Unknown-892D--19");                                                                                                  VALUE_u8; // useless
+        // case 0x1A : KEY("Unknown-892D--1A");                                                                                                  VALUE_u8; // useless
+        // case 0x1B : KEY("Unknown-892D--1B");                                                                                                  VALUE_u8; // useless
+        // case 0x1C : KEY("Unknown-892D--1C");                                                                                                  VALUE_u8; // useless
+        // case 0x1D : KEY("Unknown-892D--1D");                                                                                                  VALUE_u8; // useless
+        // case 0x1E : KEY("Unknown-892D--1E");                                                                                                  VALUE_u8; // useless
+        // case 0x1F : KEY("Unknown-892D--1F");                                                                                                  VALUE_u8; // useless
+        // case 0x20 : KEY("Unknown-892D--20");                                                                                                  VALUE_u8; // useless
+        case 0x21: switch (bitNr) {
+          case 8: BITBASIS;
+          case 0: KEY("892D-21-0");                                                                                                              VALUE_flag8;
+          case 1: KEY("892D-21-1-OUnitOn");                                                                                                      VALUE_flag8;
+          case 2: KEY("892D-21-2");                                                                                                              VALUE_flag8;
+          case 3: KEY("892D-21-3-CompressorOn");                                                                                                 VALUE_flag8;
+          case 4: KEY("892D-21-4");                                                                                                              VALUE_flag8;
+          case 5: KEY("892D-21-5");                                                                                                              VALUE_flag8;
+          case 6: KEY("892D-21-6");                                                                                                              VALUE_flag8;
+          case 7: KEY("892D-21-7-OUStarting");                                                                                                   VALUE_flag8;
+          default: UNKNOWN_BIT;
         }
-
-      case 0x08:
-        switch (bitNr)
-        {
-        case 8:
-          BITBASIS;
-        case 0:
-          KEY("8927-08-0");
-          VALUE_flag8;
-        case 1:
-          KEY("8927-08-1");
-          VALUE_flag8;
-        case 2:
-          KEY("8927-08-2");
-          VALUE_flag8;
-        case 3:
-          KEY("8927-08-3");
-          VALUE_flag8;
-        case 4:
-          KEY("8927-08-4");
-          VALUE_flag8;
-        case 5:
-          KEY("8927-08-5");
-          VALUE_flag8;
-        case 6:
-          KEY("8927-08-6");
-          VALUE_flag8;
-        case 7:
-          KEY("8927-08-7");
-          VALUE_flag8;
-        default:
-          UNKNOWN_BIT;
+        case 0x22: switch (bitNr) {
+          case 8: BITBASIS;
+          case 0: KEY("892D-22-0");                                                                                                              VALUE_flag8;
+          case 1: KEY("892D-22-1");                                                                                                              VALUE_flag8;
+          case 2: KEY("892D-22-2");                                                                                                              VALUE_flag8;
+          case 3: KEY("892D-22-3");                                                                                                              VALUE_flag8;
+          case 4: KEY("892D-22-4");                                                                                                              VALUE_flag8;
+          case 5: KEY("892D-22-5");                                                                                                              VALUE_flag8;
+          case 6: KEY("892D-22-6");                                                                                                              VALUE_flag8;
+          case 7: KEY("892D-22-7");                                                                                                              VALUE_flag8;
+          default: UNKNOWN_BIT;
         }
-
-      case 0x09:
-        KEY("TemperatureSetpoint");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_u8;
-
-        /*      case 0x0A:
-                KEY("8927--0A-clock");
-                VALUE_u8; // 8 bit byte : 129 / 193 each 30s
-        */
-        // case 0x0B : KEY("Unknown-8927--0B");                                        VALUE_u8; // useless
-        // case 0x0C : KEY("Unknown-8927--0C");                                        VALUE_u8; // useless
-        // case 0x0D : KEY("Unknown-8927--0D");                                        VALUE_u8; // useless
-        // case 0x0E : KEY("Unknown-8927--0E");                                        VALUE_u8; // useless
-        // case 0x0F : KEY("Unknown-8927--0F");                                        VALUE_u8; // useless
-        // case 0x10 : KEY("Unknown-8927--10");                                        VALUE_u8; // useless
-        // case 0x11 : KEY("Unknown-8927--11");                                        VALUE_u8; // useless
-        // case 0x12 : KEY("Unknown-8927--12");                                        VALUE_u8; // useless
-        // case 0x13 : KEY("Unknown-8927--13");                                        VALUE_u8; // useless
-        // case 0x14 : KEY("Unknown-8927--14");                                        VALUE_u8; // useless
-        // case 0x15 : KEY("Unknown-8927--15");                                        VALUE_u8; // useless
-
-      case 0x16:
-        KEY("8927--16-unsure");
-        VALUE_u8; // ?
-
-        // case 0x17 : KEY("Unknown-8927--17");                                        VALUE_u8; // useless
-        // case 0x18 : KEY("Unknown-8927--18");                                        VALUE_u8; // useless
-        // case 0x19 : KEY("Unknown-8927--19");                                        VALUE_u8; // useless
-        // case 0x1A : KEY("Unknown-8927--1A");                                        VALUE_u8; // useless
-        // case 0x1B : KEY("Unknown-8927--1B");                                        VALUE_u8; // useless
-
-      case 0x1C:
-        switch (bitNr)
-        {
-        case 8:
-          BITBASIS;
-        case 0:
-          KEY("8927-1C-0");
-          VALUE_flag8;
-        case 1:
-          KEY("8927-1C-1-PREHEAT");
-          VALUE_flag8;
-        case 2:
-          KEY("8927-1C-2");
-          VALUE_flag8;
-        case 3:
-          KEY("8927-1C-3");
-          VALUE_flag8;
-        case 4:
-          KEY("8927-1C-4");
-          VALUE_flag8;
-        case 5:
-          KEY("8927-1C-5");
-          VALUE_flag8;
-        case 6:
-          KEY("8927-1C-6");
-          VALUE_flag8;
-        case 7:
-          KEY("8927-1C-7");
-          VALUE_flag8;
-        default:
-          UNKNOWN_BIT;
-        }
-
-      case 0x23:
-        return 0; // do not report checksum
-      default:
-        UNKNOWN_BYTE;
+        // case 0x23 : KEY("Unknown-892D--23");                                                                                                  VALUE_u8; // useless
+        // case 0x24 : KEY("Unknown-892D--24");                                                                                                  VALUE_u8; // useless
+        // case 0x25 : KEY("Unknown-892D--25");                                                                                                  VALUE_u8; // useless
+        // case 0x26 : KEY("Unknown-892D--26");                                                                                                  VALUE_u8; // useless
+        // case 0x27 : KEY("Unknown-892D--27");                                                                                                  VALUE_u8; // useless
+        // case 0x28 : KEY("Unknown-892D--28");                                                                                                  VALUE_u8; // useless
+        case 0x29: return 0; // do not report checksum
+        default  : UNKNOWN_BYTE;
       }
-    default:
-      return 0; // unknown packet type
+      case 0x27: // type 2 of message
+                                                                                                    CAT_MEASUREMENT;
+                 switch (payloadIndex) {
+        // case 0x06 : KEY("Unknown-8927--06");                                                                                                  VALUE_u8; // useless
+        case 0x07: // 8 bit byte : 65 HEAT, 64 HEAT STOP, 33 VENTIL, 67 DEFROST
+                   switch (bitNr) {
+          case 8: BITBASIS;
+          case 0: KEY("8927-07-0-OUnitOn");                                                                                                      VALUE_flag8;
+          case 1: KEY("8927-07-1-DEFROST");                                                                                                      VALUE_flag8;
+          case 2: KEY("8927-07-2");                                                                                                              VALUE_flag8;
+          case 3: KEY("8927-07-3");                                                                                                              VALUE_flag8;
+          case 4: KEY("8927-07-4");                                                                                                              VALUE_flag8;
+          case 5: KEY("8927-07-5-VentilMode");                                                                                                   VALUE_flag8;
+          case 6: KEY("8927-07-6-HeatMode");                                                                                                     VALUE_flag8;
+          case 7: KEY("8927-07-7");                                                                                                              VALUE_flag8;
+          default: UNKNOWN_BIT;
+        }
+        case 0x08: switch (bitNr) {
+          case 8: BITBASIS;
+          case 0: KEY("8927-08-0");                                                                                                              VALUE_flag8;
+          case 1: KEY("8927-08-1");                                                                                                              VALUE_flag8;
+          case 2: KEY("8927-08-2");                                                                                                              VALUE_flag8;
+          case 3: KEY("8927-08-3");                                                                                                              VALUE_flag8;
+          case 4: KEY("8927-08-4");                                                                                                              VALUE_flag8;
+          case 5: KEY("8927-08-5");                                                                                                              VALUE_flag8;
+          case 6: KEY("8927-08-6");                                                                                                              VALUE_flag8;
+          case 7: KEY("8927-08-7");                                                                                                              VALUE_flag8;
+          default: UNKNOWN_BIT;
+        }
+        case 0x09: KEY("TemperatureSetpoint");                                                      CAT_TEMP; HATEMP;                            VALUE_u8;
+        // case 0x0A: KEY("8927--0A-clock");                                                                                                     VALUE_u8; // 8 bit byte : 129 / 193 each 30s
+        // case 0x0B : KEY("Unknown-8927--0B");                                                                                                  VALUE_u8; // useless
+        // case 0x0C : KEY("Unknown-8927--0C");                                                                                                  VALUE_u8; // useless
+        // case 0x0D : KEY("Unknown-8927--0D");                                                                                                  VALUE_u8; // useless
+        // case 0x0E : KEY("Unknown-8927--0E");                                                                                                  VALUE_u8; // useless
+        // case 0x0F : KEY("Unknown-8927--0F");                                                                                                  VALUE_u8; // useless
+        // case 0x10 : KEY("Unknown-8927--10");                                                                                                  VALUE_u8; // useless
+        // case 0x11 : KEY("Unknown-8927--11");                                                                                                  VALUE_u8; // useless
+        // case 0x12 : KEY("Unknown-8927--12");                                                                                                  VALUE_u8; // useless
+        // case 0x13 : KEY("Unknown-8927--13");                                                                                                  VALUE_u8; // useless
+        // case 0x14 : KEY("Unknown-8927--14");                                                                                                  VALUE_u8; // useless
+        // case 0x15 : KEY("Unknown-8927--15");                                                                                                  VALUE_u8; // useless
+        case 0x16: KEY("8927--16-unsure");                                                                                                       VALUE_u8; // ?
+        // case 0x17 : KEY("Unknown-8927--17");                                                                                                  VALUE_u8; // useless
+        // case 0x18 : KEY("Unknown-8927--18");                                                                                                  VALUE_u8; // useless
+        // case 0x19 : KEY("Unknown-8927--19");                                                                                                  VALUE_u8; // useless
+        // case 0x1A : KEY("Unknown-8927--1A");                                                                                                  VALUE_u8; // useless
+        // case 0x1B : KEY("Unknown-8927--1B");                                                                                                  VALUE_u8; // useless
+        case 0x1C: switch (bitNr) {
+          case 8: BITBASIS;
+          case 0: KEY("8927-1C-0");                                                                                                              VALUE_flag8;
+          case 1: KEY("8927-1C-1-PREHEAT");                                                                                                      VALUE_flag8;
+          case 2: KEY("8927-1C-2");                                                                                                              VALUE_flag8;
+          case 3: KEY("8927-1C-3");                                                                                                              VALUE_flag8;
+          case 4: KEY("8927-1C-4");                                                                                                              VALUE_flag8;
+          case 5: KEY("8927-1C-5");                                                                                                              VALUE_flag8;
+          case 6: KEY("8927-1C-6");                                                                                                              VALUE_flag8;
+          case 7: KEY("8927-1C-7");                                                                                                              VALUE_flag8;
+          default: UNKNOWN_BIT;
+        }
+        case 0x23: return 0; // do not report checksum
+        default  : UNKNOWN_BYTE;
+      }
+      default  : UNKNOWN_BYTE; // TODO was return 0; // unknown packet type
     }
-
-  // 0x21 : sender is certainly the indoor unit
-  case 0x21:
-    switch (packetType)
-    {
-
-    case 0x12: // type 1 of message
-      CAT_SETTING;
-      switch (payloadIndex)
-      {
-      // case 0x06 : KEY("Unknown-2112--06");
-      case 0x07: // AC MODE 195 HEAT, 192 HEAT STOP, 160 VENTIL STOP, 163 VENTIL
-        switch (bitNr)
-        {
-        case 8:
-          BITBASIS;
-        case 0:
-          KEY("ACMode0UnitOn");
-          VALUE_flag8;
-        case 1:
-          KEY("ACMode1UnitOn");
-          VALUE_flag8;
-        case 2:
-          KEY("ACMode2");
-          VALUE_flag8;
-        case 3:
-          KEY("ACMode3");
-          VALUE_flag8;
-        case 4:
-          KEY("ACMode4");
-          VALUE_flag8;
-        case 5:
-          KEY("ACMode5Ventil");
-          VALUE_flag8;
-        case 6:
-          KEY("ACMode6Heat");
-          VALUE_flag8;
-        case 7:
-          KEY("ACMode7");
-          VALUE_flag8;
-        default:
-          UNKNOWN_BIT;
+    // 0x21 : sender is certainly the indoor unit
+    case 0x21: switch (packetType) {
+      case 0x29: switch (payload[4])  { // payload[4] can be 0xF1..0xF5, currently do not decode
+        default: switch (payloadIndex) {
+          case 37: return 0; // do not report checksum
+          default  : UNKNOWN_BYTE;
         }
-
-      case 0x08: // VENTILATION 8 bit byte : 8 LOW, 4 MED, 2 HIGH
-        switch (bitNr)
-        {
-        case 8:
-          BITBASIS;
-        case 1:
-          KEY("VentilHighOn");
-          VALUE_flag8;
-        case 2:
-          KEY("VentilMedOn");
-          VALUE_flag8;
-        case 3:
-          KEY("VentilLowOn");
-          VALUE_flag8;
-        default:
-          UNKNOWN_BIT;
-        }
-
-      case 0x09:
-        KEY("TemperatureSetpoint");
-        CAT_TEMP;
-        VALUE_u8; //
-        HATEMP;
-
-        // case 0x0A : KEY("Unknown-2112--0A");                                        VALUE_u8; // useless
-
-      case 0x0B:
-        KEY("Unknown-2112--0B");
-        VALUE_u8; // ?
-
-        // case 0x0C : KEY("Unknown-2112--0C");                                        VALUE_u8; // useless
-        // case 0x0D : KEY("Unknown-2112--0D");                                        VALUE_u8; // useless
-      case 0x0E:
-        return 0; // do not report checksum
-      default:
-        UNKNOWN_BYTE;
       }
-
+      // type 1 of message has length 0x12
+      case 0x12:                                                                                    CAT_SETTING;
+                 switch (payloadIndex) {
+        // case 0x06 : KEY("Unknown-2112--06");
+        case 0x07: // AC MODE 195 HEAT, 192 HEAT STOP, 160 VENTIL STOP, 163 VENTIL
+                   switch (bitNr) {
+          case 8: BITBASIS;
+          case 0: KEY("ACMode0UnitOn");                                                                                                          VALUE_flag8;
+          case 1: KEY("ACMode1UnitOn");                                                                                                          VALUE_flag8;
+          case 2: KEY("ACMode2");                                                                                                                VALUE_flag8;
+          case 3: KEY("ACMode3");                                                                                                                VALUE_flag8;
+          case 4: KEY("ACMode4");                                                                                                                VALUE_flag8;
+          case 5: KEY("ACMode5Ventil");                                                                                                          VALUE_flag8;
+          case 6: KEY("ACMode6Heat");                                                                                                            VALUE_flag8;
+          case 7: KEY("ACMode7");                                                                                                                VALUE_flag8;
+          default: UNKNOWN_BIT;
+        }
+        case 0x08: // VENTILATION 8 bit byte : 8 LOW, 4 MED, 2 HIGH
+                   switch (bitNr) {
+          case 8: BITBASIS;
+          case 1: KEY("VentilHighOn");                                                                                                           VALUE_flag8;
+          case 2: KEY("VentilMedOn");                                                                                                            VALUE_flag8;
+          case 3: KEY("VentilLowOn");                                                                                                            VALUE_flag8;
+          default: UNKNOWN_BIT;
+        }
+        case 0x09: KEY("TemperatureSetpoint");                                                      CAT_TEMP;                                    VALUE_u8; // HATEMP;
+        // case 0x0A : KEY("Unknown-2112--0A");                                                                                                  VALUE_u8; // useless
+        case 0x0B: KEY("Unknown-2112--0B");                                                                                                      VALUE_u8; // ?
+        // case 0x0C : KEY("Unknown-2112--0C");                                                                                                  VALUE_u8; // useless
+        // case 0x0D : KEY("Unknown-2112--0D");                                                                                                  VALUE_u8; // useless
+        case 0x0E: return 0; // do not report checksum
+        default  : UNKNOWN_BYTE;
+      }
       /*
-      ****** NO INFORMATION IN THE 210B MESSAGES *****
-      case 0x0B : // type 2 of message
-                  CAT_SETTING;
+      // type 2 of message hs length 0x0B, no information found in these messages
+      case 0x0B :                                                                                   CAT_SETTING;
                   switch (payloadIndex) {
-      case 0x06 : KEY("Unknown-210B--06");                                        VALUE_u8; // ?
-        case 0x06 : KEY("Unknown-210B--06");                                        VALUE_u8; // ?
-        default     : UNKNOWN_BYTE;
+        case 0x06 : KEY("Unknown-210B--06");                                                                                                     VALUE_u8; // ?
+        case 0x06 : KEY("Unknown-210B--06");                                                                                                     VALUE_u8; // ?
+        default   : UNKNOWN_BYTE;
       }
       */
-    default:
-      return 0; // unknown packet type
+      default  : UNKNOWN_BYTE; // return 0; // unknown packet type
     }
-
-  // 0x41 : sender is Hitachi remote control or Airzone
-  case 0x41:
-    switch (packetType)
-    {
-    case 0x18: // type 1 of message : from Airzone or Hitachi remote command
-      CAT_SETTING;
-      switch (payloadIndex)
-      {
+    // 0x41 : sender is Hitachi remote control or Airzone
+    case 0x41: switch (packetType) {
+      // type 1 of message has length 0x18
+      case 0x18:                                                                                    CAT_SETTING;
+                 switch (payloadIndex) {
         // ********************
         // ***** Here we process all data as they are useful to send a remote command
         // ********************
-      case 0x00:
-        KEY("Unknown-AZ00");
-        VALUE_u8; // useless
-      case 0x01:
-        KEY("Unknown-AZ01");
-        VALUE_u8; // useless
-      case 0x02:
-        KEY("Unknown-AZ02");
-        VALUE_u8; // useless
-      case 0x03:
-        KEY("Unknown-AZ03");
-        VALUE_u8; // useless
-      case 0x04:
-        KEY("Unknown-AZ04");
-        VALUE_u8; // useless
-      case 0x05:
-        KEY("Unknown-AZ05");
-        VALUE_u8; // useless
-      case 0x06:
-        KEY("Unknown-AZ06");
-        VALUE_u8; // useless
-
-      case 0x07:
-        switch (bitNr)
-        {
-        case 8:
-          BITBASIS;
-        case 0:
-          KEY("SetACMode0UnitOn");
-          VALUE_flag8;
-        case 1:
-          KEY("SetACMode1UnitOn");
-          VALUE_flag8;
-        case 2:
-          KEY("SetACMode2");
-          VALUE_flag8;
-        case 3:
-          KEY("SetACMode3");
-          VALUE_flag8;
-        case 4:
-          KEY("SetACMode4");
-          VALUE_flag8;
-        case 5:
-          KEY("SetACMode5Ventil");
-          VALUE_flag8;
-        case 6:
-          KEY("SetACMode6Heat");
-          VALUE_flag8;
-        case 7:
-          KEY("SetACMode7");
-          VALUE_flag8;
-        default:
-          UNKNOWN_BIT;
+        case 0x00: KEY("Unknown-AZ00");                                                                                                          VALUE_u8; // useless
+        case 0x01: KEY("Unknown-AZ01");                                                                                                          VALUE_u8; // useless
+        case 0x02: KEY("Unknown-AZ02");                                                                                                          VALUE_u8; // useless
+        case 0x03: KEY("Unknown-AZ03");                                                                                                          VALUE_u8; // useless
+        case 0x04: KEY("Unknown-AZ04");                                                                                                          VALUE_u8; // useless
+        case 0x05: KEY("Unknown-AZ05");                                                                                                          VALUE_u8; // useless
+        case 0x06: KEY("Unknown-AZ06");                                                                                                          VALUE_u8; // useless
+        case 0x07: switch (bitNr) {
+          case 8: BITBASIS;
+          case 0: KEY("SetACMode0UnitOn");                                                                                                       VALUE_flag8;
+          case 1: KEY("SetACMode1UnitOn");                                                                                                       VALUE_flag8;
+          case 2: KEY("SetACMode2");                                                                                                             VALUE_flag8;
+          case 3: KEY("SetACMode3");                                                                                                             VALUE_flag8;
+          case 4: KEY("SetACMode4");                                                                                                             VALUE_flag8;
+          case 5: KEY("SetACMode5Ventil");                                                                                                       VALUE_flag8;
+          case 6: KEY("SetACMode6Heat");                                                                                                         VALUE_flag8;
+          case 7: KEY("SetACMode7");                                                                                                             VALUE_flag8;
+          default: UNKNOWN_BIT;
         }
-
-      case 0x08:
-        switch (bitNr)
-        {
-        case 8:
-          BITBASIS;
-        case 1:
-          KEY("SetVentilHighOn");
-          VALUE_flag8;
-        case 2:
-          KEY("SetVentilMedOn");
-          VALUE_flag8;
-        case 3:
-          KEY("SetVentilLowOn");
-          VALUE_flag8;
-        default:
-          UNKNOWN_BIT;
+        case 0x08: switch (bitNr) {
+          case 8: BITBASIS;
+          case 1: KEY("SetVentilHighOn");                                                                                                        VALUE_flag8;
+          case 2: KEY("SetVentilMedOn");                                                                                                         VALUE_flag8;
+          case 3: KEY("SetVentilLowOn");                                                                                                         VALUE_flag8;
+          default: UNKNOWN_BIT;
         }
-
-      case 0x09:
-        KEY("SetTemperatureSetpoint");
-        CAT_TEMP;
-        HATEMP;
-        VALUE_u8;
-      case 0x0A:
-        KEY("Unknown-AZ0A");
-        VALUE_u8; // useless
-      case 0x0B:
-        KEY("Unknown-AZ0B");
-        VALUE_u8; // useless
-      case 0x0C:
-        KEY("Unknown-AZ0C");
-        VALUE_u8; // useless
-      case 0x0D:
-        KEY("Unknown-AZ0D");
-        VALUE_u8; // useless
-      case 0x0E:
-        KEY("Unknown-AZ0E");
-        VALUE_u8; // useless
-      case 0x0F:
-        KEY("Unknown-AZ0F");
-        VALUE_u8; // useless
-      case 0x10:
-        KEY("Unknown-AZ10");
-        VALUE_u8; // useless
-      case 0x11:
-        KEY("Unknown-AZ11");
-        VALUE_u8; // useless
-      case 0x12:
-        KEY("Unknown-AZ12");
-        VALUE_u8; // useless
-      case 0x13:
-        KEY("Unknown-AZ13");
-        VALUE_u8; // useless
-      case 0x14:
-        return 0; // do not report checksum
-      default:
-        UNKNOWN_BYTE;
+        case 0x09: KEY("SetTemperatureSetpoint");                                                   CAT_TEMP; HATEMP;                            VALUE_u8;
+        case 0x0A: KEY("Unknown-AZ0A");                                                                                                          VALUE_u8; // useless
+        case 0x0B: KEY("Unknown-AZ0B");                                                                                                          VALUE_u8; // useless
+        case 0x0C: KEY("Unknown-AZ0C");                                                                                                          VALUE_u8; // useless
+        case 0x0D: KEY("Unknown-AZ0D");                                                                                                          VALUE_u8; // useless
+        case 0x0E: KEY("Unknown-AZ0E");                                                                                                          VALUE_u8; // useless
+        case 0x0F: KEY("Unknown-AZ0F");                                                                                                          VALUE_u8; // useless
+        case 0x10: KEY("Unknown-AZ10");                                                                                                          VALUE_u8; // useless
+        case 0x11: KEY("Unknown-AZ11");                                                                                                          VALUE_u8; // useless
+        case 0x12: KEY("Unknown-AZ12");                                                                                                          VALUE_u8; // useless
+        case 0x13: KEY("Unknown-AZ13");                                                                                                          VALUE_u8; // useless
+        case 0x14: return 0; // do not report checksum
+        default: UNKNOWN_BYTE;
       }
-    default:
-      return 0;
+      case 0x29: switch (payload[4])  { // payload[4] can be 0xE1..0xE5, seen E1 only, currently decode only 0xE2
+        case 0xE1: switch (payloadIndex) {
+          case 0x25: return 0; // do not report checksum
+          default : UNKNOWN_BYTE;
+        }
+        default  : return 0;
+      }
+      default: UNKNOWN_BYTE; // TODO was return 0; // unknown packet type
     }
-  default:
-    break; // do nothing
+    // 0x8A : sender is ?
+    case 0x8A: switch (packetType) {
+      case 0x29: switch (payload[4])  { // payload[4] can be 0xF1..0xF5, seen F1 only, currently decode only 0xE2
+        case 0xF1: switch (payloadIndex) {
+          case 0x25: return 0; // do not report checksum
+          default : UNKNOWN_BYTE;
+        }
+        default  : return 0;
+      }
+      default: UNKNOWN_BYTE; // TODO was return 0; // unknown packet type
+    }
+    default: break; // do nothing
   }
   // restart switch as pseudotypes 00000B 40000B coincide with H-link 21000B ; Src/Type reversed
-  switch (packetType)
-  {
-// PSUEDO_PACKETS
+  switch (packetType) {
+  // PSEUDO_PACKETS
 #include "P1P2_pseudo.h"
-  default:
-    break; // do nothing
+    default: UNKNOWN_BYTE; // break; // do nothing
   }
   return 0;
 }
- 
+   
 byte bits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte j) {
   strcpy(mqtt_key, mqttKeyPrefix);
   byte b = bytesbits2keyvalue(packetSrc, packetType, payloadIndex, payload, mqtt_key + MQTT_KEY_PREFIXLEN, mqtt_value, j) ;
   return b;
 }
-
+  
 byte bytes2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value) {
   return bits2keyvalue(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, 8) ;
 }
