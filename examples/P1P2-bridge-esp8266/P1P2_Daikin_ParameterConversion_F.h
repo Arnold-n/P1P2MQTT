@@ -654,8 +654,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    5 : KEY("Unknown_40001F_5_Temp3Q");                        HACONFIG;                                                             VALUE_u8;
         case    6 : KEY("Unknown_40001F_6_sameas_5");                      HACONFIG;                                                             VALUE_u8;
         case    7 : KEY("Unknown_40001F_7_CounterQ");                      HACONFIG;                                                             VALUE_u8;
-        case   11 : KEY("Unknown_00001F_11_Temp4Q");                       HACONFIG;                                                             VALUE_u8;
-        case   13 : KEY("Unknown_00001F_13_Temp5Q");                       HACONFIG;                                                             VALUE_u8;
+        case   11 : KEY("Unknown_40001F_11_Temp4Q");                       HACONFIG;                                                             VALUE_u8;
+        case   13 : KEY("Unknown_40001F_13_Temp5Q");                       HACONFIG;                                                             VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       default   :               UNKNOWN_BYTE;
