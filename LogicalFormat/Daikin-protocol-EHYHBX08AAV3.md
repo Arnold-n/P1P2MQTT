@@ -237,7 +237,9 @@ Header: 400013
 |     3      | 40/D0              | ?
 |   3:5-0    | 0                  | ?                                  | bit
 |   3:7-6    | 00/01/10/11        | modus ABS / WD / ABS+prog / WD+dev | bit2
-|   4-7      | 00                 | ?
+|   4-5      | 00                 | ?
+|     6      | 00                 | (only some E systems:) water pressure | u8div10
+|     7      | 00                 | ?
 |    8-9     | 0000-010E          | flow (in 0.1 l/min) (EHV/EHYHB only. Zero on EJHA) | u16div10
 |    10-11   | xxxx               | software version inner unit | u16
 |    12-13   | xxxx               | software version outer unit | u16

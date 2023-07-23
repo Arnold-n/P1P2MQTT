@@ -553,6 +553,18 @@ uint8_t value_s4abs1c(byte packetSrc, byte packetType, byte payloadIndex, byte* 
   return 1;
 }
 
+float FN_u8div10(uint8_t *b)     { return (b[0] * 0.1);}
+
+uint8_t value_u8div10(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1 /* , HYSTERESIS_TYPE_U16DIV10, HYSTERESIS_SIZE_U16DIV10 */ )) return 0;
+#ifdef __AVR__
+  dtostrf(FN_u8div10(&payload[payloadIndex]), 1, 1, mqtt_value);
+#else
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", FN_u8div10(&payload[payloadIndex]));
+#endif
+  return 1;
+}
+
 float FN_u16div10_LE(uint8_t *b)     { if (b[-1] == 0xFF) return 0; else return (b[0] * 0.1 + b[-1] * 25.6);}
 
 uint8_t value_u16div10_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig) {
@@ -1044,6 +1056,7 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 // VALUE_s4abs1c:        for 1-byte value -10..10 where bit 4 is sign and bit 0..3 is value
 // VALUE_f8_8           for 2-byte float in f8_8 format (see protocol description)
 // VALUE_f8s8           for 2-byte float in f8s8 format (see protocol description)
+// VALUE_u8div10        for 1-byte integer to be divided by 10 (used for water pressure in 0.1 bar)
 // VALUE_u16div10       for 2-byte integer to be divided by 10 (used for flow in 0.1m/s)
 // VALUE_F(value)       for self-calculated float parameter value
 // VALUE_u32hex         for 4-byte hex value (used for sw version)
@@ -1071,6 +1084,7 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define VALUE_u8_add2k          { return    value_u8_add2k(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_s4abs1c             { return      value_s4abs1c(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 
+#define VALUE_u8div10           { return        value_u8div10(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_u16div10_LE       { return    value_u16div10_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 #define VALUE_u16div10_LE_changed(ch)  { ch = value_u16div10_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); return ch; }
 
@@ -1138,6 +1152,8 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define HAMILLISECONDS {uom = 7;  stateclass = 0;};
 #define HABYTES   {uom = 8;  stateclass = 1;};
 #define HAEVENTS  {uom = 9;  stateclass = 3;};
+// uom 10..12 used by Hitachi
+#define HAPRESSURE  {uom = 13;  stateclass = 0;};
 
 byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, /*char &cat,*/ byte paramValLength) {
 // similar to bytes2keyvalue but using indirect parameter references in payloads
@@ -1832,6 +1848,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    0 : return 0;
         case    1 : KEY("Target_Temperature_DHW");                         HACONFIG; HATEMP;                                                     VALUE_f8s8;
         case    3 : KEY("Heating_modus");                                                                                                        VALUE_u8; // ABS / WD / ABS+prog / WD+prog
+        case    6 : KEY("Water_pressure");                                 HACONFIG; HAPRESSURE;    CAT_MEASUREMENT;                             VALUE_u8div10;
         case    8 : return 0;
         case    9 : KEY("Flow");                                           HACONFIG; HAFLOW;
                     Flow = FN_u16div10_LE(payloadPointer);                 CAT_MEASUREMENT;                                                      VALUE_u16div10_LE_changed(Flow_changed); //(9, 0.09, 0.15);
