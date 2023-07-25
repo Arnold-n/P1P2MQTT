@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20230726 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix
  * 20230702 v0.9.40 add NTP-based time stamps, add H-link2 decoding
  * 20230611 v0.9.38 H-link2 branch merge into main
  * 20230604 v0.9.37 support for P1P2MQTT bridge v1.2
@@ -137,9 +138,9 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.40"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.40"
-#define HA_SW "0.9.40"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.41"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.41"
+#define HA_SW "0.9.41"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
@@ -237,6 +238,7 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
                                // 0x4000 to use P1P2/R/xxx as input (requires MQTT_INPUT_HEXDATA)
                                // 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)
                                // 0x10000 to include non-HACONFIG parameters in P1P2/P/#
+                               // 0x20000 to include non-HACONFIG parameters in P1P2/P/#
 
 // no need to change these:
 #define RESET_PIN 5 // GPIO_5 on ESP-12F pin 20 connected to ATmega328P's reset line
