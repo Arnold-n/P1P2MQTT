@@ -267,6 +267,15 @@ void printWelcomeString(void) {
 #ifdef F_SERIES
   Serial.print(F(" F-series"));
 #endif /* F_SERIES */
+#ifdef FDY
+  Serial.print(F(" FDY"));
+#endif /* FDY */
+#ifdef FDYQ
+  Serial.print(F(" FDYQ"));
+#endif /* FDYQ */
+#ifdef FXMQ
+  Serial.print(F(" FXMQT"));
+#endif /* FXMQ */
 #ifdef H_SERIES
   Serial.print(F(" H-series"));
 #endif /* H_SERIES */
@@ -1737,6 +1746,10 @@ void loop() {
               wr = 1;
               n = 3;
               break;
+// messages and payload lengths:
+// FDY  0x38  16/15 / 0x39  11/4 (todo: check)
+// FYDQ 0x37 / 0x38 / 0x3C
+// FXMQ 0x32 / 0x35 / 0x36 / 0x38 / 0x39 / 0x3A
 #ifdef FDY
             case 0x38 : // FDY control message, copy bytes back and change if 'F' command is given
               wr = controlLevel;
