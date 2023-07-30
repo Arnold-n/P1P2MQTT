@@ -1630,7 +1630,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         }
         case    1 : switch (bitNr) {
           case    8 : BITBASIS;
-          case    0 : KEY("Operation_Mode_00");                                                                                                  VALUE_flag8;
+          case    0 : KEY("Heating_OnOff");                               HACONFIG;                                                              VALUE_flag8;
+          case    1 : KEY("Cooling_OnOff");                               HACONFIG;                                                              VALUE_flag8;
           case    7 : KEY("Operation_Mode_01");                                                                                                  VALUE_flag8;
           default   : UNKNOWN_BIT;
         }

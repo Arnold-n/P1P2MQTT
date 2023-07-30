@@ -56,9 +56,8 @@ Header: 000010
 |0:0       | 0/1                | Heat pump (off/on)       | bit
 |0:other   | 0                  | ?                        | bit
 |1:7       | 0/1                | Heat pump (off/on)       | bit
-|1:0       | 0/1                | 1=Heating mode           | bit
-|1:1       | 0/1                | 1=Cooling mode           | bit
-|1:0       | 1                  | Operating mode gas?      | bit
+|1:0       | 0/1                | Heating mode (off/on)    | bit
+|1:1       | 0/1                | Cooling mode (off/on)    | bit
 |1:other   | 0                  | Operating mode?          | bit
 |2:1       | 0/1                | DHW tank power (off/on)  | bit
 |2:0       | 0/1                | DHW (off/on)             | bit
@@ -92,7 +91,8 @@ Header: 400010
 
 |Byte(:bit)| Hex value observed | Description              | Data type
 |:---------|:-------------------|:-------------------------|:-
-| 0:0      | 0/1                | Heating power (off/on)   | bit
+| 0:0      | 0/1                | Heating mode (off/on)    | bit
+| 0:1      | 0/1                | Cooling mode (off/on)    | bit
 | 0:other  | 0                  | ?                        | bit
 | 1:7      | 0/1                | Operating mode gas?      | bit
 | 1:0      | 0                  | Operating mode?          | bit
