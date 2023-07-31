@@ -218,11 +218,9 @@ uint8_t writePermission = INIT_WRITE_PERMISSION;
 uint8_t errorsPermitted = INIT_ERRORS_PERMITTED;
 uint16_t parameterWritesDone = 0;
 
-// FxAbsentCnt[x] counts number of unanswered 00Fx30 messages;
+// FxAbsentCnt[x] counts number of unanswered 00Fx30 messages (only for x=0,1,F (mapped to 0,1,3));
 // if -1 than no Fx request or response seen (relevant to detect whether F1 controller is supported or not)
-static int8_t FxAbsentCnt[2] = { -1, -1};
-static int8_t FxAbsentCntInclOwn[2] = { -1, -1};
-static byte Fx30ReplyDelay[2] = { 0, 0 };
+static int8_t FxAbsentCnt[4] = { -1, -1, -1, -1};
 #endif /* #F_SERIES */
 
 static char RS[RS_SIZE];
@@ -432,6 +430,10 @@ static byte pseudo0F = 0;
 uint8_t scope_budget = 200;
 
 static byte suppressSerial = 0;
+
+byte F_prev = 0;
+byte F_max = 0;
+byte div4 = 0;
 
 void loop() {
   uint16_t temp;
@@ -837,14 +839,14 @@ void loop() {
             case 'W':
 #ifdef EF_SERIES
                       if (CONTROL_ID) {
-                        // in L1/L5 mode, insert message in time allocaed for 40F030 slot
+                        // in L1/L5 mode, insert message in time allocated for 40F030 slot
                         if (insertMessageCnt || restartDaikinCnt) {
                           Serial_println(F("* insertMessage (or restartDaikin) already scheduled"));
                           break;
                         }
-                        if (verbose) Serial_print(F("* Writing next 40F030 slot: "));
+                        if (verbose) Serial_print(F("* Writing next 40Fx30 slot: "));
                         insertMessageLength = 0;
-                        restartDaikinReady = 0; // indicate the insertMessage is overwritten and restart cannot be done until new packet received/loaded
+                        restartDaikinReady = 0; // to indicate insertMessage is overwritten and restart cannot be done until new packet received/loaded
                         while ((wb < RB_SIZE) && (wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
                           insertMessage[insertMessageLength++] = wbtemp;
                           insertMessageCnt = 1;
@@ -862,7 +864,8 @@ void loop() {
                         break;
                       }
 #endif /* EF_SERIES */
-                      // in L0 mode, or for H-link2, just write packet
+                      // for H-link2/Toshiba, just write packet
+                      // in L0 mode, just write packet (TODO: crude, only for test purposes, or improve write timing to 00Fx30 reply time slot (if available and free)?)
                       if (verbose) Serial_print(F("* Writing: "));
                       wb = 0;
                       while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
@@ -945,6 +948,8 @@ void loop() {
                             Serial_println(F("* Control_ID 0xF1 supported, no auxiliary controller found for 0xF1, switching control functionality on 0xF1 on"));
                             CONTROL_ID = 0xF1;
                             if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                          } else if (FxAbsentCnt[3] == F0THRESHOLD) {
+                            Serial_println(F("* Control_ID 0xFF supported, no auxiliary controller found for 0xFF, but control on 0xFF not supported (yet?)"));
 #endif /* E_SERIES */
                           } else {
                             Serial_println(F("* No free address for controller found (yet). Control functionality not enabled"));
@@ -1489,15 +1494,27 @@ void loop() {
         }
       }
 #else /* KLICDA */
-      if ((FxAbsentCnt[0] == F0THRESHOLD) && counterRequest && (nread > 4) && (RB[0] == 0x00) && (RB[1] == 0xF0) && (RB[2] == 0x30)) {
-        // 00F030 request message received; counterRequest > 0 so hijack every 4th time slot to request counters
-        // but only if auxiliary F0 controller has not been detected (so check on FxAbsentCnt[0])
-        // This works only if there is no other auxiliary controller responding to 0xF0, TODO: in that case extend to hijack 0xF1 timeslot
-        if ((counterRequest & 0x03) == 0x01) {
+      // check number of auxiliary controller slots (F_max), and how many already done in this cycle (F_max)
+      if ((RB[0] == 0x00) && ((RB[1] == 0xF0) || (RB[1] == 0xF1) || (RB[1] == 0xFF)) && (RB[2] == 0x30)) F_prev++;
+      if ((RB[0] == 0x00) && ((RB[1] & 0xF0) != 0xF0)) {
+        if (F_prev > F_max) {
+          F_max = F_prev;
+          Serial_print(F("* F_max set to "));
+          Serial_println(F_max);
+        }
+        F_prev = 0;
+      }
+      // insert counterRequest messages at end of each (or each 4th) cycle
+      if (counterRequest && (nread > 4) && (RB[0] == 0x00) && ((RB[1] == 0xFF) || ((RB[1] & 0xFE)  == 0xF0)) && (RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x03] == F0THRESHOLD) && (F_prev == F_max)) {
+        // 00Fx30 request message received, slot has no other aux controller active, and this is the last 00Fx30 request message in this cycle
+        // For CONTROL_ID != 0 and F_max==1, use 1-in-4 mechanism
+        if (div4) {
+          div4--;
+        } else {
           WB[0] = 0x00;
           WB[1] = 0x00;
           WB[2] = 0xB8;
-          WB[3] = counterRequest >> 2;
+          WB[3] = (counterRequest - 1);
           F030forcounter = true;
           if (P1P2Serial.writeready()) {
             P1P2Serial.writepacket(WB, 4, F03XDELAY, crc_gen, crc_feed);
@@ -1505,22 +1522,20 @@ void loop() {
             Serial_println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
             if (writeRefused < 0xFF) writeRefused++;
           }
+          if (++counterRequest == 7) counterRequest = 0;
+          if (CONTROL_ID && (F_max == 1)) div4 = 3;
         }
-        if (++counterRequest == 22) counterRequest = 0;
       }
 #endif /* KLICDA */
-      if ((nread > 4) && (RB[0] == 0x40) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30)) {
+      if ((nread > 4) && (RB[0] == 0x40) && (((RB[1] & 0xFE) == 0xF0) || (RB[1] == 0xFF)) && ((RB[2] & 0x30) == 0x30)) {
         // 40Fx3x auxiliary controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < min(F03XDELAY, F030DELAY) (- margin)
         // Note for developers using >1 P1P2Monitor-interfaces (=to self): this detection mechanism fails if there are 2 P1P2Monitor programs (and adapters) with same delay settings on the same bus.
-        // check if there is any auxiliary controller on 0x30 (including P1P2Monitor self, requires echo)
-        if (RB[2] == 0x30) FxAbsentCntInclOwn[RB[1] & 0x01] = 0;
-        Fx30ReplyDelay[RB[1] & 0x01] = (delta & 0xFF00) ? 0xFF : (delta & 0xFF);
-        // check if there is any other auxiliary controller on 0x3x
+        // check if there is any other auxiliary controller on 0x3x:
         if ((delta < F03XDELAY - 2) && (delta < F030DELAY - 2)) {
-          FxAbsentCnt[RB[1] & 0x01] = 0;
+          FxAbsentCnt[RB[1] & 0x03] = 0;
           if (RB[1] == CONTROL_ID) {
             // this should only happen if another auxiliary controller is connected if/after CONTROL_ID is set, either because
-            //    -CONTROL_ID_DEFAULT is set and conflicts with auxiliary controller, or
+            //    -CONTROL_ID_DEFAULT is set (not recommended for that reason, TODO: remove) and conflicts with auxiliary controller, or
             //    -because another auxiliary controller has been connected after CONTROL_ID has been manually set
             Serial_print(F("* Warning: another auxiliary controller is answering to address 0x"));
             Serial_print(RB[1], HEX);
@@ -1537,19 +1552,11 @@ void loop() {
           }
         }
       } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30) && !F030forcounter) {
-        // 00Fx3x request message received, and we did not use this slot to request counters
-        // check if there is any controller on 0x30 (including P1P2Monitor self, requires echo)
-        if (RB[2] == 0x30) {
-          if (FxAbsentCntInclOwn[RB[1] & 0x01] > 1) {
-            Fx30ReplyDelay[RB[1] & 0x01] = 0;
-          } else {
-            FxAbsentCntInclOwn[RB[1] & 0x01]++;
-          }
-        }
+        // 00Fx3x (F0/F1, but not FF, FF is not yet supported) request message received, and we did not use this slot to request counters
         // check if there is no other auxiliary controller
-        if ((RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x01] < F0THRESHOLD)) {
-          FxAbsentCnt[RB[1] & 0x01]++;
-          if (FxAbsentCnt[RB[1] & 0x01] == F0THRESHOLD) {
+        if ((RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x03] < F0THRESHOLD)) {
+          FxAbsentCnt[RB[1] & 0x03]++;
+          if (FxAbsentCnt[RB[1] & 0x03] == F0THRESHOLD) {
             Serial_print(F("* No auxiliary controller answering to address 0x"));
             Serial_print(RB[1], HEX);
             if (CONTROL_ID == RB[1]) {
@@ -1562,9 +1569,9 @@ void loop() {
           }
         }
         // act as auxiliary controller:
-        if ((CONTROL_ID && (FxAbsentCnt[CONTROL_ID & 0x01] == F0THRESHOLD) && (RB[1] == CONTROL_ID))
+        if ((CONTROL_ID && (FxAbsentCnt[CONTROL_ID & 0x03] == F0THRESHOLD) && (RB[1] == CONTROL_ID))
 #ifdef ENABLE_INSERT_MESSAGE
-            || ((insertMessageCnt || restartDaikinCnt) && (RB[0] == 0x00) && (RB[1] == 0xF0)
+            || ((insertMessageCnt || restartDaikinCnt) && (FxAbsentCnt[CONTROL_ID & 0x03] == F0THRESHOLD) && (RB[0] == 0x00) && (RB[1] == CONTROL_ID)
 #ifndef ENABLE_INSERT_MESSAGE_3x
                                                                                              && (RB[2] == 0x30)
 #endif /* ENABLE_INSERT_MESSAGE_3x */
@@ -1894,6 +1901,7 @@ void loop() {
       }
     }
 #endif /* MONITORCONTROL */
+
 #ifdef ENABLE_INSERT_MESSAGE
     if ((insertMessageCnt == 0) && (RB[0] == 0x00) && (RB[1] == 0x00) && (RB[2] == RESTART_PACKET_TYPE)) {
       for (int i = 0; i < nread; i++) insertMessage[i] = RB[i];
@@ -1901,6 +1909,7 @@ void loop() {
       restartDaikinReady = 1;
     }
 #endif
+
 #ifdef PSEUDO_PACKETS
 #ifdef E_SERIES
     if ((RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x10)) pseudo0D = 5; // Insert one pseudo packet 00000D in output serial after 400010
@@ -1918,10 +1927,6 @@ void loop() {
 // for H-link2, split reporting errors (if any) and data (always)
     uint16_t delta2 = delta;
 #endif /* H_SERIES */
-
-
-
-
     if (readError) {
       // error, so output data on line starting with E
       Serial_print(F("E "));
@@ -2068,17 +2073,7 @@ void loop() {
 
     }
 #endif /* H_SERIES */
-
-
-
-
-
   }
-
-
-
-
-
 #ifdef PSEUDO_PACKETS
   if (pseudo0D > 4) {
     pseudo0D = 0;
@@ -2115,14 +2110,16 @@ void loop() {
 #ifdef EF_SERIES
     WB[19] = controlLevel;
     WB[20] = CONTROL_ID ? controlLevel : 0; // auxiliary control mode fully on; is 1 for control modes 1 and 3
+    WB[21] = F_max;
 #else /* EF_SERIES */
     WB[19] = 0x00;
     WB[20] = 0x00;
-#endif /* EF_SERIES */
     WB[21] = 0x00;
+#endif /* EF_SERIES */
     WB[22] = 0x00;
     if (!suppressSerial & (verbose < 4)) writePseudoPacket(WB, 23);
   }
+// TODO add F_max to pseudo
   if (pseudo0E > 4) {
     pseudo0E = 0;
     WB[0]  = 0x00;

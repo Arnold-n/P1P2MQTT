@@ -35,6 +35,7 @@
         case   11 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_diff"); VALUE_F_L_thr((FN_u16_LE(&payload[payloadIndex - 0]) -
                                                                          FN_u16_LE(&payload[payloadIndex - 2])) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2, HYSTERESIS_TYPE_U16, 200); };
         case   15 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_avg"); HAPCONFIG; VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 51200); };
+        case   18 : KEY("F_max");                                                                                                                VALUE_u8;
         default   : return 0;
       }
       case 0x40 : switch (payloadIndex) {
