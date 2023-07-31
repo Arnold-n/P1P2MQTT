@@ -420,6 +420,8 @@ void onMqttConnect(bool sessionPresent) {
   Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttCommands, result);
   result = mqttClient.subscribe(mqttCommandsNoIP, MQTT_QOS);
   Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttCommandsNoIP, result);
+  result = mqttClient.subscribe("homeassistant/status", MQTT_QOS);
+  Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to homeassistant/status with result %i"), result);
 #ifdef MQTT_INPUT_BINDATA
   //result = mqttClient.subscribe("P1P2/X/#", MQTT_QOS);
   //Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to X/# with result %i"), result);
@@ -444,7 +446,6 @@ void onMqttConnect(bool sessionPresent) {
   Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttInputHexData, result);
   mqttInputHexData[MQTT_KEY_PREFIXIP - 1] = '\0';
 #endif
-  throttleValue = THROTTLE_VALUE;
   mqttConnected = true;
 }
 
@@ -484,6 +485,7 @@ void WiFiManagerSaveConfigCallback () {
 uint32_t milliInc = 0;
 uint32_t prevMillis = 0; //millis();
 static uint32_t reconnectTime = 0;
+static uint32_t throttleStart = 0;
 
 void ATmega_dummy_for_serial() {
   Sprint_P(true, true, true, PSTR("* [ESP] Two dummy lines to ATmega."));
@@ -618,8 +620,9 @@ void handleCommand(char* cmdString) {
               } else {
                 Sprint_P(true, true, true, PSTR("* [ESP] useSensorPrefixHA is %i"), EEPROM_state.EEPROMnew.useSensorPrefixHA);
               }
-              if (n > 5) {
-                delay(500);
+              if ((n > 5) || (n && (outputMode & 0x40000))) {
+                Sprint_P(true, true, true, PSTR("* [ESP] Restart ESP"));
+                delay(100);
                 ESP.restart();
                 delay(100);
               }
@@ -671,6 +674,9 @@ void handleCommand(char* cmdString) {
                 delay(500);
                 if (mqttClient.connected()) {
                   Sprint_P(true, true, true, PSTR("* [ESP] MQTT client connected with EEPROMnew settings"));
+                  reconnectTime = espUptime;
+                  throttleStart = espUptime;
+                  throttleValue = THROTTLE_VALUE;
                 } else {
                   Sprint_P(true, true, true, PSTR("* [ESP] MQTT connection failed, retrying in 5 seconds"));
                   reconnectTime = espUptime + 5;
@@ -679,7 +685,6 @@ void handleCommand(char* cmdString) {
               break;
     case 'd': // reset ESP
     case 'D': if (sscanf((const char*) (cmdString + 1), "%d", &temp) == 1) {
-                if (temp > 2) temp = 2;
                 switch (temp) {
                   case 0 : Sprint_P(true, true, true, PSTR("* [ESP] Restarting ESP..."));
 #ifdef REBOOT_REASON
@@ -701,8 +706,15 @@ void handleCommand(char* cmdString) {
                            ESP.reset();
                            delay(100);
                            break;
-                  case 2 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting maxLoopTime")); maxLoopTime = 0; break;
-                  default : break;
+                  case 2 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting maxLoopTime"));
+                           maxLoopTime = 0;
+                           break;
+                  case 3 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting data structures"));
+                           throttleStart = espUptime;
+                           throttleValue = THROTTLE_VALUE;
+                           resetDataStructures();
+                           break;
+                  default: Sprint_P(true, true, true, PSTR("* [ESP] Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime D3/D4=reset-data-structures (wo/w throttling)"));
                 }
               } else {
                 Sprint_P(true, true, true, PSTR("* [ESP] Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime"));
@@ -774,6 +786,8 @@ void handleCommand(char* cmdString) {
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)"), (outputMode >> 15) & 0x01);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x10000 to include non-HACONFIG parameters in P1P2/P/# "), (outputMode >> 16) & 0x01);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x20000 to add all pseudo parameters to HA in P1P2/P/# "), (outputMode >> 17) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x40000 to restart ESP after MQTT reconnect "), (outputMode >> 18) & 0x01);
+                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x80000 to restart data communication after MQTT reconnect "), (outputMode >> 19) & 0x01);
               }
               break;
     case 's': // OutputFilter
@@ -909,6 +923,10 @@ int16_t MQTT_readBuffer_readChar (void) {
 }
 #endif
 
+byte haOnline = 0;
+#define MAX_HASTATUS_LENGTH 10
+char MQTT_haStatus[MAX_HASTATUS_LENGTH];
+
 void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessageProperties& properties,
                    const size_t& len, const size_t& index, const size_t& total) {
   static bool MQTT_drop = false;
@@ -927,6 +945,27 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
         strlcpy(MQTT_commandString + index, payload, len + 1); // create null-terminated copy
         MQTT_commandString[index + len] = '\0';
         if (index + len == total) MQTT_commandReceived = true;
+      }
+    }
+  } else if (!strcmp(topic, "homeassistant/status")) {
+    if (total + 1 >= MAX_HASTATUS_LENGTH) {
+      Serial_println(F("* [ESP] Received homeassistant/status message too long"));
+    } else {
+      strlcpy(MQTT_haStatus + index, payload, len + 1); // create null-terminated copy
+      MQTT_haStatus[index + len] = '\0';
+      if (index + len == total) {
+        if (!strcmp(MQTT_haStatus, "online")) {
+          Serial_println(F("* [ESP] Detected homeassistant/status online"));
+          haOnline = 2;
+          throttleStart = espUptime;
+          throttleValue = THROTTLE_VALUE;
+          resetDataStructures();
+        } else if (!strcmp(MQTT_haStatus, "offline")) {
+          Serial_println(F("* [ESP] Detected homeassistant/status offline"));
+          haOnline = 0;
+        } else {
+          haOnline = 9;
+        }
       }
     }
 #ifdef MQTT_INPUT_BINDATA
@@ -1669,7 +1708,7 @@ void loop() {
       Mqtt_disconnectTime++;
     }
     if (milliInc < 1000) {
-      if ((throttleValue > 1) && (espUptime > (THROTTLE_VALUE - throttleValue + 1) * THROTTLE_STEP)) throttleValue--;
+      if ((throttleValue > 1) && ((espUptime - throttleStart) > (THROTTLE_VALUE - throttleValue + 1) * THROTTLE_STEP)) throttleValue--;
         Sprint_P(true, true, false, PSTR("* [ESP] Uptime %li"), espUptime);
         // alternative, more info: Sprint_P(true, true, false, PSTR("* [ESP] %d RSSI %d heap %d maxfreeblocksize %d Uptime %li disconnects %d WiFi %d ethernet %d status %d"), espUptime, WiFi.RSSI(), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(), espUptime, Mqtt_disconnects, WiFi.isConnected(), eth.connected(), eth.status());
       if (espUptime >= espUptime_telnet + 10) {
@@ -1748,8 +1787,26 @@ void loop() {
         mqttClient.connect();
         delay(500);
         if (mqttClient.connected()) {
-          Sprint_P(true, false, true, PSTR("* [ESP] Mqtt reconnected"));
-          Sprint_P(true, false, true, PSTR(WELCOMESTRING));
+          Sprint_P(true, true, true, PSTR("* [ESP] Mqtt reconnected"));
+          if (outputMode & 0x40000) {
+            Sprint_P(true, true, true, PSTR("* [ESP] Restart ESP after Mqtt reconnect (outputMode 0x40000)"));
+#ifdef REBOOT_REASON
+            EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_MQTT;
+            EEPROM.put(0, EEPROM_state);
+            EEPROM.commit();
+#endif /* REBOOT_REASON */
+            delay(100);
+            ESP.restart();
+            delay(100);
+          }
+          Sprint_P(true, true, true, PSTR(WELCOMESTRING));
+          reconnectTime = espUptime;
+          if (outputMode & 0x80000) {
+            Sprint_P(true, true, true, PSTR("* [ESP] Restart data communication after Mqtt reconnect (outputMode 0x80000)"));
+            throttleStart = espUptime;
+            throttleValue = THROTTLE_VALUE;
+            resetDataStructures();
+          }
         } else {
           Sprint_P(true, false, true, PSTR("* [ESP] Reconnect failed, retrying in 5 seconds"));
           Serial.println(F("* [ESP] Reconnect to MQTT failed, see telnet or serial output for details"));
@@ -1965,7 +2022,8 @@ void loop() {
       readHex[16] = (outputMode >> 16) & 0xFF;
       readHex[17] = (outputMode >> 8) & 0xFF;
       readHex[18] = outputMode & 0xFF;
-      for (int i = 19; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
+      readHex[19] = haOnline;
+      for (int i = 20; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
       writePseudoPacket(readHex, 23);
     }
     if (pseudo0E > 5) {

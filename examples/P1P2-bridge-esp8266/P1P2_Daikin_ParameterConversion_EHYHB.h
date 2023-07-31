@@ -178,6 +178,31 @@ uint16_t FN_u16_LE(uint8_t *b)          { return (                (((uint16_t) b
 uint32_t FN_u24_LE(uint8_t *b)          { return (((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
 uint32_t FN_u32_LE(uint8_t *b)          { return (((uint32_t) b[-3] << 24) | ((uint32_t) b[-2] << 16) | (((uint32_t) b[-1]) << 8) | (b[0]));}
 
+void resetDataStructures(void) {
+// warning: called in onMqttMessage callback, do not output via mqtt or telnet in this function
+  byte i;
+  uint16 j;
+#ifdef SAVEPARAMS
+  for (i = 0; i < 2; i++) {
+    for (j = 0; j < 0x0563; j++) paramVal[i][j] = 0;
+    for (j = 0; j < 0x03C4; j++) paramSeen[i][j] = 0;
+  }
+#endif /* SAVEPARAMS */
+#ifdef SAVESCHEDULE
+  for (i = 0; i < 2; i++) {
+    for (j = 0; j < SCHEDULE_MEM_SIZE; j++) scheduleMem[i][j] = 0;
+    for (j = 0; j < SCHEDULE_MEM_SIZE; j++) scheduleMemSeen[i][j] = false;
+  }
+#endif /* SAVESCHEDULE */
+#ifdef SAVEPACKETS
+  for (j = 0; j < sizeValSeen; j++) {
+    payloadByteVal[j]  = 0;
+    payloadByteSeen[j] = 0;
+  }
+  for (j = 0; j < 36; j++) cntByte[j] = 0;
+#endif /* SAVEPACKETS */
+}
+
 bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte length, bool saveSeen, byte applyHysteresisType = 0, uint16_t applyHysteresis = 0) {
 // returns true if a packet parameter is observed for the first time ((and publishes it for homeassistant if haConfig==true)
 // if (outputFilter <= maxOutputFilter), it detects if a parameter has changed, and returns true if changed (or if outputFilter==0)

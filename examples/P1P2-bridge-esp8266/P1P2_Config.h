@@ -239,6 +239,8 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
                                // 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)
                                // 0x10000 to include non-HACONFIG parameters in P1P2/P/#
                                // 0x20000 to include non-HACONFIG parameters in P1P2/P/#
+                               // 0x40000 to restart ESP after MQTT reconnect
+                               // 0x80000 to restart data communication after MQTT reconnect
 
 // no need to change these:
 #define RESET_PIN 5 // GPIO_5 on ESP-12F pin 20 connected to ATmega328P's reset line
