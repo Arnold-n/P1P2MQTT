@@ -720,7 +720,7 @@ void handleCommand(char* cmdString) {
                            throttleValue = THROTTLE_VALUE;
                            resetDataStructures();
                            break;
-                  default: Sprint_P(true, true, true, PSTR("* [ESP] Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime D3/D4=reset-data-structures (wo/w throttling)"));
+                  default: Sprint_P(true, true, true, PSTR("* [ESP] Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime D3=reset-data-structures (w throttling)"));
                 }
               } else {
                 Sprint_P(true, true, true, PSTR("* [ESP] Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime"));
