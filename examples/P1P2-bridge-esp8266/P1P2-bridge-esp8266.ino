@@ -17,6 +17,7 @@
  * ESP_Telnet 2.0.0 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
  * 20230611 v0.9.38 H-link data support
  * 20230604 v0.9.37 support for P1P2MQTT bridge v1.2; separate hwID for ESP and ATmega
  * 20230526 v0.9.36 threshold
@@ -58,6 +59,11 @@
 #include <EEPROM.h>
 #include <time.h>
 #include <TZ.h>
+
+// WEBSERVER
+#include "P1P2_ESP8266HTTPUpdateServer/P1P2_ESP8266HTTPUpdateServer.h"
+ESP8266WebServer httpServer(80);
+ESP8266HTTPUpdateServer httpUpdater;
 
 //const char* MY_TZ[2] = {TZ_Europe_Amsterdam, TZ_Europe_London};
 const char* MY_TZ[2] = { "CET-1CEST,M3.5.0/02,M10.5.0/03"   , "GMT0BST,M3.5.0/1,M10.5.0" };
@@ -1553,6 +1559,14 @@ void setup() {
   pinMode(RESET_PIN, INPUT);
   MDNS.begin(avrisp_host);
   MDNS.addService("avrisp", "tcp", avrisp_port);
+
+
+// WEBSERVER
+  httpUpdater.setup(&httpServer);
+  httpServer.begin();
+  MDNS.addService("http", "tcp", 80);
+
+
   Sprint_P(true, true, true, PSTR("* [ESP] AVRISP: ATmega programming: avrdude -c avrisp -p atmega328p -P net:%i.%i.%i.%i:%i -t # or -U ..."), local_ip[0], local_ip[1], local_ip[2], local_ip[3], avrisp_port);
   // listen for avrdudes
   avrprog->begin();
@@ -1683,6 +1697,8 @@ void loop() {
   byte readHex[HB];
   // OTA
   ArduinoOTA.handle();
+
+  httpServer.handleClient();
 
   // ESP-uptime and loop timing
   uint32_t currMillis = millis();

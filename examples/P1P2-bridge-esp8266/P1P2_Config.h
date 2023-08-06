@@ -5,7 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
- * 20230726 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix
+ * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
  * 20230702 v0.9.40 add NTP-based time stamps, add H-link2 decoding
  * 20230611 v0.9.38 H-link2 branch merge into main
  * 20230604 v0.9.37 support for P1P2MQTT bridge v1.2
