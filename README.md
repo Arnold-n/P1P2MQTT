@@ -78,6 +78,9 @@ Build P1P2-adapter yourself (MM1192/XL1192): schematics and pictures for the MM1
 
 Build P1P2-adapter (MAX22088): Alternatively, you may build a circuit based on the newer MAX22088 IC from Maxim. Be warned that it is difficult to solder: it's only available as a 4x4mm 0.5mm pitch TQFN-24 package. The MAX22088 is powered directly from the P1/P2 bus (take care - we don't know how much power Daikin's P1/P2 bus may provide, perhaps max 60mA) and is able to power the Arduino Uno (max 70mA at Vcc=5V). PCB and schematic files for a [MAX22088-based design](https://github.com/rothn/P1P2Adapter) are made available by Nicholas Roth. His design does not provide galvanic isolation from the P1P2 bus, but that is OK if you connect only via WiFi or ethernet.
 
+Build P1P2-adapter (Raspberry Pi Pico): Alternatively, you may build a circuit based on the Raspberry Pi Pico. It's available as RPI hat, but also works in standalone mode powered over USB.
+The design does provide galvanic isolation and is available here: [P1P2 Rpi Hat](https://github.com/siro20/P1P2_HBS_USBCdc_Modem).
+
 **Older design: P1P2-adapter**
 
 ![P1P2-adapter PCB](circuits/P1P2adapter_topside.png)
