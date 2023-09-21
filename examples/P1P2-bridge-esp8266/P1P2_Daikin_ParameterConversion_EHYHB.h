@@ -1722,9 +1722,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case    2 : KEY("Quiet_Mode");                                                                                                         VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
-        case   12 : KEY("ErrorCode1");                                                                                                           VALUE_u8hex; // coding mechanism unknown. 024D2C = HJ-11 08B908 = 89-2 08B90C = 89-3
-        case   13 : KEY("ErrorCode2");                                                                                                           VALUE_u8hex;
-        case   14 : KEY("ErrorSubCode");                                                                                                         VALUE_u8hex; // >>2 for Subcode, and what are 2 lsbits ??
+        case   12 : KEY("ErrorCode1");                                     HACONFIG; CAT_MEASUREMENT;                                            VALUE_u8hex; // coding mechanism unknown. 024D2C = HJ-11 08B908 = 89-2 08B90C = 89-3
+        case   13 : KEY("ErrorCode2");                                     HACONFIG; CAT_MEASUREMENT;                                            VALUE_u8hex;
+        case   14 : KEY("ErrorSubCode");                                   HACONFIG; CAT_MEASUREMENT;                                            VALUE_u8hex; // >>2 for Subcode, and what are 2 lsbits ??
         case   17 : switch (bitNr) {
           case    8 : BITBASIS;
           case    1 : KEY("Defrost_Operation");                            HACONFIG;                                                             VALUE_flag8;
