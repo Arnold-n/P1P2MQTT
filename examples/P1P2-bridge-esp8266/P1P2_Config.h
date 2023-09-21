@@ -138,9 +138,9 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.41"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.41"
-#define HA_SW "0.9.41"
+#define WELCOMESTRING "* [ESP] P1P2-bridge-esp8266 v0.9.42rc"
+#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.42rc"
+#define HA_SW "0.9.42rc"
 
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
