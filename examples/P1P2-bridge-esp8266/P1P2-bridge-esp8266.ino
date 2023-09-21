@@ -382,13 +382,15 @@ uint32_t Sprint_buffer_overflow = 0;
 };
 
 #define HA_KEY snprintf_P(ha_mqttKey, HA_KEY_LEN, PSTR("%s/%s/%s%c%c_%s/config"), HA_PREFIX, haDeviceID, useSensorPrefixHA ? HA_SENSOR_PREFIX : "", mqtt_key[-4], mqtt_key[-2], mqtt_key);
-#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",%s\"uniq_id\":\"%c%c_%s%s\",%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
+#define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",%s\"uniq_id\":\"%c%c_%s%s\",%s%s%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
   /* name */         mqtt_key[-4], mqtt_key[-2], mqtt_key, \
   /* stat_t */       mqtt_key - MQTT_KEY_PREFIXLEN,\
   /* state_class */  ((stateclass == 2) ? "\"state_class\":\"total_increasing\"," : ((stateclass == 1) ? "\"state_class\":\"measurement\"," : "")),\
   /* uniq_id */      mqtt_key[-4], mqtt_key[-2], mqtt_key, haPostfix, \
   /* dev_cla */      ((stateclass == 2) ? "\"dev_cla\":\"energy\"," : ""),\
-  /* unit_of_meas */ ((uom == 13) ? "bar" : ((uom == 12) ? "\"unit_of_meas\":\"%\"," :  ((uom == 11) ? "\"unit_of_meas\":\"Hz\"," :  ((uom == 10) ? "\"unit_of_meas\":\"A\"," :  ((uom == 9) ? "\"unit_of_meas\":\"events\"," : ((uom == 8) ? "\"unit_of_meas\":\"byte\"," : ((uom == 7) ? "\"unit_of_meas\":\"ms\"," : ((uom == 6) ? "\"unit_of_meas\":\"s\"," : ((uom == 5) ? "\"unit_of_meas\":\"hours\"," : ((uom == 4) ? "\"unit_of_meas\":\"kWh\"," : ((uom == 3) ? "\"unit_of_meas\":\"l/min\"," : ((uom == 2) ? "\"unit_of_meas\":\"kW\"," : ((uom == 1) ? "\"unit_of_meas\":\"°C\"," : ""))))))))))))),\
+  /* unit_of_meas */ uom ? "\"unit_of_meas\":\"" : "",\
+  /* unit_of_meas */ ((uom == 13) ? "bar," : ((uom == 12) ? "%" :  ((uom == 11) ? "Hz" :  ((uom == 10) ? "A" :  ((uom == 9) ? "events" : ((uom == 8) ? "byte" : ((uom == 7) ? "ms" : ((uom == 6) ? "s" : ((uom == 5) ? "hours" : ((uom == 4) ? "kWh" : ((uom == 3) ? "L/min" : ((uom == 2) ? "kW" : ((uom == 1) ? "°C" : ""))))))))))))),\
+  /* unit_of_meas */ uom ? "\"," : "",\
   /* ic */ ((uom == 13) ? "\"ic\":\"mdi:water\"," : ((uom == 12) ? "\"ic\":\"mdi:valve\"," :  ((uom == 11) ? "\"ic\":\"mdi:heat-pump\"," :  ((uom == 10) ? "\"ic\":\"mdi:heat-pump\"," : ((uom == 9) ? "\"ic\":\"mdi:counter\"," : ((uom == 8) ? "\"ic\":\"mdi:memory\"," : ((uom == 7) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 6) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 5) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 4) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 3) ? "\"ic\":\"mdi:water-boiler\"," : ((uom == 2) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 1) ? "\"ic\":\"mdi:coolant-temperature\"," : ""))))))))))))),\
   /* device */       \
     /* name */         haDeviceName,\
