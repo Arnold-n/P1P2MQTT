@@ -2410,10 +2410,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                             case 0x05EC : KEY("Program_Q7_6_Moments_Per_Day"); break;
                             case 0x0640 : KEY("Program_Q8_6_Moments_Per_Day"); break;
                             case 0x0694 : KEY("Program_Electricity_Price"); break;
-                            case 0x06A0 : KEY("Memory_0x0694_0x069F"); break;
+                            case 0x06A0 : KEY("Memory_0x0694_0x069F"); break; // phone number customer service UI
                             case 0x06AF : KEY("Memory_0x06A0_0x06AE"); break;
-                            case 0x06BE : KEY("Memory_0x06AF_0x06BD"); break;
-                            case 0x06E1 : KEY("Memory_0x06BE_0x06E0"); break;
+                            case 0x06BE : KEY("Memory_0x06AF_0x06BD"); break; // error history (5 errors E1 E2 YY MM DD HH mm)
+                            case 0x06E1 : KEY("Memory_0x06BE_0x06E0"); break; // names of 3 heating schedules (15 characters each)
                             case 0x070E : KEY("Memory_0x06E1_0x070D"); break;
                             default : KEY("Memory_Unknown"); break;
                           }
