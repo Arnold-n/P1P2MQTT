@@ -545,7 +545,7 @@ The parameter range in this system is 0x0000-0x006B, can be different on other m
 
 # Packet type 36 and 3B - 16 bit parameters exchange
 
-Header: [04]00F[01]03[6B]
+Header: [04]0F[01]03[6B]
 
 A few hundred 16-bit parameters can be exchanged via packet type 36 and 3A.
 
@@ -600,7 +600,7 @@ The parameter range in this system is 0x0000-0x00AE, can be different on other m
 
 # Packet type 37 and 3C - 24 bit parameters exchange
 
-Header: [04]00F[01]3[7C]
+Header: [04]0F[01]3[7C]
 
 A few hundred 24-bit parameters can be exchanged via packet type 37 and 3C.
 
@@ -631,7 +631,7 @@ The parameter range in this system is 0x0000-0x0001, can be different on other m
 
 # Packet type 38, 39, and 3D - 32 bit parameters exchange
 
-Header: [04]00F[01]3[89D]
+Header: [04]0F[01]3[89D]
 
 A few hundred 32-bit parameters can be exchanged via packet types 38, 39 and 3D.
 
@@ -748,7 +748,7 @@ The data below shows data communicated from main to auxiliary controller. We do 
 
 ### Packet type 3E: request
 
-Header: 00003E
+Header: 00F03E
 
 #### Packet type 3E, subtype 00, data segment header
 
@@ -774,7 +774,7 @@ The last data segment is padded with FFs.
 
 ### Packet type 3E: response
 
-Header: 40003E
+Header: 40F03E
 
 #### Packet type 3E, subtype 00, data segment header
 
@@ -815,7 +815,7 @@ Writes to 0x0694-0x070D occur in data segment runs of 12, 15, 35, or 45 bytes. I
 |  0598   | 0054 (84) | Weekly schedule, 6 moments/day
 |  05EC   | 0054 (84) | Weekly schedule, 6 moments/day
 |  0640   | 0054 (84) | Weekly schedule, 6 moments/day
-|  0694   | 000C (12) | ?
+|  0694   | 000C (12) | Electricity price
 |  06A0   | 000F (15) | Phone number customer service UI
 |  06AF   | 000F (15) | ?
 |  06BE   | 0023 (35) | Error history (format: 5x E1 E2 YY MM DD HH mm)
