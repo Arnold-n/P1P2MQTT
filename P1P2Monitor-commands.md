@@ -78,9 +78,10 @@ A few pre-defined parameter writing actions are still available from earlier P1P
 ## Auxiliary controller commands:
 
 - L1 sets auxiliary controller mode on (controller address (0xF0 or 0xF1) is auto-detected after check whether another auxiliary controller is present or not) (can also be set in P1P2Config.h) (controller ID is saved in EEPROM, so this command remains effective after a restart),
-- L0 sets auxiliary controller mode off,
+- L0 sets auxiliary controller mode off (remains effective after restart),
 - L2 (and L3) switch auxiliary controller mode off (and on) but do not save this change to EEPROM,
 - L5 (F-series only) switches auxiliary controller mode partially on: only 00F030 messages are responded to. This enable monitoring which 00F03x packets will be requested. Not saved to EEPROM,
+- L99 (E-series only) restarts Daikin system, use with care!
 - L  displays current controller_id (0x00 = off; 0xF0/0xF1 is first/secondary auxiliary controller),
 - C1 triggers single cycle of 6 B8 packets to request (energy/operation/starts) counters from heat pump,
 - C2 like C1, but keeps repeating every new minute,
