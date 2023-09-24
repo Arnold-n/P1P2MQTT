@@ -11,6 +11,8 @@ To comply with the license conditions of the BSPs and library dependencies and t
 
 The modified BSP adds bit-banging SPI support for non-HSPI pins to the ESP8266AVRISP library. This is required for updating the ATmega328P firmware on the P1P2-ESP-interface v1.1 (October 2022 version).
 
+A local modified copy of the ESP8266HTTPUpdateServer library is used to provide an update mechanism for both the ESP8266 (finished) and for the ATmega328P (planned).
+
 The w5500 ethernet driver hangs and (WDT-)crashes the ESP8266 if the w5500 hardware is not present, the modified BSP implements [this solution](https://github.com/esp8266/Arduino/issues/8498).
 
 You can use the unmodified BSP if (1) you have either the W5500 adapter installed or if you undefine ETHERNET in examples/P1P2-bridge-esp8266/P1P2Config.h, and (2) as long as you do not need to upgrade the ATmega328P firmware (you can temporarily use a provided P1P2-bridge-ESP8266 firmware image for that purpose).
