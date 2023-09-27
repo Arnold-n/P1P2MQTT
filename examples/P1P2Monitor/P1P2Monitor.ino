@@ -675,13 +675,29 @@ void loop() {
                         Serial_println(F("* Previous parameter write action still busy"));
                         break;
                       } else if ( (n = sscanf(RSp, (const char*) "%2x%2d%2x", &wr_pt, &wr_nr, &wr_val)) == 3) {
-                        if ((wr_pt != 0x38) && (wr_pt != 0x3B)) {
+                        // Valid write parameters
+                        // FDY  38 0 1 2 4 6 8
+                        // FXMQ 38 0 1 2 4 6 8
+                        // FDYQ 3B 0 1 2 4 6 8 16 17
+                        //
+                        // check wr_pt
+#if defined FDY || defined FXMQ
+                        if (wr_pt != 0x38) {
                           Serial_print(F("* wr_pt: 0x"));
                           Serial_print(wr_pt, HEX);
-                          Serial_println(F(" is not 0x38 or 0x3B"));
+                          Serial_println(F(" is not 0x38"));
                           break;
                         }
-                        // check valid write parameters
+#endif
+#ifdef FDYQ
+                        if (wr_pt != 0x3B) {
+                          Serial_print(F("* wr_pt: 0x"));
+                          Serial_print(wr_pt, HEX);
+                          Serial_println(F(" is not 0x3B"));
+                          break;
+                        }
+#endif
+                        // check wr_nr
                         if ((wr_nr > 17) || (wr_nr == 3) || (wr_nr == 5) || (wr_nr == 7) || ((wr_nr >= 9) && (wr_nr <= 15)) || ((wr_nr == 16) && (wr_pt == 0x38)) || ((wr_nr == 17) && (wr_pt == 0x38))) {
                           Serial_print(F("* wr_nr invalid, should be 0, 1, 2, 4, 6, 8 (or for packet type 0x3B: 16 or 17): "));
                           Serial_println(wr_nr);
@@ -1753,10 +1769,51 @@ void loop() {
               wr = 1;
               n = 3;
               break;
-// messages and payload lengths:
-// FDY  0x38  16/15 / 0x39  11/4 (todo: check)
-// FYDQ 0x37 / 0x38 / 0x3C
-// FXMQ 0x32 / 0x35 / 0x36 / 0x38 / 0x39 / 0x3A
+
+// Messages and payload lengths:
+// FDY          0x30 20/0                                                                              0x38 16/15 / 0x39 11/4
+// FDYQ         0x30 20/0                                      0x3700-0x3706 14/0 0x3707-0x3713 16/0                                       0x3B 20/19 / 0x3C 12/2
+// FXMQ         0x30 20/0   0x32 8/1   0x35 19/0   0x36 19/0                                           0x38 20/17   0x39 14/5   0x3A 18/8
+
+// Compatible systems:
+// FDY:   FDY125LV1, 2002 FBQ*B*, ADEQ100B2VEB, perhaps also: FBQ35B7V1
+// FDYQ:  FDYQ180MV1
+// FXMQ:  FXMQ200PWM and/or FXMQ100PAVE ?, FDYQN160LAV1, perhaps also: FBA60A9
+
+/*
+You can use the following commands with spaces:
+
+For FDY/FXMQ-like systems, try using
+F 38 0 1     to switch on
+F 38 0 0     to switch off
+F 38 1 61    to set heating mode
+F 38 1 62    to set cooling mode
+F 38 1 63    to set auto mode
+F 38 1 67    to set dry mode
+F 38 1 60    to set fan-only mode
+F 38 2 17    to set the setpoint to 0x17 = 23C (cooling mode)
+F 38 2 19    to set the setpoint to 0x19 = 25C
+F 38 4 11    to set the fanmode to low         (cooling mode)
+F 38 4 31    to set the fanmode to medium
+F 38 4 51    to set the fanmode to high
+F 38 6 17    to set the setpoint to 0x17 = 23C (heating mode)
+F 38 6 19    to set the setpoint to 0x19 = 25C
+F 38 8 11    to set the fanmode to low         (heating mode)
+F 38 8 31    to set the fanmode to medium
+F 38 8 51    to set the fanmode to high
+F 38 16 ?? (not sure yet, active hvac zones related)
+F 38 17 ?? (not sure yet, target fan mode related)
+or the following commands without spaces with extra zeroes in first and second operand:
+F38001     to switch on
+F38000     to switch off
+F380217    to set the setpoint to 0x17 = 23C
+F380219    to set the setpoint to 0x19 = 25C
+F380411    to set the fanmode to low
+etc
+
+For FDYQ-like systems, try using the same commands with packet type 38 replaced by 3B.
+*/
+
 #ifdef FDY
             case 0x38 : // FDY control message, copy bytes back and change if 'F' command is given
               wr = controlLevel;
