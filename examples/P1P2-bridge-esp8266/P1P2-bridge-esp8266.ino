@@ -60,10 +60,11 @@
 #include <time.h>
 #include <TZ.h>
 
-// WEBSERVER
+#ifdef WEBSERVER
 #include "P1P2_ESP8266HTTPUpdateServer/P1P2_ESP8266HTTPUpdateServer.h"
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
+#endif /* WEBSERVER */
 
 //const char* MY_TZ[2] = {TZ_Europe_Amsterdam, TZ_Europe_London};
 const char* MY_TZ[2] = { "CET-1CEST,M3.5.0/02,M10.5.0/03"   , "GMT0BST,M3.5.0/1,M10.5.0" };
@@ -224,8 +225,10 @@ bool shouldSaveConfig = false;
 static byte crc_gen = CRC_GEN;
 static byte crc_feed = CRC_FEED;
 
+#if defined AVRISP || defined WEBSERVER
+const char* P1P2_host = "P1P2";
+#endif
 #ifdef AVRISP
-const char* avrisp_host = "esp8266-avrisp";
 const uint16_t avrisp_port = 328;
 ESP8266AVRISP* avrprog;
 #endif
@@ -1552,6 +1555,9 @@ void setup() {
   });
   ArduinoOTA.begin();
 
+#if defined AVRISP || defined WEBSERVER
+  MDNS.begin(P1P2_host);
+#endif
 #ifdef AVRISP
 // AVRISP
   // set RESET_PIN high, to prevent ESP8266AVRISP from resetting ATmega328P
@@ -1559,20 +1565,17 @@ void setup() {
   avrprog = new ESP8266AVRISP(avrisp_port, RESET_PIN, ESPhwID ? SPI_SPEED_1 : SPI_SPEED_0);
   // set RESET_PIN back to INPUT mode
   pinMode(RESET_PIN, INPUT);
-  MDNS.begin(avrisp_host);
   MDNS.addService("avrisp", "tcp", avrisp_port);
-
-
-// WEBSERVER
-  httpUpdater.setup(&httpServer);
-  httpServer.begin();
-  MDNS.addService("http", "tcp", 80);
-
-
   Sprint_P(true, true, true, PSTR("* [ESP] AVRISP: ATmega programming: avrdude -c avrisp -p atmega328p -P net:%i.%i.%i.%i:%i -t # or -U ..."), local_ip[0], local_ip[1], local_ip[2], local_ip[3], avrisp_port);
   // listen for avrdudes
   avrprog->begin();
 #endif
+
+#ifdef WEBSERVER
+  httpUpdater.setup(&httpServer);
+  httpServer.begin();
+  MDNS.addService("http", "tcp", 80); // TODO testing
+#endif /* WEBSERVER */
 // Allow ATmega to enable serial input/output
   digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
   pinMode(ATMEGA_SERIAL_ENABLE, OUTPUT);
@@ -1700,7 +1703,9 @@ void loop() {
   // OTA
   ArduinoOTA.handle();
 
+#ifdef WEBSERVER
   httpServer.handleClient();
+#endif /* WEBSERVER */
 
   // ESP-uptime and loop timing
   uint32_t currMillis = millis();
@@ -1790,8 +1795,10 @@ void loop() {
   }
   // Serve the AVRISP client
   if (last_state != AVRISP_STATE_IDLE) avrprog->serve();
-  MDNS.update();
 #endif /* AVRISP */
+#if defined AVRISP || defined WEBSERVER
+  MDNS.update();
+#endif
 
   // network and mqtt connection check
   // if (WiFi.isConnected() || eth.connected()) {//} // TODO this does not work. eth.connected() becomes true after 4 minutes even if there is no ethernet cable attached

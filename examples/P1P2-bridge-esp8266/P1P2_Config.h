@@ -103,8 +103,10 @@
 #define DEBUG_OVER_SERIAL // send debugging output over serial for ESP01S_RX or USB serial interface
 // ETHERNET must be defined if a W5500 adapter is used for ethernet; otherwise ETHERNET is optional, but please
 // note that if W5500 adapter is absent, a BSP with modified w5500 library is required to avoid a WDT reboot when constructor hangs
+#if INIT_ESP_HW_ID > 0
 #define ETHERNET
-#endif
+#endif /* INIT_ESP_HW_ID */
+#endif /* P1P2_ESP_INTERFACE_115 */
 
 #ifdef ARDUINO_COMBIBOARD
 #define SERIALSPEED 250000
@@ -142,6 +144,7 @@
 #define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.42"
 #define HA_SW "0.9.42"
 
+#define WEBSERVER // adds webserver to update firmware of ESP
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface
 #define SPI_SPEED_0 2e5 // for HSPI, default avrprog speed is 3e5, which is too high to be reliable; 2e5 works
 #define SPI_SPEED_1   0 // for BB-SPI
@@ -247,7 +250,9 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #define RX_BUFFER_SIZE 2048 // to avoid serial buffer overruns (512 is too small)
 #define MQTT_MIN_FREE_MEMORY 6000 // Must likely be more than 4kB, MQTT messages will not be transmitted if available memory is below this value
 #define MQTT_QOS 0 // QOS = 1 is too slow
+#ifndef SERIAL_MAGICSTRING
 #define SERIAL_MAGICSTRING "1P2P" // Serial input of ATmega should start with SERIAL_MAGICSTRING, otherwise lines line is ignored by P1P2Monitor
+#endif /* SERIAL_MAGICSTRING */
 #ifndef TH_SERIES
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
 #else /* TH_SERIES */

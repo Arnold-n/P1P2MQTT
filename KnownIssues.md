@@ -15,7 +15,15 @@
 
  - Arduino/XL1192 or MM1192 based adapters should preferably not be connected to the P1/P2 bus if the adapter is not powered by the Arduino
 
-### Older versions
+### Todo list
 
- - Commands 'E'/'n' broken in P1P2Monitor until v0.9.17, please upgrde P1P2Monitor to v0.9.17-fix1
- - P1P2Serial (<v0.9.17) may incorrectly report read errors; please upgrade P1P2Monitor to v0.9.17-fix1
+ - COP calculation
+ - HA integration
+ - smart grid / dynamic power limitation
+ - web server
+ - setting field settings
+ - EKHBRD support
+ - documentation
+ - Hitachi support
+ - Toshiba support
+ - Panasonic support
