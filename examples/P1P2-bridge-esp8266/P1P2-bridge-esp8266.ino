@@ -392,7 +392,7 @@ uint32_t Sprint_buffer_overflow = 0;
   /* uniq_id */      mqtt_key[-4], mqtt_key[-2], mqtt_key, haPostfix, \
   /* dev_cla */      ((stateclass == 2) ? "\"dev_cla\":\"energy\"," : ""),\
   /* unit_of_meas */ uom ? "\"unit_of_meas\":\"" : "",\
-  /* unit_of_meas */ ((uom == 13) ? "bar," : ((uom == 12) ? "%" :  ((uom == 11) ? "Hz" :  ((uom == 10) ? "A" :  ((uom == 9) ? "events" : ((uom == 8) ? "byte" : ((uom == 7) ? "ms" : ((uom == 6) ? "s" : ((uom == 5) ? "hours" : ((uom == 4) ? "kWh" : ((uom == 3) ? "L/min" : ((uom == 2) ? "kW" : ((uom == 1) ? "°C" : ""))))))))))))),\
+  /* unit_of_meas */ ((uom == 13) ? "bar" : ((uom == 12) ? "%" :  ((uom == 11) ? "Hz" :  ((uom == 10) ? "A" :  ((uom == 9) ? "events" : ((uom == 8) ? "byte" : ((uom == 7) ? "ms" : ((uom == 6) ? "s" : ((uom == 5) ? "hours" : ((uom == 4) ? "kWh" : ((uom == 3) ? "L/min" : ((uom == 2) ? "kW" : ((uom == 1) ? "°C" : ""))))))))))))),\
   /* unit_of_meas */ uom ? "\"," : "",\
   /* ic */ ((uom == 13) ? "\"ic\":\"mdi:water\"," : ((uom == 12) ? "\"ic\":\"mdi:valve\"," :  ((uom == 11) ? "\"ic\":\"mdi:heat-pump\"," :  ((uom == 10) ? "\"ic\":\"mdi:heat-pump\"," : ((uom == 9) ? "\"ic\":\"mdi:counter\"," : ((uom == 8) ? "\"ic\":\"mdi:memory\"," : ((uom == 7) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 6) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 5) ? "\"ic\":\"mdi:clock-outline\"," : ((uom == 4) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 3) ? "\"ic\":\"mdi:water-boiler\"," : ((uom == 2) ? "\"ic\":\"mdi:transmission-tower\"," : ((uom == 1) ? "\"ic\":\"mdi:coolant-temperature\"," : ""))))))))))))),\
   /* device */       \
