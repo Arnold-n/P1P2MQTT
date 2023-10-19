@@ -45,7 +45,7 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 
 ## P1P2-bridge-esp8266 firmware for ESP8266 on P1P2-ESP-Interface
 
-[P1P2-bridge-esp8266 v0.9.42 (P1P2-ESP-Interface version) for Daikin E-series](P1P2-bridge-esp8266-v0.9.42-Eseries-P1P2MQTT-bridge.ino.bin)
+[P1P2-bridge-esp8266 v0.9.43 (P1P2-ESP-Interface version) for Daikin E-series](P1P2-bridge-esp8266-v0.9.43-Eseries-P1P2MQTT-bridge.ino.bin)
 
 [P1P2-bridge-esp8266 v0.9.42 (P1P2-ESP-Interface version) for Daikin F-series](P1P2-bridge-esp8266-v0.9.42-Fseries-P1P2MQTT-bridge.ino.bin)
 

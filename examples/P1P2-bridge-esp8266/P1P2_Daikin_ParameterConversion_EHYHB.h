@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20231019 v0.9.43 solves resetDataStructure bug (counter in HA not visible, introduced in v0.9.41)
  * 20230604 v0.9.37 add heating/cooling/auto setting report
  * 20230526 v0.9.36 threshold
  * 20230423 v0.9.35 (skipped)
@@ -199,7 +200,7 @@ void resetDataStructures(void) {
     payloadByteVal[j]  = 0;
     payloadByteSeen[j] = 0;
   }
-  for (j = 0; j < 36; j++) cntByte[j] = 0;
+  for (j = 0; j < 36; j++) cntByte[j] = 0xFF;
 #endif /* SAVEPACKETS */
 }
 
