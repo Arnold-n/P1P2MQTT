@@ -28,13 +28,17 @@
 // threshold 128 (*256)= 0.16V
         case    3 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_diff"); VALUE_F_L_thr((FN_u16_LE(&payload[payloadIndex - 0]) -
                                                                          FN_u16_LE(&payload[payloadIndex - 2])) * (20.9 / 1023 / (1 << ADC_AVG_SHIFT)), 2, HYSTERESIS_TYPE_U16, 128); };
+                    break;
         case    7 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_avg"); HAPCONFIG; VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 32768); };
+                    break;
 //      case    9 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 34k3/10k resistor divider, 1.1V range
 //      case   11 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
 // threshold 200 (*256) = 0.04V
         case   11 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_diff"); VALUE_F_L_thr((FN_u16_LE(&payload[payloadIndex - 0]) -
                                                                          FN_u16_LE(&payload[payloadIndex - 2])) * (3.773 / 1023 / (1 << ADC_AVG_SHIFT)), 2, HYSTERESIS_TYPE_U16, 200); };
+                    break;
         case   15 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_avg"); HAPCONFIG; VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 51200); };
+                    break;
         case   18 : KEY("F_max");                                                                                                                VALUE_u8;
         default   : return 0;
       }
