@@ -1,8 +1,66 @@
 **Release notes**
 
+v0.9.43
+
+- improves counter request mechanism
+
+v0.9.42
+
+- MDNS name changed to P1P2
+
+v0.9.41
+
+- adds option to restart after MQTT reconnect
+- Eseries water pressure
+- webserver for ESP update
+- rewrite counter request mechanism
+- reset data structures upon mqtt reconnect, homeassistant restart, or D3 command
+
+v0.9.40
+
+- adds NTP time stamps
+- H-link2 decoding
+
+v0.9.39
+
+- P1P2Serial: H-link increased buffer size
+
+v0.9.38
+
+- P1P2Serial: H-link merge
+
+v0.9.37
+
+- support for V1.2 hardware
+
+v0.9.36
+
+- some thresholding added
+
+v0.9.34
+
+- adds AP timeout
+
+v0.9.32
+
+- resolves bug in HardwareSerial library
+
+v0.9.31
+
+- P1P2Monitor: fix nr_param check
+
+v0.9.30
+
+- switch to ESP_telnet v2.0.0
+
+v0.9.29
+
+- defrost info
+
 v0.9.28 (November 12, 2022)
 
 - adds static IPv4 option
+- option to insert message in 40F030 time slot
 
 v0.9.27 (November 12, 2022)
 
@@ -127,9 +185,9 @@ v0.9.6
 - Changed byte counter in documentation: now byte counting in packet starts at 0 to match C coding convention
 - Moved generic protocol documentation to doc/README.md
 
-v0.9.5 
+v0.9.5
 
-- Changed delay behaviour and added delay timeout parameter 
+- Changed delay behaviour and added delay timeout parameter
 - minor bug fixed in reporting bytes to be written (missing leading zero for hex values 0A..0F)
 
 v0.9.4
