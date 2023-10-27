@@ -241,8 +241,8 @@ Header: 400013
 |     6      | 00                 | (only some E systems:) water pressure | u8div10
 |     7      | 00                 | ?
 |    8-9     | 0000-010E          | flow (in 0.1 l/min) (EHV/EHYHB only. Zero on EJHA) | u16div10
-|    10-11   | xxxx               | software version inner unit | u16
-|    12-13   | xxxx               | software version outer unit | u16
+|    10-11   | xxxx               | software version inside unit | u16
+|    12-13   | xxxx               | software version outside unit | u16
 |EHV only: 14| 00                 | ?                           | u8
 |EHV only: 15| 00                 | ?                           | u8
 
@@ -586,8 +586,8 @@ On EJHA\* "Flow" and "software version fields" are not supported.
 | 0018     | TempRefr2                                | no  |                               | u16div10
 | 0027     | Temp (55.0C)?                            | no  |                               | u16div10
 | 002A     | Flow                                     | no  |                               | u16div10
-| 002B     | software version outer unit              | no  |                               | u16hex_BE     
-| 002C     | software version inner unit              | no  |                               | u16hex_BE
+| 002B     | software version inside unit             | no  |                               | u16hex_BE
+| 002C     | software version outside unit            | no  |                               | u16hex_BE
 | FFFF     | Padding pattern                          | no  |                               | u16
 
 ### Parameters for packet type 3B
