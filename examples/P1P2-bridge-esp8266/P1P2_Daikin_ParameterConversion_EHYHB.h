@@ -1320,8 +1320,8 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0027 : PARAM_KEY("Target_Temperature_DHW_3");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; // = 0x13-0x40-0 ??
 // 0x13-0x40-[1-7] unknown;  = 0x0028-0x0029 ?
         case 0x002A : PARAM_KEY("Flow");                                                            CAT_MEASUREMENT;                             PARAM_VALUE_u16div10_BE; // Flow  0x13-0x40-9
-        case 0x002B : PARAM_KEY("SW_Version_Outside_Unit");                                         CAT_SETTING;                                 PARAM_VALUE_u16hex_BE    ; // Flow // 943F (LSB versus MSB?)
-        case 0x002C : PARAM_KEY("SW_Version_Inside_Unit");                                          CAT_SETTING;                                 PARAM_VALUE_u16hex_BE   ; // Flow // 0439 //SW_Version 0x3F943904 0x13-0x40-13
+        case 0x002B : PARAM_KEY("SW_Version_Inside_Unit");                                          CAT_SETTING;                                 PARAM_VALUE_u16hex_BE;
+        case 0x002C : PARAM_KEY("SW_Version_Outside_Unit");                                         CAT_SETTING;                                 PARAM_VALUE_u16hex_BE;
         case 0x002D : PARAM_KEY("Unknown_P36_002D");                                                CAT_SETTING;                                 PARAM_VALUE_u16hex_BE; // no Temp. value 0016 or 040C. Schedule related ?
         case 0xFFFF : return 0;
         default     : UNKNOWN_PARAM16;
