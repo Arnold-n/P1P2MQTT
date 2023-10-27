@@ -703,6 +703,8 @@ void handleCommand(char* cmdString) {
                            EEPROM.put(0, EEPROM_state);
                            EEPROM.commit();
 #endif /* REBOOT_REASON */
+                           // disable ATmega serial output on v1.2
+                           digitalWrite(ATMEGA_SERIAL_ENABLE, LOW);
                            delay(100);
                            ESP.restart();
                            delay(100);
@@ -713,6 +715,8 @@ void handleCommand(char* cmdString) {
                            EEPROM.put(0, EEPROM_state);
                            EEPROM.commit();
 #endif /* REBOOT_REASON */
+                           // disable ATmega serial output on v1.2
+                           digitalWrite(ATMEGA_SERIAL_ENABLE, LOW);
                            delay(100);
                            ESP.reset();
                            delay(100);
