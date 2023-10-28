@@ -330,41 +330,48 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
 #endif /* SAVEPACKETS */
 }
 
-bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte bitNr) {
+bool newPayloadBitsVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte bitNr1, byte bitNr2) {
 // returns whether bit bitNr of byte payload[payloadIndex] has a new value (also returns true if byte has not been saved)
 #ifdef SAVEPACKETS
-  bool newBit = (outputFilter == 0);
+  bool newBits = (outputFilter == 0);
   byte pts = (packetSrc >> 6);
   byte pti = packetType - PCKTP_START;
   if (packetType == 0x30) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x31 also covered
   if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 2; // hack to get 0x31 also covered
   if (payloadIndex == EMPTY_PAYLOAD) {
-    newBit = 0;
-  } else if (bitNr > 7) {
-    // Warning: bitNr > 7
-    newBit = 1;
+    newBits = 0;
+  } else if (bitNr1 > 7) {
+    // Warning: bitNr1 > 7
+    newBits = 1;
+  } else if (bitNr2 > 7) {
+    // Warning: bitNr2 > 7
+    newBits = 1;
+  } else if (bitNr1 > bitNr2) {
+    // Warning: bitNr1 > bitNr2
+    newBits = 1;
   } else if (packetType < PCKTP_START) {
-    newBit = 1;
+    newBits = 1;
   } else if ((packetType > PCKTP_END) && (packetType != 0x30) && (packetType != 0x31)) {
-    newBit = 1;
+    newBits = 1;
   } else if (payloadIndex > nr_bytes[pts][pti]) {
     // Warning: payloadIndex > expected
-    newBit = 1;
+    newBits = 1;
   } else {
     uint16_t pi2 = bytestart[pts][pti] + payloadIndex; // no multiplication, bit-wise only for u8 type
     if (pi2 >= sizeValSeen) {
       pi2 = 0;
       Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
     }
-    byte bitMask = 1 << bitNr;
-    if (payloadByteSeen[pi2] & bitMask) {
-      if ((payloadByteVal[pi2] ^ payload[payloadIndex]) & bitMask) {
-        newBit = (outputFilter <= maxOutputFilter);
-        payloadByteVal[pi2] &= (0xFF ^ bitMask);
-        payloadByteVal[pi2] |= (payload[payloadIndex] & bitMask);
-      } // else payloadBit seen and not changed
+    // byte bitMask = 1 << bitNr;
+    byte bitsMask = ((0x01 << (bitNr2 - bitNr1 + 1)) - 1) << bitNr1;
+    if (payloadByteSeen[pi2] & bitsMask) {
+      if ((payloadByteVal[pi2] ^ payload[payloadIndex]) & bitsMask) {
+        newBits = (outputFilter <= maxOutputFilter);
+        payloadByteVal[pi2] &= (0xFF ^ bitsMask);
+        payloadByteVal[pi2] |= (payload[payloadIndex] & bitsMask);
+      } // else payloadBits seen and not changed
     } else {
-      // first time for this bit
+      // first time for these bits
       if (haConfig) {
         // MQTT discovery
         // HA key
@@ -374,17 +381,21 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
         // publish key,value
         client_publish_mqtt(ha_mqttKey, ha_mqttValue);
       }
-      newBit = 1;
-      payloadByteVal[pi2] &= (0xFF ^ bitMask); // if array initialized to zero, not needed
-      payloadByteVal[pi2] |= payload[payloadIndex] & bitMask;
-      payloadByteSeen[pi2] |= bitMask;
+      newBits = 1;
+      payloadByteVal[pi2] &= (0xFF ^ bitsMask); // if array initialized to zero, not needed
+      payloadByteVal[pi2] |= payload[payloadIndex] & bitsMask;
+      payloadByteSeen[pi2] |= bitsMask;
     }
-    if (outputFilter > maxOutputFilter) newBit = 0;
+    if (outputFilter > maxOutputFilter) newBits = 0;
   }
-  return (haConfig || (outputMode & 0x10000)) && newBit;
+  return (haConfig || (outputMode & 0x10000)) && newBits;
 #else /* SAVEPACKETS */
   return (haConfig || (outputMode & 0x10000));
 #endif /* SAVEPACKETS */
+}
+
+bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte bitNr) {
+  return newPayloadBitsVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, bitNr, bitNr);
 }
 
 bool newParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte paramValLength, byte applyHysteresisType = 0, byte applyHysteresis = 0) {
@@ -546,6 +557,17 @@ bool FN_flag8(uint8_t b, uint8_t n)  { return (b >> n) & 0x01; }
 uint8_t value_flag8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte bitNr) {
   if (!newPayloadBitVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, bitNr))   return 0;
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", FN_flag8(payload[payloadIndex], bitNr));
+  return 1;
+}
+
+// multiple bits
+
+byte FN_bits(uint8_t b, uint8_t n1, uint8_t n2)  { return (b >> n1) & ((0x01 << (n2 - n1 + 1)) - 1); }
+
+uint8_t value_bits(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, byte bitNr1, byte bitNr2) {
+// use bits bitNr1 .. bitNr2
+  if (!newPayloadBitsVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, bitNr1, bitNr2))   return 0;
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", FN_bits(payload[payloadIndex], bitNr1, bitNr2));
   return 1;
 }
 
@@ -1105,6 +1127,7 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define VALUE_s16_LE            { return         value_s16_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 
 #define VALUE_flag8             { return       value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, bitNr); }
+#define VALUE_bits(n1, n2)      { return       value_bits(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, n1, n2); }
 #define UNKNOWN_BIT             { CAT_UNKNOWN; return        unknownBit(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, bitNr); }
 
 #define VALUE_u8_add2k          { return    value_u8_add2k(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
@@ -1671,11 +1694,13 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    9 : switch (bitNr) {
           case    8 : BITBASIS;
           case    5 : KEY("Heating_Cooling_Auto");                         HACONFIG;                                                             VALUE_flag8;
+          case    6 : return 0;
+          case    7 : KEY("Quiet_Level");                                  HACONFIG;                                                             VALUE_bits(6, 7); // 2-bit : 01 = silent-level 1; 02= level 3; 03=level 3; and 0 if Quiet_Mode is 0 (off)
           default   : UNKNOWN_BIT;
         }
         case   10 : switch (bitNr) {
           case    8 : BITBASIS;
-          case    2 : KEY("Quiet_Mode");                                   HACONFIG;                                                             VALUE_flag8;
+          case    2 : KEY("Quiet_Mode_OnOff");                             /* no HACONFIG as Quiet_level>0 implies Quiet_Mode */                  VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
         case   12 : BITBASIS_UNKNOWN;
@@ -2102,14 +2127,14 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                   if (LWT_changed || MWT_changed || Flow_changed) {
                     Power1 = (LWT - MWT) * Flow * 0.0697;
                     KEY("Power_Gasboiler");
-                    LWT_changed = MWT_changed = Flow_changed = 0;          HACONFIG; HAPOWER;
+                    LWT_changed = 0;                                      HACONFIG; HAPOWER;
                     SRC(9);                                                                                                                      VALUE_F(Power1);
                   } else return 0;
         case  1 : // power produced by heat pump
                   if (RWT_changed || MWT_changed || Flow_changed) {
                     Power2 = (MWT - RWT) * Flow * 0.0697;
                     KEY("Power_Heatpump");
-                    LWT_changed = MWT_changed = Flow_changed = 0;
+                    RWT_changed = MWT_changed = Flow_changed = 0;
                     SRC(9);                                                HACONFIG; HAPOWER;                                                    VALUE_F(Power2);
                   } else return 0;
         case  2 : // terminate json string at end of package
