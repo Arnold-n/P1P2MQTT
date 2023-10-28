@@ -21,8 +21,6 @@
 //#define ADC_CNT_SHIFT 4     // P1P2Serial sums 16384 = 2^(16-ADC_CNT_SHIFT) samples to V0avg/V1avg
       case 0x00 : maxOutputFilter = 1;
                   switch (payloadIndex) {
-        case   16 : KEY("ATmega_controlLevel");                                                          maxOutputFilter = 9;                    VALUE_u8;
-        case   17 : KEY("ATmega_controlLevel_bin");                                                      maxOutputFilter = 9;                    VALUE_u8;
 //      case    1 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_min"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   }; // based on 180k/10k resistor divider, 1.1V range
 //      case    3 : if (ESPhwID) { KEY("V_bus_ATmega_ADC_max"); VALUE_F_L(FN_u16_LE(&payload[payloadIndex]) * (20.9  / 1023 / (1 << ADC_AVG_SHIFT)), 2);   };
 // threshold 128 (*256)= 0.16V
@@ -39,7 +37,9 @@
                     break;
         case   15 : if (ESPhwID) { KEY("V_3V3_ATmega_ADC_avg"); HAPCONFIG; VALUE_F_L_thr(FN_u32_LE(&payload[payloadIndex]) * (3.773 / 1023 / (1 << (16 - ADC_CNT_SHIFT))), 4, HYSTERESIS_TYPE_U32, 51200); };
                     break;
-        case   18 : KEY("F_max");                                                                                                                VALUE_u8;
+        case   16 : KEY("Bridge_Control_Level");                                                         maxOutputFilter = 9;                    VALUE_u8;
+        case   17 : KEY("Bridge_Control_OnOff");                                                         maxOutputFilter = 9;                    VALUE_u8;
+        case   18 : KEY("Auxiliary_Slots_Cnt");                                                                                                  VALUE_u8;
         default   : return 0;
       }
       case 0x40 : switch (payloadIndex) {
@@ -63,8 +63,8 @@
         case    3 : KEY("ATmega_Uptime");                                  HAPCONFIG; HASECONDS;         maxOutputFilter = 2;                    VALUE_u32_LE_uptime;
         case    7 : KEY("CPU_Frequency");                                                                                                        VALUE_u32_LE;
         case    8 : KEY("Writes_Refused");                                 HACONFIG;                                                             VALUE_u8;
-        case    9 : KEY("Counter_Request_Repeat");                         HAPCONFIG;                                                            VALUE_u8;
-        case   10 : KEY("Counter_Request_Counter");                                                      maxOutputFilter = 2;                    VALUE_u8;
+        case    9 : KEY("Bridge_Counter_Request_OnOff");                   HACONFIG;                                                             VALUE_u8;
+        case   10 : KEY("Bridge_Counter_Request_Counter");                                               maxOutputFilter = 2;                    VALUE_u8;
         case   11 : KEY("Error_Oversized_Packet_Count");                   HACONFIG;                                                             VALUE_u8;
         case   12 : KEY("Parameter_Write_Request");                                                                                              VALUE_u8;
         case   13 : KEY("Parameter_Write_Packet_Type");                                                                                          VALUE_u8hex;
@@ -103,6 +103,7 @@
         case   13 : KEY("Verbose_EEPROM");                                                                                                       VALUE_u8;
         case   14 : KEY("Counter_Request_Repeat_EEPROM");                                                                                        VALUE_u8;
         case   15 : KEY("EEPROM_Signature_Match");                                                                                               VALUE_u8;
+        case   16 : KEY("Scope_Mode");                                                                                                           VALUE_u8;
         case   17 : KEY("Error_Read_Count");                               HACONFIG;                                                             VALUE_u8;
         case   18 : KEY("Error_Read_Type");                                HACONFIG;                                                             VALUE_u8;
         case   19 : KEY("Control_ID");                                     HACONFIG;                                                             VALUE_u8hex;
