@@ -469,6 +469,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
 }
 
 void onMqttPublish(uint16_t packetId) {
+  // not called for QOS 0
   Sprint_P(true, false, false, PSTR("* [ESP] Publish acknowledged of packetId %i"), packetId);
   Mqtt_acknowledged++;
   if (packetId != prevpacketId + 1) Mqtt_gap++;
@@ -507,7 +508,7 @@ void ATmega_dummy_for_serial() {
 }
 
 bool MQTT_commandReceived = false;
-char MQTT_commandString[MAX_COMMAND_LENGTH];
+char MQTT_commandString[MAX_COMMAND_LENGTH + 1];
 bool telnetCommandReceived = false;
 char telnetCommandString[MAX_COMMAND_LENGTH];
 char readBuffer[RB];
@@ -832,7 +833,7 @@ void handleCommand(char* cmdString) {
     case 'g':
     case 'G':
     case 'h':
-    case 'H': // commands v/g/h handled both by P1P2-bridge-esp8266 and P1P2Moniotr
+    case 'H': // commands v/g/h handled both by P1P2-bridge-esp8266 and P1P2Monitor
               switch (cmdString[0]) {
                 case 'v':
                 case 'V': Sprint_P(true, true, true, PSTR(WELCOMESTRING));
@@ -947,22 +948,72 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
   static bool MQTT_drop = false;
   (void) payload;
   if (!len) {
-    Serial_println(F("* [ESP] Empty MQTT payload received and ignored"));
-  } else if (index + len > 0xFF) {
-    Serial_println(F("* [ESP] Received MQTT payload too long"));
-  } else if ((!strcmp(topic, mqttCommands)) || (!strcmp(topic, mqttCommandsNoIP))) {
+    Serial_println(F("* [ESP] Empty MQTT payload received, ignored"));
+    return;
+  }
+#ifdef MQTT_INPUT_BINDATA
+  if ((!strcmp(topic, mqttInputBinData)) || (!mqttInputBinData[MQTT_KEY_PREFIXIP - 1]) && !strncmp(topic, mqttInputBinData, MQTT_KEY_PREFIXIP - 1)) {
+    // topic is either P1P2/X (or P1P2/X/xxx if xxx=mqttInputByte4 is defined)
+    if (index == 0) MQTT_drop = false;
+    if ((outputMode & 0x8000) && mqttSetupReady) {
+      uint16_t MQTT_readBufferH_new = MQTT_readBufferH + 3 + (total << 1); // 2 for "R ", 2 per byte, 1 for '\n'
+      if (((MQTT_readBufferH_new >= MQTT_RB)  && ((MQTT_readBufferT > MQTT_readBufferH) || (MQTT_readBufferT <= (MQTT_readBufferH_new - MQTT_RB)))) ||
+          ((MQTT_readBufferH_new  < MQTT_RB)  &&  (MQTT_readBufferT > MQTT_readBufferH) && (MQTT_readBufferT <= MQTT_readBufferH_new))) {
+        // buffer overrun
+        Sprint_P(true, false, false, PSTR("* [MON2] Mqtt packet input buffer overrun, dropped, index %i len %i total %i"), index, len, total);
+        MQTT_drop = true;
+      } else if (!MQTT_drop) {
+        if (index == 0) {
+          MQTT_readBuffer_writeChar('R');
+          MQTT_readBuffer_writeChar(' ');
+        }
+        for (uint16_t i = 0; i < len; i++) MQTT_readBuffer_writeHex(payload[i]);
+        if (index + len == total) MQTT_readBuffer_writeChar('\n');
+      }
+    } else {
+      // ignore based on outputMode
+    }
+    return;
+  }
+#endif /* MQTT_INPUT_BINDATA */
+#ifdef MQTT_INPUT_HEXDATA
+  if ((!strcmp(topic, mqttInputHexData)) || (!mqttInputHexData[MQTT_KEY_PREFIXIP - 1]) && !strncmp(topic, mqttInputHexData, MQTT_KEY_PREFIXIP - 1)) {
+    // topic is either P1P2/R (or P1P2/R/xxx if xxx=mqttInputByte4 is defined)
+    if (index == 0) MQTT_drop = false;
+    if ((outputMode & 0x4000) && mqttSetupReady) {
+      uint16_t MQTT_readBufferH_new = MQTT_readBufferH + total + 1; // 1 for '\n'
+      if (((MQTT_readBufferH_new >= MQTT_RB)  && ((MQTT_readBufferT > MQTT_readBufferH) || (MQTT_readBufferT <= (MQTT_readBufferH_new - MQTT_RB)))) ||
+          ((MQTT_readBufferH_new  < MQTT_RB)  &&  (MQTT_readBufferT > MQTT_readBufferH) && (MQTT_readBufferT <= MQTT_readBufferH_new))) {
+        // buffer overrun
+        Sprint_P(true, false, false, PSTR("* [MON2] Mqtt packet input buffer overrun, dropped, index %i len %i total %i"), index, len, total);
+        MQTT_drop = true;
+      } else if (!MQTT_drop) {
+        for (uint16_t i = 0; i < len; i++) MQTT_readBuffer_writeChar(payload[i]);
+        if (index + len == total) MQTT_readBuffer_writeChar('\n');
+      }
+    } else {
+      // ignore based on outputMode
+    }
+    return;
+  }
+#endif /* MQTT_INPUT_HEXDATA */
+  if ((!strcmp(topic, mqttCommands)) || (!strcmp(topic, mqttCommandsNoIP))) {
+    // topic is either P1P2/W or P1P2/W/xxx
     if (MQTT_commandReceived) {
       Serial_println(F("* [ESP] Ignoring MQTT command, previous command is still being processed"));
     } else {
-      if (total + 1 >= MAX_COMMAND_LENGTH) {
+      if (total > MAX_COMMAND_LENGTH) {
         Serial_println(F("* [ESP] Received MQTT command too long"));
       } else {
-        strlcpy(MQTT_commandString + index, payload, len + 1); // create null-terminated copy
+        // create null-terminated copy
+        strlcpy(MQTT_commandString + index, payload, len + 1);
         MQTT_commandString[index + len] = '\0';
         if (index + len == total) MQTT_commandReceived = true;
       }
     }
-  } else if (!strcmp(topic, "homeassistant/status")) {
+    return;
+  }
+  if (!strcmp(topic, "homeassistant/status")) {
     if (total + 1 >= MAX_HASTATUS_LENGTH) {
       Serial_println(F("* [ESP] Received homeassistant/status message too long"));
     } else {
@@ -983,49 +1034,11 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
         }
       }
     }
-#ifdef MQTT_INPUT_BINDATA
-  } else if ((!strcmp(topic, mqttInputBinData)) || (!mqttInputBinData[MQTT_KEY_PREFIXIP - 1]) && !strncmp(topic, mqttInputBinData, MQTT_KEY_PREFIXIP - 1)) {
-    if (index == 0) MQTT_drop = false;
-    if ((outputMode & 0x8000) && mqttSetupReady) {
-      uint16_t MQTT_readBufferH_new = MQTT_readBufferH + 3 + (total << 1); // 2 for "R ", 2 per byte, 1 for '\n'
-      if (((MQTT_readBufferH_new >= MQTT_RB)  && ((MQTT_readBufferT > MQTT_readBufferH) || (MQTT_readBufferT <= (MQTT_readBufferH_new - MQTT_RB)))) ||
-          ((MQTT_readBufferH_new  < MQTT_RB)  &&  (MQTT_readBufferT > MQTT_readBufferH) && (MQTT_readBufferT <= MQTT_readBufferH_new))) {
-        // buffer overrun
-        Sprint_P(true, false, false, PSTR("* [MON2] Mqtt packet input buffer overrun, dropped, index %i len %i total %i"), index, len, total);
-        MQTT_drop = true;
-      } else if (!MQTT_drop) {
-        if (index == 0) {
-          MQTT_readBuffer_writeChar('R');
-          MQTT_readBuffer_writeChar(' ');
-        }
-        for (uint16_t i = 0; i < len; i++) MQTT_readBuffer_writeHex(payload[i]);
-        if (index + len == total) MQTT_readBuffer_writeChar('\n');
-      }
-    } else {
-      // ignore based on outputMode
-    }
-#endif /* MQTT_INPUT_BINDATA */
-#ifdef MQTT_INPUT_HEXDATA
-  } else if ((!strcmp(topic, mqttInputHexData)) || (!mqttInputHexData[MQTT_KEY_PREFIXIP - 1]) && !strncmp(topic, mqttInputHexData, MQTT_KEY_PREFIXIP - 1)) {
-    if (index == 0) MQTT_drop = false;
-    if ((outputMode & 0x4000) && mqttSetupReady) {
-      uint16_t MQTT_readBufferH_new = MQTT_readBufferH + total + 1; // 1 for '\n'
-      if (((MQTT_readBufferH_new >= MQTT_RB)  && ((MQTT_readBufferT > MQTT_readBufferH) || (MQTT_readBufferT <= (MQTT_readBufferH_new - MQTT_RB)))) ||
-          ((MQTT_readBufferH_new  < MQTT_RB)  &&  (MQTT_readBufferT > MQTT_readBufferH) && (MQTT_readBufferT <= MQTT_readBufferH_new))) {
-        // buffer overrun
-        Sprint_P(true, false, false, PSTR("* [MON2] Mqtt packet input buffer overrun, dropped, index %i len %i total %i"), index, len, total);
-        MQTT_drop = true;
-      } else if (!MQTT_drop) {
-        for (uint16_t i = 0; i < len; i++) MQTT_readBuffer_writeChar(payload[i]);
-        if (index + len == total) MQTT_readBuffer_writeChar('\n');
-      }
-    } else {
-      // ignore based on outputMode
-    }
-#endif /* MQTT_INPUT_HEXDATA */
-  } else {
-    Serial_println(F("Unknown MQTT topic received"));
+    return;
   }
+  Serial_print(F("* [ESP] Unknown MQTT topic received: "));
+  Serial_println(topic);
+  Serial_println(mqttControlHA);
 }
 
 #ifdef TELNET
@@ -1037,7 +1050,6 @@ void onInputReceived (String str) {
       Serial_println(F("* [ESP] Received MQTT command too long"));
     } else {
       strlcpy(telnetCommandString, str.c_str(), str.length() + 1); // create null-terminated copy
-      telnetCommandString[str.length()] = '\0';
       telnetCommandReceived = true;
     }
   }
@@ -1537,7 +1549,6 @@ void setup() {
   });
   ArduinoOTA.onError([](ota_error_t error) {
     Sprint_P(true, false, false, PSTR("* [ESP] Error[%u]: "), error);
-    Sprint_P(true, false, false, PSTR("* Error[%u]: "), error);
     if (error == OTA_AUTH_ERROR) {
       Serial_println(F("* Auth Failed"));
       Sprint_P(true, true, true, PSTR("* [ESP] OTA Auth Failed"));
@@ -1600,6 +1611,7 @@ void setup() {
   delay(1000);
   mqttSetupReady = true;
   configTime(MY_TZ[0], MY_NTP_SERVER);
+  client_publish_mqtt("P1P2/Z", mqttSignal + MQTT_KEY_PREFIXIP);
 }
 
 static int jsonTerm = 1; // indicates whether json output was terminated
@@ -1670,10 +1682,16 @@ void process_for_mqtt_json(byte* rb, int n) {
 
 byte timeStamp = 30;
 
+#define PWB (24*2+33) // max pseudopacket 24 bytes (incl CRC byte)
+
 void writePseudoPacket(byte* WB, byte rh)
-// rh is packet size (without CRC byte)
+// rh is pseudo packet size (without CRC byte)
 {
-  char pseudoWriteBuffer[RB]; // TODO RB is too large
+  char pseudoWriteBuffer[PWB];
+  if ((rh * 2 + 33) > PWB ) {
+    Sprint_P(true, true, true, PSTR("* [ESP] rh > PWB error"));
+    return;
+  }
   time(&now);
   localtime_r(&now, &tm);
   snprintf(pseudoWriteBuffer, 33, "R %04i-%02i-%02i_%02i:%02i:%02i P         ", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
@@ -1735,8 +1753,11 @@ void loop() {
       Mqtt_disconnectTime++;
     }
     if (milliInc < 1000) {
-      if ((throttleValue > 1) && ((espUptime - throttleStart) > (THROTTLE_VALUE - throttleValue + 1) * THROTTLE_STEP)) throttleValue--;
-        Sprint_P(true, true, false, PSTR("* [ESP] Uptime %li"), espUptime);
+      if ((throttleValue > 1) && ((espUptime - throttleStart) > (THROTTLE_VALUE - throttleValue + 1) * THROTTLE_STEP)) {
+        throttleValue--;
+        Sprint_P(true, true, false, PSTR("* [ESP] throttling %i"), throttleValue);
+        if (throttleValue == 1) Sprint_P(true, true, false, PSTR("* [ESP] Ready throttling"));
+      }
         // alternative, more info: Sprint_P(true, true, false, PSTR("* [ESP] %d RSSI %d heap %d maxfreeblocksize %d Uptime %li disconnects %d WiFi %d ethernet %d status %d"), espUptime, WiFi.RSSI(), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(), espUptime, Mqtt_disconnects, WiFi.isConnected(), eth.connected(), eth.status());
       if (espUptime >= espUptime_telnet + 10) {
         espUptime_telnet = espUptime_telnet + 10;
@@ -1773,7 +1794,7 @@ void loop() {
   AVRISPState_t new_state = avrprog->update();
   if (last_state != new_state) {
     switch (new_state) {
-      case AVRISP_STATE_IDLE:    Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] now idle"));
+      case AVRISP_STATE_IDLE:    Sprint_P(true, true, true, PSTR("* [AVR] now idle"));
                                  digitalWrite(RESET_PIN, LOW);
                                  pinMode(RESET_PIN, OUTPUT);
                                  delay(1);
@@ -1788,10 +1809,10 @@ void loop() {
                                  ATmega_dummy_for_serial();
                                  ATmega_uptime_prev = 0;
                                  break;
-      case AVRISP_STATE_PENDING: Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] connection pending"));
+      case AVRISP_STATE_PENDING: Sprint_P(true, true, true, PSTR("* [AVR] connection pending"));
                                  pinMode(RESET_PIN, OUTPUT);
                                  break;
-      case AVRISP_STATE_ACTIVE:  Sprint_P(true, true, true, PSTR("* [ESP-AVRISP] programming mode"));
+      case AVRISP_STATE_ACTIVE:  Sprint_P(true, true, true, PSTR("* [AVR] programming mode"));
                                  pinMode(RESET_PIN, OUTPUT);
                                  break;
     }
@@ -1853,13 +1874,14 @@ void loop() {
   }
   wasConnected = WiFi.isConnected() || ethernetConnected;
 
-  // handle incoming command
   if (!OTAbusy)  {
     // Non-blocking serial input
     // serial_rb is number of char received and stored in RB
     // rb_buffer = readBuffer + serial_rb // +20 for timestamp
     // ignore first line and too-long lines
     // readBuffer does not include '\n' but may include '\r' if Windows provides serial input
+    //
+    // handle incoming command(s) for ESP from telnet or MQTT
     if (MQTT_commandReceived) {
       Serial_print(F("* [ESP] handleCommand MQTT commandString ->"));
       Serial_print((char*) MQTT_commandString);
@@ -1876,7 +1898,12 @@ void loop() {
       handleCommand(telnetCommandString);
       telnetCommandReceived = false;
     }
-
+    // handle P1/P2 data from ATmega328P or from MQTT or from serial
+    // use non-blocking serial input
+    // serial_rb is number of char received and stored in readBuffer
+    // rb_buffer = readBuffer + serial_rb
+    // ignore first line and too-long lines
+    // readBuffer does not include '\n' but may include '\r' if Windows provides serial input
     // read serial input OR MQTT_readBuffer input until and including '\n', but do not store '\n'
 #if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
     while (((c = MQTT_readBuffer_readChar()) >= 0) && (c != '\n') && (serial_rb < RB)) {
@@ -2052,7 +2079,9 @@ void loop() {
       readHex[17] = (outputMode >> 8) & 0xFF;
       readHex[18] = outputMode & 0xFF;
       readHex[19] = haOnline;
-      for (int i = 20; i <= 22; i++) readHex[i]  = 0x00; // reserved for future use
+      readHex[20] = 0x00;
+      readHex[21] = 0x00;
+      readHex[22] = 0x00; // reserved for future use
       writePseudoPacket(readHex, 23);
     }
     if (pseudo0E > 5) {

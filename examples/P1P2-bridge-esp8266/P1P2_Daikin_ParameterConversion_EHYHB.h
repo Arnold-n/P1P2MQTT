@@ -56,8 +56,8 @@
 #define CAT_COUNTER      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'C'); } // kWh/hour counters
 #define CAT_PSEUDO2      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'B'); } // 2nd ESP operation
 #define CAT_PSEUDO       { if (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] != 'B') mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'A'; } // ATmega/ESP operation
-#define CAT_TARGET       { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'D'); } // D desired
-#define CAT_DAILYSTATS   { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'R'); } // Results per day (tbd)
+// unused #define CAT_TARGET       { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'D'); } // D desired
+// unused #define CAT_DAILYSTATS   { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'R'); } // Results per day (tbd)
 #define CAT_SCHEDULE     { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'E'); } // Schedule
 #define CAT_UNKNOWN      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'U'); }
 
@@ -95,7 +95,7 @@
 char TimeString1[20] = "Mo 2000-00-00 00:00";    // reads time from packet type 0x12
 char TimeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 0x31 (+weekday from packet 12)
 byte SelectTimeString2 = 0; // to check whether TimeString2 was recently seen
-int TimeStringCnt = 0;  // reset when TimeString is changed, for use in P1P2TimeStamp
+// int TimeStringCnt = 0;  // reset when TimeString is changed, for use in P1P2TimeStamp
 byte maxOutputFilter = 0;
 
 #define PARAM_TP_START      0x35
@@ -125,13 +125,21 @@ bool scheduleMemSeen[2][SCHEDULE_MEM_SIZE] = {}; // 2 * 1166 = 2332 bytes
 #ifdef SAVEPACKETS
 #ifdef PSEUDO_PACKETS
 #define PCKTP_START  0x08
-#define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 mapped to 0x16
-#define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 3)
+#define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 to 0x16 0x20 0x21 0x60-0x9F mapped to 0x17-0x58
+#define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 3 + 18 + 48)
 //byte packetsrc                                      = { {00                                                                 }, {  40                                                                       }}
-//byte packettype                                     = { {08, 09, 0A, 0B,  0C,  0D, 0E, 0F, 10,  11,  12,  13,  14,  15,  30,  31 }, {  08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  30,  31 }}
-const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,  20, 20, 20, 20,   8,  15,   3,  15,   6,   2,   6 }, {   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0,   0 }};
-const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     = { { 0,  0,  0,  0,   0,   0, 20, 40, 60,  80,  88, 103, 106, 121, 127, 129 }, { 135, 135, 155, 175, 195, 195, 215, 235, 255, 275, 295, 315, 329, 348, 354, 354 /* , sizeValSeen=354 */ }};
-#define sizeValSeen 354
+//byte packettype                                     =
+
+// 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  30,  31,  20,  21,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  6A,  6B,  6C,  6D,  6E,  6F,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  7A,  7B,  7C,  7D,  7E,  7F,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  8A,  8B,  8C,  8D,  8E,  8F,  90,  91,  92,  93,  94,  95,  96,  97,  98,  99,  9A,  9B,  9C,  9D,  9E,  9F
+const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     =
+{{  0,   0,   0,   0,   0,  20,  20,  20,  20,   8,  15,   3,  15,   6,   2,   6,   0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20 } ,
+{   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20 }};
+
+const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     =
+{{  0,   0,   0,   0,   0,   0,  20,  40,  60,  80,  88, 103, 106, 121, 127, 129, 135, 155, 175, 195, 215, 235, 255, 275, 295, 315, 335, 355, 375, 395, 415, 435, 455, 475, 495, 515, 535, 555, 575, 595, 615, 635, 655, 675, 695, 715, 735, 755, 775, 795, 815, 835, 855, 875, 895, 915, 935, 955, 975, 995,1015,1035,1055,1075,1095,1115,1135,1155,1175,1195,1215,1235,1255,1275,1295,1315,1335,1355,1375,1395,1415,1435 } ,
+{1455,1455,1475,1495,1515,1515,1535,1555,1575,1595,1615,1635,1649,1668,1674,1674,1674,1694,1714,1734,1754,1774,1794,1814,1834,1854,1874,1894,1914,1934,1954,1974,1994,2014,2034,2054,2074,2094,2114,2134,2154,2174,2194,2214,2234,2254,2274,2294,2314,2334,2354,2374,2394,2414,2434,2454,2474,2494,2514,2534,2554,2574,2594,2614,2634,2654,2674,2694,2714,2734,2754,2774,2794,2814,2834,2854,2874,2894,2914,2934,2954,2974
+ /* ,sizeValSeen=2994 */ }};
+#define sizeValSeen 2994
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
 #else /* PSEUDO_PACKETS */
@@ -168,7 +176,8 @@ static byte stateclass = 0;
 // #define HYSTERESIS_TYPE_S_F8_8 5 // F-series
 #define HYSTERESIS_TYPE_U16 5
 #define HYSTERESIS_TYPE_U32 6
-#define HYSTERESIS_SIZE_F8_8 25     // 25/256 ~ 0.1
+
+#define HYSTERESIS_SIZE_F8_8 20     // 25/256 ~ 0.1 // TODO do better
 #define HYSTERESIS_SIZE_F8S8 1      //  1/10  = 0.1
 #define HYSTERESIS_SIZE_U16DIV10 1  //  1/10  = 0.1
 #define HYSTERESIS_SIZE_S16DIV10 1  //  1/10  = 0.1
@@ -214,14 +223,25 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
 #ifdef SAVEPACKETS
   bool newByte = (outputFilter == 0);
   byte pts = (packetSrc >> 6) & 0x01;
-  byte pti = packetType - PCKTP_START;
-  if (packetType == 0x30) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x30 also covered, treat it as PCKTP_END + 1 (0x16)
-  if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 2; // hack to get 0x31 also covered, treat it as PCKTP_END + 2 (0x17)
+  byte pti = 0xFF;
+  switch (packetType) {
+    case 0x08 ... 0x15 : pti = packetType - PCKTP_START;
+                break;
+    case 0x20 : pti = (PCKTP_END - PCKTP_START) + 3;
+                break;
+    case 0x21 : pti = (PCKTP_END - PCKTP_START) + 4;
+                break;
+    case 0x30 : pti = (PCKTP_END - PCKTP_START) + 1;
+                break;
+    case 0x31 : pti = (PCKTP_END - PCKTP_START) + 2;
+                break;
+    case 0x60 ... 0x9F : pti = (PCKTP_END - PCKTP_START) + 5 + (packetType - 0x60);
+                break;
+    default   : /* pti = 0xFF; */ break;
+  }
   if (payloadIndex == EMPTY_PAYLOAD) {
     newByte = 0;
-  } else if (packetType < PCKTP_START) {
-    newByte = 1;
-  } else if ((packetType > PCKTP_END) && (packetType != 0x30) && (packetType != 0x31)) {
+  } else if (pti == 0xFF) {
     if (packetType == 0xB8) {
       // Handle 0xB8 history
       uint16_t pi2 = payloadIndex;
@@ -295,7 +315,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       uint16_t pi2 = pi2base + i;
       if (pi2 >= sizeValSeen) {
         pi2 = 0;
-        Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
+        Sprint_P(true, true, true, PSTR("Warning: pi2 %i > sizeValSeen, Src 0x%02X Tp 0x%02X Index %i "), pi2, packetSrc, packetType, i);
         return 0;
       }
       if (payloadByteSeen[pi2]) {
@@ -335,9 +355,23 @@ bool newPayloadBitsVal(byte packetSrc, byte packetType, byte payloadIndex, byte*
 #ifdef SAVEPACKETS
   bool newBits = (outputFilter == 0);
   byte pts = (packetSrc >> 6);
-  byte pti = packetType - PCKTP_START;
-  if (packetType == 0x30) pti = (PCKTP_END - PCKTP_START) + 1; // hack to get 0x31 also covered
-  if (packetType == 0x31) pti = (PCKTP_END - PCKTP_START) + 2; // hack to get 0x31 also covered
+
+  byte pti = 0xFF;
+  switch (packetType) {
+    case 0x08 ... 0x15 : pti = packetType - PCKTP_START;
+                break;
+    case 0x20 : pti = (PCKTP_END - PCKTP_START) + 3;
+                break;
+    case 0x21 : pti = (PCKTP_END - PCKTP_START) + 4;
+                break;
+    case 0x30 : pti = (PCKTP_END - PCKTP_START) + 1;
+                break;
+    case 0x31 : pti = (PCKTP_END - PCKTP_START) + 2;
+                break;
+    case 0x60 ... 0x9F : pti = (PCKTP_END - PCKTP_START) + 5 + (packetType - 0x60);
+                break;
+    default   : /* pti = 0xFF; */ break;
+  }
   if (payloadIndex == EMPTY_PAYLOAD) {
     newBits = 0;
   } else if (bitNr1 > 7) {
@@ -352,6 +386,8 @@ bool newPayloadBitsVal(byte packetSrc, byte packetType, byte payloadIndex, byte*
   } else if (packetType < PCKTP_START) {
     newBits = 1;
   } else if ((packetType > PCKTP_END) && (packetType != 0x30) && (packetType != 0x31)) {
+    newBits = 1;
+  } else if (pti == 0xFF) {
     newBits = 1;
   } else if (payloadIndex > nr_bytes[pts][pti]) {
     // Warning: payloadIndex > expected
@@ -658,8 +694,8 @@ uint8_t value_f8s8(byte packetSrc, byte packetType, byte payloadIndex, byte* pay
 
 // change to Watt ?
 uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, float v, int length = 0, byte thresholdType = 0, uint16_t thresholdSize = 0) {
-  if (length && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1, thresholdType, thresholdSize))) return 0;
-  if (!length) newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1);
+  if ((length > 0) && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1, thresholdType, thresholdSize))) return 0;
+  if (!length) newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1, thresholdType, thresholdSize);
 #ifdef __AVR__
   dtostrf(v, 1, 2, mqtt_value);
 #else
@@ -1049,9 +1085,12 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0xEC : FIELDKEY("[F_0B]_A.3.1.1.6.1_Shutoff_Valve_Closed_During_Thermo_OFF"); // 0 default No, 1 Yes
     case 0xED : FIELDKEY("[F_0C]_A.3.1.1.6.2_Shutoff_Valve_Closed_During_Cooling"); // 0 No, 1 default Yes
     case 0xEE : FIELDKEY("[F_0D]_A.2.1.9_Pump_Operation_Mode"); // 0 continuous, 1 sample ([C-07]=0, LWT control), 2 request ([C-07] <> 0, RT control)
+    case 0xFFFF : return 0; // dummy field setting // TODO check
     default   : // 31x packetSrc = 0x40 (src = '1'): all printed values zero.
                 byte f = packetSrc ? 0xFF : 0x00;
                 if ((payload[payloadIndex] == (f | 0x01) )   && (payload[payloadIndex - 1] == f) && (payload[payloadIndex - 2] == f)  && (payload[payloadIndex - 3] == f)) return 0;
+                if ((payload[payloadIndex] ==  f         )   && (payload[payloadIndex - 1] == f) && (payload[payloadIndex - 2] == f)  && (payload[payloadIndex - 3] == f)) return 0; // TODO check ?
+                Sprint_P(true, true, true, PSTR("* Fieldsetting unknown 0x%02X 0x%02X    0x%02X 0x%02X 0x%02X 0x%02X"), packetSrc, paramNr, payload[payloadIndex - 3], payload[payloadIndex - 2], payload[payloadIndex - 1], payload[payloadIndex]);
                 FIELDKEY("Fieldsetting_Unknown");
   }
   // byte 2
@@ -1067,14 +1106,15 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
   uint16_t fieldSettingMax        = fieldSettingMin + payload[payloadIndex - 2] * (fieldSettingStepMantissa * (fieldSettingStepExponent ? (fieldSettingStepExponentSign ? 0.100001 : 10) : 1)); // <0.1 >10 not yet observed / unsure how to implement
   float fieldSettingVal        = fieldSettingMin + (payload[payloadIndex - 3] & 0x3F)  * (fieldSettingStepMantissa * (fieldSettingStepExponent ? (fieldSettingStepExponentSign ? 0.1 : 10) : 1)); // <0.1 >10 not yet observed / unsure how to implement
   if (fieldSettingStepExponentSign) {
-    snprintf(mqtt_value, MQTT_VALUE_LEN, "{\"val\":%1.1f, \"min\":%i, \"max\":%i, \"stepsize\":0.%i}", fieldSettingVal, fieldSettingMin, fieldSettingMax, fieldSettingStepMantissa);
+    snprintf(mqtt_value, MQTT_VALUE_LEN, "{\"val\":%1.1f, \"min\":%i, \"max\":%i, \"stepsize\":0.%i, \"bits\":\"%i%i\"i, \"bitsstep\":\"0x%02X\"}", fieldSettingVal, fieldSettingMin, fieldSettingMax, fieldSettingStepMantissa, fieldSettingUnknownBitsVal >> 7, (fieldSettingUnknownBitsVal >> 6) & 0x01, fieldSettingUnknownBitsStep);
   } else {
-    snprintf(mqtt_value, MQTT_VALUE_LEN, "{\"val\":%1.0f, \"min\":%i, \"max\":%i, \"stepsize\":%i}", fieldSettingVal, fieldSettingMin, fieldSettingMax, fieldSettingStepMantissa * (fieldSettingStepExponent ? 10 : 1));
+    snprintf(mqtt_value, MQTT_VALUE_LEN, "{\"val\":%1.0f, \"min\":%i, \"max\":%i, \"stepsize\":%i, \"bits\":\"%i%i\"i, \"bitsstep\":\"0x%02X\"}", fieldSettingVal, fieldSettingMin, fieldSettingMax, fieldSettingStepMantissa * (fieldSettingStepExponent ? 10 : 1), fieldSettingUnknownBitsVal >> 7, (fieldSettingUnknownBitsVal >> 6) & 0x01, fieldSettingUnknownBitsStep);
   }
   return 1;
 }
 
-uint8_t field_setting(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value/*, char &cat*/) {
+uint8_t field_setting(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig/*, char &cat*/) {
+  if (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 4, 1)) return 0;
   byte FieldNr1 = (packetType + 0x04) & 0x0F;
   byte FieldNr2 = (8 - ((packetType & 0xF0) >> 4)) * 5 + (payloadIndex >> 2);
   uint16_t paramNr = FieldNr1 * 0x0F + FieldNr2;
@@ -1170,6 +1210,7 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define PARAM_VALUE_u16hex_LE   { return      param_value_hex_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u16hex_BE   { return      param_value_hex_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u24hex_LE   { return      param_value_hex_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
+#define PARAM_VALUE_u24hex_BE   { return      param_value_hex_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_VALUE_u32hex_LE   { return      param_value_hex_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig, paramValLength); }
 #define PARAM_FIELD_SETTING           { return param_field_setting(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_key, mqtt_value, haConfig/*, cat*/); }
 
@@ -1182,14 +1223,19 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 
 #define HANDLE_PARAM(paramValLength)     { return handleParam(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, /*cat,*/ paramValLength); }
 
-#define FIELD_SETTING           { return     field_setting(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value/*, cat*/); }
+#define FIELD_SETTING           { return     field_setting(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig/*, cat*/); }
 
 #define BITBASIS_UNKNOWN        { switch (bitNr) { case 8 : BITBASIS; default : UNKNOWN_BIT; } }
+
+
+
+
 #define TERMINATEJSON           { return 9; }
 
 #define BITBASIS                { return newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 0) << 3; }
 // BITBASIS returns 8 if at least one bit of a byte changed, or if at least one bit of a byte hasn't been seen before, otherwise 0
 // value of byte and of seen status should not be saved (yet) (saveSeen=0), this is done on bit basis
+// stateclass in HA: 1 measurement 2 total_increasing (increases only exc for periodic reset) 3 total (may increase/decrease)
 
 #define HACONFIG { haConfig = 1; uom = 0; stateclass = 0;};
 #define HATEMP { uom = 1;  stateclass = 1;};
@@ -1230,18 +1276,33 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
       case 0x40 : // parameters aux -> main
                                                                                                     CAT_SETTING;
                   switch (paramNr) {
+        case 0x0000 : PARAM_KEY("Reboot_related_Q10-35-00");                                                                                           PARAM_VALUE_u8; //  0x00 0x01
+        case 0x0001 : PARAM_KEY("Reboot_related_Q11-35-01");                                                                                           PARAM_VALUE_u8; //  0x00 0x01
+        case 0x0003 : PARAM_KEY("Quiet_Mode_35");                                                                                                PARAM_VALUE_u8;
+        case 0x0004 : PARAM_KEY("Reboot_related_Q11-35-01");                                                                                           PARAM_VALUE_u8; //  0x00 0x01
+
+
         case 0x000A : PARAM_KEY("Heatpump_Active_Q0");                                                                                           PARAM_VALUE_u8; // ?
         case 0x003C : PARAM_KEY("Heatpump_Active_Q1");                                                                                           PARAM_VALUE_u8; // ? or circ pump?
-        case 0x0003 : PARAM_KEY("Quiet_Mode_35");                                                                                                PARAM_VALUE_u8;
         case 0x000E : PARAM_KEY("Circulation_Pump");                                                                                             PARAM_VALUE_u8;
         case 0x0011 : PARAM_KEY("DHW_Related_Q");                                                                                                PARAM_VALUE_u8; // DHW  ??
-        case 0x0012 : PARAM_KEY("DHW_Active_0");                                                                                                 PARAM_VALUE_u8; // DHW active or flow sensor
+        case 0x0012 : PARAM_KEY("Gasboiler_Active");                                                                                             PARAM_VALUE_u8;
         case 0x0019 : PARAM_KEY("kWh_Preferential_Mode");                                                                                        PARAM_VALUE_u8;
-        case 0x002E : PARAM_KEY("LWT_Control_OnOff_1");                                                                                          PARAM_VALUE_u8;
-        case 0x002F : PARAM_KEY("LWT_Control_OnOff_2");                                                                                          PARAM_VALUE_u8;
-        case 0x0030 : PARAM_KEY("Room_Temperature_Control_OnOff_1");                                                                             PARAM_VALUE_u8;
-        case 0x0031 : PARAM_KEY("Room_Temperature_Control_OnOff_2");                                                                             PARAM_VALUE_u8;
-        case 0x003A : PARAM_KEY("Heating_Cooling");                                                                                              PARAM_VALUE_u8;
+        case 0x002E : PARAM_KEY("Climate_LWT_OnOff_1");                                                                                          PARAM_VALUE_u8;
+        case 0x002F : PARAM_KEY("Climate_LWT_OnOff_2");                                                                                          PARAM_VALUE_u8;
+        case 0x0030 : if (paramSrc == 0x00) {
+                        PARAM_KEY("Climate_RT_OnOff");
+                      } else {
+                        PARAM_KEY("Climate_RT_OnOff_1");
+                      }                                                                                                                          PARAM_VALUE_u8; // main->aux
+        case 0x0031 : if (paramSrc == 0x40) {
+                        PARAM_KEY("Climate_RT_OnOff");
+                      } else {
+                        PARAM_KEY("Climate_RT_OnOff_2");
+                      }                                                                                                                          PARAM_VALUE_u8; // aux->main
+        case 0x0032 : PARAM_KEY("Heating_Cooling_Q32");                                                                                          PARAM_VALUE_u8; // 0/1 hc off/on? 1=heating?
+        case 0x0039 : PARAM_KEY("Climate_Mode_Heating_Cooling_1");                                                                               PARAM_VALUE_u8; // 1=heating/2=cooling
+        case 0x003A : PARAM_KEY("Climate_Mode_Heating_Cooling_2");                                                                               PARAM_VALUE_u8; // 1=heating/2=cooling
         case 0x0037 : PARAM_KEY("IU_Operation_Mode");                                                                                            PARAM_VALUE_u8; // 0x00 0x01 0x04 0x05 ?? status depends on DHW on/off, heating on/off, and tapwater-flow yes/no ? / seems to match combined info from S1_Valve_Zone_Main and S1_Valve_DHW_Tank
         case 0x003F : PARAM_KEY("DHW_OnOff_2");                                                                                                  PARAM_VALUE_u8; // DHW on/off setting
         case 0x0040 : PARAM_KEY("DHW_OnOff_3");                                                                                                  PARAM_VALUE_u8; // DHW on/off setting
@@ -1249,29 +1310,29 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0042 : PARAM_KEY("DHW_OnOff_5");                                                                                                  PARAM_VALUE_u8; // always 0 on tank-less model?
         case 0x0047 : PARAM_KEY("DHW_Boost_OnOff_1");                                                                                            PARAM_VALUE_u8; // always 0 on tank-less model?
         case 0x0048 : PARAM_KEY("DHW_Boost_OnOff_2");                                                                                            PARAM_VALUE_u8; // always 0 on tank-less model?
-        case 0x0050 : PARAM_KEY("DHW_Active_1");                                                                                                 PARAM_VALUE_u8; // DHW active or flow sensor
-        case 0x0055 : PARAM_KEY("Heating_modus_1");                                                                                              PARAM_VALUE_u8; // ABS / WD / ABS+prog / WD+prog
-        case 0x0056 : PARAM_KEY("Heating_modus_2");                                                                                              PARAM_VALUE_u8; // idem, writable
+        case 0x0050 : PARAM_KEY("DHW_Active");                                                                                                   PARAM_VALUE_u8; // DHW active (DHW flow sensor)
+        case 0x0055 : PARAM_KEY("Heating_modus_1");                                                                                              PARAM_VALUE_u8; // ABS / WD / ABS+prog / WD+prog // bits 0-1 separately? for Climate_Mode_Wd and Climate_Mode_use_deviation
+        case 0x0056 : PARAM_KEY("Heating_modus_2");                                                                                              PARAM_VALUE_u8; // idem, writable // bits 0-1 separately?
         case 0x009D : PARAM_KEY("Counter_Schedules");                                                                                            PARAM_VALUE_u8; // increments at scheduled changes
         case 0x013A ... 0x0145 : return 0; // characters for product name
         case 0x00A2 : return 0; // useless sequence counter?
         // params which change or non-zero, function tbd
-        case 0x0013 : // fallthrough 0x00 0x01
+        case 0x0013 : PARAM_KEY("Reboot_related_Q12-35-13");                                                                                           PARAM_VALUE_u8; //  0x00 0x01
+        case 0x0023 : PARAM_KEY("Reboot_related_Q13-35-23");                                                                                           PARAM_VALUE_u8; //  0x00 0x01 UI/LCD?
+        case 0x0027 : PARAM_KEY("Reboot_related_Q14-35-27");                                                                                           PARAM_VALUE_u8; //  0x00 0x01 UI/LCD?
+        case 0x004D : PARAM_KEY("Reboot_related_Q15-35-4D");                                                                                           PARAM_VALUE_u8; //  0x00 0x01
+        case 0x004E : PARAM_KEY("Reboot_related_Q15-35-4E");                                                                                           PARAM_VALUE_u8; //
+        case 0x005A : PARAM_KEY("Reboot_related_Q16-35-5A");                                                                                           PARAM_VALUE_u8; //  0x00 0x01 related to F036-0x0002
+        case 0x005C : PARAM_KEY("Reboot_related_Q17-35-5C");                                                                                           PARAM_VALUE_u8; //  0x00 0x7F
+        case 0x009B : PARAM_KEY("Reboot_related_Q18-35-9B");                                                                                           PARAM_VALUE_u8; //  0x00 0x01 0x02
         case 0x0021 : // fallthrough
         case 0x0022 : // fallthrough
-        case 0x0023 : // fallthrough 0x01
-        case 0x0027 : // fallthrough
-        case 0x0039 : // fallthrough
-        case 0x004E : // fallthrough
         case 0x004F : // fallthrough
-        case 0x005A : // fallthrough 0x01-0x00 related to F036-0x0002
-        case 0x005C : // fallthrough 0x7F
         case 0x0088 : // fallthrough
         case 0x008D : // fallthrough
         case 0x0093 : // fallthrough
         case 0x0098 : // fallthrough
         case 0x009A : // fallthrough
-        case 0x009B : // fallthrough 0x02
         case 0x00B4 : // fallthrough
         case 0x00B6 : // fallthrough
         case 0x00B7 : // fallthrough
@@ -1314,12 +1375,12 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
       case 0x00 :
       case 0x40 :
                   switch (paramNr) {
-        case 0x0000 : PARAM_KEY("Target_Temperature_Room");                                         CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; // 0x0000 = 0x10-0x_0-(7/8)
-        case 0x0001 : PARAM_KEY("Temperature_Unknown_Q1");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; //  15.0? (min/max heating?)
+        case 0x0000 : PARAM_KEY("Target_Temperature_Room_Heating");                                 CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
+        case 0x0001 : PARAM_KEY("Target_Temperature_Room_Cooling");                                 CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
         case 0x0002 : PARAM_KEY("Temperature_Room_1");                                              CAT_TEMP;                                    PARAM_VALUE_u16div10_BE; // Temproom1 (reported by main controller)
         case 0x0003 : PARAM_KEY("Target_Temperature_DHW_1");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; // = 0x13-0x40-0
         case 0x0004 : PARAM_KEY("Target_Temperature_DHW_2");                                        CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
-        case 0x0005 : PARAM_KEY("Unknown_Pulse_Q");                                                 CAT_UNKNOWN;                                 PARAM_VALUE_u16div10_and_u16hex_BE;   // 0xFE69 pulse /0xFe68  regular value ??0 / B8 related ??
+        case 0x0005 : PARAM_KEY("Temperature_DHW_Tank");                                            CAT_TEMP;                                    PARAM_VALUE_s16div10_BE; // R5T DHW_tank temp
         case 0x0006 : PARAM_KEY("Target_Setpoint_LWT_Heating_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
         case 0x0007 : PARAM_KEY("Target_Setpoint_LWT_Cooling_Zone_Main");                            CAT_SETTING;                                 PARAM_VALUE_u16div10_BE;
         case 0x0008 : PARAM_KEY("Deviation_LWT_Heating_Zone_Main");                                 CAT_SETTING;                                 PARAM_VALUE_s16div10_BE;
@@ -1331,7 +1392,7 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x000E : PARAM_KEY("Deviation_LWT_Cooling_Zone_Add");                                  CAT_SETTING;                                 PARAM_VALUE_s16div10_BE;
         case 0x000F : PARAM_KEY("Target_LWT_Zone_Add");                                             CAT_TEMP;                                    PARAM_VALUE_u16div10_BE;
 
-        case 0x0010 : PARAM_KEY("Target_Temperature_Q10");                                          CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; // 30.0
+        case 0x0010 : PARAM_KEY("Target_Temperature_Room_Q10");                                     CAT_SETTING;                                 PARAM_VALUE_u16div10_BE; // 30.0
         case 0x0011 : PARAM_KEY("Temperature_Outside_1");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_BE; // Tempout1  in 0.5 C // ~ 0x11-0x40-5
         case 0x0012 : PARAM_KEY("Temperature_Outside_2");                                           CAT_TEMP;                                    PARAM_VALUE_s16div10_BE; // Tempout2 in 0.1 C
         case 0x0013 : PARAM_KEY("Temperature_Room_2");                                              CAT_TEMP;                                    PARAM_VALUE_u16div10_BE; // Temproom2 (copied by Daikin system with minor delay)
@@ -1344,8 +1405,12 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
 // 0x13-0x40-[1-7] unknown;  = 0x0028-0x0029 ?
         case 0x002A : PARAM_KEY("Flow");                                                            CAT_MEASUREMENT;                             PARAM_VALUE_u16div10_BE; // Flow  0x13-0x40-9
         case 0x002B : PARAM_KEY("SW_Version_Inside_Unit");                                          CAT_SETTING;                                 PARAM_VALUE_u16hex_BE;
-        case 0x002C : PARAM_KEY("SW_Version_Outside_Unit");                                         CAT_SETTING;                                 PARAM_VALUE_u16hex_BE;
+        case 0x002C : if (payload[payloadIndex] || payload[payloadIndex - 1]) {
+                        PARAM_KEY("SW_Version_Outside_Unit");                                       CAT_SETTING;                                 PARAM_VALUE_u16hex_BE;
+                      }
+                      return 0;
         case 0x002D : PARAM_KEY("Unknown_P36_002D");                                                CAT_SETTING;                                 PARAM_VALUE_u16hex_BE; // no Temp. value 0016 or 040C. Schedule related ?
+        case 0x002E : PARAM_KEY("Unknown_P36_002E");                                                CAT_SETTING;                                 PARAM_VALUE_u16hex_BE; // 0x0000
         case 0xFFFF : return 0;
         default     : UNKNOWN_PARAM16;
         }
@@ -1354,7 +1419,8 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
 
     case 0x37 :
                 switch (paramSrc) {
-      case 0x00 :
+      case 0x00 : // 0x01010D 0x010D00 reboot related?
+                  PARAM_KEY("Reboot_related_param37_Q");                                            CAT_UNKNOWN;                                PARAM_VALUE_u24hex_BE;
       case 0x40 :
                   switch (paramNr) {
         case 0xFFFF : return 0;
@@ -1392,9 +1458,8 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x001B : PARAM_KEY("Hours_Gasboiler_DHW");                                                                                          PARAM_VALUE_u32_BE;
         case 0x001C : PARAM_KEY("Starts_Compressor");                                                                                            PARAM_VALUE_u32_BE;
         case 0x001D : PARAM_KEY("Starts_Gasboiler");                                                                                             PARAM_VALUE_u32_BE;
+        case 0x001E : PARAM_KEY("Packet15_Byte0_2");                                                                                             PARAM_VALUE_u32_BE;
         case 0xFFFF : return 0;
-        case 0x001E : // observed value 540B0000
-                      // fallthrough
         default     : UNKNOWN_PARAM32;
       }
       case 0x40 : // parameters written by auxiliary controller (does this happen?)
@@ -1444,13 +1509,14 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x003F : PARAM_KEY("Unit_Temperature");                                                                                             PARAM_VALUE_u8;
         case 0x0040 : PARAM_KEY("Unit_Energy");                                                                                                  PARAM_VALUE_s8;
         case 0x004B : PARAM_KEY("Unit_DST");                                                                                                     PARAM_VALUE_s8;
-        case 0x004C : PARAM_KEY("Quiet_Mode_3A");                                                                                                PARAM_VALUE_s8;
-        case 0x004D : PARAM_KEY("Quiet_Level");                                                                                                  PARAM_VALUE_s8;
-        case 0x004E : PARAM_KEY("Mode_Cooling_Heating");                                                                                         PARAM_VALUE_s8;
+        case 0x004C : PARAM_KEY("Quiet_UI_Mode");                                                                                                PARAM_VALUE_s8; // interface quiet-menu mode 0=auto 1=off 2=on
+        case 0x004D : PARAM_KEY("Quiet_Level");                                                                                                  PARAM_VALUE_s8; // 0=mild .. 2=most silent
+        case 0x004E : PARAM_KEY("Climate_Mode");                                                                                                 PARAM_VALUE_s8; // heating/cooling/auto
         case 0x005B : PARAM_KEY("Holiday");                                                                                                      PARAM_VALUE_s8;
         case 0x005E : PARAM_KEY("Schedule_Heating");                                                                                             PARAM_VALUE_s8;
         case 0x005F : PARAM_KEY("Schedule_Cooling");                                                                                             PARAM_VALUE_s8;
         case 0x0064 : PARAM_KEY("Schedule_DHW");                                                                                                 PARAM_VALUE_s8;
+        case 0x005D : PARAM_KEY("DHW_temp_semidegree");                                                                                          PARAM_VALUE_u8; // TODO: semi degrees; 0x00 = -16C; 0x98 = 60C
         case 0xFFFF : return 0;
         case 0x0003 ... 0x0008 : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x0009 ... 0x001C : // all 0x52
@@ -1459,7 +1525,6 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0041            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x0044 ... 0x0048  : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x005C            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
-        case 0x005D            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x0060            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x0066            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x0067            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
@@ -1541,6 +1606,7 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
       case 0x40 :
                   switch (paramNr) {
         case 0xFFFF : return 0;
+        case 0x001E : PARAM_KEY("Packet15_Byte3_5");                                                                                             PARAM_VALUE_u32_BE;
         case 0x0002 : // observed non-zero
         case 0x0005 : // observed non-zero
         case 0x000B : // observed non-zero
@@ -1551,11 +1617,11 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0017 : // observed non-zero 0x402F0200
         case 0x001B : // observed non-zero 0x402F0200
         case 0x001A : // observed non-zero
-        case 0x001F : // observed non-zero
+        case 0x001F : // observed non-zero 0x00000352 = packet15 bytes 3-5
         default   : byte f = paramSrc ? 0xFF : 0x00;
                     if ((payload[payloadIndex] == f)   && (payload[payloadIndex - 1] == f) && (payload[payloadIndex - 2] == f)  && (payload[payloadIndex - 3] == f)) return 0;
-                    FIELDKEY("Fieldsetting_Q_Unknown");
-                        UNKNOWN_PARAM32;
+//                    FIELDKEY("Fieldsetting_Q_Unknown");
+                    UNKNOWN_PARAM32;
         }
       default   : return 0;
       }
@@ -1611,11 +1677,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
   byte payloadByte = 0;
   byte* payloadPointer = 0;
   if (payloadIndex != EMPTY_PAYLOAD) {
-    payloadByte = (payloadIndex == EMPTY_PAYLOAD ? 0 : payload[payloadIndex]);
-    payloadPointer = (payloadIndex == EMPTY_PAYLOAD ? 0 : &payload[payloadIndex]);
+    payloadByte = payload[payloadIndex];
+    payloadPointer = &payload[payloadIndex];
   };
 
-  byte PS = packetSrc ? 1 : 0;
+  byte PS = packetSrc ? ((packetSrc == 0x80) ? 6 : 1) : 0; // 0x80 used? TODO
   byte src = PS;
   if ((packetType & 0xF0) == 0x30) src += 2;  // 2, 3 from/to auxiliary controller (use 4, 5 for 2nd auxiliary controller?)
   if ((packetType & 0xF8) == 0x00) src = 7; // boot
@@ -1674,14 +1740,19 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       case 0x00 : switch (payloadIndex) {
         case    0 : switch (bitNr) {
           case    8 : BITBASIS;
-          case    0 : KEY("Heating_OnOff");                                HACONFIG;                                                              VALUE_flag8;
+          case    0 : KEY("Climate_OnOff");                                HACONFIG;                                                              VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
         case    1 : switch (bitNr) {
           case    8 : BITBASIS;
-          case    0 : KEY("Heating_OnOff");                               HACONFIG;                                                              VALUE_flag8;
-          case    1 : KEY("Cooling_OnOff");                               HACONFIG;                                                              VALUE_flag8;
-          case    7 : KEY("Operation_Mode_01");                                                                                                  VALUE_flag8;
+          case    0 : KEY("Climate_Mode_Heating");                                  HACONFIG;                                                              VALUE_flag8; // =? Space_CH_Op_or_BPH // wasClimate_LWT_OnOff
+          case    1 : KEY("Climate_Mode_Cooling");                               HACONFIG;                                                              VALUE_flag8;
+          case    7 : KEY("Climate_RT_OnOff");                                                                                                          VALUE_flag8; // =? Space_heating_Operation_ONOFF
+//        case    2 : KEY("Reboot_related_Q10-00-1-2");                                                                                              VALUE_flag8;
+//        case    3 : KEY("Reboot_related_Q10-00-1-3");                                                                                              VALUE_flag8;
+//        case    4 : KEY("Reboot_related_Q10-00-1-4");                                                                                              VALUE_flag8;
+//        case    5 : KEY("Reboot_related_Q10-00-1-5");                                                                                              VALUE_flag8;
+//        case    6 : KEY("Reboot_related_Q10-00-1-6");                                                                                              VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
         case    2 : switch (bitNr) {
@@ -1690,9 +1761,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           default   : UNKNOWN_BIT;
         }
         case    7 : return 0;
-        case    8 : KEY("Target_Temperature_Room");                        HACONFIG; HATEMP;                                                     VALUE_f8s8;
+        case    8 : KEY("Target_Temperature_Room_Heating");                HACONFIG; HATEMP;                                                     VALUE_f8s8;
         case    9 : switch (bitNr) {
           case    8 : BITBASIS;
+                      // 0..4 reboot related ?
           case    5 : KEY("Heating_Cooling_Auto");                         HACONFIG;                                                             VALUE_flag8;
           case    6 : return 0;
           case    7 : KEY("Quiet_Level");                                  HACONFIG;                                                             VALUE_bits(6, 7); // 2-bit : 01 = silent-level 1; 02= level 3; 03=level 3; and 0 if Quiet_Mode is 0 (off)
@@ -1703,9 +1775,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case    2 : KEY("Quiet_Mode_OnOff");                             /* no HACONFIG as Quiet_level>0 implies Quiet_Mode */                  VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
-        case   12 : BITBASIS_UNKNOWN;
-        case   15 : BITBASIS_UNKNOWN;
-        case   17 : switch (bitNr) {
+        case   12 : switch (bitNr) {
+          case    8 : BITBASIS; // bit 3 reboot related?
+          case    3 : KEY("Reboot_related_Q10-00-12-3");                                                                                              VALUE_flag8;
+          default   : UNKNOWN_BIT;
+        }
+//        case   13 : KEY("Reboot_related_Q10-00-13");                       CAT_UNKNOWN;                                                          VALUE_u8hex;
+        case   15 : return 0;
+        case   16 : KEY("Target_Temperature_Room_Cooling");                HACONFIG; HATEMP;                                                     VALUE_f8s8; // 15.0, 20.0, or 26.0?, or 111.5 (?!)
+        case   17 : switch (bitNr) { // DHW (tank) mode
           case    8 : BITBASIS;
           case    1 : KEY("DHW_Booster_Active");                           HACONFIG;                                                             VALUE_flag8;
           case    6 : KEY("DHW_Related_Q");                                                                                                      VALUE_flag8;
@@ -1718,23 +1796,28 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       case 0x40 : switch (payloadIndex) {
         case    0 : switch (bitNr) {
           case  8 : BITBASIS;
-          case  0 :   KEY("Heating_OnOff_1");                             HACONFIG;                                                              VALUE_flag8;
-          case  1 :   KEY("Cooling_OnOff_1");                             HACONFIG;                                                              VALUE_flag8;
+          case  0 :   KEY("Climate_OnOff");                             HACONFIG;                                                              VALUE_flag8; // was Climate_LWT_OnOff
+          case  1 :   KEY("Climate_Mode_Q2");                                   HACONFIG;                                                              VALUE_flag8;
           default :   UNKNOWN_BIT;
         }
-        case    1 :             BITBASIS_UNKNOWN;
+        case    1 : switch (bitNr) {
+          case    8 : BITBASIS;
+          case    7 : KEY("Climate_RT_OnOff");                                                                                                      VALUE_flag8;
+          default   : UNKNOWN_BIT;
+        }
         case    2 : switch (bitNr) {
           case    8 : BITBASIS;
-          case    0 : KEY("Valve_Heating");                                                                                                      VALUE_flag8;
-          case    1 : KEY("Valve_Cooling");                                                                                                      VALUE_flag8;
+          case    0 : KEY("Climate_Mode_Heating");                        HACONFIG;                                                              VALUE_flag8; // earlier than /0/ in auto mode // was: Valve_Heating
+          case    1 : KEY("Climate_Mode_Cooling");                        HACONFIG;                                                              VALUE_flag8; // earlier than /0/ in auto mode // was: Valve_Cooling
+          case    4 : KEY("Climate_Mode_Change_Pulse");                   HACONFIG;                                                              VALUE_flag8; // in auto mode, signals 1 until Climate_Mode_Heating /0/ matches above values
           case    5 : KEY("Valve_Zone_Main");                             HACONFIG;                                                              VALUE_flag8;
           case    6 : KEY("Valve_Zone_Add");                                                                                                     VALUE_flag8;
-          case    7 : KEY("Valve_DHW_Tank");                              HACONFIG;                                                              VALUE_flag8;
+          case    7 : KEY("Valve_DHW_Tank");                              HACONFIG;                                                              VALUE_flag8; // depends on DHW_OnOff and on Heatpump/Compressor being active
           default   : UNKNOWN_BIT;
         }
         case    3 : switch (bitNr) {
           case    8 : BITBASIS;
-          case    0 : KEY("Valve_3Way");                                                                                                         VALUE_flag8;
+          case    0 : KEY("Valve_3Way");                                                                                                         VALUE_flag8; // depends on DHW_OnOff
           case    4 : KEY("SHC_Tank");                                                                                                           VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
@@ -1743,6 +1826,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    6 : BITBASIS_UNKNOWN;
         case    8 : return 0;
         case    9 : KEY("Target_Temperature_Room");                                                                                              VALUE_f8s8;
+        case   10 : switch (bitNr) {
+          case    8 : BITBASIS;
+          case    5 : KEY("Climate_Mode_Auto");                                                                                                  VALUE_flag8;
+          default   : UNKNOWN_BIT; /* perhaps reboot related */
+        }
         case   11 : switch (bitNr) {
           case    8 : BITBASIS;
           case    2 : KEY("Quiet_Mode");                                                                                                         VALUE_flag8;
@@ -1751,6 +1839,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   12 : KEY("ErrorCode1");                                     HACONFIG; CAT_MEASUREMENT;                                            VALUE_u8hex; // coding mechanism unknown. 024D2C = HJ-11 08B908 = 89-2 08B90C = 89-3
         case   13 : KEY("ErrorCode2");                                     HACONFIG; CAT_MEASUREMENT;                                            VALUE_u8hex;
         case   14 : KEY("ErrorSubCode");                                   HACONFIG; CAT_MEASUREMENT;                                            VALUE_u8hex; // >>2 for Subcode, and what are 2 lsbits ??
+//        case   15 : KEY("Reboot_related_Q10-40-15");                                                                                             VALUE_u8hex;
         case   17 : switch (bitNr) {
           case    8 : BITBASIS;
           case    1 : KEY("Defrost_Operation");                            HACONFIG;                                                             VALUE_flag8;
@@ -1776,36 +1865,36 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     case 0x11 :                                                            CAT_TEMP; // includes maxOutputFilter = 1;
                 switch (packetSrc) { // temperatures+flow
       case 0x00 : switch (payloadIndex) {
-        case    0 : return 0;                         // Room temperature, reported by main controller
+        case    0 : return 0;
         case    1 : KEY("Temperature_Room");                               HACONFIG; HATEMP;                                                     VALUE_f8_8;
-        default : UNKNOWN_BYTE;
+//        case    7 : KEY("Reboot_related_Q11-00-7");                                                                                                   VALUE_u8hex;
+        default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
         case    0 : return 0;
         case    1 : KEY("Temperature_Leaving_Water");                      HACONFIG; HATEMP;
                     LWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(LWT_changed); // R2T
         case    2 : return 0;                         // Domestic hot water temperature (on some models)
-        case    3 : KEY("Temperature_DHW_Tank");                            HACONFIG; HATEMP; VALUE_f8_8;                                        VALUE_f8_8;   // DHW tank, unconnected on EHYHBX08AAV3?, then reading -40
+        case    3 : KEY("Temperature_DHW_Tank");                            HACONFIG; HATEMP; VALUE_f8_8;                                        VALUE_f8_8;   // R5T DHW tank, unconnected on EHYHBX08AAV3?, then reading -40.7/-40.8
         case    4 : return 0;                         // Outside air temperature (low res)
         case    5 : KEY("Temperature_Outside_1");                          HACONFIG; HATEMP;                                                     VALUE_f8_8; // outside temperature outside unit
         case    6 : return 0;
-        case    7 : // UOM("C");
-                    KEY("Temperature_Return_Water");                       HACONFIG; HATEMP;
+        case    7 : KEY("Temperature_Return_Water");                       HACONFIG; HATEMP;                                                                   // R4T
                     RWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(RWT_changed);
         case    8 : return 0;
-        case    9 : KEY("Temperature_HP2Gas_Water");                       HACONFIG;HATEMP;  // Leaving water temperature on the heat exchanger
+        case    9 : KEY("Temperature_HP2Gas_Water");                       HACONFIG;HATEMP;                                                                    // R1T Leaving water temperature on the heat exchanger
                     MWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(MWT_changed);
         case   10 : return 0;                         // Refrigerant temperature
-        case   11 : KEY("Temperature_Refrigerant_1");                      HACONFIG;  HATEMP;                                                    VALUE_f8_8;
+        case   11 : KEY("Temperature_Refrigerant_1");                      HACONFIG;  HATEMP;                                                    VALUE_f8_8;  // R3T refrigerant temp liquid side
         case   12 : return 0;                         // Room temperature copied with minor delay by Daikin system
-        case   13 : KEY("Temperature_Room");                               HACONFIG; HATEMP;                                                                                             VALUE_f8_8;
+        case   13 : KEY("Temperature_Room");                               HACONFIG; HATEMP;                                                     VALUE_f8_8;
         case   14 : return 0;                         // Outside air temperature
         case   15 : KEY("Temperature_Outside_2");                          HACONFIG; HATEMP;                                                     VALUE_f8_8; // outside air temperature based on outside unit or based on R6T external sensor
         case   16 : return 0;                         // Unused ?
         case   17 : KEY("Temperature_Unused_400011_16");                   HACONFIG; HATEMP;                                                     VALUE_f8_8;
         case   18 : return 0;                         // Outside air temperature
         case   19 : KEY("Temperature_Unused_400011_18");                   HACONFIG; HATEMP;                                                     VALUE_f8_8;
-        default : UNKNOWN_BYTE;
+        default   : UNKNOWN_BYTE;
       }
       default   : UNKNOWN_BYTE;
     }
@@ -1815,7 +1904,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                   switch (payloadIndex) {
         case    0 : switch (bitNr) {
           case  8 : BITBASIS;
-          case  1 : KEY("Hourly_Pulse");                                                                                                         VALUE_flag8;
+          case  1 : return 0; // suppress hourly pulse reporting
+                    KEY("Hourly_Pulse_0");                                                                                                       VALUE_flag8;
           default :                                                                                                                              UNKNOWN_BIT;
         }
         case    1 : switch (payloadByte) {
@@ -1830,19 +1920,20 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     TimeString2[0] = TimeString1[0];
                     TimeString2[1] = TimeString1[1];
                     return 0;
-        case    2 : if (SelectTimeString2) {
+        case    2 : // Hour
+                    if (SelectTimeString2) {
                       SelectTimeString2--;
                     }
-                              // Switch to TimeString1 if we have not seen a 00Fx31 payload for a few cycli (>6 in view of counter request blocking 6 cycli)
-                              TimeString1[14] = '0' + (payloadByte / 10);
-                              TimeString1[15] = '0' + (payloadByte % 10);
-                              return 0;
-                              KEY("Hours");                                                                                                      VALUE_u8;
-        case    3 :
-                    if (!(SelectTimeString2) && ((TimeString1[18]-'0') != (payloadByte % 10))) TimeStringCnt = 0; // reset at start of new minute
+                    // Switch to TimeString1 if we have not seen a 00Fx31 payload for a few cycli (>6 in view of counter request blocking 6 cycli)
+                    TimeString1[14] = '0' + (payloadByte / 10);
+                    TimeString1[15] = '0' + (payloadByte % 10);
+                    return 0;
+                    KEY("Hours");                                                                                                      VALUE_u8;
+        case    3 : // Minute
+                    // if (!(SelectTimeString2) && ((TimeString1[18]-'0') != (payloadByte % 10))) TimeStringCnt = 0; // reset at start of new minute
                     if (payloadByte != prevMin) {
                       prevMin = payloadByte;
-
+                      // newMin = 1;
                       TimeString1[17] = '0' + (payloadByte / 10);
                       TimeString1[18] = '0' + (payloadByte % 10);
                       if (!SelectTimeString2) printTimeString1 = true;
@@ -1865,26 +1956,29 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       KEY("Date_Time");                                                                                 maxOutputFilter = 2;     VALUE_timeString(TimeString1);
                     }
                     return 0;
-        case   12 : // fallthrough
+        case   12 : KEY("Reboot_trigger");                                                                                                             VALUE_u8hex; // Reboot trigger?
         case   13 : BITBASIS_UNKNOWN;
-        default : UNKNOWN_BYTE;
+        default   : UNKNOWN_BYTE;
       }
       case 0x40 :
                                                                                                     CAT_SETTING; // PacketSrc 40 PacketType12 system settings and operation
                   switch (payloadIndex) {
+        case    1 : KEY("Reboot_related_Q12-40-1");                                                                                                   VALUE_u8hex; // 0x00 0x40
         case   10 : switch (bitNr) {
           case    8 : BITBASIS;
           case    4 : KEY("Preferential_Mode");                            HACONFIG;                                                             VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
+
         case   11 : KEY("Restart_Byte");                                                                                                         VALUE_u8hex;
         case   12 : switch (bitNr) {
           case    8 : BITBASIS;
-          case    0 : KEY("Heatpump_On");                                  HACONFIG;                                                             VALUE_flag8;
-          case    6 : KEY("Gasboiler_On");                                 HACONFIG;                                                             VALUE_flag8; // status depends both on DHW on/off and heating on/off ?
-          case    7 : KEY("DHW_Active_1");                                 HACONFIG;                                                             VALUE_flag8;
+          case    0 : KEY("Climate_On");                                   HACONFIG;                                                             VALUE_flag8;
+          case    6 : KEY("System_On_Q");                                 HACONFIG;                                                             VALUE_flag8; // status depends both on DHW on/off and heating on/off ?
+          case    7 : KEY("DHW_Active_1");                                 HACONFIG;                                                             VALUE_flag8; // (one of the DHW_Active's is likely Gasboiler_Active?)
           default   : UNKNOWN_BIT;
         }
+        case   13 : KEY("Reboot_related_Q12-40-13");                                                                                                   VALUE_u8hex; // 0x00 0x04, or 0x0C during boot?
         default : UNKNOWN_BYTE;
       }
       default   : UNKNOWN_BYTE;
@@ -1893,21 +1987,33 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                                                                                                     CAT_SETTING; // PacketType13 system settings and operation, and flow measurement
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
-        case  2 : KEY("Heating_modus");                                    HACONFIG;                                                             VALUE_u8; // ABS / WD / ABS+prog / WD+prog (only bits 7-6?)
+        case  0 : KEY("UI_Reboot_related_Q");                              HACONFIG;                                                             VALUE_u8hex;
+        case    2 : switch (bitNr) {
+          case    8 : BITBASIS;
+          case    6 : KEY("Climate_Mode_WD");                             HACONFIG;                                                             VALUE_flag8;
+          case    7 : KEY("Climate_Mode_use_deviation");                  HACONFIG;                                                             VALUE_flag8;
+          default   : UNKNOWN_BIT;
+        }
         default : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
         case    0 : return 0;
         case    1 : KEY("Target_Temperature_DHW");                         HACONFIG; HATEMP;                                                     VALUE_f8s8;
-        case    3 : KEY("Heating_modus");                                                                                                        VALUE_u8; // ABS / WD / ABS+prog / WD+prog
+        case    3 : switch (bitNr) {
+          case    8 : BITBASIS;
+          case    6 : KEY("Climate_Mode_WD");                             HACONFIG;                                                             VALUE_flag8;
+          case    7 : KEY("Climate_Mode_use_deviation");                  HACONFIG;                                                             VALUE_flag8;
+          default   : UNKNOWN_BIT;
+        }
         case    6 : KEY("Water_pressure");                                 HACONFIG; HAPRESSURE;    CAT_MEASUREMENT;                             VALUE_u8div10;
         case    8 : return 0;
         case    9 : KEY("Flow");                                           HACONFIG; HAFLOW;
-                    Flow = FN_u16div10_LE(payloadPointer);                 CAT_MEASUREMENT;                                                      VALUE_u16div10_LE_changed(Flow_changed); //(9, 0.09, 0.15);
+                    Flow = FN_u16div10_LE(payloadPointer);                 CAT_MEASUREMENT;                                                      VALUE_u16div10_LE_changed(Flow_changed);
         case   10 : return 0;
         case   11 : KEY("SW_Version_inside_unit");                                                                                               VALUE_u16hex_LE;
         case   12 : return 0;
-        case   13 : KEY("SW_Version_outside_unit");                                                                                              VALUE_u16hex_LE;
+        case   13 : if (payloadByte || payload[payloadIndex - 1]) { KEY("SW_Version_Outside_Unit");                                                VALUE_u16hex_LE; }
+                    return 0;
         default :   UNKNOWN_BYTE;
       }
       default   : UNKNOWN_BYTE;
@@ -1918,42 +2024,45 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       case 0x00 :
                   switch (payloadIndex) {
         case    0 : return 0;
-        case    1 : KEY("Temperature_Setpoint_LWT_Heating_Zone_Main");                              HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8?
+        case    1 : KEY("Temperature_Setpoint_LWT_ABS_Heating_Zone_Main");                              HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8? // in ABS mode
         case    2 : return 0;
-        case    3 : KEY("Temperature_Setpoint_LWT_Cooling_Zone_Main");                              HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8?
+        case    3 : KEY("Temperature_Setpoint_LWT_ABS_Cooling_Zone_Main");                              HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8? // in ABS mode
         case    4 : return 0;
-        case    5 : KEY("Temperature_Setpoint_LWT_Heating_Zone_Add");                               HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8?
+        case    5 : KEY("Temperature_Setpoint_LWT_ABS_Heating_Zone_Add");                               HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8? // in ABS mode
         case    6 : return 0;
-        case    7 : KEY("Temperature_Setpoint_LWT_Cooling_Zone_Add");                               HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8?
+        case    7 : KEY("Temperature_Setpoint_LWT_ABS_Cooling_Zone_Add");                               HACONFIG; HATEMP;                            VALUE_f8_8; // or f8s8? // in ABS mode
         case    8 : KEY("Deviation_LWT_Heating_Zone_Main");                                                                                      VALUE_s4abs1c;
         case    9 : KEY("Deviation_LWT_Cooling_Zone_Main");                                                                                      VALUE_s4abs1c; // guess
         case   10 : KEY("Deviation_LWT_Heating_Zone_Add");                                                                                       VALUE_s4abs1c;
         case   11 : KEY("Deviation_LWT_Cooling_Zone_Add");                                                                                       VALUE_s4abs1c; // guess
-        case   12 : // first package 37 instead of 00
+        case   12 : // first package 37 instead of 00 (55 = initial target temp?)
         case   13 :
         case   14 :
         default :   UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
         case    0 : return 0;                                                     // no need to output to HA if duplicate from above
-        case    1 : KEY("Temperature_Setpoint_LWT_Heating_Zone_Main");
+        case    1 : KEY("Temperature_Setpoint_LWT_ABS_Heating_Zone_Main");
         case    2 : return 0;
-        case    3 : KEY("Temperature_Setpoint_LWT_Cooling_Zone_Main");
+        case    3 : KEY("Temperature_Setpoint_LWT_ABS_Cooling_Zone_Main");
         case    4 : return 0;
-        case    5 : KEY("Temperature_Setpoint_LWT_Heating_Zone_Add");
+        case    5 : KEY("Temperature_Setpoint_LWT_ABS_Heating_Zone_Add");
         case    6 : return 0;
-        case    7 : KEY("Temperature_Setpoint_LWT_Cooling_Zone_Add");
+        case    7 : KEY("Temperature_Setpoint_LWT_ABS_Cooling_Zone_Add");
         case    8 : KEY("Deviation_LWT_Heating_Zone_Main");
         case    9 : KEY("Deviation_LWT_Cooling_Zone_Main");
         case   10 : KEY("Deviation_LWT_Heating_Zone_Add");
         case   11 : KEY("Deviation_LWT_Cooling_Zone_Add");
-        case   12 :
-        case   13 :
-        case   14 : UNKNOWN_BYTE;
         case   15 : return 0;
-        case   16 : KEY("Target_LWT_Zone_Main");                                                    HACONFIG; HATEMP; CAT_TEMP;                  VALUE_f8s8; // TODO check s8/_8 temp in basic packet
+        case   16 : if (payloadByte || payload[payloadIndex - 1]) {
+                      KEY("Target_LWT_Zone_Main");                                                    HACONFIG; HATEMP; CAT_TEMP;                  VALUE_f8s8; // TODO check s8/_8 temp in basic packet // really f8s8
+                    }
+                    return 0; // 2.4, too low, or cooling?
         case   17 : return 0;
-        case   18 : KEY("Target_LWT_Zone_Add");                                                     HACONFIG; HATEMP; CAT_TEMP;                  VALUE_f8_8;
+        case   18 : if (payloadByte || payload[payloadIndex - 1]) {
+                      KEY("Target_LWT_Zone_Add");                                                     HACONFIG; HATEMP; CAT_TEMP;                  VALUE_f8s8;
+                    }
+                    return 0;
         default :   UNKNOWN_BYTE;
       }
       default   :   UNKNOWN_BYTE;
@@ -1962,22 +2071,36 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                                                                            CAT_TEMP  ; // PacketType15 system settings and operation
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
-        default : UNKNOWN_BYTE;
+        case    0 : return 0;
+        case    1 : return 0;
+        case    2 : KEY("Reboot-related-u24");                                                       CAT_UNKNOWN;                                      VALUE_u24hex_LE;
+        default :   UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
         case    0 : return 0;
         case    1 : KEY("Temperature_Unused_400015_0");          HACONFIG; HATEMP;                                                                                  VALUE_f8_8;
         case    2 : return 0;
-        case    3 : KEY("Temperature_Refrigerant_2");           HACONFIG; HATEMP;                                                                VALUE_f8_8;
+        case    3 : KEY("Temperature_Refrigerant_2");           HACONFIG; HATEMP;                                                                VALUE_f8_8;       // =? Brine_inlet_temp
         case    4 : return 0;
         case    5 : KEY("Temperature_Refrigerant_3_Q");           HACONFIG; HATEMP;                                                                VALUE_f8_8;
         default :             UNKNOWN_BYTE;
       }
       default :               UNKNOWN_BYTE;
     }
+    // case 0x16 : // TODO reintroduce 0x16 decoding
+    case 0x20 ... 0x21 : switch (packetSrc) {                   //  0x20 0x21 sensor-related?
+      case 0x00 : // fallthrough
+        //          return 0; // TODO check for payload content?
+        default : UNKNOWN_BYTE; // 0x20 1-byte payload, currently not stored in history; 0x20 empty poayload
+      case 0x40 : switch (payloadIndex) {
+        case  0 : // 0x00 0x01
+        case  2 : // 0x01 0x02 (related to Pref / cooling / ??)
+        default : UNKNOWN_BYTE;
+      }
+    }
     case 0x60 ... 0x8F : switch (packetSrc) {                   // field setting
       case 0x00 : // fallthrough
-                  return 0; // TODO check for payload content?
+         //         return 0; // TODO check for payload content?
       case 0x40 : switch (payloadIndex) {
         case  3        : // fallthrough
         case  7        : // fallthrough
@@ -1992,6 +2115,19 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         default : UNKNOWN_BYTE;
       }
     }
+
+// 0x90-0x9F restart info?
+    case 0x90 ... 0x9F : switch (packetSrc) {
+      case 0x00 : /* if (payloadByte) */ UNKNOWN_BYTE;
+//                  return 0;
+      case 0x40 : /* if (payloadByte) */ UNKNOWN_BYTE;
+//                  return 0;
+      default : UNKNOWN_BYTE;
+    }
+// 0xA1 name of outside unit
+// 0xB1 name of inside unit
+    case 0xA1 : return 0; // TODO return text
+    case 0xB1 : return 0; // TODO return text
     case 0xB8 :
                                                                            HACONFIG; CAT_COUNTER    ; // PacketType B8 system settings and operation
                 switch (packetSrc) {
@@ -2115,9 +2251,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       default :               UNKNOWN_BYTE;
     }
-    // Packet types 0x3x main controller (0x00) and first auxiliary controller (0xF0)
-    // Code here assumes there is no secondary controller (0xF1) (TODO what if)
-    case 0x30 :                                                                                     CAT_MEASUREMENT; // PacketType 30 will be used here to communicate power and COP calculations
+    // Packet types 0x3x from main controller (0x00) and from first auxiliary controller (0xF0)
+    // Code here assumes there is no secondary controller active (TODO: what if)
+    case 0x30 :                                                                                     CAT_MEASUREMENT;  // PacketType 30 will be used here to communicate power and COP calculations
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case  0 : // bytes in 0x30 message do not seem to contain usable information
@@ -2155,12 +2291,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case  0 :             BITBASIS_UNKNOWN;
         case  1 :             KEY("F031_1");                               CAT_UNKNOWN;                                                          VALUE_u8hex;
         case  2 :             KEY("F031_2");                               CAT_UNKNOWN;                                                          VALUE_u8hex;
-        case  3 :             KEY("Control_ID_1");                         CAT_UNKNOWN;                                                          VALUE_u8hex; // 01 (product type?), sometimes 0x81
-        case  4 :             KEY("Control_ID_1");                         CAT_UNKNOWN;                                                          VALUE_u8hex; // B4, sometimes 0x74
+        case  3 :             KEY("UI_status_LCD");                         CAT_UNKNOWN;                                                          VALUE_u8hex; // 01=LCD off, 81=LCD on ??; 0x80/0x00 also seen during reboot (UI off/on) (LCD off/on) ?
+        case  4 :             KEY("UI_Installer_Mode");                         CAT_UNKNOWN;                                                          VALUE_u8hex; // B4=installer, 74=user mode 60=during reboot?
         case  5 : switch (bitNr) {
+          case    0 : KEY("Reboot_related_Q31-00-5-0");                       CAT_UNKNOWN;                                                          VALUE_flag8;
           case    8 : BITBASIS;
-          case    6 : KEY("F0x31_05_6_Hourly_Pulse_Qd_Reply_Q");           CAT_SETTING;                                                          VALUE_flag8;
-          case    2 : KEY("Protocol_Missing_F0_Reply_Detected");           CAT_SETTING;                                                          VALUE_flag8;
+          case    6 : return 0; // suppress hourly pulse reporting
+                      KEY("Hourly_Pulse_1");                               CAT_SETTING;                                                          VALUE_flag8;
+          case    2 : return 0; // suppress error messages caused by inserted messages and counter requests
+                      KEY("Protocol_Missing_F0_Reply_Detected");           CAT_SETTING;                                                          VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
         case  6 :             SelectTimeString2 = 4;
@@ -2191,7 +2330,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                               return 0;
                               KEY("Minutes_2");                                                                                                  VALUE_u8;
         case 11 :
-                              if ((SelectTimeString2) && ((TimeString2[18] - '0') != (payloadByte % 10))) TimeStringCnt = 0; // reset at start of new minute
+                              // if ((SelectTimeString2) && ((TimeString2[18] - '0') != (payloadByte % 10))) TimeStringCnt = 0; // reset at start of new minute
                               TimeString2[20] = '0' + (payloadByte / 10);
                               TimeString2[21] = '0' + (payloadByte % 10);
                               if (payloadByte != prevSec) {
@@ -2474,4 +2613,5 @@ byte bits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte* pay
 byte bytes2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value) {
   return bits2keyvalue(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, 8) ;
 }
+
 #endif /* P1P2_Daikin_ParameterConversion_EHYHB */
