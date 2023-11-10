@@ -1783,11 +1783,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       case 0x40 : switch (payloadIndex) {
         case    0 : return 0;
         case    1 : KEY("Temperature_Leaving_Water");                      HACONFIG; HATEMP;
-                    LWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(LWT_changed);
+                    LWT = FN_f8_8(payloadPointer);                                                                                               VALUE_f8_8_changed(LWT_changed); // R2T
         case    2 : return 0;                         // Domestic hot water temperature (on some models)
         case    3 : KEY("Temperature_DHW_Tank");                            HACONFIG; HATEMP; VALUE_f8_8;                                        VALUE_f8_8;   // DHW tank, unconnected on EHYHBX08AAV3?, then reading -40
         case    4 : return 0;                         // Outside air temperature (low res)
-        case    5 : KEY("Temperature_Outside_1");                          HACONFIG; HATEMP;                                                     VALUE_f8_8;
+        case    5 : KEY("Temperature_Outside_1");                          HACONFIG; HATEMP;                                                     VALUE_f8_8; // outside temperature outside unit
         case    6 : return 0;
         case    7 : // UOM("C");
                     KEY("Temperature_Return_Water");                       HACONFIG; HATEMP;
@@ -1800,7 +1800,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   12 : return 0;                         // Room temperature copied with minor delay by Daikin system
         case   13 : KEY("Temperature_Room");                               HACONFIG; HATEMP;                                                                                             VALUE_f8_8;
         case   14 : return 0;                         // Outside air temperature
-        case   15 : KEY("Temperature_Outside_2");                          HACONFIG; HATEMP;                                                     VALUE_f8_8;
+        case   15 : KEY("Temperature_Outside_2");                          HACONFIG; HATEMP;                                                     VALUE_f8_8; // outside air temperature based on outside unit or based on R6T external sensor
         case   16 : return 0;                         // Unused ?
         case   17 : KEY("Temperature_Unused_400011_16");                   HACONFIG; HATEMP;                                                     VALUE_f8_8;
         case   18 : return 0;                         // Outside air temperature
