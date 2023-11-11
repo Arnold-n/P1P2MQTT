@@ -255,7 +255,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
         // HA value
         HA_VALUE
         // publish key,value
-        client_publish_mqtt(ha_mqttKey, ha_mqttValue);
+        clientPublishMqtt(ha_mqttKey, ha_mqttValue);
       }
       if (cntByte[pi2] != (payload[payloadIndex] & 0x7F) ) { // it's a 3-byte (slow) counter, so sufficient if we look at the 7 least significant bits LSB byte (LE); bit 7 = "!seen"
         newByte = (outputFilter <= maxOutputFilter) || (cntByte[pi2] == 0xFF);
@@ -267,11 +267,11 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
     newByte = true;
   } else if (payloadIndex > nr_bytes[pts][pti]) {
     // Warning: payloadIndex > expected
-    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
+    printfTopicS("Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X", payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
     newByte = true;
   } else if (payloadIndex + 1 < length) {
     // Warning: payloadIndex + 1 < length
-    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex + 1 < length"));
+    printfTopicS("Warning: payloadIndex + 1 < length");
     return 0;
   } else {
     bool pubHA = false;
@@ -315,7 +315,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       uint16_t pi2 = pi2base + i;
       if (pi2 >= sizeValSeen) {
         pi2 = 0;
-        Sprint_P(true, true, true, PSTR("Warning: pi2 %i > sizeValSeen, Src 0x%02X Tp 0x%02X Index %i "), pi2, packetSrc, packetType, i);
+        printfTopicS("Warning: pi2 %i > sizeValSeen, Src 0x%02X Tp 0x%02X Index %i ", pi2, packetSrc, packetType, i);
         return 0;
       }
       if (payloadByteSeen[pi2]) {
@@ -341,7 +341,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       // HA value
       HA_VALUE
       // publish key,value
-      client_publish_mqtt(ha_mqttKey, ha_mqttValue);
+      clientPublishMqtt(ha_mqttKey, ha_mqttValue);
     }
   }
   return (haConfig || (outputMode & 0x10000) || !saveSeen) && newByte;
@@ -396,7 +396,7 @@ bool newPayloadBitsVal(byte packetSrc, byte packetType, byte payloadIndex, byte*
     uint16_t pi2 = bytestart[pts][pti] + payloadIndex; // no multiplication, bit-wise only for u8 type
     if (pi2 >= sizeValSeen) {
       pi2 = 0;
-      Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
+      printfTopicS("Warning: pi2 > sizeValSeen");
     }
     // byte bitMask = 1 << bitNr;
     byte bitsMask = ((0x01 << (bitNr2 - bitNr1 + 1)) - 1) << bitNr1;
@@ -415,7 +415,7 @@ bool newPayloadBitsVal(byte packetSrc, byte packetType, byte payloadIndex, byte*
         // HA value
         HA_VALUE
         // publish key,value
-        client_publish_mqtt(ha_mqttKey, ha_mqttValue);
+        clientPublishMqtt(ha_mqttKey, ha_mqttValue);
       }
       newBits = 1;
       payloadByteVal[pi2] &= (0xFF ^ bitsMask); // if array initialized to zero, not needed
@@ -483,7 +483,7 @@ bool newParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte pay
         // HA value
         HA_VALUE
         // publish key,value
-        client_publish_mqtt(ha_mqttKey, ha_mqttValue);
+        clientPublishMqtt(ha_mqttKey, ha_mqttValue);
       }
       newParam = 1;
       for (byte i = payloadIndex + 1 - paramValLength; i <= payloadIndex - (paramPacketType == 0x39 ? 3 : 0); i++) paramVal[pts][ptbv++] = payload[i];
@@ -1090,7 +1090,7 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
                 byte f = packetSrc ? 0xFF : 0x00;
                 if ((payload[payloadIndex] == (f | 0x01) )   && (payload[payloadIndex - 1] == f) && (payload[payloadIndex - 2] == f)  && (payload[payloadIndex - 3] == f)) return 0;
                 if ((payload[payloadIndex] ==  f         )   && (payload[payloadIndex - 1] == f) && (payload[payloadIndex - 2] == f)  && (payload[payloadIndex - 3] == f)) return 0; // TODO check ?
-                Sprint_P(true, true, true, PSTR("* Fieldsetting unknown 0x%02X 0x%02X    0x%02X 0x%02X 0x%02X 0x%02X"), packetSrc, paramNr, payload[payloadIndex - 3], payload[payloadIndex - 2], payload[payloadIndex - 1], payload[payloadIndex]);
+                printfTopicS("* Fieldsetting unknown 0x%02X 0x%02X    0x%02X 0x%02X 0x%02X 0x%02X", packetSrc, paramNr, payload[payloadIndex - 3], payload[payloadIndex - 2], payload[payloadIndex - 1], payload[payloadIndex]);
                 FIELDKEY("Fieldsetting_Unknown");
   }
   // byte 2
@@ -2486,7 +2486,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case    1 : // sequence number, verify
                       if (scheduleLength[PS] && (scheduleSeq[PS]++ != payloadByte)) {
                         // WARNING subseq nr out of sync
-                        Sprint_P(true, true, true, PSTR("* [ESP] Warning: 0x3E subsequence out of sync"));
+                        printfTopicS("Warning: 0x3E subsequence out of sync");
                       };
                       return 0;
           default   : // we received one byte from/for the schedule memory

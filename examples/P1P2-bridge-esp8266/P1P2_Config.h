@@ -272,7 +272,7 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #define MAX_COMMAND_LENGTH 252 // B command can be long
 #define RB 1000     // max size of readBuffer (serial input from Arduino) (was 400, changed for long-scope-mode to 1000)
 #ifndef TH_SERIES
-#define HB 33      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
+#define HB 24      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
 #else /* TH_SERIES */
 #define HB 65      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
 #endif /* TH_SERIES */

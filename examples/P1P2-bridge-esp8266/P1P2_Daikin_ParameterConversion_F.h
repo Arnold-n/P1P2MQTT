@@ -157,11 +157,11 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
   } else if (pti != 0xFF) {
     if (payloadIndex > nr_bytes[pts][pti]) {
       // Warning: payloadIndex > expected
-      Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
+      printfTopicS("Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X", payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
       newByte = 1;
     } else if (payloadIndex + 1 < length) {
       // Warning: payloadIndex + 1 < length
-      Sprint_P(true, true, true, PSTR(" Warning: payloadIndex + 1 < length"));
+      printfTopicS("Warning: payloadIndex + 1 < length");
       return 0;
     } else {
       bool pubHA = false;
@@ -205,7 +205,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
         uint16_t pi2 = pi2base + i;
         if (pi2 >= sizeValSeen) {
           pi2 = 0;
-          Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
+          printfTopicS("Warning: pi2 > sizeValSeen");
           return 0;
         }
         if (payloadByteSeen[pi2]) {
@@ -231,7 +231,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
         // HA value
         HA_VALUE
         // publish key,value
-        client_publish_mqtt(ha_mqttKey, ha_mqttValue);
+        clientPublishMqtt(ha_mqttKey, ha_mqttValue);
       }
     }
   }

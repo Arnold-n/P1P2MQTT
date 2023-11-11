@@ -196,18 +196,18 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
   }
 
 
-  // Sprint_P(true, true, true, PSTR(" newpayloadbytesval pti=0x%02X packetSrc=0x%02X packetType=0x%02X payload7=0x%02X"), pti, packetSrc, packetType, payload7);
+  // printfTopicS("newpayloadbytesval pti=0x%02X packetSrc=0x%02X packetType=0x%02X payload7=0x%02X", pti, packetSrc, packetType, payload7);
 
 
   if (pti == 0xFF) {
     newByte = 1;
   } else if (payloadIndex > nr_bytes[pti]) {
     // Warning: payloadIndex > expected
-    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pti], packetSrc, packetType);
+    printfTopicS("Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X", payloadIndex, nr_bytes[pti], packetSrc, packetType);
     newByte = true;
   } else if (payloadIndex + 1 < length) {
     // Warning: payloadIndex + 1 < length
-    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex + 1 < length"));
+    printfTopicS("Warning: payloadIndex + 1 < length");
     return 0;
   } else {
     bool pubHA = false;
@@ -252,7 +252,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       uint16_t pi2 = pi2base + i;
       if (pi2 >= sizeValSeen) {
         pi2 = 0;
-        Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
+        printfTopicS("Warning: pi2 > sizeValSeen");
         return 0;
       }
       if (payloadByteSeen[pi2]) {
@@ -278,7 +278,7 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
       // HA value
       HA_VALUE
       // publish key,value
-      client_publish_mqtt(ha_mqttKey, ha_mqttValue);
+      clientPublishMqtt(ha_mqttKey, ha_mqttValue);
     }
   }
   return (haConfig || (outputMode & 0x10000) || !saveSeen) && newByte;
@@ -321,14 +321,14 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
     newBit = true;
   } else if (payloadIndex > nr_bytes[pti]) {
     // Warning: payloadIndex > expected
-    Sprint_P(true, true, true, PSTR(" Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X"), payloadIndex, nr_bytes[pti], packetSrc, packetType);
+    printfTopicS("Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X", payloadIndex, nr_bytes[pti], packetSrc, packetType);
     newBit = true;
   } else {
     bool pubHA = false;
     uint16_t pi2 = bytestart[pti] + payloadIndex; // no multiplication, bit-wise only for u8 type
     if (pi2 >= sizeValSeen) {
       pi2 = 0;
-      Sprint_P(true, true, true, PSTR("Warning: pi2 > sizeValSeen"));
+      printfTopicS("Warning: pi2 > sizeValSeen");
       return 0;
     }
     byte bitMask = 1 << bitNr;
@@ -348,7 +348,7 @@ bool newPayloadBitVal(byte packetSrc, byte packetType, byte payloadIndex, byte* 
         // HA value
         HA_VALUE
         // publish key,value
-        client_publish_mqtt(ha_mqttKey, ha_mqttValue);
+        clientPublishMqtt(ha_mqttKey, ha_mqttValue);
       }
       newBit = 1;
       payloadByteVal[pi2] &= (0xFF ^ bitMask); // if array initialized to zero, not needed

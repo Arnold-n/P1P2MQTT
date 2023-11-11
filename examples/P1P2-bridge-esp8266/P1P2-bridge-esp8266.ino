@@ -321,16 +321,7 @@ void onTelnetConnectionAttempt(String ip) {
 
 #define EMPTY_PAYLOAD 0xFF
 
-uint32_t MQTT_waitCounter = 0;
-
-void client_publish_serial(char* key, char* value) {
-  Serial_print(F("** "));
-  Serial_print(key);
-  Serial_print(F(" "));
-  Serial_println(value);
-}
-
-bool mqttConnected = false;
+bool mqttConnected = false; // TODO which of mqttConnected and mqttClient.connected() is better?
 bool mqttSetupReady = false;
 uint16_t Mqtt_msgSkipLowMem = 0;
 uint16_t Mqtt_msgSkipNotConnected = 0;
@@ -341,17 +332,18 @@ uint16_t Mqtt_disconnectTimeTotal = 0;
 uint32_t Mqtt_acknowledged = 0; // does not increment in case of QOS=0
 uint32_t Mqtt_gap = 0;          // does not increment in case of QOS=0
 uint16_t prevpacketId = 0;
+uint32_t Mqtt_waitCounter = 0;
 
 #define MAXWAIT 20
 
 uint32_t mqttPublished = 0;
 bool ignoreSerial = false;
 
-void client_publish_mqtt(char* key, char* value, bool retain = MQTT_RETAIN) {
+void clientPublishMqtt(char* key, char* value, bool retain = MQTT_RETAIN) {
   if (mqttConnected) {
     byte i = 0;
     while ((ESP.getMaxFreeBlockSize() < MQTT_MIN_FREE_MEMORY) && (i++ < MAXWAIT)) {
-      MQTT_waitCounter++;
+      Mqtt_waitCounter++;
       delay(5);
     }
     if (ESP.getMaxFreeBlockSize() >= MQTT_MIN_FREE_MEMORY) {
@@ -365,26 +357,76 @@ void client_publish_mqtt(char* key, char* value, bool retain = MQTT_RETAIN) {
   }
 }
 
-void client_publish_telnet(char* key, char* value) {
+#define PREFIX_LENGTH_TZ 29 // "* [ESP] date_time" total 29 bytes incl null
+
+void clientPublishTelnet(char* key, char* value, bool addDate = true) {
   if (telnetConnected) {
-    telnet.println((String) key + ' ' + (String) value);
+    if (addDate) {
+      char timeString[PREFIX_LENGTH_TZ];
+      time(&now);
+      localtime_r(&now, &tm);
+      snprintf_P(timeString, PREFIX_LENGTH_TZ, PSTR("[ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+      telnet.print(timeString);
+    }
+    if (key) {
+      telnet.print(key);
+      telnet.print(' ');
+    }
+    telnet.println(value);
     telnet.loop();
   }
 }
 
-char sprint_value[SPRINT_VALUE_LEN];
+void clientPublishSerial(char* key, char* value) {
+  Serial_print(F("** "));
+  Serial_print(key);
+  Serial_print(F(" "));
+  Serial_println(value);
+}
+
+char sprint_value[SPRINT_VALUE_LEN + PREFIX_LENGTH_TZ];
 uint32_t Sprint_buffer_overflow = 0;
 
-#define Sprint_P(pubSerial, pubMqtt, pubTelnet, ...) { \
-  if (snprintf_P(sprint_value, SPRINT_VALUE_LEN, __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
+// printfTopicS publishes string, always prefixed by NTP-date, via Mqtt topic P1P2/S, telnet, and/or serial, depending on connectivity (and TODO?: depending on j-mask setting)
+
+#define printfTopicS(formatstring, ...) { \
+  time(&now);\
+  localtime_r(&now, &tm);\
+  uint8_t slen = snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("* [ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);\
+  if (snprintf_P(sprint_value + slen, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
     Sprint_buffer_overflow++; \
   }; \
-  if (pubSerial) client_publish_serial(mqttSignal, sprint_value);\
-  if (pubMqtt) client_publish_mqtt(mqttSignal, sprint_value);\
-  if (pubTelnet) client_publish_telnet(mqttSignal, sprint_value);\
+  clientPublishSerial(mqttSignal, sprint_value);\
+  clientPublishMqtt(mqttSignal, sprint_value);\
+  clientPublishTelnet(0, sprint_value + 2, false);\
+};
+
+#define printfTopicS_MON(formatstring, ...) { \
+  time(&now);\
+  localtime_r(&now, &tm);\
+  uint8_t slen = snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("* [MON] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);\
+  if (snprintf_P(sprint_value + slen, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
+    Sprint_buffer_overflow++; \
+  }; \
+  clientPublishSerial(mqttSignal, sprint_value);\
+  clientPublishMqtt(mqttSignal, sprint_value);\
+  clientPublishTelnet(0, sprint_value + 2, false);\
+};
+
+// printfSerial publishes only via serial (for OTA)
+
+#define printfSerial(formatstring, ...) { \
+  time(&now);\
+  localtime_r(&now, &tm);\
+  uint8_t slen = snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("** [ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);\
+  if (snprintf_P(sprint_value + slen, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
+    Sprint_buffer_overflow++; \
+  }; \
+  clientPublishSerial(mqttSignal, sprint_value);\
 };
 
 #define HA_KEY snprintf_P(ha_mqttKey, HA_KEY_LEN, PSTR("%s/%s/%s%c%c_%s/config"), HA_PREFIX, haDeviceID, useSensorPrefixHA ? HA_SENSOR_PREFIX : "", mqtt_key[-4], mqtt_key[-2], mqtt_key);
+
 #define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",%s\"uniq_id\":\"%c%c_%s%s\",%s%s%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
   /* name */         mqtt_key[-4], mqtt_key[-2], mqtt_key, \
   /* stat_t */       mqtt_key - MQTT_KEY_PREFIXLEN,\
@@ -404,7 +446,7 @@ uint32_t Sprint_buffer_overflow = 0;
     /* sw */           HA_SW);
 
 // Include Daikin product-dependent header file for parameter conversion
-// include here such that Sprint_P(PSTR()) is available in header file code
+// include here such that printfTopicS() is available in header file code
 
 #ifdef E_SERIES
 #include "P1P2_Daikin_ParameterConversion_EHYHB.h"
@@ -426,51 +468,49 @@ static byte throttle = 1;
 static byte throttleValue = THROTTLE_VALUE;
 
 void onMqttConnect(bool sessionPresent) {
-  Serial.println(F("* [ESP] Connected to MQTT server"));
+  printfSerial("Connected to MQTT server");
   int result = mqttClient.subscribe(mqttCommands, MQTT_QOS);
-  Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttCommands, result);
+  printfSerial("Subscribed to %s with result %i", mqttCommands, result);
   result = mqttClient.subscribe(mqttCommandsNoIP, MQTT_QOS);
-  Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttCommandsNoIP, result);
+  printfSerial("Subscribed to %s with result %i", mqttCommandsNoIP, result);
   result = mqttClient.subscribe("homeassistant/status", MQTT_QOS);
-  Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to homeassistant/status with result %i"), result);
+  printfSerial("Subscribed to homeassistant/status with result %i", result);
 #ifdef MQTT_INPUT_BINDATA
   //result = mqttClient.subscribe("P1P2/X/#", MQTT_QOS);
-  //Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to X/# with result %i"), result);
+  //printfSerial("Subscribed to X/# with result %i", result);
   if (!mqttInputBinData[MQTT_KEY_PREFIXIP - 1]) {
     mqttInputBinData[MQTT_KEY_PREFIXIP - 1] = '/';
     mqttInputBinData[MQTT_KEY_PREFIXIP] = '#';
     mqttInputBinData[MQTT_KEY_PREFIXIP + 1] = '\0';
   }
   result = mqttClient.subscribe(mqttInputBinData, MQTT_QOS);
-  Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttInputBinData, result);
+  printfSerial("Subscribed to %s with result %i", mqttInputBinData, result);
   mqttInputBinData[MQTT_KEY_PREFIXIP - 1] = '\0';
 #endif
 #ifdef MQTT_INPUT_HEXDATA
   //result = mqttClient.subscribe("P1P2/R/#", MQTT_QOS);
-  //Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to R/# with result %i"), result);
+  //printfSerial("Subscribed to R/# with result %i", result);
   if (!mqttInputHexData[MQTT_KEY_PREFIXIP - 1]) {
     mqttInputHexData[MQTT_KEY_PREFIXIP - 1] = '/';
     mqttInputHexData[MQTT_KEY_PREFIXIP] = '#';
     mqttInputHexData[MQTT_KEY_PREFIXIP + 1] = '\0';
   }
   result = mqttClient.subscribe(mqttInputHexData, MQTT_QOS);
-  Sprint_P(true, false, false, PSTR("* [ESP] Subscribed to %s with result %i"), mqttInputHexData, result);
+  printfSerial("Subscribed to %s with result %i", mqttInputHexData, result);
   mqttInputHexData[MQTT_KEY_PREFIXIP - 1] = '\0';
 #endif
   mqttConnected = true;
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
-  Serial_print(F("* [ESP] Disconnected from MQTT server "));
-  Serial_println(Mqtt_disconnects);
-  Sprint_P(true, false, false, PSTR("* [ESP] Disconnected from MQTT."));
+  printfSerial("Disconnected from MQTT server.");
   Mqtt_disconnects++;
   mqttConnected = false;
 }
 
 void onMqttPublish(uint16_t packetId) {
   // not called for QOS 0
-  Sprint_P(true, false, false, PSTR("* [ESP] Publish acknowledged of packetId %i"), packetId);
+  printfSerial("Publish acknowledged of packetId %i", packetId);
   Mqtt_acknowledged++;
   if (packetId != prevpacketId + 1) Mqtt_gap++;
   prevpacketId = packetId;
@@ -500,7 +540,7 @@ static uint32_t reconnectTime = 0;
 static uint32_t throttleStart = 0;
 
 void ATmega_dummy_for_serial() {
-  Sprint_P(true, true, true, PSTR("* [ESP] Two dummy lines to ATmega."));
+  printfTopicS("Two dummy lines to ATmega.");
   Serial.print(F(SERIAL_MAGICSTRING));
   Serial.println(F("* Dummy line 1."));
   Serial.print(F(SERIAL_MAGICSTRING));
@@ -554,7 +594,7 @@ void handleCommand(char* cmdString) {
   }
   switch (cmdString[0]) {
     case 'a': // reset ATmega
-    case 'A': Sprint_P(true, true, true, PSTR("* [ESP] Hard resetting ATmega..."));
+    case 'A': printfTopicS("Hard resetting ATmega...");
               digitalWrite(RESET_PIN, LOW);
               pinMode(RESET_PIN, OUTPUT);
               delay(1);
@@ -566,24 +606,24 @@ void handleCommand(char* cmdString) {
               break;
     case 'b': // display or set MQTT settings
     case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s %i %i %i %i", &EEPROM_state.EEPROMnew.mqttServer, &EEPROM_state.EEPROMnew.mqttPort, &EEPROM_state.EEPROMnew.mqttUser, &EEPROM_state.EEPROMnew.mqttPassword, &mqttInputByte4, &ESPhwID, &noWiFi, &useSensorPrefixHA)) > 0) {
-                Sprint_P(true, true, true, PSTR("* [ESP] Writing new MQTT settings to EEPROM"));
+                printfTopicS("Writing new MQTT settings to EEPROM");
                 if (n > 4) EEPROM_state.EEPROMnew.mqttInputByte4 = mqttInputByte4;
                 if ((n > 5) && (ESPhwID != EEPROM_state.EEPROMnew.ESPhwID)) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to change ESPhwID"));
+                  printfTopicS("Reboot required to change ESPhwID");
 #ifdef REBOOT_REASON
                   EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
 #endif /* REBOOT_REASON */
                   EEPROM_state.EEPROMnew.ESPhwID = ESPhwID;
                 }
                 if ((n > 6) && (EEPROM_state.EEPROMnew.noWiFi != noWiFi)) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to change noWiFi"));
+                  printfTopicS("Reboot required to change noWiFi");
 #ifdef REBOOT_REASON
                   EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
 #endif /* REBOOT_REASON */
                   EEPROM_state.EEPROMnew.noWiFi = noWiFi;
                 }
                 if ((n > 7)  && (useSensorPrefixHA != EEPROM_state.EEPROMnew.useSensorPrefixHA)) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] Reboot required to rediscover new sensor names"));
+                  printfTopicS("Reboot required to rediscover new sensor names");
 #ifdef REBOOT_REASON
                   EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
 #endif /* REBOOT_REASON */
@@ -593,57 +633,57 @@ void handleCommand(char* cmdString) {
               EEPROM.put(0, EEPROM_state);
               EEPROM.commit();
               if (n > 0) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server set to %s"), EEPROM_state.EEPROMnew.mqttServer);
+                printfTopicS("MQTT_server set to %s", EEPROM_state.EEPROMnew.mqttServer);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_server is %s"), EEPROM_state.EEPROMnew.mqttServer);
+                printfTopicS("MQTT_server is %s", EEPROM_state.EEPROMnew.mqttServer);
               }
               if (n > 1) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port set to %i"), EEPROM_state.EEPROMnew.mqttPort);
+                printfTopicS("MQTT_port set to %i", EEPROM_state.EEPROMnew.mqttPort);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_port is %i"), EEPROM_state.EEPROMnew.mqttPort);
+                printfTopicS("MQTT_port is %i", EEPROM_state.EEPROMnew.mqttPort);
               }
               if (n > 2) {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user set to %s"), EEPROM_state.EEPROMnew.mqttUser);
+                printfTopicS("MQTT_user set to %s", EEPROM_state.EEPROMnew.mqttUser);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT_user is %s"), EEPROM_state.EEPROMnew.mqttUser);
+                printfTopicS("MQTT_user is %s", EEPROM_state.EEPROMnew.mqttUser);
               }
               if (n > 3) {
-                Sprint_P(true, true, true, PSTR("* [ESP] New MQTT_password set") /*, EEPROM_state.EEPROMnew.mqttPassword */);
+                printfTopicS("New MQTT_password set" /*, EEPROM_state.EEPROMnew.mqttPassword */);
               } else {
-                // Sprint_P(true, true, true, PSTR("* [ESP] MQTT_password is %s"), EEPROM_state.EEPROMnew.mqttPassword);
+                // printfTopicS("MQTT_password is %s", EEPROM_state.EEPROMnew.mqttPassword);
               }
               if (n > 4) {
-                Sprint_P(true, true, true, PSTR("* [ESP] mqttInputByte4 set to %i"), EEPROM_state.EEPROMnew.mqttInputByte4);
+                printfTopicS("mqttInputByte4 set to %i", EEPROM_state.EEPROMnew.mqttInputByte4);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] mqttInputByte4 is %i"), EEPROM_state.EEPROMnew.mqttInputByte4);
+                printfTopicS("mqttInputByte4 is %i", EEPROM_state.EEPROMnew.mqttInputByte4);
               }
               if (n > 5) {
-                Sprint_P(true, true, true, PSTR("* [ESP] ESPhwID set to %i"), EEPROM_state.EEPROMnew.ESPhwID);
+                printfTopicS("ESPhwID set to %i", EEPROM_state.EEPROMnew.ESPhwID);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] ESPhwID %i"), EEPROM_state.EEPROMnew.ESPhwID);
+                printfTopicS("ESPhwID %i", EEPROM_state.EEPROMnew.ESPhwID);
               }
               if (n > 6) {
-                Sprint_P(true, true, true, PSTR("* [ESP] noWiFi set to %i"), EEPROM_state.EEPROMnew.noWiFi);
+                printfTopicS("noWiFi set to %i", EEPROM_state.EEPROMnew.noWiFi);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] noWiFi is %i"), EEPROM_state.EEPROMnew.noWiFi);
+                printfTopicS("noWiFi is %i", EEPROM_state.EEPROMnew.noWiFi);
               }
               if (n > 7) {
-                Sprint_P(true, true, true, PSTR("* [ESP] useSensorPrefixHA set to %i"), EEPROM_state.EEPROMnew.useSensorPrefixHA);
+                printfTopicS("useSensorPrefixHA set to %i", EEPROM_state.EEPROMnew.useSensorPrefixHA);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] useSensorPrefixHA is %i"), EEPROM_state.EEPROMnew.useSensorPrefixHA);
+                printfTopicS("useSensorPrefixHA is %i", EEPROM_state.EEPROMnew.useSensorPrefixHA);
               }
               if ((n > 5) || (n && (outputMode & 0x40000))) {
-                Sprint_P(true, true, true, PSTR("* [ESP] Restart ESP"));
+                printfTopicS("Restart ESP");
                 delay(100);
                 ESP.restart();
                 delay(100);
               }
-              Sprint_P(true, true, true, PSTR("* [ESP] Local IP address: %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
-              // TODO enable in future WiFiManager version: if (WiFi.isConnected()) Sprint_P(true, true, true, PSTR("* [ESP] Connected to WiFi SSID %s"), wifiManager.getWiFiSSID());
-              // Sprint_P(true, true, true, PSTR("* [ESP] Pass of AP is %s"), wifiManager.getWiFiPass());
+              printfTopicS("Local IP address: %i.%i.%i.%i", local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+              // TODO enable in future WiFiManager version: if (WiFi.isConnected()) printfTopicS("Connected to WiFi SSID %s", wifiManager.getWiFiSSID());
+              // printfTopicS("Pass of AP is %s", wifiManager.getWiFiPass());
               if (n > 0) {
                 if (mqttClient.connected()) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] MQTT Client connected, disconnect"));
+                  printfTopicS("MQTT Client connected, disconnect");
                   // unsubscribe topics here before disconnect?
                   mqttClient.disconnect();
                   delay(1000);
@@ -655,9 +695,9 @@ void handleCommand(char* cmdString) {
                 mqttInputBinData[MQTT_KEY_PREFIXIP] = (EEPROM_state.EEPROMnew.mqttInputByte4 / 100) + '0';
                 mqttInputBinData[MQTT_KEY_PREFIXIP + 1] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 100) / 10 + '0';
                 mqttInputBinData[MQTT_KEY_PREFIXIP + 2] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 10) + '0';
-                Sprint_P(true, true, true, PSTR("* [ESP] mqttInputBinData set to %s"), mqttInputBinData);
+                printfTopicS("mqttInputBinData set to %s", mqttInputBinData);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] mqttInputBinData %s"), mqttInputBinData);
+                printfTopicS("mqttInputBinData %s", mqttInputBinData);
               }
 #endif
 #ifdef MQTT_INPUT_HEXDATA
@@ -666,31 +706,31 @@ void handleCommand(char* cmdString) {
                 mqttInputHexData[MQTT_KEY_PREFIXIP] = (EEPROM_state.EEPROMnew.mqttInputByte4 / 100) + '0';
                 mqttInputHexData[MQTT_KEY_PREFIXIP + 1] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 100) / 10 + '0';
                 mqttInputHexData[MQTT_KEY_PREFIXIP + 2] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 10) + '0';
-                Sprint_P(true, true, true, PSTR("* [ESP] mqttInputHexData set to %s"), mqttInputHexData);
+                printfTopicS("mqttInputHexData set to %s", mqttInputHexData);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] mqttInputHexData %s"), mqttInputHexData);
+                printfTopicS("mqttInputHexData %s", mqttInputHexData);
               }
 #endif
               if (n > 0) {
                 if (mqttClient.connected()) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] MQTT Client still connected ?"));
+                  printfTopicS("MQTT Client still connected ?");
                   delay(500);
                 } else {
-                  Sprint_P(true, true, true, PSTR("* [ESP] MQTT Client disconnected"));
+                  printfTopicS("MQTT Client disconnected");
                 }
                 mqttClient.setServer(EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort);
                 mqttClient.setCredentials((EEPROM_state.EEPROMnew.mqttUser[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttUser, (EEPROM_state.EEPROMnew.mqttPassword[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttPassword);
-                Sprint_P(true, true, true, PSTR("* [ESP] MQTT Try to connect"));
+                printfTopicS("MQTT Try to connect");
                 Mqtt_disconnectTime = 0;
                 mqttClient.connect();
                 delay(500);
                 if (mqttClient.connected()) {
-                  Sprint_P(true, true, true, PSTR("* [ESP] MQTT client connected with EEPROMnew settings"));
+                  printfTopicS("MQTT client connected with EEPROMnew settings");
                   reconnectTime = espUptime;
                   throttleStart = espUptime;
                   throttleValue = THROTTLE_VALUE;
                 } else {
-                  Sprint_P(true, true, true, PSTR("* [ESP] MQTT connection failed, retrying in 5 seconds"));
+                  printfTopicS("MQTT connection failed, retrying in 5 seconds");
                   reconnectTime = espUptime + 5;
                 }
               }
@@ -698,7 +738,7 @@ void handleCommand(char* cmdString) {
     case 'd': // reset ESP
     case 'D': if (sscanf((const char*) (cmdString + 1), "%d", &temp) == 1) {
                 switch (temp) {
-                  case 0 : Sprint_P(true, true, true, PSTR("* [ESP] Restarting ESP..."));
+                  case 0 : printfTopicS("Restarting ESP...");
 #ifdef REBOOT_REASON
                            EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_D0;
                            EEPROM.put(0, EEPROM_state);
@@ -710,7 +750,7 @@ void handleCommand(char* cmdString) {
                            ESP.restart();
                            delay(100);
                            break;
-                  case 1 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting ESP..."));
+                  case 1 : printfTopicS("Resetting ESP...");
 #ifdef REBOOT_REASON
                            EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_D1;
                            EEPROM.put(0, EEPROM_state);
@@ -722,23 +762,23 @@ void handleCommand(char* cmdString) {
                            ESP.reset();
                            delay(100);
                            break;
-                  case 2 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting maxLoopTime"));
+                  case 2 : printfTopicS("Resetting maxLoopTime");
                            maxLoopTime = 0;
                            break;
-                  case 3 : Sprint_P(true, true, true, PSTR("* [ESP] Resetting data structures"));
+                  case 3 : printfTopicS("Resetting data structures");
                            throttleStart = espUptime;
                            throttleValue = THROTTLE_VALUE;
                            resetDataStructures();
                            break;
-                  default: Sprint_P(true, true, true, PSTR("* [ESP] Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime D3=reset-data-structures (w throttling)"));
+                  default: printfTopicS("Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime D3=reset-data-structures (w throttling)");
                 }
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime"));
+                printfTopicS("Specify D0=RESTART-ESP D1=RESET-ESP D2=RESET-maxLoopTime");
               }
               break;
     case 'i': // static IP address (for now, WiFi only) //  TODO ethernet
     case 'I': if ((n = sscanf((const char*) (cmdString + 1), "%i %15s %15s %15s %15s", &useStaticIP, &EEPROM_state.EEPROMnew.static_ip, &EEPROM_state.EEPROMnew.static_gw, &EEPROM_state.EEPROMnew.static_nm)) > 0) {
-                Sprint_P(true, true, true, PSTR("* [ESP] Writing new static ip settings to EEPROM"));
+                printfTopicS("Writing new static ip settings to EEPROM");
                 EEPROM_state.EEPROMnew.useStaticIP = useStaticIP;
 #ifdef REBOOT_REASON
                 EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_STATICIP;
@@ -747,27 +787,27 @@ void handleCommand(char* cmdString) {
                 EEPROM.commit();
               }
               if (n > 0) {
-                Sprint_P(true, true, true, PSTR("* [ESP] useStaticIP set to %i"), EEPROM_state.EEPROMnew.useStaticIP);
+                printfTopicS("useStaticIP set to %i", EEPROM_state.EEPROMnew.useStaticIP);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] useStaticIP is %i"), EEPROM_state.EEPROMnew.useStaticIP);
+                printfTopicS("useStaticIP is %i", EEPROM_state.EEPROMnew.useStaticIP);
               }
               if (n > 1) {
-                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 address set to %s"), EEPROM_state.EEPROMnew.static_ip);
+                printfTopicS("static IPv4 address set to %s", EEPROM_state.EEPROMnew.static_ip);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 address is %s"), EEPROM_state.EEPROMnew.static_ip);
+                printfTopicS("static IPv4 address is %s", EEPROM_state.EEPROMnew.static_ip);
               }
               if (n > 2) {
-                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 gateway set to %s"), EEPROM_state.EEPROMnew.static_gw);
+                printfTopicS("static IPv4 gateway set to %s", EEPROM_state.EEPROMnew.static_gw);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 gateway is %s"), EEPROM_state.EEPROMnew.static_gw);
+                printfTopicS("static IPv4 gateway is %s", EEPROM_state.EEPROMnew.static_gw);
               }
               if (n > 3) {
-                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 netmask set to %s"), EEPROM_state.EEPROMnew.static_nm);
+                printfTopicS("static IPv4 netmask set to %s", EEPROM_state.EEPROMnew.static_nm);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] static IPv4 netmask is %s"), EEPROM_state.EEPROMnew.static_nm);
+                printfTopicS("static IPv4 netmask is %s", EEPROM_state.EEPROMnew.static_nm);
               }
               if (n > 0) {
-                Sprint_P(true, true, true, PSTR("* [ESP] Restart required to use new settings"));
+                printfTopicS("Restart required to use new settings");
                 delay(500);
                 ESP.restart();
                 delay(100);
@@ -781,29 +821,29 @@ void handleCommand(char* cmdString) {
                   EEPROM.put(0, EEPROM_state);
                   EEPROM.commit();
                 }
-                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode set to 0x%06X"), outputMode);
+                printfTopicS("Outputmode set to 0x%06X", outputMode);
               } else {
-                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode 0x%04X is sum of"), outputMode);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx"), outputMode  & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/xxx/#"), (outputMode >> 1) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0004 to output json data over mqtt P1P2/J/xxx"), (outputMode >> 2) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0008 to have mqtt/json include parameters even if functionality is unknown, warning: easily overloads ATmega/ESP (best to combine this with outputfilter >=1)"), (outputMode >> 3) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0010 ESP to output raw data over telnet"), (outputMode >> 4) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0020 to output mqtt individual parameter data over telnet"), (outputMode >> 5) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0040 to output json data over telnet"), (outputMode >> 6) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0080 (reserved for adding time string in R output)"), (outputMode >> 7) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0100 ESP to output raw data over serial"), (outputMode >> 8) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0200 to output mqtt individual parameter data over serial"), (outputMode >> 9) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0400 to output json data over serial"), (outputMode >> 10) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0800 to output raw bin data over P1P2/X/xxx"), (outputMode >> 11) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x1000 to output timing data also over P1P2/R/xxx (prefix: C) and via telnet"), (outputMode >> 12) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x2000 to output error data also over P1P2/R/xxx (prefix: *)"), (outputMode >> 13) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x4000 to use P1P2/R/xxx as input (requires MQTT_INPUT_HEXDATA)"), (outputMode >> 14) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)"), (outputMode >> 15) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x10000 to include non-HACONFIG parameters in P1P2/P/# "), (outputMode >> 16) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x20000 to add all pseudo parameters to HA in P1P2/P/# "), (outputMode >> 17) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x40000 to restart ESP after MQTT reconnect "), (outputMode >> 18) & 0x01);
-                Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x80000 to restart data communication after MQTT reconnect "), (outputMode >> 19) & 0x01);
+                printfTopicS("Outputmode 0x%04X is sum of", outputMode);
+                printfTopicS("%ix 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx", outputMode  & 0x01);
+                printfTopicS("%ix 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/xxx/#", (outputMode >> 1) & 0x01);
+                printfTopicS("%ix 0x0004 to output json data over mqtt P1P2/J/xxx", (outputMode >> 2) & 0x01);
+                printfTopicS("%ix 0x0008 to have mqtt/json include parameters even if functionality is unknown, warning: easily overloads ATmega/ESP (best to combine this with outputfilter >=1)", (outputMode >> 3) & 0x01);
+                printfTopicS("%ix 0x0010 ESP to output raw data over telnet", (outputMode >> 4) & 0x01);
+                printfTopicS("%ix 0x0020 to output mqtt individual parameter data over telnet", (outputMode >> 5) & 0x01);
+                printfTopicS("%ix 0x0040 to output json data over telnet", (outputMode >> 6) & 0x01);
+                printfTopicS("%ix 0x0080 (reserved for adding time string in R output)", (outputMode >> 7) & 0x01);
+                printfTopicS("%ix 0x0100 ESP to output raw data over serial", (outputMode >> 8) & 0x01);
+                printfTopicS("%ix 0x0200 to output mqtt individual parameter data over serial", (outputMode >> 9) & 0x01);
+                printfTopicS("%ix 0x0400 to output json data over serial", (outputMode >> 10) & 0x01);
+                printfTopicS("%ix 0x0800 to output raw bin data over P1P2/X/xxx", (outputMode >> 11) & 0x01);
+                printfTopicS("%ix 0x1000 to output timing data also over P1P2/R/xxx (prefix: C) and via telnet", (outputMode >> 12) & 0x01);
+                printfTopicS("%ix 0x2000 to output error data also over P1P2/R/xxx (prefix: *)", (outputMode >> 13) & 0x01);
+                printfTopicS("%ix 0x4000 to use P1P2/R/xxx as input (requires MQTT_INPUT_HEXDATA)", (outputMode >> 14) & 0x01);
+                printfTopicS("%ix 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)", (outputMode >> 15) & 0x01);
+                printfTopicS("%ix 0x10000 to include non-HACONFIG parameters in P1P2/P/# ", (outputMode >> 16) & 0x01);
+                printfTopicS("%ix 0x20000 to add all pseudo parameters to HA in P1P2/P/# ", (outputMode >> 17) & 0x01);
+                printfTopicS("%ix 0x40000 to restart ESP after MQTT reconnect ", (outputMode >> 18) & 0x01);
+                printfTopicS("%ix 0x80000 to restart data communication after MQTT reconnect ", (outputMode >> 19) & 0x01);
               }
               break;
     case 's': // OutputFilter
@@ -819,11 +859,11 @@ void handleCommand(char* cmdString) {
                 temp = 99;
               }
               switch (outputFilter) {
-                case 0 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s0 all parameters, no filter"), (temp != 99) ? "set to " : ""); break;
-                case 1 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s1 only changed data"), (temp != 99) ? "set to " : ""); break;
-                case 2 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s2 only changed data, excluding temp/flow"), (temp != 99) ? "set to " : ""); break;
-                case 3 : Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter %s3 only changed data, excluding temp/flow/time"), (temp != 99) ? "set to " : ""); break;
-                default: Sprint_P(true, true, true, PSTR("* [ESP] Outputfilter illegal state %i"), outputFilter); break;
+                case 0 : printfTopicS("Outputfilter %s0 all parameters, no filter", (temp != 99) ? "set to " : ""); break;
+                case 1 : printfTopicS("Outputfilter %s1 only changed data", (temp != 99) ? "set to " : ""); break;
+                case 2 : printfTopicS("Outputfilter %s2 only changed data, excluding temp/flow", (temp != 99) ? "set to " : ""); break;
+                case 3 : printfTopicS("Outputfilter %s3 only changed data, excluding temp/flow/time", (temp != 99) ? "set to " : ""); break;
+                default: printfTopicS("Outputfilter illegal state %i", outputFilter); break;
               }
               break;
     case '\0':break;
@@ -836,39 +876,39 @@ void handleCommand(char* cmdString) {
     case 'H': // commands v/g/h handled both by P1P2-bridge-esp8266 and P1P2Monitor
               switch (cmdString[0]) {
                 case 'v':
-                case 'V': Sprint_P(true, true, true, PSTR(WELCOMESTRING));
-                          Sprint_P(true, true, true, PSTR("* [ESP] Compiled %s %s"), __DATE__, __TIME__);
+                case 'V': printfTopicS(WELCOMESTRING);
+                          printfTopicS("Compiled %s %s", __DATE__, __TIME__);
 #ifdef E_SERIES
-                          Sprint_P(true, true, true, PSTR("* [ESP] E-Series"));
+                          printfTopicS("E-Series");
 #endif /* E_SERIES */
 #ifdef F_SERIES
-                          Sprint_P(true, true, true, PSTR("* [ESP] F-Series"));
+                          printfTopicS("F-Series");
 #endif /* F_SERIES */
 #ifdef H_SERIES
-                          Sprint_P(true, true, true, PSTR("* [ESP] H-Series"));
+                          printfTopicS("H-Series");
 #endif /* H_SERIES */
 #ifdef MHI_SERIES
-                          Sprint_P(true, true, true, PSTR("* [ESP] MHI-Series"));
+                          printfTopicS("MHI-Series");
 #endif /* MHI_SERIES */
-                          Sprint_P(true, true, true, PSTR("* [ESP] ESP_hw_identifier %i"), ESPhwID);
+                          printfTopicS("ESP_hw_identifier %i", ESPhwID);
                           if (mqttClient.connected()) {
-                            Sprint_P(true, true, true, PSTR("* [ESP] Connected to MQTT server"));
+                            printfTopicS("Connected to MQTT server");
                           } else {
-                            Sprint_P(true, true, true, PSTR("* [ESP] Warning: not connected to MQTT server"));
+                            printfTopicS("Warning: not connected to MQTT server");
                           }
-                          Sprint_P(true, true, true, PSTR("* [ESP] MQTT Clientname = %s"), MQTT_CLIENTNAME);
-                          Sprint_P(true, true, true, PSTR("* [ESP] MQTT User = %s"), EEPROM_state.EEPROMnew.mqttUser);
-                          // Sprint_P(true, true, true, PSTR("* [ESP] MQTT Password = %s"), EEPROM_state.EEPROMnew.mqttPassword);
-                          Sprint_P(true, true, true, PSTR("* [ESP] MQTT Server = %s"), EEPROM_state.EEPROMnew.mqttServer);
-                          Sprint_P(true, true, true, PSTR("* [ESP] MQTT Port = %i"), EEPROM_state.EEPROMnew.mqttPort);
-                          Sprint_P(true, true, true, PSTR("* [ESP] ESP reboot reason = 0x%2X"), saveRebootReason);
-                          Sprint_P(true, true, true, PSTR("* [ESP] outputMode = 0x%X"), outputMode);
-                          Sprint_P(true, true, true, PSTR("* [ESP] outputFilter = %i"), outputFilter);
-                          Sprint_P(true, true, true, PSTR("* [ESP] mqttInputByte4 = %i"), mqttInputByte4);
-                          Sprint_P(true, true, true, PSTR("* [ESP] EEPROM version = %i"), EEPROM_state.EEPROMnew.EEPROM_version);
+                          printfTopicS("MQTT Clientname = %s", MQTT_CLIENTNAME);
+                          printfTopicS("MQTT User = %s", EEPROM_state.EEPROMnew.mqttUser);
+                          // printfTopicS("MQTT Password = %s", EEPROM_state.EEPROMnew.mqttPassword);
+                          printfTopicS("MQTT Server = %s", EEPROM_state.EEPROMnew.mqttServer);
+                          printfTopicS("MQTT Port = %i", EEPROM_state.EEPROMnew.mqttPort);
+                          printfTopicS("ESP reboot reason = 0x%2X", saveRebootReason);
+                          printfTopicS("outputMode = 0x%X", outputMode);
+                          printfTopicS("outputFilter = %i", outputFilter);
+                          printfTopicS("mqttInputByte4 = %i", mqttInputByte4);
+                          printfTopicS("EEPROM version = %i", EEPROM_state.EEPROMnew.EEPROM_version);
                           if (sscanf((const char*) (cmdString + 1), "%2x", &temp) == 1) {
                             if (temp < 2) {
-                              Sprint_P(true, true, true, PSTR("* [ESP] Warning: verbose < 2 not supported by P1P2-bridge-esp8266, changing to verbosity mode 3"));
+                              printfTopicS("Warning: verbose < 2 not supported by P1P2-bridge-esp8266, changing to verbosity mode 3");
                               cmdString[1] = '3';
                               cmdString[2] = '\n';
                             }
@@ -882,24 +922,24 @@ void handleCommand(char* cmdString) {
                 case 'g':
                 case 'G': if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
                             crc_gen = temphex;
-                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_gen set to 0x%02X"), crc_gen);
+                            printfTopicS("CRC_gen set to 0x%02X", crc_gen);
                           } else {
-                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_gen 0x%02X"), crc_gen);
+                            printfTopicS("CRC_gen 0x%02X", crc_gen);
                           }
                           break;
                 case 'h':
                 case 'H': if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
                             crc_feed = temphex;
-                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_feed set to 0x%02X"), crc_feed);
+                            printfTopicS("CRC_feed set to 0x%02X", crc_feed);
                           } else {
-                            Sprint_P(true, true, true, PSTR("* [ESP] CRC_feed 0x%02X"), crc_feed);
+                            printfTopicS("CRC_feed 0x%02X", crc_feed);
                           }
                           break;
                 default : break;
               }
               // fallthrough for v/g/h commands handled both by P1P2-bridge-esp8266 and P1P2Monitor
               // 'c' 'C' 'p' 'P' 'e' 'E' 'f' 'F' 't' 'T" 'o' 'O" 'u' 'U" 'x' 'X" 'w' 'W" 'k' 'K' 'l' 'L' 'q' 'Q' 'm' 'M' 'z' 'Z' 'r' 'R' 'n' 'N' 'y' 'Y' handled by P1P2Monitor (except for 'f' 'F" for H-link)
-    default : Sprint_P(true, true, true, PSTR("* [ESP] To ATmega: ->%s<-"), cmdString);
+    default : printfTopicS("To ATmega: ->%s<-", cmdString);
               Serial.print(F(SERIAL_MAGICSTRING));
               Serial.println((char *) cmdString);
               if ((cmdString[0] == 'k') || (cmdString[0] == 'K')) {
@@ -910,6 +950,7 @@ void handleCommand(char* cmdString) {
               break;
   }
 }
+
 
 static byte pseudo0D = 0;
 static byte pseudo0E = 0;
@@ -960,7 +1001,7 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
       if (((MQTT_readBufferH_new >= MQTT_RB)  && ((MQTT_readBufferT > MQTT_readBufferH) || (MQTT_readBufferT <= (MQTT_readBufferH_new - MQTT_RB)))) ||
           ((MQTT_readBufferH_new  < MQTT_RB)  &&  (MQTT_readBufferT > MQTT_readBufferH) && (MQTT_readBufferT <= MQTT_readBufferH_new))) {
         // buffer overrun
-        Sprint_P(true, false, false, PSTR("* [MON2] Mqtt packet input buffer overrun, dropped, index %i len %i total %i"), index, len, total);
+        printfSerial("Mqtt packet input buffer overrun, dropped, index %i len %i total %i", index, len, total);
         MQTT_drop = true;
       } else if (!MQTT_drop) {
         if (index == 0) {
@@ -985,7 +1026,7 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
       if (((MQTT_readBufferH_new >= MQTT_RB)  && ((MQTT_readBufferT > MQTT_readBufferH) || (MQTT_readBufferT <= (MQTT_readBufferH_new - MQTT_RB)))) ||
           ((MQTT_readBufferH_new  < MQTT_RB)  &&  (MQTT_readBufferT > MQTT_readBufferH) && (MQTT_readBufferT <= MQTT_readBufferH_new))) {
         // buffer overrun
-        Sprint_P(true, false, false, PSTR("* [MON2] Mqtt packet input buffer overrun, dropped, index %i len %i total %i"), index, len, total);
+        printfSerial("Mqtt packet input buffer overrun, dropped, index %i len %i total %i", index, len, total);
         MQTT_drop = true;
       } else if (!MQTT_drop) {
         for (uint16_t i = 0; i < len; i++) MQTT_readBuffer_writeChar(payload[i]);
@@ -1196,8 +1237,7 @@ void setup() {
   } else {
     saveRebootReason = REBOOT_REASON_NOTSTORED;
   }
-  Serial.print(F("* [ESP] ESP reboot reason 0x"));
-  Serial.println(saveRebootReason, HEX);
+  printfSerial("ESP reboot reason 0x%02X", saveRebootReason);
 #endif /* REBOOT_REASON */
 
   IPAddress local_ip;
@@ -1322,7 +1362,7 @@ void setup() {
 
     if (shouldSaveConfig) {
       // write new WiFi parameters provided in AP portal to EEPROM
-      Sprint_P(true, true, true, PSTR("* [ESP] Writing new WiFiManager-provided MQTT parameters to EEPROM"));
+      printfTopicS("Writing new WiFiManager-provided MQTT parameters to EEPROM");
       strlcpy(EEPROM_state.EEPROMnew.mqttServer,   WiFiManMqttServer.getValue(),   sizeof(EEPROM_state.EEPROMnew.mqttServer));
       if ((!strlen(WiFiManMqttPort.getValue())) || (sscanf(WiFiManMqttPort.getValue(), "%i", &EEPROM_state.EEPROMnew.mqttPort) != 1)) EEPROM_state.EEPROMnew.mqttPort = MQTT_PORT;
       strlcpy(EEPROM_state.EEPROMnew.mqttUser,     WiFiManMqttUser.getValue(),     sizeof(EEPROM_state.EEPROMnew.mqttUser));
@@ -1335,7 +1375,7 @@ void setup() {
       EEPROM.put(0, EEPROM_state);
       EEPROM.commit();
       if (useStaticIP) {
-        Sprint_P(true, true, true, PSTR("* [ESP] Restart ESP to set static IP"));
+        printfTopicS("Restart ESP to set static IP");
         delay(500);
         ESP.restart();
         delay(200);
@@ -1382,8 +1422,6 @@ void setup() {
   haPostfix[HA_POSTFIX_PREFIX] = (local_ip[3] / 100) + '0';
   haPostfix[HA_POSTFIX_PREFIX + 1] = (local_ip[3] % 100) / 10 + '0';
   haPostfix[HA_POSTFIX_PREFIX + 2] = (local_ip[3] % 10) + '0';
-
-  Sprint_P(true, false, false, PSTR("* [ESP] ESP reboot reason 0x%2X"), saveRebootReason);
 
 // MQTT client setup
   mqttClient.onConnect(onMqttConnect);
@@ -1470,41 +1508,41 @@ void setup() {
   useStaticIP = EEPROM_state.EEPROMnew.useStaticIP;
 
   if (mqttClient.connected()) {
-    Sprint_P(true, true, true, PSTR(WELCOMESTRING));
+    printfTopicS(WELCOMESTRING);
 #ifdef E_SERIES
-    Sprint_P(true, true, true, PSTR("* [ESP] E-Series"));
+    printfTopicS("E-Series");
 #endif /* E_SERIES */
 #ifdef F_SERIES
-    Sprint_P(true, true, true, PSTR("* [ESP] F-Series"));
+    printfTopicS("F-Series");
 #endif /* F_SERIES */
 #ifdef H_SERIES
-    Sprint_P(true, true, true, PSTR("* [ESP] H-Series"));
+    printfTopicS("H-Series");
 #endif /* H_SERIES */
 #ifdef MHI_SERIES
-    Sprint_P(true, true, true, PSTR("* [ESP] MHI-Series"));
+    printfTopicS("MHI-Series");
 #endif /* MHI_SERIES */
-    Sprint_P(true, true, true, PSTR("* [ESP] ESP_hw_identifier %i"), ESPhwID);
-    Sprint_P(true, true, true, PSTR("* [ESP] noWiFi %i"), noWiFi);
-    Sprint_P(true, true, true, PSTR("* [ESP] useStaticIP %i"), useStaticIP);
-    Sprint_P(true, true, true, PSTR("* [ESP] Connected to MQTT server"));
-    Sprint_P(true, true, true, PSTR("* [ESP] MQTT Clientname = %s"), MQTT_CLIENTNAME);
-    Sprint_P(true, true, true, PSTR("* [ESP] MQTT User = %s"), EEPROM_state.EEPROMnew.mqttUser);
-    // Sprint_P(true, true, true, PSTR("* [ESP] MQTT Password = %s"), EEPROM_state.EEPROMnew.mqttPassword);
-    Sprint_P(true, true, true, PSTR("* [ESP] MQTT Server = %s"), EEPROM_state.EEPROMnew.mqttServer);
-    Sprint_P(true, true, true, PSTR("* [ESP] MQTT Port = %i"), EEPROM_state.EEPROMnew.mqttPort);
-    Sprint_P(true, true, true, PSTR("* [ESP] ESP reboot reason = 0x%2X"), saveRebootReason);
-    Sprint_P(true, true, true, PSTR("* [ESP] outputMode = 0x%X"), outputMode);
-    Sprint_P(true, true, true, PSTR("* [ESP] outputFilter = %i"), outputFilter);
-    // Sprint_P(true, true, true, PSTR("* [ESP] mqttInputByte4 = %i"), mqttInputByte4);
-    Sprint_P(true, true, true, PSTR("* [ESP] EEPROM version = %i"), EEPROM_state.EEPROMnew.EEPROM_version);
+    printfTopicS("ESP_hw_identifier %i", ESPhwID);
+    printfTopicS("noWiFi %i", noWiFi);
+    printfTopicS("useStaticIP %i", useStaticIP);
+    printfTopicS("Connected to MQTT server");
+    printfTopicS("MQTT Clientname = %s", MQTT_CLIENTNAME);
+    printfTopicS("MQTT User = %s", EEPROM_state.EEPROMnew.mqttUser);
+    // printfTopicS("MQTT Password = %s", EEPROM_state.EEPROMnew.mqttPassword);
+    printfTopicS("MQTT Server = %s", EEPROM_state.EEPROMnew.mqttServer);
+    printfTopicS("MQTT Port = %i", EEPROM_state.EEPROMnew.mqttPort);
+    printfTopicS("ESP reboot reason = 0x%2X", saveRebootReason);
+    printfTopicS("outputMode = 0x%X", outputMode);
+    printfTopicS("outputFilter = %i", outputFilter);
+    // printfTopicS("mqttInputByte4 = %i", mqttInputByte4);
+    printfTopicS("EEPROM version = %i", EEPROM_state.EEPROMnew.EEPROM_version);
   }
   delay(200);
 
 #ifdef TELNET
   if (telnetSuccess) {
-    Sprint_P(true, false, false, PSTR("* [ESP] Telnet running on %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+    printfSerial("Telnet running on %i.%i.%i.%i", local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
   } else {
-    Sprint_P(true, false, false, PSTR("* [ESP] Telnet error."));
+    printfSerial("Telnet error");
   }
 #endif
 
@@ -1526,16 +1564,16 @@ void setup() {
   ArduinoOTA.onStart([]() {
     OTAbusy = 1;
     if (ArduinoOTA.getCommand() == U_FLASH) {
-      Sprint_P(true, true, true, PSTR("* [ESP] Start OTA updating sketch"));
+      printfTopicS("Start OTA updating sketch");
     } else { // U_SPIFFS (not used here)
-      Sprint_P(true, true, true, PSTR("* [ESP] Start OTA updating filesystem"));
+      printfTopicS("Start OTA updating filesystem");
     }
     // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
   });
   ArduinoOTA.onEnd([]() {
     OTAbusy = 2;
-    Sprint_P(true, true, true, PSTR("* [ESP] OTA End"));
-    Sprint_P(true, true, true, PSTR("* [ESP] Disconnect and stop telnet"));
+    printfTopicS("OTA End");
+    printfTopicS("Disconnect and stop telnet");
 #ifdef REBOOT_REASON
     EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_OTA;
     EEPROM.put(0, EEPROM_state);
@@ -1545,25 +1583,22 @@ void setup() {
     ESP.restart();
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Sprint_P(true, false, false, PSTR("* [ESP] Progress: %u%%\r"), (progress / (total / 100)));
+    printfSerial("Progress: %u%%\r", (progress / (total / 100)));
   });
   ArduinoOTA.onError([](ota_error_t error) {
-    Sprint_P(true, false, false, PSTR("* [ESP] Error[%u]: "), error);
-    if (error == OTA_AUTH_ERROR) {
-      Serial_println(F("* Auth Failed"));
-      Sprint_P(true, true, true, PSTR("* [ESP] OTA Auth Failed"));
-    } else if (error == OTA_BEGIN_ERROR) {
-      Serial_println(F("* Begin Failed"));
-      Sprint_P(true, true, true, PSTR("* [ESP] OTA Begin Failed"));
-    } else if (error == OTA_CONNECT_ERROR) {
-      Serial_println(F("* Connect Failed"));
-      Sprint_P(true, true, true, PSTR("* [ESP] OTA Connect Failed"));
-    } else if (error == OTA_RECEIVE_ERROR) {
-      Serial_println(F("* Receive Failed"));
-      Sprint_P(true, true, true, PSTR("* [ESP] OTA Receive Failed"));
-    } else if (error == OTA_END_ERROR) {
-      Serial_println(F("* End Failed"));
-      Sprint_P(true, true, true, PSTR("* [ESP] OTA End Failed"));
+    switch (error) {
+      case OTA_AUTH_ERROR    : printfTopicS("OTA Auth Failed");
+                               break;
+      case OTA_BEGIN_ERROR   : printfTopicS("OTA Begin Failed");
+                               break;
+      case OTA_CONNECT_ERROR : printfTopicS("OTA Connect Failed");
+                               break;
+      case OTA_RECEIVE_ERROR : printfTopicS("OTA Receive Failed");
+                               break;
+      case OTA_END_ERROR     : printfTopicS("OTA Begin Failed");
+                               break;
+      default                : printfTopicS("OTA unknown error");
+                               break;
     }
     ignoreremainder = 2;
     OTAbusy = 0;
@@ -1581,7 +1616,7 @@ void setup() {
   // set RESET_PIN back to INPUT mode
   pinMode(RESET_PIN, INPUT);
   MDNS.addService("avrisp", "tcp", avrisp_port);
-  Sprint_P(true, true, true, PSTR("* [ESP] AVRISP: ATmega programming: avrdude -c avrisp -p atmega328p -P net:%i.%i.%i.%i:%i -t # or -U ..."), local_ip[0], local_ip[1], local_ip[2], local_ip[3], avrisp_port);
+  printfTopicS("AVRISP: ATmega programming: avrdude -c avrisp -p atmega328p -P net:%i.%i.%i.%i:%i -t # or -U ...", local_ip[0], local_ip[1], local_ip[2], local_ip[3], avrisp_port);
   // listen for avrdudes
   avrprog->begin();
 #endif
@@ -1602,16 +1637,16 @@ void setup() {
   ATmega_dummy_for_serial();
 
 // Ready, report status
-  Sprint_P(true, true, true, PSTR("* [ESP] Setup ready"));
+  printfTopicS("Setup ready");
   if (telnetSuccess) {
-    Sprint_P(true, true, true, PSTR("* [ESP] TELNET: telnet %i.%i.%i.%i"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+    printfTopicS("TELNET: telnet %i.%i.%i.%i", local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
   } else {
-    Sprint_P(true, true, true, PSTR("* [ESP] Telnet setup failed."));
+    printfTopicS("Telnet setup failed.");
   }
   delay(1000);
   mqttSetupReady = true;
   configTime(MY_TZ[0], MY_NTP_SERVER);
-  client_publish_mqtt("P1P2/Z", mqttSignal + MQTT_KEY_PREFIXIP);
+  clientPublishMqtt("P1P2/Z", mqttSignal + MQTT_KEY_PREFIXIP);
 }
 
 static int jsonTerm = 1; // indicates whether json output was terminated
@@ -1640,22 +1675,22 @@ void process_for_mqtt_json(byte* rb, int n) {
             jsonTerm = 1;
             jsonString[jsonStringp++] = '}';
             jsonString[jsonStringp++] = '\0';
-            if (outputMode & 0x0004) client_publish_mqtt(mqttJsondata, jsonString);
-            if (outputMode & 0x0040) client_publish_telnet(mqttJsondata, jsonString);
-            if (outputMode & 0x0400) client_publish_serial(mqttJsondata, jsonString);
+            if (outputMode & 0x0004) clientPublishMqtt(mqttJsondata, jsonString);
+            if (outputMode & 0x0040) clientPublishTelnet(mqttJsondata, jsonString);
+            if (outputMode & 0x0400) clientPublishSerial(mqttJsondata, jsonString);
             jsonStringp = 1;
           }
         } else {
           if (kvrbyte > 9) {
             kvrbyte = 0;
-            Sprint_P(true, true, true, PSTR("* [ESP] Warning: kvrbyte > 9 Src 0x%02X Tp 0x%02X Byte %i"),rb[0], rb[2], i);
+            printfTopicS("Warning: kvrbyte > 9 Src 0x%02X Tp 0x%02X Byte %i",rb[0], rb[2], i);
           }
           for (byte j = 0; j < kvrbyte; j++) {
             int kvr = (kvrbyte == 8) ? bits2keyvalue(rb[0], rb[2], i - 3, rb + 3, mqtt_key, mqtt_value, j) : kvrbyte;
             if (kvr) {
-              if (outputMode & 0x0002) client_publish_mqtt(mqtt_key, mqtt_value);
-              if (outputMode & 0x0020) client_publish_telnet(mqtt_key, mqtt_value);
-              if (outputMode & 0x0200) client_publish_serial(mqtt_key, mqtt_value);
+              if (outputMode & 0x0002) clientPublishMqtt(mqtt_key, mqtt_value);
+              if (outputMode & 0x0020) clientPublishTelnet(mqtt_key, mqtt_value);
+              if (outputMode & 0x0200) clientPublishSerial(mqtt_key, mqtt_value);
               // don't add another parameter if remaining space is not enough for mqtt_key, mqtt_value, and ',' '"', '"', ':', '}', and '\0'
               if (jsonStringp + strlen(mqtt_value) + strlen(mqtt_key + MQTT_KEY_PREFIXLEN) + 6 <= sizeof(jsonString)) {
                 if (jsonTerm) {
@@ -1682,19 +1717,20 @@ void process_for_mqtt_json(byte* rb, int n) {
 
 byte timeStamp = 30;
 
-#define PWB (24*2+33) // max pseudopacket 24 bytes (incl CRC byte)
+#define MAXRH 23
+#define PWB (23*2+36) // max pseudopacket 23 bytes (excl CRC byte), 33 bytes for timestamp-prefix, 1 byte for terminating null, 2 for CRC byte
 
 void writePseudoPacket(byte* WB, byte rh)
 // rh is pseudo packet size (without CRC byte)
 {
   char pseudoWriteBuffer[PWB];
-  if ((rh * 2 + 33) > PWB ) {
-    Sprint_P(true, true, true, PSTR("* [ESP] rh > PWB error"));
+  if (rh > MAXRH) {
+    printfTopicS("rh > %i", MAXRH);
     return;
   }
   time(&now);
   localtime_r(&now, &tm);
-  snprintf(pseudoWriteBuffer, 33, "R %04i-%02i-%02i_%02i:%02i:%02i P         ", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+  snprintf_P(pseudoWriteBuffer, 33, PSTR("R %04i-%02i-%02i_%02i:%02i:%02i P         "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec); // TODO ??? TZ ????
   uint8_t crc = crc_feed;
   for (uint8_t i = 0; i < rh; i++) {
     uint8_t c = WB[i];
@@ -1707,10 +1743,11 @@ void writePseudoPacket(byte* WB, byte rh)
   WB[rh] = crc;
   if (crc_gen) snprintf(pseudoWriteBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", crc);
 #if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
-  if (outputMode & 0x0001) client_publish_mqtt(mqttHexdata, pseudoWriteBuffer);
+  if (outputMode & 0x0001) clientPublishMqtt(mqttHexdata, pseudoWriteBuffer);
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
-  if (outputMode & 0x0010) client_publish_telnet(mqttHexdata, pseudoWriteBuffer);
-  if (outputMode & 0x0100) client_publish_serial(mqttHexdata, pseudoWriteBuffer);
+  if (outputMode & 0x0100) clientPublishSerial(mqttHexdata, pseudoWriteBuffer);
+  pseudoWriteBuffer[22] = 'R';
+  if (outputMode & 0x0010) clientPublishTelnet(mqttHexdata, pseudoWriteBuffer + 22);
 #if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
   if ((outputMode & 0x0800) && (mqttConnected)) mqttClient.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) WB, rh + 1);
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
@@ -1755,22 +1792,22 @@ void loop() {
     if (milliInc < 1000) {
       if ((throttleValue > 1) && ((espUptime - throttleStart) > (THROTTLE_VALUE - throttleValue + 1) * THROTTLE_STEP)) {
         throttleValue--;
-        Sprint_P(true, true, false, PSTR("* [ESP] throttling %i"), throttleValue);
-        if (throttleValue == 1) Sprint_P(true, true, false, PSTR("* [ESP] Ready throttling"));
+        if (throttleValue == 1) {
+          printfTopicS("Ready throttling");
+        } else {
+          printfTopicS("Throttling at %i", throttleValue);
+        }
       }
-        // alternative, more info: Sprint_P(true, true, false, PSTR("* [ESP] %d RSSI %d heap %d maxfreeblocksize %d Uptime %li disconnects %d WiFi %d ethernet %d status %d"), espUptime, WiFi.RSSI(), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(), espUptime, Mqtt_disconnects, WiFi.isConnected(), eth.connected(), eth.status());
       if (espUptime >= espUptime_telnet + 10) {
         espUptime_telnet = espUptime_telnet + 10;
-        time(&now);
-        localtime_r(&now, &tm);
-        Sprint_P(false, false, true, PSTR("* [ESP] Uptime %li at %04i%02i%02i_%02i:%02i:%02i"), espUptime, tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+        printfTopicS("Uptime %li", espUptime);
       }
-      if (!mqttClient.connected()) Sprint_P(true, false, true, PSTR("* [ESP] MQTT is disconnected (%i s total %i s)"), Mqtt_disconnectTime, Mqtt_disconnectTimeTotal);
+      if (!mqttClient.connected()) printfTopicS("MQTT is disconnected (%i s total %i s)", Mqtt_disconnectTime, Mqtt_disconnectTimeTotal);
       pseudo0D++;
       pseudo0E++;
       pseudo0F++;
       if (Mqtt_disconnectTime > MQTT_DISCONNECT_RESTART) {
-        Sprint_P(true, true, true, PSTR("* [ESP] Restarting ESP to attempt to reconnect Mqtt"));
+        printfTopicS("Restarting ESP to attempt to reconnect Mqtt");
 #ifdef REBOOT_REASON
         EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_MQTT;
         EEPROM.put(0, EEPROM_state);
@@ -1794,7 +1831,7 @@ void loop() {
   AVRISPState_t new_state = avrprog->update();
   if (last_state != new_state) {
     switch (new_state) {
-      case AVRISP_STATE_IDLE:    Sprint_P(true, true, true, PSTR("* [AVR] now idle"));
+      case AVRISP_STATE_IDLE:    printfTopicS("AVR now idle");
                                  digitalWrite(RESET_PIN, LOW);
                                  pinMode(RESET_PIN, OUTPUT);
                                  delay(1);
@@ -1803,16 +1840,22 @@ void loop() {
                                  // enable ATmega to determine PB5=GPIO14/GPIO15 for v1.0/v1.1
                                  delay(1);
                                  // enable ATmega serial output on v1.2
+
+
+                                 while ((c = Serial.read()) >= 0); // flush serial input
+
+
+
                                  pinMode(ATMEGA_SERIAL_ENABLE, OUTPUT); // not really needed
                                  digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
                                  delay(100);
                                  ATmega_dummy_for_serial();
                                  ATmega_uptime_prev = 0;
                                  break;
-      case AVRISP_STATE_PENDING: Sprint_P(true, true, true, PSTR("* [AVR] connection pending"));
+      case AVRISP_STATE_PENDING: printfTopicS("AVR connection pending");
                                  pinMode(RESET_PIN, OUTPUT);
                                  break;
-      case AVRISP_STATE_ACTIVE:  Sprint_P(true, true, true, PSTR("* [AVR] programming mode"));
+      case AVRISP_STATE_ACTIVE:  printfTopicS("AVR programming mode");
                                  pinMode(RESET_PIN, OUTPUT);
                                  break;
     }
@@ -1832,14 +1875,13 @@ void loop() {
   if (WiFi.isConnected() || ethernetConnected) {  // TODO for now: use initial ethernet connection status instead (ethernet cable disconnect is thus not detected)
     if (!mqttClient.connected()) {
       if (espUptime > reconnectTime) {
-        // Sprint_P(true, false, true, PSTR("* [ESP] MQTT Try to reconnect to MQTT server %s:%i (user %s/password %s)"), EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort, EEPROM_state.EEPROMnew.mqttUser, EEPROM_state.EEPROMnew.mqttPassword);
-        Sprint_P(true, false, true, PSTR("* [ESP] MQTT Try to reconnect to MQTT server %s:%i (user %s/password *)"), EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort, EEPROM_state.EEPROMnew.mqttUser);
+        printfTopicS("MQTT Try to reconnect to MQTT server %s:%i (user %s/password *)", EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort, EEPROM_state.EEPROMnew.mqttUser);
         mqttClient.connect();
         delay(500);
         if (mqttClient.connected()) {
-          Sprint_P(true, true, true, PSTR("* [ESP] Mqtt reconnected"));
+          printfTopicS("Mqtt reconnected");
           if (outputMode & 0x40000) {
-            Sprint_P(true, true, true, PSTR("* [ESP] Restart ESP after Mqtt reconnect (outputMode 0x40000)"));
+            printfTopicS("Restart ESP after Mqtt reconnect (outputMode 0x40000)");
 #ifdef REBOOT_REASON
             EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_MQTT;
             EEPROM.put(0, EEPROM_state);
@@ -1849,17 +1891,16 @@ void loop() {
             ESP.restart();
             delay(100);
           }
-          Sprint_P(true, true, true, PSTR(WELCOMESTRING));
+          printfTopicS(WELCOMESTRING);
           reconnectTime = espUptime;
           if (outputMode & 0x80000) {
-            Sprint_P(true, true, true, PSTR("* [ESP] Restart data communication after Mqtt reconnect (outputMode 0x80000)"));
+            printfTopicS("Restart data communication after Mqtt reconnect (outputMode 0x80000)");
             throttleStart = espUptime;
             throttleValue = THROTTLE_VALUE;
             resetDataStructures();
           }
         } else {
-          Sprint_P(true, false, true, PSTR("* [ESP] Reconnect failed, retrying in 5 seconds"));
-          Serial.println(F("* [ESP] Reconnect to MQTT failed, see telnet or serial output for details"));
+          printfTopicS("Reconnect failed, retrying in 5 seconds"); // TODO
           reconnectTime = espUptime + 5;
         }
       }
@@ -1912,7 +1953,7 @@ void loop() {
         time(&now);
         localtime_r(&now, &tm);
         if (c == 'R') {
-          snprintf(&readBuffer[1], 21, "-%04i-%02i-%02i_%02i:%02i:%02i", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+          snprintf_P(&readBuffer[1], 21, PSTR(" %04i-%02i-%02i_%02i:%02i:%02i"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
           serial_rb += 20;
           rb_buffer += 20;
         }
@@ -1926,8 +1967,8 @@ void loop() {
         if (!serial_rb) {
           time(&now);
           localtime_r(&now, &tm);
-          if (c == 'R') {
-            snprintf(&readBuffer[1], 21, "-%04i-%02i-%02i_%02i:%02i:%02i", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+          if ((c == 'R') || (c == 'C') || (c == 'c')) {
+            snprintf_P(&readBuffer[1], 21, PSTR(" %04i-%02i-%02i_%02i:%02i:%02i"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
             serial_rb += 20;
             rb_buffer += 20;
           }
@@ -1949,13 +1990,15 @@ void loop() {
           *(--rb_buffer) = '\0';
         }
         if (ignoreremainder == 2) {
-          Sprint_P(true, true, true, PSTR("* [ESP] First line from ATmega ignored %s"), readBuffer);
+          printfTopicS("First line from ATmega ignored %s", readBuffer);
           ignoreremainder = 0;
         } else if (ignoreremainder == 1) {
-          Sprint_P(true, true, true, PSTR("* [ESP] Line from ATmega too long, last part: ->%s<-"), readBuffer);
+          printfTopicS("Line from ATmega too long, last part: ->%s<-", readBuffer);
           ignoreremainder = 0;
         } else {
-          if (readBuffer[0] == 'R') {
+          if (!serial_rb) {
+            // ignore empty line
+          } else if (readBuffer[0] == 'R') {
             int rbp = 22; // TODO or 2?
             int n, rbtemp;
             byte rh = 0;
@@ -1966,11 +2009,15 @@ void loop() {
             } else {
               timeStamp = 20; // TODO ???
             }
-            while ((rh < HB) && (sscanf(readBuffer + rbp, "%2x%n", &rbtemp, &n) == 1)) { // TODO
-              readHex[rh++] = rbtemp;
+            while (sscanf(readBuffer + rbp, "%2x%n", &rbtemp, &n) == 1) { // TODO
+              if (rh < HB) readHex[rh] = rbtemp;
+              rh++;
               rbp += n;
             }
-            if (rh == HB) Sprint_P(true, true, true, PSTR("* [MON] Buffer full, overflow not checked"));
+            if (rh > HB) {
+              printfTopicS("Unexpected input buffer full/overflow, received %i, ignoring remainder", rh);
+              rh = RB;
+            }
             if ((rh > 1) || (rh == 1) && !crc_gen) {
               if (crc_gen) rh--;
               // rh is packet length (not counting CRC byte readHex[rh])
@@ -1985,10 +2032,14 @@ void loop() {
 // if (outputMode & ??) add timestring TODO to readBuffer
               if ((!crc_gen) || (crc == readHex[rh])) {
 #if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
-                if (outputMode & 0x0001) client_publish_mqtt(mqttHexdata, readBuffer); // TODO
+                if (outputMode & 0x0001) clientPublishMqtt(mqttHexdata, readBuffer); // TODO
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
-                if (outputMode & 0x0010) client_publish_telnet(mqttHexdata, readBuffer); // TODO
-                if (outputMode & 0x0100) client_publish_serial(mqttHexdata, readBuffer); // TODO
+                if (outputMode & 0x0100) clientPublishSerial(mqttHexdata, readBuffer); // TODO
+
+                readBuffer[22] = 'R';
+                if (outputMode & 0x0010) clientPublishTelnet(mqttHexdata, readBuffer + 22);
+
+
 #if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
                 if ((outputMode & 0x0800) && (mqttConnected)) mqttClient.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) readHex, rh + 1);
 #endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
@@ -2010,28 +2061,38 @@ void loop() {
                   ATmega_uptime_prev = ATmega_uptime;
                 }
               } else {
-                Sprint_P(true, true, true, PSTR("* [MON] Serial input buffer overrun or CRC error in R data:%s expected 0x%02X"), readBuffer + 1, crc);
+                printfTopicS("Serial input buffer overrun or CRC error in R data:%s expected 0x%02X", readBuffer + 1, crc);
                 if (ESP_serial_input_Errors_CRC < 0xFF) ESP_serial_input_Errors_CRC++;
               }
             } else {
-              Sprint_P(true, true, true, PSTR("* [MON] Not enough readable data in R line: ->%s<-"), readBuffer + 1);
+              printfTopicS("Not enough readable data in R line: ->%s<-", readBuffer + 1);
               if (ESP_serial_input_Errors_Data_Short < 0xFF) ESP_serial_input_Errors_Data_Short++;
             }
           } else if ((readBuffer[0] == 'C') || (readBuffer[0] == 'c')) {
             // timing info
             if (outputMode & 0x1000) {
-              client_publish_mqtt(mqttHexdata, readBuffer);
-              client_publish_telnet(mqttHexdata, readBuffer);
+              clientPublishMqtt(mqttHexdata, readBuffer);
+              // clientPublishTelnet(mqttHexdata, readBuffer);
+              readBuffer[22] = 'R';
+              if (outputMode & 0x0010) clientPublishTelnet(mqttHexdata, readBuffer + 22);
             }
           } else if (readBuffer[0] == 'E') {
             // data with errors
             readBuffer[0] = '*'; // backwards output report compatibility // TODO
-            Sprint_P(true, true, true, PSTR("* %04i-%02i-%02i_%02i:%02i:%02i [MON]%s"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, readBuffer + 1);
-            if (outputMode & 0x2000) client_publish_mqtt(mqttHexdata, readBuffer);
+            if (readBuffer[1] == ' ') {
+              printfTopicS_MON("%s", readBuffer + 2);
+            } else {
+              printfTopicS_MON("%s", readBuffer + 1);
+            }
+            if (outputMode & 0x2000) clientPublishMqtt(mqttHexdata, readBuffer);
           } else if (readBuffer[0] == '*') {
-            Sprint_P(true, true, true, PSTR("* %04i-%02i_%02i_%02i:%02i:%02i [MON]%s"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, readBuffer + 1);
+            if (readBuffer[1] == ' ') {
+              printfTopicS_MON("%s", readBuffer + 2);
+            } else {
+              printfTopicS_MON("%s", readBuffer + 1);
+            }
           } else {
-            Sprint_P(true, true, true, PSTR("* %04i-%02i_%02i_%02i:%02i:%02i [MON] %s"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, readBuffer);
+            printfTopicS_MON("%s", readBuffer);
             if (ESP_serial_input_Errors_Data_Short < 0xFF) ESP_serial_input_Errors_Data_Short++;
           }
         }
@@ -2040,10 +2101,10 @@ void loop() {
         char lst = *(rb_buffer - 1);
         *(rb_buffer - 1) = '\0';
         if (c != '\n') {
-          Sprint_P(true, true, true, PSTR("* [MON] Line from ATmega too long, ignored, ignoring remainder: ->%s<-->%c<-->%c<-"), readBuffer, lst, c); // TODO
+          printfTopicS("Line from ATmega too long, ignored, ignoring remainder: ->%s<-->%c<-->%c<-", readBuffer, lst, c);
           ignoreremainder = 1;
         } else {
-          Sprint_P(true, true, true, PSTR("* [MON] Line from ATmega too long, terminated, ignored: ->%s<-->%c<-"), readBuffer, lst); // TODO
+          printfTopicS("Line from ATmega too long, terminated, ignored: ->%s<-->%c<-", readBuffer, lst);
           ignoreremainder = 0;
         }
       }
@@ -2135,10 +2196,10 @@ void loop() {
       readHex[10] = Sprint_buffer_overflow & 0xFF;
       readHex[11] = ESP_serial_input_Errors_Data_Short;
       readHex[12] = ESP_serial_input_Errors_CRC;
-      readHex[13] = (MQTT_waitCounter >> 24) & 0xFF;
-      readHex[14] = (MQTT_waitCounter >> 16) & 0xFF;
-      readHex[15] = (MQTT_waitCounter >> 8) & 0xFF;
-      readHex[16] = MQTT_waitCounter & 0xFF;
+      readHex[13] = (Mqtt_waitCounter >> 24) & 0xFF;
+      readHex[14] = (Mqtt_waitCounter >> 16) & 0xFF;
+      readHex[15] = (Mqtt_waitCounter >> 8) & 0xFF;
+      readHex[16] = Mqtt_waitCounter & 0xFF;
       readHex[17] = (Mqtt_disconnects >> 8) & 0xFF;
       readHex[18] = Mqtt_disconnects & 0xFF;
       readHex[19] = (Mqtt_disconnectSkippedPackets >> 8) & 0xFF;
