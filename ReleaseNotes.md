@@ -1,5 +1,11 @@
 **Release notes**
 
+v0.9.44
+
+- improves counter request mechanism
+- various entity name changes
+- improves ATmega behaviour during ESP reset
+
 v0.9.43
 
 - improves counter request mechanism

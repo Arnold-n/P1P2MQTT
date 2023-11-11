@@ -7,6 +7,7 @@
 
 ### Software related, fixed
 
+ - (solved in 0.9.44) counter requests may stop after Daikin system restart
  - (solved in 0.9.27) Power\_\* was not visible in HA
  - (solved in 0.9.26) MQTT username/password length was limited to 19/39 characters in WiFiManager. Max length now 80.
  - (solved in 0.9.23) MQTT reconnect may fail, especially if the WIFI signal is weak (~ -90 dBm), resulting in an ESP8266 reboot
@@ -18,10 +19,11 @@
 ### Todo list
 
  - COP calculation
- - HA integration
+ - HA control integration
  - smart grid / dynamic power limitation
+ - external electricity meter input
  - web server
- - setting field settings
+ - logging/setting field settings
  - EKHBRD support
  - documentation
  - Hitachi support
