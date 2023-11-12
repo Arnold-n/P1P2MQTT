@@ -21,9 +21,9 @@ Commands to switch heating off and on on EHYHBX08AAV3 in LWT control mode:
 
 Switching between heating, cooling, and automatic mode
 - parameter nr 0x4E (works on EHYHBX08AAV3) (value 0=heating 1=cooling 2=auto)
-- E 3A 4E 0 = set mode to heating
-- E 3A 4E 1 = set mode to cooling
-- E 3A 4E 2 = set mode to auto
+- `E 3A 4E 0` = set mode to heating
+- `E 3A 4E 1` = set mode to cooling
+- `E 3A 4E 2` = set mode to auto
 Budulinek reports that parameter 0x3A this may not work correctly, and that parameter 0x4E in packet type 3A may have to be used instead.
 
 Parameter in packet type 35 for switching DHW on/off
@@ -31,7 +31,7 @@ Parameter in packet type 35 for switching DHW on/off
 - 0x3E (works on EHVX08S26CA9W) (and/or in certain DHW operating modes)
 
 Parameter in packet type 35 for switching DHW boost on/off
-- 0x48 (may work on some models
+- 0x48 (may work on some models)
 
 Parameter in packet type 35 for switching DHWbooster on/off
 - 0x48 (works on EHVX08S26CB9W)
@@ -66,9 +66,9 @@ Parameter in packet type 36 for setting main zone heating temperature deviation 
 - 0x08 (works on EHYHBX08AAV3)
 
 Example commands to set WD-LWT mode curve deviation
-- E36 8 0 sets deviation to +0 C
-- E36 8 A sets deviation to +1 C
-- E36 8 FFF6 sets deviation to -1 C
+- `E36 8 0` sets deviation to +0 C
+- `E36 8 A` sets deviation to +1 C
+- `E36 8 FFF6` sets deviation to -1 C
 
 Parameter in packet type 36 for setting main zone cooling temperature deviation (only in weather-dependent LWT mode)
 - 0x09 (works on EHYHBX08AAV3)
