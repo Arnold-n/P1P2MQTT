@@ -1885,8 +1885,8 @@ F 38 6 19    to set the setpoint to 0x19 = 25C
 F 38 8 11    to set the fanmode to low         (heating mode)
 F 38 8 31    to set the fanmode to medium
 F 38 8 51    to set the fanmode to high
-F 38 16 ?? (not sure yet, active hvac zones related)
-F 38 17 ?? (not sure yet, target fan mode related)
+F 3B 16 ?? (not sure yet, active hvac zones related)
+F 3B 17 ?? (not sure yet, target fan mode related)
 or the following commands without spaces with extra zeroes in first and second operand:
 F38001     to switch on
 F38000     to switch off
