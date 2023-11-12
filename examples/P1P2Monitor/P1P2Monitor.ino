@@ -720,8 +720,11 @@ void loop() {
                           Serial_println(F("wr_val for payload byte 2/6 (target-temp cooling/heating) must be in range 0x10-0x20"));
                           break;
                         }
-                        if (((wr_nr == 4) || (wr_nr == 8)) && ((wr_val < 0x11) || (wr_val > 0x51))) {
-                          Serial_println(F("wr_val for payload byte 4/8 (fan-speed cooling/heating) must be in range 0x11-0x51"));
+                        if (((wr_nr == 4) || (wr_nr == 8)) && (wr_val < 0x03)) {
+                          wr_val = 0x11 + (wr_val << 5); // 0x00 -> 0x11; 0x01 -> 0x31; 0x02 -> 0x51
+                          break;
+                        } else if (((wr_nr == 4) || (wr_nr == 8)) && ((wr_val < 0x11) || (wr_val > 0x51))) {
+                          Serial_println(F("wr_val for payload byte 4/8 (fan-speed cooling/heating) must be in range 0x11-0x51 or 0x00-0x02"));
                           break;
                         }
                         // no limitations for wr_nr == 16
