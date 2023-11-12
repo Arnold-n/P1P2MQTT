@@ -2,6 +2,8 @@
 
 Protocol data format for a FDY125LV1 Daikin ducted model, which seems to be specific for the Australian market.
 
+Some other systems seem to use the same or very similar data format, including: ADEQ100B2VEB, FBQ*B*, FBQ60C7VEB, and perhaps also: FBQ35B7V.
+
 Please read the common README.md first for the general format description.
 
 All values in this document are hex, except for the byte numbering in the payload and time (ms) references.
