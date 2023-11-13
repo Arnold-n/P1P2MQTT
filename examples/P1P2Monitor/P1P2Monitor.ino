@@ -1771,14 +1771,16 @@ void loop() {
               break;
 
 // Messages and payload lengths:
-// FDY          0x30 20/0                                                                              0x38 16/15 / 0x39 11/4
-// FDYQ         0x30 20/0                                      0x3700-0x3706 14/0 0x3707-0x3713 16/0                                       0x3B 20/19 / 0x3C 12/2
-// FXMQ         0x30 20/0   0x32 8/1   0x35 19/0   0x36 19/0                                           0x38 20/17   0x39 14/5   0x3A 18/8
+// ?   EKHBRD*ADV   0x30   /               0x34  5/0                                                                  0x38 20/14
+// BCL FDY          0x30 20/0                                                                                         0x38 16/15 / 0x39 11/4
+// LPA FXMQ         0x30 20/0   0x32 8/1              0x35 19/0   0x36 19/0                                           0x38 20/17   0x39 14/5   0x3A 18/8
+// M   FDYQ         0x30 20/0                                                 0x3700-0x3706 14/0 0x3707-0x3713 16/0                                       0x3B 20/19 / 0x3C 12/2
 
 // Compatible systems:
-// FDY:   FDY125LV1, 2002 FBQ*B*, ADEQ100B2VEB, perhaps also: FBQ35B7V1
-// FDYQ:  FDYQ180MV1
-// FXMQ:  FXMQ200PWM and/or FXMQ100PAVE ?, FDYQN160LAV1, perhaps also: FBA60A9
+// ?   EKHBRD*ADV: ?
+// BCL FDY:  FDY125LV1, 2002 FBQ*B*, ADEQ100B2VEB, perhaps also: FBQ35B7V1
+// LPA FXMQ: FXMQ200PWM and/or FXMQ100PAVE ?, FDYQN160LAV1, perhaps also: FBA60A9
+// M   FDYQ: FDYQ180MV1
 
 /*
 You can use the following commands with spaces:
