@@ -147,7 +147,51 @@ const byte Compile_Options = 0 // multi-line statement
 
 #ifdef EEPROM_SUPPORT
 #include <EEPROM.h>
-void initEEPROM() {
+
+static byte signatureOffsetEeprom = 0;
+static byte activePageId = 0;
+static byte activePageWrites = 0;
+
+void loadPagedMemoryState() {
+  activePageId = EEPROM.read(signatureOffsetEeprom);
+  activePageWrites = readPagedEEPROM(-EEPROM_PAGE_HEADER) << 4;
+}
+
+void promoteNewPage() {
+  uint8_t oldPageId = activePageId;
+  activePageId = (activePageId + 1) % (EEPROM_MAX_PAGE_INDEX + 1);
+  activePageWrites = 1;
+  // Copy content of current page to new one
+  for (uint8_t i = 0; i < EEPROM_PAGE_SIZE; i++) {
+    uint8_t value = EEPROM.read(signatureOffsetEeprom + EEPROM_PAGE_SIZE * oldPageId + i);
+    EEPROM.update(signatureOffsetEeprom + EEPROM_PAGE_SIZE * activePageId + i, value);
+  }
+  // Reset active page writes counter
+  EEPROM.update(signatureOffsetEeprom + EEPROM_PAGE_SIZE * activePageId, 0);
+  // Promition finished, update main header
+  EEPROM.update(signatureOffsetEeprom, activePageId);
+}
+
+
+void updatePagedEEPROM(int8_t x, y) {
+  uint16_t pageBegin = signatureOffsetEeprom + EEPROM_PAGE_SIZE * activePageId;
+  activePageWrites += 1;
+  uint8_t decimationMask = (1 << EEPROM_WRITE_DECIMATION_BITS) - 1;
+  if ((activePageWrites & decimationMask) == 0) {
+    // Store page writes divided by 16 to reduced stress, its good enough
+      EEPROM.update(pageBegin, activePageWrites >> EEPROM_WRITE_DECIMATION_BITS)
+  }
+
+  if (activePageWrites > EEPROM_CYCLE_EVERY_WRITES) promoteNewPage();
+  EEPROM.update(addr + EEPROM_PAGE_HEADER, y);
+}
+
+uint8_t readPagedEEPROM(int8_t x) {
+  uint16_t pageBegin = signatureOffsetEeprom + EEPROM_PAGE_SIZE * activePageId + EEPROM_PAGE_HEADER;
+  return EEPROM.read(pageBegin + x);
+}
+
+bool verifyEEPROMSignature() {
   if (verbose) Serial.println(F("* checking EEPROM"));
   bool sigMatch = 1;
   for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) sigMatch &= (EEPROM.read(EEPROM_ADDRESS_SIGNATURE + i) == EEPROM_SIGNATURE[i]);
@@ -155,15 +199,26 @@ void initEEPROM() {
      Serial.print(F("* EEPROM sig match"));
      Serial.println(sigMatch);
   }
-  if (!sigMatch) {
+  signatureOffsetEeprom = strlen(EEPROM_SIGNATURE);
+  return sigMatch;
+}
+
+void initEEPROM() {
+  bool sigMatch = verifyEEPROMSignature();
+  if (sigMatch) {
+    loadPagedMemoryState();
+  } else {
     if (verbose) Serial.println(F("* EEPROM sig mismatch, initializing EEPROM"));
     for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) EEPROM.update(EEPROM_ADDRESS_SIGNATURE + i, EEPROM_SIGNATURE[i]); // no '\0', not needed
-    EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID_DEFAULT); // Daikin specific
-    EEPROM.update(EEPROM_ADDRESS_COUNTER_STATUS, COUNTERREPEATINGREQUEST); // Daikin specific
-    EEPROM.update(EEPROM_ADDRESS_VERBOSITY, INIT_VERBOSE);
+    updatePagedEEPROM(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID_DEFAULT); // Daikin specific
+    updatePagedEEPROM(EEPROM_ADDRESS_COUNTER_STATUS, COUNTERREPEATINGREQUEST); // Daikin specific
+    updatePagedEEPROM(EEPROM_ADDRESS_VERBOSITY, INIT_VERBOSE);
+    promoteNewPage();
   }
 }
-#define EEPROM_update(x, y) { EEPROM.update(x, y); };
+
+
+#define EEPROM_update(x, y) { updatePagedEEPROM(x, y); };
 #else /* EEPROM_SUPPORT */
 #define EEPROM_update(x, y) {}; // dummy function to avoid cluttering code with #ifdef EEPROM_SUPPORT
 #endif /* EEPROM_SUPPORT */
@@ -362,10 +417,10 @@ void setup() {
 #ifdef EEPROM_SUPPORT
   initEEPROM();
 #ifdef EF_SERIES
-  CONTROL_ID = EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
-  counterRepeatingRequest = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
+  CONTROL_ID = readPagedEEPROM(EEPROM_ADDRESS_CONTROL_ID);
+  counterRepeatingRequest = readPagedEEPROM(EEPROM_ADDRESS_COUNTER_STATUS);
 #endif /* EF_SERIES */
-  verbose    = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);
+  verbose    = readPagedEEPROM(EEPROM_ADDRESS_VERBOSITY);
 #endif /* EEPROM_SUPPORT */
   // 0 v1.0 no ADC
   // 1 v1.1 use ADC6 and ADC7
@@ -2243,17 +2298,17 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
     WB[14] = ATmegaHwID;
 #ifdef EEPROM_SUPPORT
 #ifdef EF_SERIES
-    WB[15] = EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
+    WB[15] = readPagedEEPROM(EEPROM_ADDRESS_CONTROL_ID);
 #else /* EF_SERIES */
     WB[15] = 0x00; // EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
 #endif /* EF_SERIES */
-    WB[16] = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);
+    WB[16] = readPagedEEPROM(EEPROM_ADDRESS_VERBOSITY);
 #ifdef EF_SERIES
-    WB[17] = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
+    WB[17] = readPagedEEPROM(EEPROM_ADDRESS_COUNTER_STATUS);
 #else /* EF_SERIES */
     WB[17] = 0x00; // EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
 #endif /* EF_SERIES */
-    for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) sigMatch &= (EEPROM.read(EEPROM_ADDRESS_SIGNATURE + i) == EEPROM_SIGNATURE[i]);
+    for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) sigMatch &= (readPagedEEPROM(EEPROM_ADDRESS_SIGNATURE + i) == EEPROM_SIGNATURE[i]);
     WB[18] = sigMatch;
 #else /* EEPROM_SUPPORT */
     WB[15] = 0x00;
