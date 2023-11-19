@@ -606,24 +606,24 @@ void handleCommand(char* cmdString) {
               break;
     case 'b': // display or set MQTT settings
     case 'B': if ((n = sscanf((const char*) (cmdString + 1), "%19s %i %80s %80s %i %i %i %i", &EEPROM_state.EEPROMnew.mqttServer, &EEPROM_state.EEPROMnew.mqttPort, &EEPROM_state.EEPROMnew.mqttUser, &EEPROM_state.EEPROMnew.mqttPassword, &mqttInputByte4, &ESPhwID, &noWiFi, &useSensorPrefixHA)) > 0) {
-                printfTopicS("Writing new MQTT settings to EEPROM");
+                printfTopicS("Writing new settings to EEPROM of ESP");
                 if (n > 4) EEPROM_state.EEPROMnew.mqttInputByte4 = mqttInputByte4;
                 if ((n > 5) && (ESPhwID != EEPROM_state.EEPROMnew.ESPhwID)) {
-                  printfTopicS("Reboot required to change ESPhwID");
+                  // printfTopicS("Reboot required to change ESPhwID");
 #ifdef REBOOT_REASON
                   EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
 #endif /* REBOOT_REASON */
                   EEPROM_state.EEPROMnew.ESPhwID = ESPhwID;
                 }
                 if ((n > 6) && (EEPROM_state.EEPROMnew.noWiFi != noWiFi)) {
-                  printfTopicS("Reboot required to change noWiFi");
+                  // printfTopicS("Reboot required to change noWiFi");
 #ifdef REBOOT_REASON
                   EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
 #endif /* REBOOT_REASON */
                   EEPROM_state.EEPROMnew.noWiFi = noWiFi;
                 }
                 if ((n > 7)  && (useSensorPrefixHA != EEPROM_state.EEPROMnew.useSensorPrefixHA)) {
-                  printfTopicS("Reboot required to rediscover new sensor names");
+                  // printfTopicS("Reboot required to rediscover new sensor names");
 #ifdef REBOOT_REASON
                   EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_BCMD;
 #endif /* REBOOT_REASON */
@@ -673,7 +673,7 @@ void handleCommand(char* cmdString) {
                 printfTopicS("useSensorPrefixHA is %i", EEPROM_state.EEPROMnew.useSensorPrefixHA);
               }
               if ((n > 5) || (n && (outputMode & 0x40000))) {
-                printfTopicS("Restart ESP");
+                printfTopicS("ESP will be restarted now");
                 delay(100);
                 ESP.restart();
                 delay(100);
@@ -683,7 +683,7 @@ void handleCommand(char* cmdString) {
               // printfTopicS("Pass of AP is %s", wifiManager.getWiFiPass());
               if (n > 0) {
                 if (mqttClient.connected()) {
-                  printfTopicS("MQTT Client connected, disconnect");
+                  printfTopicS("MQTT Client still connected, will be disconnected now");
                   // unsubscribe topics here before disconnect?
                   mqttClient.disconnect();
                   delay(1000);
@@ -713,19 +713,19 @@ void handleCommand(char* cmdString) {
 #endif
               if (n > 0) {
                 if (mqttClient.connected()) {
-                  printfTopicS("MQTT Client still connected ?");
+                  printfTopicS("Unexpected: MQTT Client is still connected");
                   delay(500);
                 } else {
-                  printfTopicS("MQTT Client disconnected");
+                  printfTopicS("MQTT Client is disconnected");
                 }
                 mqttClient.setServer(EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort);
                 mqttClient.setCredentials((EEPROM_state.EEPROMnew.mqttUser[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttUser, (EEPROM_state.EEPROMnew.mqttPassword[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttPassword);
-                printfTopicS("MQTT Try to connect");
+                printfTopicS("Trying to connect to MQTT server");
                 Mqtt_disconnectTime = 0;
                 mqttClient.connect();
                 delay(500);
                 if (mqttClient.connected()) {
-                  printfTopicS("MQTT client connected with EEPROMnew settings");
+                  printfTopicS("MQTT client is now connected");
                   reconnectTime = espUptime;
                   throttleStart = espUptime;
                   throttleValue = THROTTLE_VALUE;
