@@ -179,8 +179,10 @@ static byte scope = INIT_SCOPE;         // scope setting (to log timing info)
 #ifdef EF_SERIES
 static uint8_t CONTROL_ID = CONTROL_ID_NONE;
 #endif /* EF_SERIES */
+#ifdef E_SERIES
 static byte counterRequest = 0;
 static byte counterRepeatingRequest = 0;
+#endif /* E_SERIES */
 
 byte save_MCUSR;
 
@@ -296,8 +298,10 @@ void printWelcomeString(void) {
 #ifdef EF_SERIES
   Serial.print(F("* Control_ID=0x"));
   Serial.println(CONTROL_ID, HEX);
+#ifdef E_SERIES
   Serial.print(F("* Counterrepeatingrequest="));
   Serial.println(counterRepeatingRequest);
+#endif /* E_SERIES */
 /*
   Serial.print(F("* F030DELAY="));
   Serial.println(F030DELAY);
@@ -369,8 +373,10 @@ void setup() {
   initEEPROM();
 #ifdef EF_SERIES
   CONTROL_ID = EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
-  counterRepeatingRequest = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
 #endif /* EF_SERIES */
+#ifdef E_SERIES
+  counterRepeatingRequest = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
+#endif /* E_SERIES */
   verbose    = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);
 #endif /* EEPROM_SUPPORT */
   // 0 v1.0 no ADC
@@ -426,14 +432,14 @@ static byte suppressSerial = 0;
 
 #ifdef EF_SERIES
 void stopControlAndCounters() {
-          if (counterRepeatingRequest) Serial_println(F("* Switching counter request function off (also after ATmega reboot)"));
           if (CONTROL_ID) Serial_println(F("* Switching control functionality off (also after ATmega reboot)"));
           CONTROL_ID = CONTROL_ID_NONE;
+          EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+#ifdef E_SERIES
+          if (counterRepeatingRequest) Serial_println(F("* Switching counter request function off (also after ATmega reboot)"));
           counterRepeatingRequest = 0;
           counterRequest = 0;
-          EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
           EEPROM_update(EEPROM_ADDRESS_COUNTER_STATUS, counterRepeatingRequest);
-#ifdef E_SERIES
 #ifdef OLD_COMMANDS
           setRequest35 = 0;
           setRequest36 = 0;
@@ -1545,7 +1551,8 @@ void loop() {
 #ifdef MONITORCONTROL
     if (!readError) {
       // message received, no error detected, no buffer overrun
-      byte w;
+      bool F030forcounter = false;
+#ifdef E_SERIES
       if ((nread > 9) && (RB[0] == 0x00) && (RB[1] == 0x00) && (RB[2] == 0x12)) {
         // obtain day-of-week, hour, minute
         Tmin = RB[6];
@@ -1554,7 +1561,6 @@ void loop() {
           Tminprev = Tmin;
         }
       }
-      bool F030forcounter = false;
 #ifdef KLICDA
       // request one counter per cycle in short pause after first 0012 msg at start of each minute
       if ((nread > 4) && (RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x12)) {
@@ -1627,6 +1633,7 @@ void loop() {
         }
       }
 #endif /* KLICDA */
+#endif /* E_SERIES */
       if ((nread > 4) && (RB[0] == 0x40) && (((RB[1] & 0xFE) == 0xF0) || (RB[1] == 0xFF)) && ((RB[2] & 0x30) == 0x30)) {
         // 40Fx3x auxiliary controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < min(F03XDELAY, F030DELAY) (- margin)
         // Note for developers using >1 P1P2Monitor-interfaces (=to self): this detection mechanism fails if there are 2 P1P2Monitor programs (and adapters) with same delay settings on the same bus.
@@ -1674,6 +1681,7 @@ void loop() {
           int n = nread;
           int d = F03XDELAY;
           bool wr = 0;
+          byte w;
           if (crc_gen) n--; // omit CRC from received-byte-counter
           if (n > WB_SIZE) {
             n = WB_SIZE;
@@ -2268,8 +2276,10 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
     WB[9]  = (F_CPU >> 8) & 0xFF;
     WB[10] = F_CPU & 0xFF;
     WB[11] = writeRefused;
+#ifdef E_SERIES
     WB[12] = counterRepeatingRequest;
     WB[13] = counterRequest;
+#endif /* E_SERIES */
     WB[14] = errorsLargePacket;
 #ifdef EF_SERIES
     WB[15] = wr_cnt;
