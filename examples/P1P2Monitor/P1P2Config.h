@@ -113,16 +113,23 @@
 // -verbose (verbosity level)
 //
 // to reset EEPROM to settings in P1P2Config.h, either erase EEPROM, or change EEPROM_SIGNATURE in P1P2Config.h
-#define EEPROM_SIGNATURE "P1P2SIG01" // change this every time you wish to re-init EEPROM settings to the settings in P1P2Config.h
+#define EEPROM_SIGNATURE "P1P2SIG02" // change this every time you wish to re-init EEPROM settings to the settings in P1P2Config.h
 #define EEPROM_ADDRESS_CONTROL_ID      0x00 // 1 byte for CONTROL_ID (Daikin-specific)
 #define EEPROM_ADDRESS_COUNTER_STATUS  0x01 // 1 byte for counterrepeatingrequest (Daikin-specific)
 #define EEPROM_ADDRESS_VERBOSITY       0x02 // 1 byte for verbose
                                             // 0x03 .. 0x0F reserved
 #define EEPROM_ADDRESS_SIGNATURE       0x10 // should be highest, in view of unspecified strlen(EEPROM_SIGNATURE)
+#define EEPROM_MAX_SIZE                1024 // max size of EEPROM (1kB for ATmega328P)
+#define EEPROM_ACTIVE_PAGE_HEADER      0x01 // 1 byte for byte selection of active page
+#define EEPROM_PAGE_HEADER             0x01 // 1 byte for write count
+#define EEPROM_PAGE_SIZE               EEPROM_BLOCK_HEADER + EEPROM_ADDRESS_SIGNATURE // Size of EEPROM page
+#define EEPROM_MAX_PAGE_INDEX          ((EEPROM_MAX_SIZE - strlen(EEPROM_SIGNATURE) - EEPROM_ACTIVE_PAGE_HEADER) / EEPROM_PAGE_SIZE) - 1 // Max adressable page index
+#define EEPROM_CYCLE_EVERY_WRITES      1000 // Cycle pages every 1000 writes
+#define EEPROM_WRITE_DECIMATION_BITS   0x4 // Update page write stats every 16 writes
 
 #ifdef EF_SERIES
 // Write budget: thottle parameter writes to limit flash memory wear
-#define TIME_WRITE_PERMISSION 3600 // on avg max one write per 3600s allowed
+#define TIME_WRITE_PERMISSION 3600/60 // on avg max one write per 60s allowed
 #define MAX_WRITE_PERMISSION   100 // budget never higher than 100 (don't allow to burn more than 100 writes at once) // 8-bit, so max 254; 255 is "infinity" (i.e. no budget limit)
 #define INIT_WRITE_PERMISSION   10 // initial write budget upon boot (255 = unlimited; recommended: 10)
 #define WR_CNT 1                   // number of write repetitions for writing a paramter. 1 should work reliably, no real need for higher value
@@ -130,7 +137,7 @@
 // Error budget: P1P2Monitor should not see any errors except upon start falling into a packet
 // so if P1P2Monitor sees see too many errors, it stops writing
 //
-#define TIME_ERRORS_PERMITTED 3600 // on avg max one error per 3600s allowed (otherwise writing will be switched off)
+#define TIME_ERRORS_PERMITTED 3600/60 // on avg max one error per 60s allowed (otherwise writing will be switched off)
 #define MAX_ERRORS_PERMITTED    20 // budget never higher than this (don't allow too many errors before we switch writing off) // 8-bit, so max 255
 #define INIT_ERRORS_PERMITTED   10 // initial error budget upon boot
 #define MIN_ERRORS_PERMITTED     5 // don't start control unless error budget is at least this value
