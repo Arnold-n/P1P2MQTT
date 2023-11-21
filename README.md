@@ -214,13 +214,13 @@ The MAX22088 and MAX22288 are available from regular distributors such as Mouser
 
 **What does the data on the P1/P2 bus look like, at the physical level?**
 
-Please refer to the [P1/P2 physical layer](PhysicalLayer/README.md) documentation.
+Please refer to the [P1/P2 physical format](PhysicalFormat/README.md) documentation.
 
 **What does the data on the P1/P2 bus look like, at the logical level?**
 
 The P1/P2 data contains various data items, like temperatures, data flow, software serial number, operating mode, number of operating hours, energy consumed, schedules, field settings, etcetera.
 
-Please refer to the [P1/P2 logical layer](LogicalLayer/README.md) documentation for more details.
+Please refer to the [P1/P2 logical format](LogicalFormat/README.md) documentation for more details.
 
 **Acknowledgements**
 
