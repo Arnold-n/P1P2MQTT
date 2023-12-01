@@ -55,8 +55,7 @@
 // Define timeout for AP, to restart ESP after power outage when AP starts if WiFi is not immediately available
 #define WIFIPORTAL_TIMEOUT 180
 
-// Define to add time from NTP server
-#define MY_NTP_SERVER "at.pool.ntp.org"
+#define MY_NTP_SERVER "europe.pool.ntp.org"
 
 // Define P1P2-ESP-Interface version, set during EEPROM initialization only (can be changed with 6th parameter of 'B' command)
 // To avoid erasing the ESP EEPROM and overwriting the hw-identifier, use "Sketch Only" when flashing over USB
@@ -119,7 +118,7 @@
 #ifdef ESP01S_MQTT
 #define SERIALSPEED 115200
 #define DEBUG_OVER_SERIAL // send debugging output over serial (to be captured over USB)
-#define MQTT_INPUT_HEXDATA // use raw data from P1P2/X/xxx instead of serial input (for ESP01S_MQTT)
+#define MQTT_INPUT_HEXDATA // use hex data from P1P2/R/xxx instead of serial input (for ESP01S_MQTT)
 //#define MQTT_INPUT_BINDATA // use raw data from P1P2/X/xxx instead of serial input (for ESP01S_MQTT)
 // if MQTT_INPUT_HEXDATA and/or MQTT_INPUT_BINDATA is defined, the serial input to the ESP (from ATmega) is ignored and data from either or both of
 // the defined R/X topics is used for processing (subject to (outputMode & 0x4000) and (outputMode & 0x8000) respectively):
