@@ -780,7 +780,7 @@ void handleCommand(char* cmdString) {
                   EEPROM.put(0, EEPROM_state);
                   EEPROM.commit();
                 }
-                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode set to 0x%04X"), outputMode);
+                Sprint_P(true, true, true, PSTR("* [ESP] Outputmode set to 0x%06X"), outputMode);
               } else {
                 Sprint_P(true, true, true, PSTR("* [ESP] Outputmode 0x%04X is sum of"), outputMode);
                 Sprint_P(true, true, true, PSTR("* [ESP] %ix 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx"), outputMode  & 0x01);
@@ -1668,12 +1668,12 @@ void process_for_mqtt_json(byte* rb, int n) {
   }
 }
 
-byte timeStamp = 30; // TODO
+byte timeStamp = 30;
 
 void writePseudoPacket(byte* WB, byte rh)
 // rh is packet size (without CRC byte)
 {
-  char pseudoWriteBuffer[RB];
+  char pseudoWriteBuffer[RB]; // TODO RB is too large
   time(&now);
   localtime_r(&now, &tm);
   snprintf(pseudoWriteBuffer, 33, "R %04i-%02i-%02i_%02i:%02i:%02i P         ", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
@@ -1881,36 +1881,36 @@ void loop() {
 #if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
     while (((c = MQTT_readBuffer_readChar()) >= 0) && (c != '\n') && (serial_rb < RB)) {
       *rb_buffer++ = (char) c;
-      if (serial_rb) {
-        serial_rb++;
-      } else {
-        // add timestamp TZ
+      if (!serial_rb) {
         time(&now);
         localtime_r(&now, &tm);
-        snprintf(&readBuffer[1], 22, " %04i-%02i-%02i_%02i:%02i:%02i ", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-        serial_rb += 21;
-        rb_buffer += 20;
+        if (c == 'R') {
+          snprintf(&readBuffer[1], 21, "-%04i-%02i-%02i_%02i:%02i:%02i", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+          serial_rb += 20;
+          rb_buffer += 20;
+        }
       }
+      serial_rb++;
     }
-#else
+#else /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
     if (!ignoreSerial) {
       while (((c = Serial.read()) >= 0) && (c != '\n') && (serial_rb < RB)) {
         *rb_buffer++ = (char) c;
-        if (serial_rb) {
-          serial_rb++;
-        } else {
-          // add timestamp TZ
+        if (!serial_rb) {
           time(&now);
           localtime_r(&now, &tm);
-          snprintf(&readBuffer[1], 22, " %04i-%02i-%02i_%02i:%02i:%02i ", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-          serial_rb += 21;
-          rb_buffer += 20;
+          if (c == 'R') {
+            snprintf(&readBuffer[1], 21, "-%04i-%02i-%02i_%02i:%02i:%02i", tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+            serial_rb += 20;
+            rb_buffer += 20;
+          }
         }
+        serial_rb++;
       }
     } else {
       c = -1;
     }
-#endif
+#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
     // ((c == '\n' and serial_rb > 0))  and/or  serial_rb == RB)  or  c == -1
     if (c >= 0) {
       if ((c == '\n') && (serial_rb < RB)) {
@@ -1929,7 +1929,7 @@ void loop() {
           ignoreremainder = 0;
         } else {
           if (readBuffer[0] == 'R') {
-            int rbp = 21; // TODO +20 added
+            int rbp = 22; // TODO or 2?
             int n, rbtemp;
             byte rh = 0;
             if ((serial_rb > 32) && ((readBuffer[22] == 'T') || (readBuffer[22] == 'P') || (readBuffer[22] == 'X'))) { // TODO +20 -> 32
@@ -1983,28 +1983,28 @@ void loop() {
                   ATmega_uptime_prev = ATmega_uptime;
                 }
               } else {
-                Sprint_P(true, true, true, PSTR("* [MON] Serial input buffer overrun or CRC error in R data:%s expected 0x%02X"), readBuffer + 1, crc); // TODO
+                Sprint_P(true, true, true, PSTR("* [MON] Serial input buffer overrun or CRC error in R data:%s expected 0x%02X"), readBuffer + 1, crc);
                 if (ESP_serial_input_Errors_CRC < 0xFF) ESP_serial_input_Errors_CRC++;
               }
             } else {
-              Sprint_P(true, true, true, PSTR("* [MON] Not enough readable data in R line: ->%s<-"), readBuffer + 1); // TODO
+              Sprint_P(true, true, true, PSTR("* [MON] Not enough readable data in R line: ->%s<-"), readBuffer + 1);
               if (ESP_serial_input_Errors_Data_Short < 0xFF) ESP_serial_input_Errors_Data_Short++;
             }
-          } else if ((readBuffer[0] == 'C') || (readBuffer[0] == 'c')) { // TODO
+          } else if ((readBuffer[0] == 'C') || (readBuffer[0] == 'c')) {
             // timing info
             if (outputMode & 0x1000) {
-              client_publish_mqtt(mqttHexdata, readBuffer); // TODO
-              client_publish_telnet(mqttHexdata, readBuffer); // TODO
+              client_publish_mqtt(mqttHexdata, readBuffer);
+              client_publish_telnet(mqttHexdata, readBuffer);
             }
-          } else if (readBuffer[0] == 'E') { // TODO
+          } else if (readBuffer[0] == 'E') {
             // data with errors
             readBuffer[0] = '*'; // backwards output report compatibility // TODO
-            Sprint_P(true, true, true, PSTR("* [MON]%s"), readBuffer + 1); // TODO
-            if (outputMode & 0x2000) client_publish_mqtt(mqttHexdata, readBuffer); // TODO
-          } else if (readBuffer[0] == '*') { // TODO
-            Sprint_P(true, true, true, PSTR("* [MON]%s"), readBuffer + 1); // TODO
+            Sprint_P(true, true, true, PSTR("* %04i-%02i-%02i_%02i:%02i:%02i [MON]%s"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, readBuffer + 1);
+            if (outputMode & 0x2000) client_publish_mqtt(mqttHexdata, readBuffer);
+          } else if (readBuffer[0] == '*') {
+            Sprint_P(true, true, true, PSTR("* %04i-%02i_%02i_%02i:%02i:%02i [MON]%s"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, readBuffer + 1);
           } else {
-            Sprint_P(true, true, true, PSTR("* [MON]:%s"), readBuffer); // TODO
+            Sprint_P(true, true, true, PSTR("* %04i-%02i_%02i_%02i:%02i:%02i [MON] %s"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, readBuffer);
             if (ESP_serial_input_Errors_Data_Short < 0xFF) ESP_serial_input_Errors_Data_Short++;
           }
         }
