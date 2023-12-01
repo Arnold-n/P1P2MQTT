@@ -456,15 +456,17 @@ void loop() {
                suppressSerial = 1;
                P1P2Serial.ledPower(1);
                P1P2Serial.ledError(0);
+               Serial.println("* Pausing serial");
                Serial.end();
-               return;
+               break;
              }
              if ((PINB & 0x20) == 0) { // if GPIO15=0, go inactive, then wait for GPIO15=1
                suppressSerial = 2;
                P1P2Serial.ledPower(0);
                P1P2Serial.ledError(1);
+               Serial.println("* Pausing serial");
                Serial.end();
-               return;
+               break;
              }
              break;
     case 1 : // GPIO=0; wait for GPIO15=0
@@ -473,7 +475,7 @@ void loop() {
                suppressSerial = 2;
                P1P2Serial.ledError(1);
              }
-             return;
+             break;
     case 2 : // GPIO=0; GPIO15=0, wait for GPIO15=1
              // in this mode, error LED is on, power LED is off
              if ((PINB & 0x20) == 0x20) { // wait for GPIO15=1
@@ -488,7 +490,7 @@ void loop() {
                P1P2Serial.ledPower(1);
                printWelcomeString();
              }
-             return;
+             break;
   }
 
 // Non-blocking serial input
