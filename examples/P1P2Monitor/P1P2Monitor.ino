@@ -1711,7 +1711,7 @@ void loop() {
       }
       // insert counterRequest messages at end of each (or each 4th) cycle
       if (counterRequest && (nread > 4) && (RB[0] == 0x00) && ((RB[1] == 0xFF) || ((RB[1] & 0xFE)  == 0xF0)) && (RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x03] == F0THRESHOLD) && (F_prev == F_max)) {
-        // 00Fx30 request message received, slot has no other aux controller active, and this is the last 00Fx30 request message in this cycle
+        // non-empty 00Fx30 request message received, slot has no other aux controller active, and this is the last 00Fx30 request message in this cycle
         // For CONTROL_ID != 0 and F_max==1, use 1-in-4 mechanism
         if (div4) {
           div4--;
