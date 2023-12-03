@@ -84,4 +84,7 @@ Some other parameters:
 - parameter 0x5F in packet type 3A is used to switch between cooling schedules
 - parameter 0x64 in packet type 3A is used to switch between DHW schedules
 
+Force defrost (defrost start is subject to outdoor unit conditions):
+- `E35003601`
+
 Many thanks to Budulinek for finding some of these parameters. More writable parameters can be found in Budulinek's [documentation](https://github.com/budulinek/Daikin-P1P2---UDP-Gateway/blob/main/Payload-data-write.md).
