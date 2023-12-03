@@ -176,7 +176,7 @@ bool initEthernet()
   delay(100);
   // see also https://github.com/esp8266/Arduino/pull/8395 and https://github.com/esp8266/Arduino/issues/8144
   if (EEPROM_state.EEPROMnew.useStaticIP) {
-    Serial.println(F("* [ESP] Using static IP"));
+    Serial_println(F("* [ESP] Using static IP"));
     IPAddress _ip, _gw, _nm;
     _ip.fromString(EEPROM_state.EEPROMnew.static_ip);
     _gw.fromString(EEPROM_state.EEPROMnew.static_gw);
@@ -185,7 +185,7 @@ bool initEthernet()
   }
   // eth.setDefault();
   if (!eth.begin()) {
-    Serial.println("* [ESP] No Ethernet hardware detected");
+    Serial_println("* [ESP] No Ethernet hardware detected");
     return false;
   } else {
     Serial_println("* [ESP] Connecting to network");
@@ -193,7 +193,7 @@ bool initEthernet()
     while (!eth.connected()) {
       if (++timeoutcnt > ETHERNET_CONNECTION_TIMEOUT) {
         if (noWiFi) {
-          Serial.println(F("* [ESP] Ethernet failed, restart"));
+          Serial_println(F("* [ESP] Ethernet failed, restart"));
 #ifdef REBOOT_REASON
           EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_ETH;
           EEPROM.put(0, EEPROM_state);
@@ -203,12 +203,12 @@ bool initEthernet()
           ESP.restart();
           delay(100);
         } else {
-          Serial.println(F("* [ESP] Ethernet failed, trying WiFi"));
+          Serial_println(F("* [ESP] Ethernet failed, trying WiFi"));
           return false;
         }
       }
-      Serial.print("* [ESP] Waiting for ethernet connection... ");
-      Serial.println(timeoutcnt);
+      Serial_print("* [ESP] Waiting for ethernet connection... ");
+      Serial_println(timeoutcnt);
       delay(1000);
     }
     Serial_println(F("* [ESP] Ethernet connected"));
@@ -363,8 +363,6 @@ void clientPublishTelnet(char* key, char* value, bool addDate = true) {
   if (telnetConnected) {
     if (addDate) {
       char timeString[PREFIX_LENGTH_TZ];
-      time(&now);
-      localtime_r(&now, &tm);
       snprintf_P(timeString, PREFIX_LENGTH_TZ, PSTR("[ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
       telnet.print(timeString);
     }
@@ -373,7 +371,7 @@ void clientPublishTelnet(char* key, char* value, bool addDate = true) {
       telnet.print(' ');
     }
     telnet.println(value);
-    telnet.loop();
+    // telnet.loop();
   }
 }
 
@@ -390,8 +388,6 @@ uint32_t Sprint_buffer_overflow = 0;
 // printfTopicS publishes string, always prefixed by NTP-date, via Mqtt topic P1P2/S, telnet, and/or serial, depending on connectivity (and TODO?: depending on j-mask setting)
 
 #define printfTopicS(formatstring, ...) { \
-  time(&now);\
-  localtime_r(&now, &tm);\
   uint8_t slen = snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("* [ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);\
   if (snprintf_P(sprint_value + slen, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
     Sprint_buffer_overflow++; \
@@ -402,8 +398,6 @@ uint32_t Sprint_buffer_overflow = 0;
 };
 
 #define printfTopicS_MON(formatstring, ...) { \
-  time(&now);\
-  localtime_r(&now, &tm);\
   uint8_t slen = snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("* [MON] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);\
   if (snprintf_P(sprint_value + slen, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
     Sprint_buffer_overflow++; \
@@ -416,8 +410,6 @@ uint32_t Sprint_buffer_overflow = 0;
 // printfSerial publishes only via serial (for OTA)
 
 #define printfSerial(formatstring, ...) { \
-  time(&now);\
-  localtime_r(&now, &tm);\
   uint8_t slen = snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("** [ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);\
   if (snprintf_P(sprint_value + slen, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
     Sprint_buffer_overflow++; \
@@ -939,7 +931,7 @@ void handleCommand(char* cmdString) {
               }
               // fallthrough for v/g/h commands handled both by P1P2-bridge-esp8266 and P1P2Monitor
               // 'c' 'C' 'p' 'P' 'e' 'E' 'f' 'F' 't' 'T" 'o' 'O" 'u' 'U" 'x' 'X" 'w' 'W" 'k' 'K' 'l' 'L' 'q' 'Q' 'm' 'M' 'z' 'Z' 'r' 'R' 'n' 'N' 'y' 'Y' handled by P1P2Monitor (except for 'f' 'F" for H-link)
-    default : printfTopicS("To ATmega: ->%s<-", cmdString);
+    default : // printfTopicS("To ATmega: ->%s<-", cmdString);
               Serial.print(F(SERIAL_MAGICSTRING));
               Serial.println((char *) cmdString);
               if ((cmdString[0] == 'k') || (cmdString[0] == 'K')) {
@@ -989,8 +981,22 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
   static bool MQTT_drop = false;
   (void) payload;
   if (!len) {
-    Serial_println(F("* [ESP] Empty MQTT payload received, ignored"));
+    Serial_println(F("* [ESP] Empty MQTT payload received and ignored"));
     return;
+  } else if (index + len > 0xFF) {
+    Serial_println(F("* [ESP] Received MQTT payload too long"));
+  } else if ((!strcmp(topic, mqttCommands)) || (!strcmp(topic, mqttCommandsNoIP))) {
+    if (MQTT_commandReceived) {
+      Serial_println(F("* [ESP] Ignoring MQTT command, previous command is still being processed"));
+    } else {
+      if (total + 1 >= MAX_COMMAND_LENGTH) {
+        Serial_println(F("* [ESP] Received MQTT command too long"));
+      } else {
+        strlcpy(MQTT_commandString + index, payload, len + 1); // create null-terminated copy
+        MQTT_commandString[index + len] = '\0';
+        if (index + len == total) MQTT_commandReceived = true;
+      }
+    }
   }
 #ifdef MQTT_INPUT_BINDATA
   if ((!strcmp(topic, mqttInputBinData)) || (!mqttInputBinData[MQTT_KEY_PREFIXIP - 1]) && !strncmp(topic, mqttInputBinData, MQTT_KEY_PREFIXIP - 1)) {
@@ -1254,12 +1260,12 @@ void setup() {
 #endif TELNET
 
 #ifdef ETHERNET
-  Serial.println(F("* [ESP] Trying initEthernet"));
+  Serial_println(F("* [ESP] Trying initEthernet"));
   if (ethernetConnected = initEthernet()) {
     telnetSuccess = telnet.begin(telnet_port, false); // change in v0.9.30 to official unmodified ESP_telnet v2.0.0
     local_ip = eth.localIP();
-    Serial.print(F("* [ESP] Connected to ethernet, IP address: "));
-    Serial.println(local_ip);
+    Serial_print(F("* [ESP] Connected to ethernet, IP address: "));
+    Serial_println(local_ip);
   } else
 #endif
   {
@@ -1332,7 +1338,7 @@ void setup() {
     // If it does not connect it starts an access point with the specified name,
     // and goes into a blocking loop awaiting configuration.
     // First parameter is name of access point, second is the password.
-    Serial.println(F("* [ESP] Trying autoconnect"));
+    Serial_println(F("* [ESP] Trying autoconnect"));
 #ifdef WIFIPORTAL_TIMEOUT
     wifiManager.setConfigPortalTimeout(WIFIPORTAL_TIMEOUT);
 #endif /* WIFIPORTAL_TIMEOUT */
@@ -1449,7 +1455,7 @@ void setup() {
   delay(500);
 
   if (mqttClient.connected()) {
-    Serial.println(F("* [ESP] MQTT client connected on first try"));
+    Serial_println(F("* [ESP] MQTT client connected on first try"));
 #ifdef REBOOT_REASON
     if (delayedRebootReasonReset == 2) {
       EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
@@ -1459,14 +1465,14 @@ void setup() {
     }
 #endif
   } else {
-    Serial.println(F("* [ESP] MQTT client connect failed"));
+    Serial_println(F("* [ESP] MQTT client connect failed"));
   }
 
   byte connectTimeout = 20; // 10s timeout
   while (!mqttClient.connected()) {
     mqttClient.connect();
     if (mqttClient.connected()) {
-      Serial.println(F("* [ESP] MQTT client connected"));
+      Serial_println(F("* [ESP] MQTT client connected"));
 #ifdef REBOOT_REASON
       if (delayedRebootReasonReset == 2) {
         EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_UNKNOWN;
@@ -1477,8 +1483,8 @@ void setup() {
 #endif
       break;
     } else {
-      Serial.print(F("* [ESP] MQTT client connect failed, retrying in setup() until time-out "));
-      Serial.println(connectTimeout);
+      Serial_print(F("* [ESP] MQTT client connect failed, retrying in setup() until time-out "));
+      Serial_println(connectTimeout);
       if (!--connectTimeout) break;
       delay(500);
     }
@@ -1572,8 +1578,7 @@ void setup() {
   });
   ArduinoOTA.onEnd([]() {
     OTAbusy = 2;
-    printfTopicS("OTA End");
-    printfTopicS("Disconnect and stop telnet");
+    printfTopicS("OTA End, restarting");
 #ifdef REBOOT_REASON
     EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_OTA;
     EEPROM.put(0, EEPROM_state);
@@ -1620,7 +1625,6 @@ void setup() {
   // listen for avrdudes
   avrprog->begin();
 #endif
-
 #ifdef WEBSERVER
   httpUpdater.setup(&httpServer);
   httpServer.begin();
@@ -1728,8 +1732,6 @@ void writePseudoPacket(byte* WB, byte rh)
     printfTopicS("rh > %i", MAXRH);
     return;
   }
-  time(&now);
-  localtime_r(&now, &tm);
   snprintf_P(pseudoWriteBuffer, 33, PSTR("R %04i-%02i-%02i_%02i:%02i:%02i P         "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec); // TODO ??? TZ ????
   uint8_t crc = crc_feed;
   for (uint8_t i = 0; i < rh; i++) {
@@ -1761,6 +1763,9 @@ void loop() {
   byte readHex[HB];
   // OTA
   ArduinoOTA.handle();
+
+  time(&now);
+  localtime_r(&now, &tm);
 
 #ifdef WEBSERVER
   httpServer.handleClient();
@@ -1908,7 +1913,7 @@ void loop() {
   } else {
     // clean up
     if (wasConnected) {
-      Serial.println("* [ESP] WiFi/ethernet disconnected");
+      Serial_println("* [ESP] WiFi/ethernet disconnected");
     }
     mqttClient.clearQueue();        // needed ? TODO
     mqttClient.disconnect(true);    // needed ? TODO
@@ -1950,8 +1955,6 @@ void loop() {
     while (((c = MQTT_readBuffer_readChar()) >= 0) && (c != '\n') && (serial_rb < RB)) {
       *rb_buffer++ = (char) c;
       if (!serial_rb) {
-        time(&now);
-        localtime_r(&now, &tm);
         if (c == 'R') {
           snprintf_P(&readBuffer[1], 21, PSTR(" %04i-%02i-%02i_%02i:%02i:%02i"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
           serial_rb += 20;
@@ -1965,8 +1968,6 @@ void loop() {
       while (((c = Serial.read()) >= 0) && (c != '\n') && (serial_rb < RB)) {
         *rb_buffer++ = (char) c;
         if (!serial_rb) {
-          time(&now);
-          localtime_r(&now, &tm);
           if ((c == 'R') || (c == 'C') || (c == 'c')) {
             snprintf_P(&readBuffer[1], 21, PSTR(" %04i-%02i-%02i_%02i:%02i:%02i"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
             serial_rb += 20;

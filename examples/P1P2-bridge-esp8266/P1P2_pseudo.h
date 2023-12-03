@@ -97,7 +97,7 @@
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    0 : KEY("Compile_Options_ATmega");                                                                                               VALUE_u8hex;
-        case    1 : KEY("Verbose");                                        HAPCONFIG;                                                            VALUE_u8;
+        case    1 : return 0;
         case    2 : KEY("Reboot_MCUSR");                                   HAPCONFIG;                                                            VALUE_u8hex;
         case    3 : KEY("Write_Budget");                                   HAPCONFIG;                                                            VALUE_u8;
         case    4 : KEY("Error_Budget");                                   HACONFIG;                                                             VALUE_u8;
@@ -106,10 +106,10 @@
         case    8 : KEY("Delay_Packet_Write");                                                                                                   VALUE_u16_LE;
         case   10 : KEY("Delay_Packet_Write_Timeout");                                                                                           VALUE_u16_LE;
         case   11 : KEY("P1P2_ESP_Interface_hwID_ATmega");                                                                                       VALUE_u8hex;
-        case   12 : KEY("Control_ID_EEPROM");                                                                                                    VALUE_u8hex;
-        case   13 : KEY("Verbose_EEPROM");                                                                                                       VALUE_u8;
-        case   14 : KEY("Counter_Request_Repeat_EEPROM");                                                                                        VALUE_u8;
-        case   15 : KEY("EEPROM_Signature_Match");                                                                                               VALUE_u8;
+        case   12 : return 0;
+        case   13 : KEY("Verbose");                                                                                                              VALUE_u8;
+        case   14 : KEY("Brand");                                                                                                                VALUE_u8;
+        case   15 : KEY("Model");                                                                                                                VALUE_u8;
         case   16 : KEY("Scope_Mode");                                                                                                           VALUE_u8;
         case   17 : KEY("Error_Read_Count");                               HACONFIG;                                                             VALUE_u8;
         case   18 : KEY("Error_Read_Type");                                HACONFIG;                                                             VALUE_u8;

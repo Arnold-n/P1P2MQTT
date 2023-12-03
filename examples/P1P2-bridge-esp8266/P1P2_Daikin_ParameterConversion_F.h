@@ -145,94 +145,94 @@ bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte
   switch (packetType) {
     case 0x08 ... 0x11 : pti = packetType - PCKTP_START; break;        // 0 .. 9
     case          0x18 : pti = 0x12 - PCKTP_START; break;              // 10
-    case          0x1F : pti = 0x13 - PCKTP_START; break;              // 10
-    case          0x20 : pti = 0x14 - PCKTP_START; break;              // 11
-    case 0x30 ... 0x3F : pti = packetType - 35; break;                 // 12 .. 27
-    case          0x80 : pti = 29; break;                              // 28
-    case          0xA3 : pti = 30; break;                              // 29
-    default            : /* pti = 0xFF;*/ newByte = 1; break;          // or newByte = 0;?
+    case          0x1F : pti = 0x13 - PCKTP_START; break;              // 11
+    case          0x20 : pti = 0x14 - PCKTP_START; break;              // 12
+    case 0x30 ... 0x3F : pti = packetType - 35; break;                 // 13 .. 28
+    case          0x80 : pti = 29; break;                              // 29
+    case          0xA3 : pti = 30; break;                              // 30
+    default            : /* pti = 0xFF;*/ break;                       // no history
   }
   if (payloadIndex == EMPTY_PAYLOAD) {
     newByte = 0;
-  } else if (pti != 0xFF) {
-    if (payloadIndex > nr_bytes[pts][pti]) {
-      // Warning: payloadIndex > expected
-      printfTopicS("Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X", payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
-      newByte = 1;
-    } else if (payloadIndex + 1 < length) {
-      // Warning: payloadIndex + 1 < length
-      printfTopicS("Warning: payloadIndex + 1 < length");
-      return 0;
-    } else {
-      bool pubHA = false;
-      bool skipHysteresis = false;
-      uint16_t pi2base = bytestart[pts][pti];
-      if (applyHysteresisType && (pi2base < sizeValSeen) && payloadByteSeen[pi2base + payloadIndex - 1] && payloadByteSeen[pi2base + payloadIndex]) {
-        if (applyHysteresisType == HYSTERESIS_TYPE_F8_8) {
-          int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 256 + payloadByteVal[pi2base + payloadIndex];
-          int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 256 + payload[payloadIndex];
-          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
-        } else if (applyHysteresisType == HYSTERESIS_TYPE_F8S8) {
-          int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
-          int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
-          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
-        } else if (applyHysteresisType == HYSTERESIS_TYPE_U16DIV10) {
-          uint16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
-          uint16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
-          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+  } else if (pti == 0xFF) {
+    newByte = 1;
+  } else if (payloadIndex > nr_bytes[pts][pti]) {
+    // Warning: payloadIndex > expected
+    printfTopicS("Warning: payloadIndex %i > expected %i for Src 0x%02X Type 0x%02X", payloadIndex, nr_bytes[pts][pti], packetSrc, packetType);
+    newByte = 1;
+  } else if (payloadIndex + 1 < length) {
+    // Warning: payloadIndex + 1 < length
+    printfTopicS("Warning: payloadIndex + 1 < length");
+    return 0;
+  } else {
+    bool pubHA = false;
+    bool skipHysteresis = false;
+    uint16_t pi2base = bytestart[pts][pti];
+    if (applyHysteresisType && (pi2base < sizeValSeen) && payloadByteSeen[pi2base + payloadIndex - 1] && payloadByteSeen[pi2base + payloadIndex]) {
+      if (applyHysteresisType == HYSTERESIS_TYPE_F8_8) {
+        int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 256 + payloadByteVal[pi2base + payloadIndex];
+        int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 256 + payload[payloadIndex];
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_F8S8) {
+        int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
+        int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_U16DIV10) {
+        uint16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
+        uint16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
 // E-series
 //        } else if (applyHysteresisType == HYSTERESIS_TYPE_S16DIV10) {
 //          int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 10 + payloadByteVal[pi2base + payloadIndex];
 //          int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 10 + payload[payloadIndex];
 //          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
-        } else if (applyHysteresisType == HYSTERESIS_TYPE_U16) {
-          uint16_t oldValue = FN_u16_LE(&payloadByteVal[pi2base + payloadIndex]);
-          uint16_t newValue = FN_u16_LE(&payload[payloadIndex]);
-          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
-        } else if (applyHysteresisType == HYSTERESIS_TYPE_U32) {
-          uint32_t oldValue = FN_u32_LE(&payloadByteVal[pi2base + payloadIndex]);
-          uint32_t newValue = FN_u32_LE(&payload[payloadIndex]);
-          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
-        } else if (applyHysteresisType == HYSTERESIS_TYPE_S_F8_8) {
-          int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 256 + payloadByteVal[pi2base + payloadIndex];
-          if (payloadByteVal[pi2base + payloadIndex - 2]) oldValue = -oldValue;
-          int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 256 + payload[payloadIndex];
-          if (payload[payloadIndex - 2]) newValue = -newValue;
-          skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_U16) {
+        uint16_t oldValue = FN_u16_LE(&payloadByteVal[pi2base + payloadIndex]);
+        uint16_t newValue = FN_u16_LE(&payload[payloadIndex]);
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_U32) {
+        uint32_t oldValue = FN_u32_LE(&payloadByteVal[pi2base + payloadIndex]);
+        uint32_t newValue = FN_u32_LE(&payload[payloadIndex]);
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      } else if (applyHysteresisType == HYSTERESIS_TYPE_S_F8_8) {
+        int16_t oldValue = ((int8_t) payloadByteVal[pi2base + payloadIndex - 1]) * 256 + payloadByteVal[pi2base + payloadIndex];
+        if (payloadByteVal[pi2base + payloadIndex - 2]) oldValue = -oldValue;
+        int16_t newValue = ((int8_t) payload[payloadIndex - 1]) * 256 + payload[payloadIndex];
+        if (payload[payloadIndex - 2]) newValue = -newValue;
+        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue >= oldValue - applyHysteresis));
+      }
+    }
+    for (byte i = payloadIndex + 1 - length; i <= payloadIndex; i++) {
+      uint16_t pi2 = pi2base + i;
+      if (pi2 >= sizeValSeen) {
+        pi2 = 0;
+        printfTopicS("Warning: pi2 > sizeValSeen");
+        return 0;
+      }
+      if (payloadByteSeen[pi2]) {
+        // this byte or at least some bits have been seen and saved before.
+        if (payloadByteVal[pi2] != payload[i]) {
+          newByte = (outputFilter <= maxOutputFilter) && !skipHysteresis;
+          if (saveSeen && !skipHysteresis) payloadByteVal[pi2] = payload[i];
+        } // else payloadByteVal seen and not changed
+      } else {
+        // first time for this byte
+        newByte = 1;
+        if (saveSeen) {
+          pubHA = haConfig;
+          payloadByteSeen[pi2] = 0xFF;
+          payloadByteVal[pi2] = payload[i];
         }
       }
-      for (byte i = payloadIndex + 1 - length; i <= payloadIndex; i++) {
-        uint16_t pi2 = pi2base + i;
-        if (pi2 >= sizeValSeen) {
-          pi2 = 0;
-          printfTopicS("Warning: pi2 > sizeValSeen");
-          return 0;
-        }
-        if (payloadByteSeen[pi2]) {
-          // this byte or at least some bits have been seen and saved before.
-          if (payloadByteVal[pi2] != payload[i]) {
-            newByte = (outputFilter <= maxOutputFilter) && !skipHysteresis;
-            if (saveSeen && !skipHysteresis) payloadByteVal[pi2] = payload[i];
-          } // else payloadByteVal seen and not changed
-        } else {
-          // first time for this byte
-          newByte = 1;
-          if (saveSeen) {
-            pubHA = haConfig;
-            payloadByteSeen[pi2] = 0xFF;
-            payloadByteVal[pi2] = payload[i];
-          }
-        }
-      }
-      if (pubHA) {
-        // MQTT discovery
-        // HA key
-        HA_KEY
-        // HA value
-        HA_VALUE
-        // publish key,value
-        clientPublishMqtt(ha_mqttKey, ha_mqttValue);
-      }
+    }
+    if (pubHA) {
+      // MQTT discovery
+      // HA key
+      HA_KEY
+      // HA value
+      HA_VALUE
+      // publish key,value
+      clientPublishMqtt(ha_mqttKey, ha_mqttValue);
     }
   }
   return (haConfig || (outputMode & 0x10000) || !saveSeen) && newByte;
@@ -422,7 +422,8 @@ uint8_t value_f8s8(byte packetSrc, byte packetType, byte payloadIndex, byte* pay
 
 // change to Watt ?
 uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, float v, int length = 0, byte thresholdType = 0, uint16_t thresholdSize = 0) {
-  if (length && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1, thresholdType, thresholdSize))) return 0;
+  if ((length > 0) && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1, thresholdType, thresholdSize))) return 0;
+  if (!length) newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1, thresholdType, thresholdSize);
 #ifdef __AVR__
   dtostrf(v, 1, 2, mqtt_value);
 #else
@@ -433,6 +434,7 @@ uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payloa
 
 uint8_t value_s(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, char* mqtt_value, byte haConfig, int v, int length = 0) {
   if (length && (!newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, length, 1))) return 0;
+  if (!length) newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 1);
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", v);
   return (outputFilter > maxOutputFilter ? 0 : 1);
 }
@@ -526,8 +528,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
   byte payloadByte = 0;
   byte* payloadPointer = 0;
   if (payloadIndex != EMPTY_PAYLOAD) {
-    payloadByte = (payloadIndex == EMPTY_PAYLOAD ? 0 : payload[payloadIndex]);
-    payloadPointer = (payloadIndex == EMPTY_PAYLOAD ? 0 : &payload[payloadIndex]);
+    payloadByte = payload[payloadIndex];
+    payloadPointer = &payload[payloadIndex];
   };
 
   byte PS = packetSrc ? ((packetSrc == 0x80) ? 6 : 1) : 0;
