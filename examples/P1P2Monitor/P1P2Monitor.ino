@@ -2271,10 +2271,9 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
     WB[4]  = (upt >> 16) & 0xFF;
     WB[5]  = (upt >> 8) & 0xFF;
     WB[6]  = upt & 0xFF;
-    WB[7]  = (F_CPU >> 24) & 0xFF;
-    WB[8]  = (F_CPU >> 16) & 0xFF;
-    WB[9]  = (F_CPU >> 8) & 0xFF;
-    WB[10] = F_CPU & 0xFF;
+    WB[7] = SW_MAJOR_VERSION; // dropped F_CPU
+    WB[8] = SW_MINOR_VERSION;
+    WB[9] = SW_PATCH_VERSION;
     WB[11] = writeRefused;
 #ifdef E_SERIES
     WB[12] = counterRepeatingRequest;

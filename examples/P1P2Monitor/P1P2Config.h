@@ -75,6 +75,9 @@
 #endif /* F_CPU */
 
 #define WELCOMESTRING "P1P2Monitor-v0.9.44rc2"
+#define SW_MAJOR_VERSION 0
+#define SW_MINOR_VERSION 9
+#define SW_PATCH_VERSION 44
 
 #define INIT_VERBOSE 3
 // Set verbosity level

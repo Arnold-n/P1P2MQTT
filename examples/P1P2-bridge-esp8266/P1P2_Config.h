@@ -142,6 +142,9 @@
 #define WELCOMESTRING "P1P2-bridge-esp8266 v0.9.44rc2"
 #define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.44rc2"
 #define HA_SW "0.9.44rc2"
+#define SW_MAJOR_VERSION 0
+#define SW_MINOR_VERSION 9
+#define SW_PATCH_VERSION 44
 
 #define WEBSERVER // adds webserver to update firmware of ESP
 #define AVRISP // enables flashing ATmega by ESP on P1P2-ESP-Interface

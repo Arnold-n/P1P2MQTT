@@ -51,6 +51,10 @@
         case   10 : KEY("WiFi_status");                                    HAPCONFIG;                                                            VALUE_u8;
         case   11 : KEY("ESP_reboot_reason");                              HAPCONFIG;                                                            VALUE_u8hex;
         case   15 : KEY("ESP_Output_Mode");                                HACONFIG;                                                             VALUE_u32hex_LE;
+        case   16 : KEY("HA_Online");                                                                                                            VALUE_u8;
+        case   17 : KEY("P1P2-bridge_major_version");                                                                                            VALUE_u8;
+        case   18 : KEY("P1P2-bridge_minor_version");                                                                                            VALUE_u8;
+        case   19 : KEY("P1P2-bridge_patch_version");                                                                                            VALUE_u8;
         default   : return 0;
       }
       default   : return 0;
@@ -61,7 +65,10 @@
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    3 : KEY("ATmega_Uptime");                                  HAPCONFIG; HASECONDS;         maxOutputFilter = 2;                    VALUE_u32_LE_uptime;
-        case    7 : KEY("CPU_Frequency");                                                                                                        VALUE_u32_LE;
+        case    4 : KEY("P1P2Monitor_major_version");                                                                                            VALUE_u8;
+        case    5 : KEY("P1P2Monitor_minor_version");                                                                                            VALUE_u8;
+        case    6 : KEY("P1P2Monitor_patch_version");                                                                                            VALUE_u8;
+        case    7 : return 0;
         case    8 : KEY("Writes_Refused");                                 HACONFIG;                                                             VALUE_u8;
         case    9 : KEY("Bridge_Counter_Request_OnOff");                   HACONFIG;                                                             VALUE_u8;
         case   10 : KEY("Bridge_Counter_Request_Counter");                                               maxOutputFilter = 2;                    VALUE_u8;

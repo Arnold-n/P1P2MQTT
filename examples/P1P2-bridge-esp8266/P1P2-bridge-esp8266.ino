@@ -2140,9 +2140,9 @@ void loop() {
       readHex[17] = (outputMode >> 8) & 0xFF;
       readHex[18] = outputMode & 0xFF;
       readHex[19] = haOnline;
-      readHex[20] = 0x00;
-      readHex[21] = 0x00;
-      readHex[22] = 0x00; // reserved for future use
+      readHex[20] = SW_MAJOR_VERSION;
+      readHex[21] = SW_MINOR_VERSION;
+      readHex[22] = SW_PATCH_VERSION;
       writePseudoPacket(readHex, 23);
     }
     if (pseudo0E > 5) {
