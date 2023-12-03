@@ -114,14 +114,52 @@
 // -CONTROL_ID (whether P1P2Monitor acts as auxiliary controller, and which one) (not for H-link2)
 // -counterrepeatingrequest (whether P1P2Monitor repeatedly requests counters) (not for H-link2)
 // -verbose (verbosity level)
+// -brand  0=unknown 
+//         1=Daikin
+//         2=Hitachi
+//         3=Mitsubishi
+//         4=MHI
+//         5=Panasonic
+//         6=Sanyo
+//         7=Toshiba
+// -model (currently for Daikin only):
+//         0=undefined/unknown
+//         1=F-series generic,
+//         2=EKH/Altherma, EKH, EWYQ?
+//         3=major versions CA/CB/Altherma 3
+//         4-9 reserved for other major versions
+//         10=F-series, major version B,C,L(some) 
+//         11=F-series, major version L(some),P,A 
+//         12=F-series, major version M
+//         20-29 reserved for EKH*/Altherma 2/ perhaps EWYQ,EWAQ
+//         30-39 reserved for Altherma 3 models
 //
 // to reset EEPROM to settings in P1P2Config.h, either erase EEPROM, or change EEPROM_SIGNATURE in P1P2Config.h
 #define EEPROM_SIGNATURE "P1P2SIG01" // change this every time you wish to re-init EEPROM settings to the settings in P1P2Config.h
 #define EEPROM_ADDRESS_CONTROL_ID      0x00 // 1 byte for CONTROL_ID (Daikin-specific)
 #define EEPROM_ADDRESS_COUNTER_STATUS  0x01 // 1 byte for counterrepeatingrequest (Daikin-specific)
 #define EEPROM_ADDRESS_VERBOSITY       0x02 // 1 byte for verbose
-                                            // 0x03 .. 0x0F reserved
+#define EEPROM_ADDRESS_BRAND           0x03 // 1 byte for brand
+#define EEPROM_ADDRESS_MODEL           0x04 // 1 byte for model
+                                            // 0x05 .. 0x0F reserved
 #define EEPROM_ADDRESS_SIGNATURE       0x10 // should be highest, in view of unspecified strlen(EEPROM_SIGNATURE)
+
+#ifdef E_SERIES
+#define INIT_BRAND 1
+#define INIT_MODEL 3
+#endif
+#ifdef F_SERIES
+#define INIT_BRAND 1
+#define INIT_MODEL 1
+#endif
+#ifdef H_SERIES
+#define INIT_BRAND 2
+#define INIT_MODEL 0
+#endif
+#ifdef T_SERIES
+#define INIT_BRAND 6
+#define INIT_MODEL 0
+#endif
 
 #ifdef EF_SERIES
 // Write budget: thottle parameter writes to limit flash memory wear

@@ -104,6 +104,8 @@
 #define SPI_CLK_PIN_VALUE (PINB & 0x20)
 
 static byte verbose = INIT_VERBOSE;
+static byte brand = INIT_BRAND;
+static byte model = INIT_MODEL;
 static byte readErrors = 0;
 static byte readErrorLast = 0;
 static byte errorsLargePacket = 0;
@@ -162,6 +164,8 @@ void initEEPROM() {
     EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID_NONE); // Daikin specific
     EEPROM.update(EEPROM_ADDRESS_COUNTER_STATUS, COUNTERREPEATINGREQUEST); // Daikin specific
     EEPROM.update(EEPROM_ADDRESS_VERBOSITY, INIT_VERBOSE);
+    EEPROM.update(EEPROM_ADDRESS_BRAND, INIT_BRAND);
+    EEPROM.update(EEPROM_ADDRESS_MODEL, INIT_MODEL);
   }
 }
 #define EEPROM_update(x, y) { EEPROM.update(x, y); };
@@ -249,11 +253,16 @@ uint16_t testADC = 0;
 
 void printWelcomeString(void) {
   Serial.println("*");
+  Serial.print("* ");
   Serial.print(F(WELCOMESTRING));
   Serial.print(F(" compiled "));
   Serial.print(F(__DATE__));
   Serial.print(F(" "));
   Serial.print(F(__TIME__));
+  Serial.print(F(" brand "));
+  Serial.print(brand);
+  Serial.print(F(" modelnr "));
+  Serial.print(model);
 #ifdef MONITORCONTROL
   Serial.print(F(" +control"));
 #endif /* MONITORCONTROL */
@@ -271,15 +280,6 @@ void printWelcomeString(void) {
 #ifdef F_SERIES
   Serial.print(F(" F-series"));
 #endif /* F_SERIES */
-#ifdef FDY
-  Serial.print(F(" FDY"));
-#endif /* FDY */
-#ifdef FDYQ
-  Serial.print(F(" FDYQ"));
-#endif /* FDYQ */
-#ifdef FXMQ
-  Serial.print(F(" FXMQT"));
-#endif /* FXMQ */
 #ifdef H_SERIES
   Serial.print(F(" H-series"));
 #endif /* H_SERIES */
@@ -379,6 +379,17 @@ void setup() {
 #endif /* E_SERIES */
   verbose    = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);
 #endif /* EEPROM_SUPPORT */
+  brand = EEPROM.read(EEPROM_ADDRESS_BRAND);
+  model = EEPROM.read(EEPROM_ADDRESS_MODEL);
+  // write brand/model if not yet known and if defined in P1P2Config.h
+  if (brand == 0xFF) {
+    EEPROM.update(EEPROM_ADDRESS_BRAND, INIT_BRAND);
+    brand = INIT_BRAND;
+  }
+  if (model == 0xFF) {
+    EEPROM.update(EEPROM_ADDRESS_MODEL, INIT_MODEL);
+    model = INIT_MODEL;
+  }
   // 0 v1.0 no ADC
   // 1 v1.1 use ADC6 and ADC7
   // 2 v1.2 use ADC0 and ADC1, reverse R,W LEDs
@@ -469,8 +480,8 @@ void(* resetFunc) (void) = 0; // declare reset function at address 0
 
 int32_t upt = 0;
 static byte pseudo0D = 0;
-static byte pseudo0E = 0;
-static byte pseudo0F = 0;
+static byte pseudo0E = 1;
+static byte pseudo0F = 2;
 
 uint8_t scope_budget = 200;
 
@@ -558,6 +569,13 @@ void writeParam(void) {
 }
 #endif /* E_SERIES */
 
+#ifdef F_SERIES
+                                  //   30  31  32  33  34  35  36  37  38  39  3A  3B  3C  3D  3E  3F
+const int8_t expectedLength[3][16] ={{ 20, -1, -1, -1, -1, -1, -1, -1, 16, 11, -1, -1, -1, -1, -1, -1 },
+                                     { 20, -1,  8, -1, -1, 19, 19, -1, 20, 14, 18, -1, -1, -1, -1, -1 },
+                                     { 20, -1, -1, -1, -1, -1, -1, -2, -1, -1, -1, 20, 12, -1, -1, -1 }};
+#endif /* F_SERIES */
+
 void loop() {
   uint16_t temp;
   uint16_t temphex;
@@ -567,6 +585,8 @@ void loop() {
   int c;
   static byte ignoreremainder = 2; // ignore first line from serial input to avoid misreading a partial message just after reboot
   static bool reportedTooLong = 0;
+  static bool lengthReported[16] = { false };
+  static bool wrongLengthReported[16] = { false };
 
 // if GPIO0 = PB4 = L, do nothing, and disable serial input/output, to enable ESP programming
 // MISO GPIO0  pin 18 // PB4 // pull-up   // P=Power // white // DS18B20                                            V10/V11
@@ -742,27 +762,30 @@ void loop() {
                         break;
                       } else if ( (n = sscanf(RSp, (const char*) "%2x%2d%2x", &wr_pt, &wr_nr, &wr_val)) == 3) {
                         // Valid write parameters
-                        // FDY  38 0 1 2 4 6 8
-                        // FXMQ 38 0 1 2 4 6 8
-                        // FDYQ 3B 0 1 2 4 6 8 16 17
+                        // 10 BCL FDY  38 0 1 2 4 6 8
+                        // 11 LPA FXMQ 38 0 1 2 4 6 8
+                        // 12 M   FDYQ 3B 0 1 2 4 6 8 16 17
                         //
                         // check wr_pt
-#if defined FDY || defined FXMQ
-                        if (wr_pt != 0x38) {
-                          Serial_print(F("* wr_pt: 0x"));
-                          Serial_print(wr_pt, HEX);
-                          Serial_println(F(" is not 0x38"));
+                        if ((model == 10) || (model == 11)) {
+                          if (wr_pt != 0x38) {
+                            Serial_print(F("* wr_pt: 0x"));
+                            Serial_print(wr_pt, HEX);
+                            Serial_println(F(" is not 0x38"));
+                            break;
+                          }
+                        } else if (model == 12) {
+                          if (wr_pt != 0x3B) {
+                            Serial_print(F("* wr_pt: 0x"));
+                            Serial_print(wr_pt, HEX);
+                            Serial_println(F(" is not 0x3B"));
+                            break;
+                          }
+                        } else {
+                          Serial_print(F("* F cmd not supported yet for model "));
+                          Serial_println(model);
                           break;
                         }
-#endif
-#ifdef FDYQ
-                        if (wr_pt != 0x3B) {
-                          Serial_print(F("* wr_pt: 0x"));
-                          Serial_print(wr_pt, HEX);
-                          Serial_println(F(" is not 0x3B"));
-                          break;
-                        }
-#endif
                         // check wr_nr
                         if ((wr_nr > 17) || (wr_nr == 3) || (wr_nr == 5) || (wr_nr == 7) || ((wr_nr >= 9) && (wr_nr <= 15)) || ((wr_nr == 16) && (wr_pt == 0x38)) || ((wr_nr == 17) && (wr_pt == 0x38))) {
                           Serial_print(F("* wr_nr invalid, should be 0, 1, 2, 4, 6, 8 (or for packet type 0x3B: 16 or 17): "));
@@ -981,6 +1004,56 @@ void loop() {
             case 'K': Serial_println(F("* Resetting ATmega ...."));
                       resetFunc(); // call reset
                       break;
+#ifdef F_SERIES
+            case 'm': // set Daikin model type (currently for F-series only)
+            case 'M': if (scanint(RSp, temp) == 1) {
+                        if (((temp >= 10) && (temp <= 12)) || (temp == 1)) {
+                          Serial_print(F("* F_series model will now be set to "));
+                          model = temp;
+                          EEPROM.update(EEPROM_ADDRESS_MODEL, model);
+                          Serial_print(model);
+                          switch (model) {
+                            case  1 : Serial_println(F(": Unknown F-series model"));
+                                      break;
+                            case 10 : Serial_println(F(": FDY / version B/C/L"));
+                                      break;
+                            case 11 : Serial_println(F(": FXMQ / version L/P/A"));
+                                      break;
+                            case 12 : Serial_println(F(": FDYQ / version M"));
+                                      break;
+                            default : Serial_println(F(": unknown/should not happen"));
+                                      break;
+                           }
+                        } else {
+                          Serial_println(F("* Model can (only) be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M111 or M12 to do so)"));
+                        }
+                      } else {
+                        Serial_println(F("* Model can be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M111 or M12 to do so)"));
+                      }
+                      Serial_print(F("* Brand is "));
+                      Serial_print(brand);
+                      switch (brand) {
+                        case  1 : Serial_println(F(": Daikin"));
+                                  break;
+                        default : Serial_println(F(": unknown/should not happen"));
+                                  break;
+                      }
+                      Serial_print(F("* Model is "));
+                      Serial_print(model);
+                      switch (model) {
+                        case  1 : Serial_println(F(": Unknown F-series model"));
+                                  break;
+                        case 10 : Serial_println(F(": FDY / version B/C/L"));
+                                  break;
+                        case 11 : Serial_println(F(": FXMQ / version L/P/A"));
+                                  break;
+                        case 12 : Serial_println(F(": FDYQ / version M"));
+                                  break;
+                        default : Serial_println(F(": unknown/should not happen"));
+                                  break;
+                      }
+                      break;
+#endif /* F_SERIES */
 #ifdef EF_SERIES
             case 'l': // set auxiliary controller function on/off; CONTROL_ID address is set automatically; Daikin-specific
             case 'L': // 0 controller mode off, and store setting in EEPROM // 1 controller mode on, and store setting in EEPROM
@@ -989,6 +1062,7 @@ void loop() {
                       // 5 (for experimenting with F-series only) controller responds only to 00F030 message with an empty packet, but not to other 00F03x packets
                       // 99 restart Daikin
                       // other values are treated as 0 and are reserved for further experimentation of control modes
+
                       if (scanint(RSp, temp) == 1) {
 #ifdef ENABLE_INSERT_MESSAGE
                         if (temp == 99) {
@@ -1013,7 +1087,12 @@ void loop() {
                         if (temp > 3) temp = 0;
 #endif /* E_SERIES */
 #ifdef F_SERIES
-                        if ((temp > 5) || (temp == 4)) temp = 0;
+                        if ((temp > 5) || (temp == 4)) {
+                          Serial_println(F("* Valid arguments: 0 (control mode off, store state in EEPROM), 1 (control mode on, store state in EEPROM),"));
+                          Serial_println(F("* 2 (control mode off, do not store state in EEPROM), 3 (control mode on, do not store state in EEPROM),"));
+                          Serial_println(F("* 5 (partial control mode on, do not store state in EEPROM)"));
+                          Serial_println(F("* Control mode is limited for model 1 (F generic)"));
+                        }
 #endif /* F_SERIES */
                         byte setMode = temp & 0x01;
                         if (setMode) {
@@ -1022,9 +1101,12 @@ void loop() {
                             break;
                           }
                           if (CONTROL_ID) {
-                            Serial_print(F("* CONTROL_ID is already 0x"));
-                            Serial_println(CONTROL_ID, HEX);
+                            Serial_print(F("* CONTROL_ID is 0x"));
+                            Serial_print(CONTROL_ID, HEX);
+                            Serial_print(F(", changing control mode to L"));
+                            Serial_println(temp);
                             if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                            controlLevel = (temp == 5) ? 0 : 1; // F-series: special mode L5 answers only to F030
                             break;
                           }
                           if (FxAbsentCnt[0] == F0THRESHOLD) {
@@ -1047,6 +1129,7 @@ void loop() {
                         } else {
                           if (!CONTROL_ID) {
                             Serial_println(F("* CONTROL_ID is already 0x00"));
+                            if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
                             break;
                           } else {
                             CONTROL_ID = 0x00;
@@ -1071,6 +1154,22 @@ void loop() {
                       if (verbose) Serial_print(F("* Control_id is 0x"));
                       if (CONTROL_ID <= 0x0F) Serial_print("0");
                       Serial_println(CONTROL_ID, HEX);
+                      if (CONTROL_ID) {
+                        if (controlLevel) {
+                          if (model > 1) {
+                            Serial_println(F("* Control mode is on"));
+                          } else {
+                            Serial_println(F("* Control mode is limited because model=1, consider M command to set Daikin model"));
+                          }
+                        } else {
+                          Serial_println(F("* Control mode is limited (L5 mode), replying only to 00F030*"));
+                        }
+                      } else {
+                        Serial_println(F("* Control mode is off"));
+                      }
+                      Serial_println(F("* Valid arguments for L command: 0 (control mode off, store state in EEPROM), 1 (control mode on, store state in EEPROM),"));
+                      Serial_println(F("* 2 (control mode off, do not store state in EEPROM), 3 (control mode on, do not store state in EEPROM),"));
+                      Serial_println(F("* 5 (partial control mode on, do not store state in EEPROM)"));
                       break;
 #endif /* EF_SERIES */
 #ifdef E_SERIES
@@ -1635,7 +1734,7 @@ void loop() {
 #endif /* KLICDA */
 #endif /* E_SERIES */
       if ((nread > 4) && (RB[0] == 0x40) && (((RB[1] & 0xFE) == 0xF0) || (RB[1] == 0xFF)) && ((RB[2] & 0x30) == 0x30)) {
-        // 40Fx3x auxiliary controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < min(F03XDELAY, F030DELAY) (- margin)
+        // non-empty 40Fx3x auxiliary controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < min(F03XDELAY, F030DELAY) (- margin)
         // Note for developers using >1 P1P2Monitor-interfaces (=to self): this detection mechanism fails if there are 2 P1P2Monitor programs (and adapters) with same delay settings on the same bus.
         // check if there is any other auxiliary controller on 0x3x:
         if ((delta < F03XDELAY - 2) && (delta < F030DELAY - 2)) {
@@ -1649,8 +1748,9 @@ void loop() {
           }
         }
       } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30) && !F030forcounter) {
-        // 00Fx3x (F0/F1, but not FF, FF is not yet supported) request message received, and we did not use this slot to request counters
+        // non-empty 00Fx3x (F0/F1, but not FF, FF is not yet supported) request message received, and we did not use this slot to request counters
         // check if there is no other auxiliary controller
+        // TODO should we detect and report empty payload messages?
         if ((RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x03] < F0THRESHOLD)) {
           FxAbsentCnt[RB[1] & 0x03]++;
           if (FxAbsentCnt[RB[1] & 0x03] == F0THRESHOLD) {
@@ -1661,10 +1761,59 @@ void loop() {
               insertMessageCnt = 0;  // avoid delayed insertMessage/restartDaikin
               restartDaikinCnt = 0;
             } else {
-              Serial_println(F(" detected, switching control functionality can be switched on (using L1)"));
+#ifdef E_SERIES
+              Serial_println(F(" detected, switching control functionality can be switched on (using L command, L1 for full control)"));
+#else /* E_SERIES */
+              Serial_println(F(" detected, switching control functionality can be switched on (using L command, L1 for full control, L5 for partial control, subject to model selection (M command))"));
+#endif /* E_SERIES */
             }
           }
         }
+#ifdef F_SERIES
+        if (((RB[2] & 0xF0) == 0x30) && !lengthReported[RB[2] & 0x0F]) {
+          if (RB[2] == 0x38) {
+            if ((nread == 16 + 4) && (model != 10)) {
+              Serial_println(F("* Packet type 0x38 has payload length 16; perhaps this unit is compatible with model 10 (FDY / BCL), you may try command M10"));
+              lengthReported[8] = true;
+            } else if ((nread == 20 + 4)  && (model != 11)) {
+              Serial_println(F("* Packet type 0x38 has payload length 20; perhaps this unit is compatible with model 11 (FXMQ / LPA), you may try command M11"));
+              lengthReported[8] = true;
+            }
+          }
+          if (RB[2] == 0x3B) {
+            if ((nread == 20 + 4) && (model != 12)) {
+              Serial_println(F("* Packet type 0x3B has payload length 20; perhaps this unit is compatible with model 12 (FDYQ / M), you may try command M12"));
+              lengthReported[11] = true;
+            }
+          }
+          if (!lengthReported[RB[2] & 0x0F]) {
+            Serial_print(F("* Packet type 0x"));
+            Serial_print(RB[2], HEX);
+            Serial_print(F(" observed with payload length "));
+            Serial_println(nread - 4);
+            lengthReported[RB[2] & 0x0F] = true;
+          }
+        }
+        if ((model >= 10) && (model <= 12) && !wrongLengthReported[RB[2] & 0x0F]) {
+          int8_t expLength = expectedLength[model - 10][RB[2] & 0x0F];
+          if (expLength == -1) {
+            Serial_print(F("* Packet type 0x"));
+            Serial_print(RB[2], HEX);
+            Serial_print(F(" not expected for model "));
+            Serial_println(model);
+            wrongLengthReported[RB[2] & 0x0F] = true;
+          }
+          if ((expLength >= 0)  && ((nread - 4) != expLength)) {
+            Serial_print(F("* Packet length "));
+            Serial_print(nread - 4);
+            Serial_print(F(" not expected for packet type 0x"));
+            Serial_print(RB[2], HEX);
+            Serial_print(F(" and model "));
+            Serial_println(model);
+            wrongLengthReported[RB[2] & 0x0F] = true;
+          }
+        }
+#endif /* F_SERIES */
         // act as auxiliary controller:
         if ((CONTROL_ID && (FxAbsentCnt[CONTROL_ID & 0x03] == F0THRESHOLD) && (RB[1] == CONTROL_ID))
 #ifdef ENABLE_INSERT_MESSAGE
@@ -1686,7 +1835,8 @@ void loop() {
           if (n > WB_SIZE) {
             n = WB_SIZE;
             Serial_print(F("* Surprise: received 00Fx3x packet of size "));
-            Serial_println(nread); }
+            Serial_println(nread);
+          }
           switch (RB[2]) {
 #ifdef E_SERIES
             case 0x30 :
@@ -1854,12 +2004,6 @@ void loop() {
                         break;
 #endif /* E_SERIES */
 #ifdef F_SERIES
-            case 0x30 : // all models: polling auxiliary controller, reply with empty payload
-              d = F030DELAY;
-              wr = 1;
-              n = 3;
-              break;
-
 // Messages and payload lengths:
 // ?   EKHBRD*ADV   0x30   /               0x34  5/0                                                                  0x38 20/14
 // BCL FDY          0x30 20/0                                                                                         0x38 16/15 / 0x39 11/4
@@ -1872,6 +2016,10 @@ void loop() {
 // LPA FXMQ: FXMQ200PWM and/or FXMQ100PAVE ?, FDYQN160LAV1, perhaps also: FBA60A9
 // M   FDYQ: FDYQ180MV1
 
+// writable payload fields
+// 10 BCL FDY  38 0 1 2 4 6 8
+// 11 LPA FXMQ 38 0 1 2 4 6 8
+// 12 M   FDYQ 3B 0 1 2 4 6 8 16 17
 /*
 You can use the following commands with spaces:
 
@@ -1906,133 +2054,164 @@ etc
 For FDYQ-like systems, try using the same commands with packet type 38 replaced by 3B.
 */
 
-#ifdef FDY
-            case 0x38 : // FDY control message, copy bytes back and change if 'F' command is given
-              wr = controlLevel;
-              n = 18;
-              for (w = 13; w <= 15; w++) WB[w] = 0x00;
-              WB[3]  = RB[3] & 0x01;           // W target status
-              WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
-              WB[5]  = RB[7];                  // W target temperature cooling
-              WB[6]  = 0x00;                   //   clear change flag 80 from input (alternative:? WB[6] = RB[8] & 0x7F)
-              WB[7]  = (RB[9] & 0x60) | 0x11;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
-              WB[8]  = 0x00;                   //   clear change flag 80 from input
-              WB[9]  = RB[11];                 // W target temperature heating
-              WB[10] = 0x00;                   //   clear change flag from input    (alternative:? WB[10] = RB[12] & 0x7F)
-              WB[11] = (RB[13] & 0x60) | 0x11; // W target fan speed heating;       (alternative: WB[11] = RB[13] & 0x7F might work too)
-              WB[12] = RB[14] & 0x7F;          //   clear change flag from input
-              WB[16] = RB[18];                 //   target fan mode ?? & 0x03 ?
-              WB[17] = 0x00;                   //   ? (change flag, & 0x7F ?)
-              if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
-              break;
-            case 0x39 : // guess that this is filter for FDY, reply with 4-byte payload
-              wr = controlLevel;
-              n = 7;
-              WB[3] = 0x00;
-              WB[4] = 0x00;
-              WB[5] = RB[11];
-              WB[6] = RB[12];
-              if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
-              break;
-#endif
-#ifdef FDYQ
-            case 0x37 : // FDYQ zone name packet, reply with empty payload
-              wr = controlLevel;
+            case 0x30 : // all models: polling auxiliary controller, reply with empty payload
+              d = F030DELAY;
+              wr = 1;
               n = 3;
               break;
-            case 0x3B : // FDYQ control message, copy bytes back and change if 'F' command is given
-              wr = controlLevel;
-              n = 22;
-              for (w = 13; w <= 18; w++) WB[w] = 0x00;
-              WB[3]  = RB[3] & 0x01;           // W target status
-              WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
-              WB[5]  = RB[7];                  // W target temperature cooling
-              WB[6]  = 0x00;                   //   clear change flag 80 from input (alternative:? WB[6] = RB[8] & 0x7F)
-              WB[7]  = (RB[9] & 0x60) | 0x11;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
-              WB[8]  = 0x00;                   //   clear change flag 80 from input
-              WB[9]  = RB[11];                 // W target temperature heating
-              WB[10] = 0x00;                   //   clear change flag from input    (alternative:? WB[10] = RB[12] & 0x7F)
-              WB[11] = (RB[13] & 0x60) | 0x11; // W target fan speed heating        (alternative: WB[11] = RB[13] & 0x7F might work too)
-              WB[12] = RB[14] & 0x7F;          //   clear change flag from input
-              WB[19] = RB[20];                 // W active hvac zones
-              WB[20] = RB[21] & 0x03;          // W target fan mode
-              WB[21] = 0x00;                   //   ? (change flag, & 0x7F ?)
-              if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
-              break;
-            case 0x3C : // FDYQ filter message, reply with 2-byte zero payload
-              wr = controlLevel;
-              n = 5;
-              WB[3] = 0x00;
-              WB[4] = 0x00;
-              if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
-              break;
-#endif
-#ifdef FXMQ
             case 0x32 : // incoming message,  occurs only once, 8 bytes, first byte is 0xC0, others 0x00; reply is one byte value 0x01? polling auxiliary controller?, reply with empty payload
+              // if (model != 11)  break;
+              // FXMQ / version LPA
               d = F030DELAY;
               wr = controlLevel;
               n = 4;
               WB[3]  = 0x01; // W target status
               break;
             case 0x35 : // FXMQ outside unit name, reply with empty payload
+              // if (model != 11)  break;
+              // FXMQ / version LPA
               wr = controlLevel;
               n = 3;
               break;
             case 0x36 : // FXMQ indoor unit name, reply with empty payload
+              // if (model != 11)  break;
+              // FXMQ / version LPA
               wr = controlLevel;
               n = 3;
               break;
-            case 0x38 : // FXMQ control message, copy a few bytes back, change bytes if 'F' command is given
+            case 0x37 : // FDYQ / version M  zone name packet, reply with empty payload
+              // if (model != 12)  break;
+              // FDYQ / version M
               wr = controlLevel;
-              n = 20;
-              WB[3]  = RB[3] & 0x01;           // W target status
-              WB[4]  = RB[5];                  // W target operating mode
-              WB[5]  = RB[7];                  // W target temperature cooling (can be changed by reply with different value)
-              WB[6]  = 0x00;
-              WB[7]  = RB[9];                  // W target fan speed cooling/fan (11 / 31 / 51) (can be changed by reply with different value)
-              WB[8]  = 0x00;
-              WB[9]  = RB[11];                 // W target temperature heating (can be changed by reply with different value)
-              WB[10] = 0x00;
-              WB[11] = RB[13];                 // W target fan speed heating/fan (11 / 31 / 51)
-              WB[12] = RB[14];                 // no flag?
-              WB[13] = 0x00;
-              WB[14] = 0x00;
-              WB[15] = 0x00;
-              WB[16] = RB[18];                 // C0, E0 when payload byte 0 set to 1
-              WB[17] = 0x00;
-              WB[18] = 0;                      // puzzle: initially 0, then 2, then 1 ????
-              WB[19] = 0x00;
-              if (wr_cnt && (wr_pt == RB[2])) {
+              n = 3;
+              break;
+            case 0x38 :
+              if (model == 10) {
+                // FDY / version BCL control message, copy bytes back and change if 'F' command is given
+                wr = controlLevel;
+                n = 18;
+                for (w = 13; w <= 15; w++) WB[w] = 0x00;
+                WB[3]  = RB[3] & 0x01;           // W target status
+                WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
+                WB[5]  = RB[7];                  // W target temperature cooling
+                WB[6]  = 0x00;                   //   clear change flag 80 from input (alternative:? WB[6] = RB[8] & 0x7F)
+                WB[7]  = (RB[9] & 0x60) | 0x11;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
+                WB[8]  = 0x00;                   //   clear change flag 80 from input
+                WB[9]  = RB[11];                 // W target temperature heating
+                WB[10] = 0x00;                   //   clear change flag from input    (alternative:? WB[10] = RB[12] & 0x7F)
+                WB[11] = (RB[13] & 0x60) | 0x11; // W target fan speed heating;       (alternative: WB[11] = RB[13] & 0x7F might work too)
+                WB[12] = RB[14] & 0x7F;          //   clear change flag from input
+                WB[16] = RB[18];                 //   target fan mode ?? & 0x03 ?
+                WB[17] = 0x00;                   //   ? (change flag, & 0x7F ?)
+                if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+                break;
+              }
+              if (model == 11) {
+                // FXMQ / version PCL control message, copy a few bytes back, change bytes if 'F' command is given
+                wr = controlLevel;
+                n = 20;
+                WB[3]  = RB[3] & 0x01;           // W target status
+                WB[4]  = RB[5];                  // W target operating mode
+                WB[5]  = RB[7];                  // W target temperature cooling (can be changed by reply with different value)
+                WB[6]  = 0x00;
+                WB[7]  = RB[9];                  // W target fan speed cooling/fan (11 / 31 / 51) (can be changed by reply with different value)
+                WB[8]  = 0x00;
+                WB[9]  = RB[11];                 // W target temperature heating (can be changed by reply with different value)
+                WB[10] = 0x00;
+                WB[11] = RB[13];                 // W target fan speed heating/fan (11 / 31 / 51)
+                WB[12] = RB[14];                 // no flag?
+                WB[13] = 0x00;
+                WB[14] = 0x00;
+                WB[15] = 0x00;
+                WB[16] = RB[18];                 // C0, E0 when payload byte 0 set to 1
+                WB[17] = 0x00;
+                WB[18] = 0;                      // puzzle: initially 0, then 2, then 1 ????
+                WB[19] = 0x00;
+                if (wr_cnt && (wr_pt == RB[2])) {
                 if ((wr_nr == 0) && (WB[wr_nr + 3] == 0x00) && (wr_val)) WB[16] |= 0x20; // change payload byte 13 from C0 to E0, only if payload byte 0 is set to 1 here
-                WB[wr_nr + 3] = wr_val;
-                wr_cnt--;
+                  WB[wr_nr + 3] = wr_val;
+                  wr_cnt--;
+                }
+                break;
               }
               break;
-            case 0x39 : // ??, reply with 5-byte all-zero payload
-              wr = controlLevel;
-              n = 8;
-              WB[3] = 0x00;
-              WB[4] = 0x00;
-              WB[5] = 0x00;
-              WB[6] = 0x00;
-              WB[7] = 0x00;
-              // for now, don't support write: if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+            case 0x39 :
+              if (model == 10)  {
+                // guess that this is filter warning for FDY / version BCL, reply with 4-byte payload
+                wr = controlLevel;
+                n = 7;
+                WB[3] = 0x00;
+                WB[4] = 0x00;
+                WB[5] = RB[11];
+                WB[6] = RB[12];
+                if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+                break;
+              }
+              if (model == 11) {
+                // FXMQ / LPA reply with 5-byte all-zero payload
+                wr = controlLevel;
+                n = 8;
+                WB[3] = 0x00;
+                WB[4] = 0x00;
+                WB[5] = 0x00;
+                WB[6] = 0x00;
+                WB[7] = 0x00;
+                // for now, don't support write: if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+                break;
+              }
               break;
             case 0x3A : // ??, reply with 8-byte all-zero payload
-              wr = controlLevel;
-              n = 11;
-              WB[3] = 0x00;
-              WB[4] = 0x00;
-              WB[5] = 0x00;
-              WB[6] = 0x00;
-              WB[7] = 0x00;
-              WB[8] = 0x00;
-              WB[9] = 0x00;
-              // for now, don't support write: if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+              if (model == 11)  {
+                // FXMQ / version LPA
+                wr = controlLevel;
+                n = 11;
+                WB[3] = 0x00;
+                WB[4] = 0x00;
+                WB[5] = 0x00;
+                WB[6] = 0x00;
+                WB[7] = 0x00;
+                WB[8] = 0x00;
+                WB[9] = 0x00;
+                // for now, don't support write: if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+                break;
+              }
               break;
-#endif
+            case 0x3B : // FDYQ /version M control message, copy bytes back and change if 'F' command is given
+              if (model == 12)  {
+                // FDYQ / version M
+                wr = controlLevel;
+                n = 22;
+                for (w = 13; w <= 18; w++) WB[w] = 0x00;
+                WB[3]  = RB[3] & 0x01;           // W target status
+                WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
+                WB[5]  = RB[7];                  // W target temperature cooling
+                WB[6]  = 0x00;                   //   clear change flag 80 from input (alternative:? WB[6] = RB[8] & 0x7F)
+                WB[7]  = (RB[9] & 0x60) | 0x11;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
+                WB[8]  = 0x00;                   //   clear change flag 80 from input
+                WB[9]  = RB[11];                 // W target temperature heating
+                WB[10] = 0x00;                   //   clear change flag from input    (alternative:? WB[10] = RB[12] & 0x7F)
+                WB[11] = (RB[13] & 0x60) | 0x11; // W target fan speed heating        (alternative: WB[11] = RB[13] & 0x7F might work too)
+                WB[12] = RB[14] & 0x7F;          //   clear change flag from input
+                WB[19] = RB[20];                 // W active hvac zones
+                WB[20] = RB[21] & 0x03;          // W target fan mode
+                WB[21] = 0x00;                   //   ? (change flag, & 0x7F ?)
+                if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+                break;
+              }
+              break;
+            case 0x3C : // FDYQ filter message, reply with 2-byte zero payload
+              if (model == 12)  {
+                // FDYQ / version M
+                wr = controlLevel;
+                n = 5;
+                WB[3] = 0x00;
+                WB[4] = 0x00;
+                if (wr_cnt && (wr_pt == RB[2])) { WB[wr_nr + 3] = wr_val; wr_cnt--; };
+                break;
+              }
+              break;
 #endif /* F_SERIES */
-            default   : // not seen, no response
+            default   : // 0x31/0x33/0x34/0x3E/0x3F not seen, no response
               break;
           }
           if (wr) {
@@ -2299,7 +2478,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
     // WB[1]  = 0x00;
     WB[2]  = 0x0F;
     WB[3]  = Compile_Options;
-    WB[4]  = verbose;
+    WB[4]  = 0; // reserved for more compile_options;
     WB[5]  = save_MCUSR;
 #ifdef EF_SERIES
     WB[6]  = writePermission;
@@ -2312,17 +2491,9 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
     WB[12] = (sdto >> 8) & 0xFF;
     WB[13] = sdto & 0xFF;
     WB[14] = ATmegaHwID;
-#ifdef EEPROM_SUPPORT
-#ifdef EF_SERIES
-    WB[15] = EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
-#endif /* EF_SERIES */
-    WB[16] = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);
-#ifdef EF_SERIES
-    WB[17] = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
-#endif /* EF_SERIES */
-    for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) sigMatch &= (EEPROM.read(EEPROM_ADDRESS_SIGNATURE + i) == EEPROM_SIGNATURE[i]);
-    WB[18] = sigMatch;
-#endif /* EEPROM_SUPPORT */
+    WB[16] = verbose;
+    WB[17] = brand;
+    WB[18] = model;
     WB[19] = scope;
     WB[20] = readErrors;
     WB[21] = readErrorLast;
