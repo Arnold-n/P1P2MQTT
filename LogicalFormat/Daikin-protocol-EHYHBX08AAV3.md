@@ -1178,8 +1178,8 @@ The heat pump communicates all field settings (format and data value) to main co
 
 ## Packet type 21 communication
 
-- Request header: 000020, payload: 00
-- Response header: 400020, payload: <20 bytes, function tbd>
+- Request header: 000021, payload: 00
+- Response header: 400021, payload: <13 bytes, function tbd>
 
 ## Start of regular package communication
 
