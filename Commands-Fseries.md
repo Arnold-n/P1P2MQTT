@@ -68,6 +68,6 @@ As an example, payload byte 0 in packet type 3B is used for switching cooling/he
 | `F 3B 6 19`  | to set the setpoint to 0x19 = 25C
 | `F 3B 8 11`  | to set the fanmode to low         (heating mode)
 | `F 3B 8 31`  | to set the fanmode to medium
-| `F 3B 8 51``  | to set the fanmode to high
+| `F 3B 8 51`  | to set the fanmode to high
 | `F 3B 16 ??` | (not sure yet, active hvac zones related)
 | `F 3B 17 ??` | (not sure yet, target fan mode related)
