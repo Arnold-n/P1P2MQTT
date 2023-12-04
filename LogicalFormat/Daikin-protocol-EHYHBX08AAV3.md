@@ -666,20 +666,20 @@ These parameters resemble the counters in packet type B8 but there are some diff
 | 000B     | ?                                                  | u32
 | 000C     | ?                                                  | u32
 | 000D     | pump hours                                         | u32
-| 000E     | compressor for heating                             | u32
-| 000F     | compressor for cooling                             | u32
-| 0010     | compressor for DHW                                 | u32
-| 0011     | backup heater1 for heating                         | u32
-| 0012     | backup heater1 for DHW                             | u32
-| 0013     | backup heater2 for heating                         | u32
-| 0014     | backup heater2 for DHW                             | u32
+| 000E     | compressor hours for heating                       | u32
+| 000F     | compressor hours for cooling                       | u32
+| 0010     | compressor hours for DHW                           | u32
+| 0011     | backup heater1 hours for heating                   | u32
+| 0012     | backup heater1 hours for DHW                       | u32
+| 0013     | backup heater2 hours for heating                   | u32
+| 0014     | backup heater2 hours for DHW                       | u32
 | 0015     | ?                                                  | u32
-| 0016     | ?                                                  | u32
+| 0016     | drain pan heater hours                             | u32
 | 0017     | ?                                                  | u32
 | 0018     | ?                                                  | u32
 | 0019     | ?                                                  | u32
-| 001A     | boiler operating hours for heating                 | u32
-| 001B     | boiler operating hours for DHW                     | u32
+| 001A     | gasboiler operating hours for heating              | u32
+| 001B     | gasboiler operating hours for DHW                  | u32
 | 001C     | number of compressor starts                        | u32
 | 001D     | number of boiler starts                            | u32
 | 001E     | ?                                                  | u32
@@ -1090,11 +1090,11 @@ On EJHA\* all counters for type 01 are always zero.
 | Byte nr       | Hex value observed            | Description                               | Data type
 |:--------------|:------------------------------|:------------------------------------------|:-
 |    0          | 05                            | data type 05 : gas boiler in hybrid model | u8
-|  1-3          | XX XX XX                      | boiler operating hours for heating        | u24
-|  4-6          | XX XX XX                      | boiler operating hours for DHW            | u24
+|  1-3          | XX XX XX                      | gasboiler operating hours for heating     | u24
+|  4-6          | XX XX XX                      | gasboiler operating hours for DHW         | u24
 |  7-9          | XX XX XX                      | gas usage for heating (unit tbd)          | u24
 | 10-12         | XX XX XX                      | gas usage for heating (unit tbd)          | u24
-| 13-15         | XX XX XX                      | number of boiler starts                   | u24
+| 13-15         | XX XX XX                      | number of gasboiler starts                | u24
 | 16-18         | XX XX XX                      | gas usage total (unit tbd)                | u24
 
 Internal gas metering seems only supported on newer models, not on the AAV3.

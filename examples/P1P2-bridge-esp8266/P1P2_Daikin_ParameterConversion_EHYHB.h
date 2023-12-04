@@ -1453,7 +1453,8 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0012 : PARAM_KEY("Hours_Backup1_DHW");                                                                                            PARAM_VALUE_u32_BE;
         case 0x0013 : PARAM_KEY("Hours_Backup2_Heating");                                                                                        PARAM_VALUE_u32_BE;
         case 0x0014 : PARAM_KEY("Hours_Backup2_DHW");                                                                                            PARAM_VALUE_u32_BE;
-
+        case 0x0015 : PARAM_KEY("Hours_Unknown_Function");                                                                                       PARAM_VALUE_u32_BE;
+        case 0x0016 : PARAM_KEY("Hours_Drain_Pan_Heater");                                                                                       PARAM_VALUE_u32_BE; // Drain pan heater (BPV/bodemplaat verwarming), thanks to Pim Snoeks for finding this function
         case 0x001A : PARAM_KEY("Hours_Gasboiler_Heating");                                                                                      PARAM_VALUE_u32_BE;
         case 0x001B : PARAM_KEY("Hours_Gasboiler_DHW");                                                                                          PARAM_VALUE_u32_BE;
         case 0x001C : PARAM_KEY("Starts_Compressor");                                                                                            PARAM_VALUE_u32_BE;
@@ -2206,7 +2207,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case 15 :           KEY("Hours_Unknown_34");                                    HAHOURS;                                               VALUE_u24_LE; // ?
           case 16 :           return 0;
           case 17 :           return 0;
-          case 18 :           KEY("Hours_Unknown_35");                                    HAHOURS;                                               VALUE_u24_LE; // reports 0?
+          case 18 :           KEY("Hours_Drain_Pan_Heater");                              HAHOURS;                                               VALUE_u24_LE; // Drain pan heater (BPV/bodemplaat verwarming), thanks to Pim Snoeks for finding this function
           default :           UNKNOWN_BYTE;
         }
         case 0x04 : switch (payloadIndex) {                                // payload B8 subtype 04
