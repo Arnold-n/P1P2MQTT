@@ -1106,9 +1106,9 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
   uint16_t fieldSettingMax        = fieldSettingMin + payload[payloadIndex - 2] * (fieldSettingStepMantissa * (fieldSettingStepExponent ? (fieldSettingStepExponentSign ? 0.100001 : 10) : 1)); // <0.1 >10 not yet observed / unsure how to implement
   float fieldSettingVal        = fieldSettingMin + (payload[payloadIndex - 3] & 0x3F)  * (fieldSettingStepMantissa * (fieldSettingStepExponent ? (fieldSettingStepExponentSign ? 0.1 : 10) : 1)); // <0.1 >10 not yet observed / unsure how to implement
   if (fieldSettingStepExponentSign) {
-    snprintf(mqtt_value, MQTT_VALUE_LEN, "{\"val\":%1.1f, \"min\":%i, \"max\":%i, \"stepsize\":0.%i, \"bits\":\"%i%i\"i, \"bitsstep\":\"0x%02X\"}", fieldSettingVal, fieldSettingMin, fieldSettingMax, fieldSettingStepMantissa, fieldSettingUnknownBitsVal >> 7, (fieldSettingUnknownBitsVal >> 6) & 0x01, fieldSettingUnknownBitsStep);
+    snprintf(mqtt_value, MQTT_VALUE_LEN, "{\"val\":%1.1f, \"min\":%i, \"max\":%i, \"stepsize\":0.%i, \"bits\":\"%i%i\", \"bitsstep\":\"0x%02X\"}", fieldSettingVal, fieldSettingMin, fieldSettingMax, fieldSettingStepMantissa, fieldSettingUnknownBitsVal >> 7, (fieldSettingUnknownBitsVal >> 6) & 0x01, fieldSettingUnknownBitsStep);
   } else {
-    snprintf(mqtt_value, MQTT_VALUE_LEN, "{\"val\":%1.0f, \"min\":%i, \"max\":%i, \"stepsize\":%i, \"bits\":\"%i%i\"i, \"bitsstep\":\"0x%02X\"}", fieldSettingVal, fieldSettingMin, fieldSettingMax, fieldSettingStepMantissa * (fieldSettingStepExponent ? 10 : 1), fieldSettingUnknownBitsVal >> 7, (fieldSettingUnknownBitsVal >> 6) & 0x01, fieldSettingUnknownBitsStep);
+    snprintf(mqtt_value, MQTT_VALUE_LEN, "{\"val\":%1.0f, \"min\":%i, \"max\":%i, \"stepsize\":%i, \"bits\":\"%i%i\", \"bitsstep\":\"0x%02X\"}", fieldSettingVal, fieldSettingMin, fieldSettingMax, fieldSettingStepMantissa * (fieldSettingStepExponent ? 10 : 1), fieldSettingUnknownBitsVal >> 7, (fieldSettingUnknownBitsVal >> 6) & 0x01, fieldSettingUnknownBitsStep);
   }
   return 1;
 }
