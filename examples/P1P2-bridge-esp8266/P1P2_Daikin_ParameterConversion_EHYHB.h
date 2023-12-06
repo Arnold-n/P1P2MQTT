@@ -1850,6 +1850,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case    8 : BITBASIS;
           case    0 : KEY("Compressor_OnOff");                             HACONFIG;                                                             VALUE_flag8;
           case    3 : KEY("Circulation_Pump_OnOff");                       HACONFIG;                                                             VALUE_flag8;
+          case    5 : KEY("BUH_2_OnOff");                                  HACONFIG;                                                             VALUE_flag8;
           default   : UNKNOWN_BIT;
         }
         case   19 : switch (bitNr) {
