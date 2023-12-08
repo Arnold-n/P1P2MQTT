@@ -1843,6 +1843,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
 //        case   15 : KEY("Reboot_related_Q10-40-15");                                                                                             VALUE_u8hex;
         case   17 : switch (bitNr) {
           case    8 : BITBASIS;
+//        case    6 : KEY("BUH1_OnOff_Q");                                 HACONFIG;                                                             VALUE_flag8;
           case    1 : KEY("Defrost_Operation");                            HACONFIG;                                                             VALUE_flag8;
           default   : UNKNOWN_BIT;
         }

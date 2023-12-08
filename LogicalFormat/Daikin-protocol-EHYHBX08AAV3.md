@@ -121,7 +121,9 @@ Header: 400010
 |13        | 00                 | Error code part 2        | u8
 |14        | 00                 | Error subcode            | u8
 |15-17     | 00                 | ?
+|17:5      | 0/1                | BUH1? (off/on)           | bit
 |17:1      | 0/1                | Defrost operation        | bit
+|18:5      | 0/1                | BUH2? (off/on)           | bit
 |18:3      | 0/1                | Circ.pump (off/on)       | bit
 |18:1      | 0/1                | ?                        | bit
 |18:0      | 0/1                | Compressor (off/on)      | bit
