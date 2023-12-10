@@ -1280,8 +1280,9 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0001 : PARAM_KEY("Reboot_related_Q11-35-01");                                                                                           PARAM_VALUE_u8; //  0x00 0x01
         case 0x0003 : PARAM_KEY("Quiet_Mode_35");                                                                                                PARAM_VALUE_u8;
         case 0x0004 : PARAM_KEY("Reboot_related_Q11-35-01");                                                                                           PARAM_VALUE_u8; //  0x00 0x01
-
-
+        case 0x0008 : PARAM_KEY("Compressor_OnOff");                                                                                             PARAM_VALUE_u8;
+        case 0x0035 : PARAM_KEY("Defrost_Q_35");                                                                                                 PARAM_VALUE_u8;
+        case 0x0036 : PARAM_KEY("Defrost_Q_36");                                                                                                 PARAM_VALUE_u8;
         case 0x000A : PARAM_KEY("Heatpump_Active_Q0");                                                                                           PARAM_VALUE_u8; // ?
         case 0x003C : PARAM_KEY("Heatpump_Active_Q1");                                                                                           PARAM_VALUE_u8; // ? or circ pump?
         case 0x000E : PARAM_KEY("Circulation_Pump");                                                                                             PARAM_VALUE_u8;
@@ -1856,7 +1857,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         }
         case   19 : switch (bitNr) {
           case  8 : BITBASIS;
-          case  1 : KEY("Gasboiler_Active_0");                             HACONFIG;                                                             VALUE_flag8; // ??
+          case  1 : KEY("Gasboiler_Active_0");                             HACONFIG;                                                             VALUE_flag8; // not gasboiler/BUH?
           case  2 : KEY("DHW_Mode_OnOff");                                 HACONFIG;                                                             VALUE_flag8; // ??
 //          case  1 : KEY("DHWactive1");                                                                                                           VALUE_flag8;
                     default : UNKNOWN_BIT;
