@@ -1,3 +1,4 @@
+#define OLD_COMMANDS
 /* P1P2Monitor: monitor and control program for HBS such as P1/P2 bus on many Daikin systems.
  *              Reads the P1/P2 bus using the P1P2Serial library, and outputs raw hex data and verbose output over serial.
  *              A few additional parameters are added in raw hex data as so-called pseudo-packets (packet type 0x08 and 0x09).
@@ -148,7 +149,7 @@ const byte Compile_Options = 0 // multi-line statement
 #ifdef EEPROM_SUPPORT
 #include <EEPROM.h>
 void initEEPROM() {
-  if (verbose) Serial.println(F("* checking EEPROM"));
+  if (verbose) Serial.println(F("* EEPROM check"));
   bool sigMatch = 1;
   for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) sigMatch &= (EEPROM.read(EEPROM_ADDRESS_SIGNATURE + i) == EEPROM_SIGNATURE[i]);
   if (verbose) {
@@ -156,9 +157,9 @@ void initEEPROM() {
      Serial.println(sigMatch);
   }
   if (!sigMatch) {
-    if (verbose) Serial.println(F("* EEPROM sig mismatch, initializing EEPROM"));
+    if (verbose) Serial.println(F("* EEPROM init"));
     for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) EEPROM.update(EEPROM_ADDRESS_SIGNATURE + i, EEPROM_SIGNATURE[i]); // no '\0', not needed
-    EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID_DEFAULT); // Daikin specific
+    EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID_NONE); // Daikin specific
     EEPROM.update(EEPROM_ADDRESS_COUNTER_STATUS, COUNTERREPEATINGREQUEST); // Daikin specific
     EEPROM.update(EEPROM_ADDRESS_VERBOSITY, INIT_VERBOSE);
   }
@@ -176,7 +177,7 @@ static byte echo = INIT_ECHO;           // echo setting (whether written data is
 static byte allow = ALLOW_PAUSE_BETWEEN_BYTES;
 static byte scope = INIT_SCOPE;         // scope setting (to log timing info)
 #ifdef EF_SERIES
-static uint8_t CONTROL_ID = CONTROL_ID_DEFAULT;
+static uint8_t CONTROL_ID = CONTROL_ID_NONE;
 #endif /* EF_SERIES */
 static byte counterRequest = 0;
 static byte counterRepeatingRequest = 0;
@@ -184,6 +185,7 @@ static byte counterRepeatingRequest = 0;
 byte save_MCUSR;
 
 #ifdef E_SERIES
+#ifdef OLD_COMMANDS
 byte setRequestDHW = 0;
 byte setStatusDHW = 0;
 
@@ -198,6 +200,7 @@ uint16_t setValue36 = 0;
 uint16_t setParam3A = PARAM_SYS;
 byte setRequest3A = 0;
 byte setValue3A = 0;
+#endif /* OLD_COMMANDS */
 #endif /* E_SERIES */
 
 #ifdef EF_SERIES
@@ -243,8 +246,9 @@ static byte ATmegaHwID = 0;
 uint16_t testADC = 0;
 
 void printWelcomeString(void) {
-  Serial.println(F(WELCOMESTRING));
-  Serial.print(F("* Compiled "));
+  Serial.println("*");
+  Serial.print(F(WELCOMESTRING));
+  Serial.print(F(" compiled "));
   Serial.print(F(__DATE__));
   Serial.print(F(" "));
   Serial.print(F(__TIME__));
@@ -292,22 +296,24 @@ void printWelcomeString(void) {
 #ifdef EF_SERIES
   Serial.print(F("* Control_ID=0x"));
   Serial.println(CONTROL_ID, HEX);
-  Serial.print(F("* CONTROL_ID_DEFAULT=0x"));
-  Serial.println(CONTROL_ID_DEFAULT, HEX);
   Serial.print(F("* Counterrepeatingrequest="));
   Serial.println(counterRepeatingRequest);
+/*
   Serial.print(F("* F030DELAY="));
   Serial.println(F030DELAY);
   Serial.print(F("* F03XDELAY="));
   Serial.println(F03XDELAY);
+*/
 #endif /* EF_SERIES */
   Serial.print(F("* Verbosity="));
   Serial.println(verbose);
 // Initial parameters
+/*
   Serial.print(F("* CPU_SPEED="));
   Serial.println(F_CPU);
   Serial.print(F("* SERIALSPEED="));
   Serial.println(SERIALSPEED);
+*/
 #ifdef KLICDA
 #ifdef KLICDA_DELAY
   Serial.print(F("* KLICDA_DELAY="));
@@ -420,19 +426,20 @@ static byte suppressSerial = 0;
 
 #ifdef EF_SERIES
 void stopControlAndCounters() {
-          if (counterRepeatingRequest) Serial_println(F("* Switching counter request function off"));
-          if (CONTROL_ID) Serial_println(F("* Switching control functionality off"));
-          Serial_println(F("* Warning: Upon ATmega restart auxiliary controller functionality and counter request functionality will remain switched off"));
+          if (counterRepeatingRequest) Serial_println(F("* Switching counter request function off (also after ATmega reboot)"));
+          if (CONTROL_ID) Serial_println(F("* Switching control functionality off (also after ATmega reboot)"));
           CONTROL_ID = CONTROL_ID_NONE;
           counterRepeatingRequest = 0;
           counterRequest = 0;
           EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
           EEPROM_update(EEPROM_ADDRESS_COUNTER_STATUS, counterRepeatingRequest);
 #ifdef E_SERIES
+#ifdef OLD_COMMANDS
           setRequest35 = 0;
           setRequest36 = 0;
           setRequest3A = 0;
           setRequestDHW = 0;
+#endif /* OLD_COMMANDS */
 #endif /* E_SERIES */
           wr_cnt = 0;
 }
@@ -454,6 +461,7 @@ const uint32_t nr_params[PARAM_ARR_SZ] = { 0x014A, 0x002D, 0x0001, 0x001F, 0x00F
 
 void(* resetFunc) (void) = 0; // declare reset function at address 0
 
+int32_t upt = 0;
 static byte pseudo0D = 0;
 static byte pseudo0E = 0;
 static byte pseudo0F = 0;
@@ -461,10 +469,88 @@ static byte pseudo0F = 0;
 uint8_t scope_budget = 200;
 
 
+byte skipPackets = 10; // skip at most 10 initial packets with errors
 int8_t F_prev = -1;
 byte F_prevDet = 0;
 byte F_max = 0;
 byte div4 = 0;
+
+#define Serial_read(...) (suppressSerial ? -1 : Serial.read(__VA_ARGS__))
+#define Serial_print(...) if (!suppressSerial) Serial.print(__VA_ARGS__)
+#define Serial_println(...) if (!suppressSerial) Serial.println(__VA_ARGS__)
+
+#ifdef E_SERIES
+void writeParam(void) {
+/*
+  if (wr_cnt) {
+    // previous write still being processed
+    Serial_println(F("* Previous parameter write action still busy"));
+    return;
+  }
+*/
+  if ((wr_pt < PARAM_TP_START) || (wr_pt > PARAM_TP_END)) {
+    Serial_print(F("* wr_pt: 0x"));
+    Serial_print(wr_pt, HEX);
+    Serial_println(F(" not 0x35-0x3D"));
+    return;
+  }
+  if (wr_nr > nr_params[wr_pt - PARAM_TP_START]) {
+    Serial_print(F("* wr_nr > expected: 0x"));
+    Serial_println(wr_nr, HEX);
+    return;
+  }
+  uint8_t wr_nrb;
+  switch (wr_pt) {
+    case 0x35 : // fallthrough
+    case 0x3A : wr_nrb = 1; break;
+    case 0x36 : // fallthrough
+    case 0x3B : wr_nrb = 2; break;
+    case 0x37 : // fallthrough
+    case 0x3C : wr_nrb = 3; break;
+    case 0x38 : // fallthrough
+    case 0x39 : // fallthrough
+    case 0x3D : wr_nrb = 4; break;
+  }
+  if (wr_val >> (wr_nrb << 3)) {
+    Serial_print(F("* Parameter value too large for packet type; #bytes is "));
+    Serial_print(wr_nrb);
+    Serial_print(F(" value is "));
+    Serial_println(wr_val, HEX);
+    return;
+  }
+#ifdef OLD_COMMANDS
+  if ((wr_pt == 0x35) && (wr_nr == PARAM_DHW_ONOFF) && (setRequestDHW)) {
+    Serial_println(F("* Ignored DHW35_req"));
+    return;
+  }
+  if ((wr_pt == 0x35) && (wr_nr == setParam35) && (setRequest35)) {
+    Serial_println(F("* Ignored 35_req"));
+    return;
+  }
+  if ((wr_pt == 0x36) && (wr_nr == setParam36) && (setRequest36)) {
+    Serial_println(F("* Ignored 36_req"));
+    return;
+  }
+  if ((wr_pt == 0x3A) && (wr_nr == setParam3A) && (setRequest3A)) {
+    Serial_println(F("* Ignored 3A_req"));
+    return;
+  }
+#endif /* OLD_COMMANDS */
+  if (writePermission) {
+    if (writePermission != 0xFF) writePermission--;
+    wr_cnt = WR_CNT; // write repetitions, 1 should be enough
+    Serial_print(F("* Initiating parameter write for packet-type 0x"));
+    Serial_print(wr_pt, HEX);
+    Serial_print(F(" parameter nr 0x"));
+    Serial_print(wr_nr, HEX);
+    Serial_print(F(" to value 0x"));
+    Serial_print(wr_val, HEX);
+    Serial_println();
+  } else {
+    Serial_println(F("* Currently no write budget left"));
+  }
+}
+#endif /* E_SERIES */
 
 void loop() {
   uint16_t temp;
@@ -541,20 +627,22 @@ void loop() {
       *(RSp - 1) = '\0';
       if (c != '\n') {
         if (!reportedTooLong) {
-          Serial_print(F("* Line too long, ignored, ignoring remainder: ->"));
-          Serial_print(RS);
-          Serial_print(lst);
-          Serial_print(c);
-          Serial_println(F("<-"));
+          Serial_println(F("* Line too long, ignored"));
+          // Serial_print(F("* Line too long, ignored, ignoring remainder: ->"));
+          // Serial_print(RS);
+          // Serial_print(lst);
+          // Serial_print(c);
+          // Serial_println(F("<-"));
           // show full line, so not yet setting reportedTooLong = 1 here;
         }
         ignoreremainder = 1;
       } else {
         if (!reportedTooLong) {
-          Serial_print(F("* Line too long, terminated, ignored: ->"));
-          Serial_print(RS);
-          Serial_print(lst);
-          Serial_println(F("<-"));
+          Serial_println(F("* Line too long, terminated"));
+          // Serial_print(F("* Line too long, terminated, ignored: ->"));
+          // Serial_print(RS);
+          // Serial_print(lst);
+          // Serial_println(F("<-"));
           reportedTooLong = 1;
         }
         ignoreremainder = 0;
@@ -568,7 +656,8 @@ void loop() {
         *(--RSp) = '\0';
       }
       if (ignoreremainder == 2) {
-        Serial_print(F("* First line ignored: ->")); // TODO printing for debugging purposes, remove printing parts later
+/*
+        Serial_print(F("* First line ignored: ->"));
         if (rs < 10) {
           Serial_print(RS);
         } else {
@@ -577,11 +666,12 @@ void loop() {
           Serial_print("...");
         }
         Serial_println("<-");
+*/
         ignoreremainder = 0;
       } else if (ignoreremainder == 1) {
         if (!reportedTooLong) {
-          Serial_print(F("* Line too long, last part: ")); // TODO idem
-          Serial_println(RS);
+          // Serial_print(F("* Line too long, last part: "));
+          // Serial_println(RS);
           reportedTooLong = 1;
         }
         ignoreremainder = 0;
@@ -608,76 +698,17 @@ void loop() {
                       break;
 #ifdef E_SERIES
             case 'e':
-            case 'E':
-                      if (!CONTROL_ID) {
-                        Serial_println(F("* Command requires operation as auxiliary controller (L1)"));
+            case 'E': if (!CONTROL_ID) {
+                        Serial_println(F("* Requires L1"));
                         break;
                       }
                       if (wr_cnt) {
                         // previous write still being processed
                         Serial_println(F("* Previous parameter write action still busy"));
                         break;
-                      } else if ( (n = sscanf(RSp, (const char*) "%2x%4x%8lx", &wr_pt, &wr_nr, &wr_val)) == 3) {
-                        if ((wr_pt < PARAM_TP_START) || (wr_pt > PARAM_TP_END)) {
-                          Serial_print(F("* wr_pt: 0x"));
-                          Serial_print(wr_pt, HEX);
-                          Serial_println(F(" out of range 0x35-0x3D"));
-                          break;
-                        }
-                        if (wr_nr > nr_params[wr_pt - PARAM_TP_START]) {
-                          Serial_print(F("* wr_nr > expected: 0x"));
-                          Serial_println(wr_nr, HEX);
-                          break;
-                        }
-                        uint8_t wr_nrb;
-                        switch (wr_pt) {
-                          case 0x35 : // fallthrough
-                          case 0x3A : wr_nrb = 1; break;
-                          case 0x36 : // fallthrough
-                          case 0x3B : wr_nrb = 2; break;
-                          case 0x37 : // fallthrough
-                          case 0x3C : wr_nrb = 3; break;
-                          case 0x38 : // fallthrough
-                          case 0x39 : // fallthrough
-                          case 0x3D : wr_nrb = 4; break;
-                        }
-                        if (wr_val >> (wr_nrb << 3)) {
-                          Serial_print(F("* Parameter value too large for packet type; #bytes is "));
-                          Serial_print(wr_nrb);
-                          Serial_print(F(" value is "));
-                          Serial_println(wr_val, HEX);
-                          break;
-                        }
-                        if ((wr_pt == 0x35) && (wr_nr == PARAM_DHW_ONOFF) && (setRequestDHW)) {
-                          Serial_println(F("* Ignored - Writing to this parameter already pending by DHW35_request"));
-                          break;
-                        }
-                        if ((wr_pt == 0x35) && (wr_nr == setParam35) && (setRequest35)) {
-                          Serial_println(F("* Ignored - Writing to this parameter already pending by 35_request"));
-                          break;
-                        }
-                        if ((wr_pt == 0x36) && (wr_nr == setParam36) && (setRequest36)) {
-                          Serial_println(F("* Ignored - Writing to this parameter already pending by 36_request"));
-                          break;
-                        }
-                        if ((wr_pt == 0x3A) && (wr_nr == setParam3A) && (setRequest3A)) {
-                          Serial_println(F("* Ignored - Writing to this parameter already pending by 3A_request"));
-                          break;
-                        }
-                        if (writePermission) {
-                          if (writePermission != 0xFF) writePermission--;
-                          wr_cnt = WR_CNT; // write repetitions, 1 should be enough
-                          Serial_print(F("* Initiating parameter write for packet-type 0x"));
-                          Serial_print(wr_pt, HEX);
-                          Serial_print(F(" parameter nr 0x"));
-                          Serial_print(wr_nr, HEX);
-                          Serial_print(F(" to value 0x"));
-                          Serial_print(wr_val, HEX);
-                          Serial_println();
-                        } else {
-                          Serial_println(F("* Currently no write budget left"));
-                          break;
-                        }
+                      }
+                      if ( (n = sscanf(RSp, (const char*) "%2x%4x%8lx", &wr_pt, &wr_nr, &wr_val)) == 3) {
+                        writeParam();
                       } else {
                         Serial_print(F("* Ignoring instruction, expected 3 arguments, received: "));
                         Serial_print(n);
@@ -888,8 +919,12 @@ void loop() {
 #ifdef EF_SERIES
                       if (CONTROL_ID) {
                         // in L1/L5 mode, insert message in time allocated for 40F030 slot
-                        if (insertMessageCnt || restartDaikinCnt) {
-                          Serial_println(F("* insertMessage (or restartDaikin) already scheduled"));
+                        if (insertMessageCnt) {
+                          Serial_println(F("* insertMessage already scheduled"));
+                          break;
+                        }
+                        if (restartDaikinCnt) {
+                          Serial_println(F("* restartDaikin already scheduled"));
                           break;
                         }
                         if (verbose) Serial_print(F("* Writing next 40Fx30 slot: "));
@@ -977,7 +1012,7 @@ void loop() {
                         byte setMode = temp & 0x01;
                         if (setMode) {
                           if (errorsPermitted < MIN_ERRORS_PERMITTED) {
-                            Serial_println(F("* Errorspermitted (error budget) too low; control functionality cannot enabled"));
+                            Serial_println(F("* Errorspermitted (error budget) too low; control not enabled"));
                             break;
                           }
                           if (CONTROL_ID) {
@@ -987,7 +1022,7 @@ void loop() {
                             break;
                           }
                           if (FxAbsentCnt[0] == F0THRESHOLD) {
-                            Serial_println(F("* Control_ID 0xF0 supported, no auxiliary controller found for 0xF0, switching control functionality on 0xF0 on"));
+                            Serial_println(F("* Control_ID 0xF0 supported and free, starting auxiliary controller"));
                             CONTROL_ID = 0xF0;
                             controlLevel = (temp == 5) ? 0 : 1; // F-series: special mode L5 answers only to F030
                             if (temp < 2) EEPROM_update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID); // L2/L3/L5 for short experiments, doesn't survive ATmega reboot !
@@ -1010,10 +1045,12 @@ void loop() {
                           } else {
                             CONTROL_ID = 0x00;
 #ifdef E_SERIES
+#ifdef OLD_COMMANDS
                             setRequest35 = 0;
                             setRequest36 = 0;
                             setRequest3A = 0;
                             setRequestDHW = 0;
+#endif /* OLD_COMMANDS */
 #endif /* E_SERIES */
                             wr_cnt = 0;
                           }
@@ -1031,20 +1068,19 @@ void loop() {
                       break;
 #endif /* EF_SERIES */
 #ifdef E_SERIES
-      // TODO check for cannot-switch-L-on-yet and/or for (FxAbsentCnt[0] == F0THRESHOLD)
             case 'c': // set counterRequest cycle (once or repetitive)
             case 'C': if (scanint(RSp, temp) == 1) {
                         if (temp) {
-                          if (FxAbsentCnt[0] != F0THRESHOLD) {
-                            Serial_println(F("* Address 0xF0 not free for controller found (yet). Counter functionality not enabled"));
+                          if ((FxAbsentCnt[0] != F0THRESHOLD) && (FxAbsentCnt[1] != F0THRESHOLD) && (FxAbsentCnt[3] != F0THRESHOLD)) {
+                            Serial_println(F("* No free controller slot found (yet). Counter functionality cannot enabled"));
+                            break;
+                          }
+                          if (errorsPermitted < MIN_ERRORS_PERMITTED) {
+                            Serial_println(F("* Errorspermitted too low; counter functinality not enabled"));
                             break;
                           }
                         }
                         if (temp > 1) {
-                          if (errorsPermitted < MIN_ERRORS_PERMITTED) {
-                            Serial_println(F("* Errorspermitted too low; control functinality not enabled"));
-                            break;
-                          }
                           if (counterRepeatingRequest) {
                             Serial_println(F("* Repetitive requesting of counter values was already active"));
                             break;
@@ -1059,10 +1095,11 @@ void loop() {
                           }
                           if (counterRepeatingRequest) {
                             counterRepeatingRequest = 0;
+                            Serial_print(F("* Switching repetitive requesting of counters off, "));
                             if (counterRequest) {
-                              Serial_println(F("* Switching repetitive requesting of counters off, was still active, no new cycle iniated"));
+                              Serial_println(F("was still active, finish current cycle"));
                             } else {
-                              Serial_println(F("* Switching repetitive requesting of counters off, single counter cycle iniated"));
+                              Serial_println(F("and initiate single counter cycle"));
                               counterRequest = 1;
                             }
                           } else {
@@ -1086,6 +1123,7 @@ void loop() {
                         Serial_println(counterRequest);
                       }
                       break;
+#ifdef OLD_COMMANDS
             case 'p': // select F035-parameter to write in z step below (default PARAM_HC_ONOFF in P1P2Config.h)
             case 'P': if (verbose) Serial_print(F("* Param35-2Write "));
                       if (scanhex(RSp, temphex) == 1) {
@@ -1303,6 +1341,7 @@ void loop() {
                         Serial_println(F(": no DHW-write-request pending"));
                       }
                       break;
+#endif /* OLD_COMMANDS */
 #endif /* E_SERIES */
             default:  Serial_print(F("* Command not understood: "));
                       Serial_println(RSp - 1);
@@ -1353,6 +1392,11 @@ void loop() {
       if (errorsLargePacket < 0xFF) errorsLargePacket++;
     }
     for (int i = 0; i < nread; i++) readError |= EB[i];
+    if (!readError) skipPackets = 0;
+    if (skipPackets) {
+      skipPackets--;
+      break;
+    }
 #ifdef SW_SCOPE
 
 #if F_CPU > 8000000L
@@ -1535,7 +1579,7 @@ void loop() {
         }
       }
 #else /* KLICDA */
-      // check number of auxiliary controller slots (F_max), and how many already done in this cycle (F_max)
+      // check number of auxiliary controller slots (F_max), and how many already done in this cycle (F_prev)
       if ((RB[0] == 0x00) && ((RB[1] & 0xF0) == 0xF0) && (RB[2] == 0x30)) {
         byte auxCtrl = RB[1] & 0x03;
         if (F_prev < 0) {
@@ -1590,9 +1634,7 @@ void loop() {
         if ((delta < F03XDELAY - 2) && (delta < F030DELAY - 2)) {
           FxAbsentCnt[RB[1] & 0x03] = 0;
           if (RB[1] == CONTROL_ID) {
-            // this should only happen if another auxiliary controller is connected if/after CONTROL_ID is set, either because
-            //    -CONTROL_ID_DEFAULT is set (not recommended for that reason, TODO: remove) and conflicts with auxiliary controller, or
-            //    -because another auxiliary controller has been connected after CONTROL_ID has been manually set
+            // this should only happen if another auxiliary controller is connected if/after CONTROL_ID is set
             Serial_print(F("* Warning: another aux controller answering to address 0x"));
             Serial_print(RB[1], HEX);
             Serial_println(F(" detected"));
@@ -1660,12 +1702,14 @@ void loop() {
 #endif
                         // in: 17 byte; out: 17 byte; answer WB[7] should contain a 01 if we want to communicate a new setting in packet type 35
                         for (w = 3; w < n; w++) WB[w] = 0x00;
+#ifdef OLD_COMMANDS
                         // set byte WB[7] to 0x01 to request a F035 message to set Value35 and/or DHWstatus
                         if (setRequestDHW || setRequest35) WB[7] = 0x01;
                         // set byte WB[8] to 0x01 to request a F036 message to set setParam36 to Value36
                         if (setRequest36) WB[8] = 0x01;
                         // set byte WB[12] to 0x01 to request a F03A message to set setParam3A to Value3A
                         if (setRequest3A) WB[12] = 0x01;
+#endif /* OLD_COMMANDS */
                         // set byte WB[<wr_pt - 0x2E>] to 0x01 to request a F03x message to set wr_nr to wr_val
                         if (wr_cnt) WB[wr_pt - 0x2E] = 0x01;
                         d = F030DELAY;
@@ -1707,8 +1751,10 @@ void loop() {
                         // change bytes for triggering 35request
                         w = 3;
                         if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = (wr_val & 0xFF); wr_cnt--; wr_req = 1; Serial_println_ExecutingCommand('E'); }
+#ifdef OLD_COMMANDS
                         if (setRequestDHW) { WB[w++] = PARAM_DHW_ONOFF & 0xff; WB[w++] = PARAM_DHW_ONOFF >> 8; WB[w++] = setStatusDHW; setRequestDHW = 0; Serial_println_ExecutingCommand('Y'); }
                         if (setRequest35)  { WB[w++] = setParam35  & 0xff; WB[w++] = setParam35  >> 8; WB[w++] = setValue35;   setRequest35 = 0; Serial_println_ExecutingCommand('Z'); }
+#endif /* OLD_COMMANDS */
                         // feedback no longer supported:
                         // for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == setParam35) Value35 = RB[w+2];
                         // for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == PARAM_DHW_ONOFF) DHWstatus = RB[w+2];
@@ -1720,7 +1766,9 @@ void loop() {
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
                         if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = wr_val & 0xFF; WB[w++] = (wr_val >> 8) & 0xFF; wr_cnt--; wr_req = 1; Serial_println_ExecutingCommand('E'); }
+#ifdef OLD_COMMANDS
                         if (setRequest36) { WB[w++] = setParam36 & 0xff; WB[w++] = (setParam36 >> 8) & 0xff; WB[w++] = setValue36 & 0xff; WB[w++] = (setValue36 >> 8) & 0xff; setRequest36 = 0; Serial_println_ExecutingCommand('R'); }
+#endif /* OLD_COMMANDS */
                         // check if set36status has been changed by main controller; removed this part as it is not the most reliable confirmation method
                         // for (w = 3; w < n; w+=4) if (((RB[w+1] << 8) | RB[w]) == setParam36) Value36 = RB[w+2] | (RB[w+3] << 8);
                         wr = 1;
@@ -1758,7 +1806,9 @@ void loop() {
                         for (w = 3; w < n; w++) WB[w] = 0xFF;
                         w = 3;
                         if (wr_cnt && (wr_pt == RB[2])) { WB[w++] = wr_nr & 0xff; WB[w++] = wr_nr >> 8; WB[w++] = (wr_val & 0xFF); wr_cnt--; wr_req = 1; Serial_println_ExecutingCommand('E'); }
+#ifdef OLD_COMMANDS
                         if (setRequest3A)  { WB[w++] = setParam3A  & 0xff; WB[w++] = setParam3A  >> 8; WB[w++] = setValue3A;   setRequest3A = 0; Serial_println_ExecutingCommand('N'); }
+#endif /* OLD_COMMANDS */
                         // feedback no longer supported:
                         // for (w = 3; w < n; w+=3) if ((RB[w] | (RB[w+1] << 8)) == setParam3A) Value3A = RB[w+2];
                         wr = 1;
@@ -1995,8 +2045,8 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
 
 #ifdef ENABLE_INSERT_MESSAGE
     if ((insertMessageCnt == 0) && (RB[0] == 0x00) && (RB[1] == 0x00) && (RB[2] == RESTART_PACKET_TYPE)) {
-      for (int i = 0; i < nread; i++) insertMessage[i] = RB[i];
-      insertMessageLength = nread;
+      for (int i = 0; i < nread - 1; i++) insertMessage[i] = RB[i];
+      insertMessageLength = nread - 1;
       restartDaikinReady = 1;
     }
 #endif
@@ -2166,10 +2216,11 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
 #endif /* H_SERIES */
   }
 #ifdef PSEUDO_PACKETS
+  for (byte i = 0; i < 23; i++) WB[i] = 0x00;
   if (pseudo0D > 4) {
+    // WB[0]  = 0x00;
+    // WB[1]  = 0x00;
     pseudo0D = 0;
-    WB[0]  = 0x00;
-    WB[1]  = 0x00;
     WB[2]  = 0x0D;
     if (ATmegaHwID) {
       uint16_t V0_min;
@@ -2195,26 +2246,18 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
       WB[16] = (V1_avg >> 16) & 0xFF;
       WB[17] = (V1_avg >> 8) & 0xFF;
       WB[18] = V1_avg & 0xFF;
-    } else {
-      for (int i = 3; i <= 18; i++) WB[i]  = 0x00;
     }
 #ifdef EF_SERIES
     WB[19] = controlLevel;
     WB[20] = CONTROL_ID ? controlLevel : 0; // auxiliary control mode fully on; is 1 for control modes 1 and 3
     WB[21] = F_max;
-#else /* EF_SERIES */
-    WB[19] = 0x00;
-    WB[20] = 0x00;
-    WB[21] = 0x00;
 #endif /* EF_SERIES */
-    WB[22] = 0x00;
     if (!suppressSerial & (verbose < 4)) writePseudoPacket(WB, 23);
   }
-// TODO add F_max to pseudo
   if (pseudo0E > 4) {
     pseudo0E = 0;
-    WB[0]  = 0x00;
-    WB[1]  = 0x00;
+    // WB[0]  = 0x00;
+    // WB[1]  = 0x00;
     WB[2]  = 0x0E;
     WB[3]  = (upt >> 24) & 0xFF;
     WB[4]  = (upt >> 16) & 0xFF;
@@ -2237,24 +2280,14 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
     WB[20] = 0xFF & (wr_val >> 16);
     WB[21] = 0xFF & (wr_val >> 8);
     WB[22] = 0xFF & wr_val;
-    if (!suppressSerial & (verbose < 4)) writePseudoPacket(WB, 23);
-#else /* EF_SERIES */
-    WB[15] = 0x00;
-    WB[16] = 0x00;
-    WB[17] = 0x00;
-    WB[18] = 0x00;
-    WB[19] = 0x00;
-    WB[20] = 0x00;
-    WB[21] = 0x00;
-    WB[22] = 0x00;
-    if (verbose < 4) writePseudoPacket(WB, 23);
 #endif /* EF_SERIES */
+    if (!suppressSerial & (verbose < 4)) writePseudoPacket(WB, 23);
   }
   if (pseudo0F > 4) {
     bool sigMatch = 1;
     pseudo0F = 0;
-    WB[0]  = 0x00;
-    WB[1]  = 0x00;
+    // WB[0]  = 0x00;
+    // WB[1]  = 0x00;
     WB[2]  = 0x0F;
     WB[3]  = Compile_Options;
     WB[4]  = verbose;
@@ -2264,11 +2297,6 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
     WB[7]  = errorsPermitted;
     WB[8]  = (parameterWritesDone >> 8) & 0xFF;
     WB[9]  = parameterWritesDone & 0xFF;
-#else /* EF_SERIES */
-    WB[6]  = 0x00;
-    WB[7]  = 0x00;
-    WB[8]  = 0x00;
-    WB[9]  = 0x00;
 #endif /* EF_SERIES */
     WB[10] = (sd >> 8) & 0xFF;
     WB[11] = sd & 0xFF;
@@ -2278,30 +2306,19 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
 #ifdef EEPROM_SUPPORT
 #ifdef EF_SERIES
     WB[15] = EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
-#else /* EF_SERIES */
-    WB[15] = 0x00; // EEPROM.read(EEPROM_ADDRESS_CONTROL_ID);
 #endif /* EF_SERIES */
     WB[16] = EEPROM.read(EEPROM_ADDRESS_VERBOSITY);
 #ifdef EF_SERIES
     WB[17] = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
-#else /* EF_SERIES */
-    WB[17] = 0x00; // EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
 #endif /* EF_SERIES */
     for (uint8_t i = 0; i < strlen(EEPROM_SIGNATURE); i++) sigMatch &= (EEPROM.read(EEPROM_ADDRESS_SIGNATURE + i) == EEPROM_SIGNATURE[i]);
     WB[18] = sigMatch;
-#else /* EEPROM_SUPPORT */
-    WB[15] = 0x00;
-    WB[16] = 0x00;
-    WB[17] = 0x00;
-    WB[18] = 0x00;
 #endif /* EEPROM_SUPPORT */
     WB[19] = scope;
     WB[20] = readErrors;
     WB[21] = readErrorLast;
 #ifdef EF_SERIES
     WB[22] = CONTROL_ID;
-#else /* EF_SERIES */
-    WB[22] = 0x00;
 #endif /* EF_SERIES */
     if (!suppressSerial & (verbose < 4)) writePseudoPacket(WB, 23);
   }

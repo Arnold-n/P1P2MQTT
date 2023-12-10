@@ -50,6 +50,9 @@
 #if (defined E_SERIES || defined F_SERIES)
 #define EF_SERIES
 #define MONITORCONTROL   // enables P1P2 bus writing (as auxiliary controller and/or for requesting counters)
+#ifdef E_SERIES
+#define OLD_COMMANDS // still support commands like 'Z' until we run out of ATmega program memory
+#endif
 #endif /* (defined E_SERIES || defined F_SERIES) */
 
 #if (defined T_SERIES || defined H_SERIES)
@@ -103,9 +106,6 @@
 #define CONTROL_ID_NONE 0x00     // do not act as auxiliary controller
 #define CONTROL_ID_0    0xF0     // first auxiliary controller address
 #define CONTROL_ID_1    0xF1     // second auxiliary controller address
-#define CONTROL_ID_DEFAULT CONTROL_ID_NONE   // by default, P1P2Monitor passively monitors.
-                                             // If CONTROL_ID_DEFAULT is set to CONTROL_ID_0 (or _1) P1P2Monitor
-                                             // will start to act as an auxiliary controller if no other controller is detected.
 
 // EEPROM saves state of
 // -CONTROL_ID (whether P1P2Monitor acts as auxiliary controller, and which one) (not for H-link2)
@@ -173,7 +173,7 @@
 
 #define ENABLE_INSERT_MESSAGE // enables L99 to restart Daikin system and enables W command to insert messages in 40F030 (3x if ENABLE_INSERT_ME$SAGE_3x also defined) slot during L1 operation, use with care!
 #define ENABLE_INSERT_MESSAGE_3x // enables L99 to restart Daikin system and enables W command to insert messages in 40F03x slot during L1 operation, use with even more care!
-#define F030DELAY_INSERT 5    // Time delay for inserted message, should preferably be less than 7, but enough to transmit reliably
+#define F030DELAY_INSERT 25    // Time delay for inserted message; 25 seems OK, but if bus collisions occur, try 5
 #define RESTART_NR_MESSAGES 1 // nr of restart messages to be sent (should be 1, perhaps 2, not more)
 #define RESTART_PACKET_TYPE 0x12
 #define RESTART_PACKET_PAYLOAD_BYTE 12
