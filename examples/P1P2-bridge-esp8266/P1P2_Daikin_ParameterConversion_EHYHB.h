@@ -2264,15 +2264,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                   // we (ab)use this to communicate calculated power
                   // power produced by gas boiler / based on 4182 J/kg K, 1 kg/l
                   if (LWT_changed || MWT_changed || Flow_changed) {
-                    Power1 = (LWT - MWT) * Flow * 0.0697;
-                    KEY("Power_Gasboiler");
+                    Power1 = (LWT - MWT) * Flow * 69.7;
+                    KEY("Heat_Production_Gasboiler");
                     LWT_changed = 0;                                      HACONFIG; HAPOWER;
                     SRC(9);                                                                                                                      VALUE_F(Power1);
                   } else return 0;
         case  1 : // power produced by heat pump
                   if (RWT_changed || MWT_changed || Flow_changed) {
-                    Power2 = (MWT - RWT) * Flow * 0.0697;
-                    KEY("Power_Heatpump");
+                    Power2 = (MWT - RWT) * Flow * 69.7;
+                    KEY("Heat_Production_Heatpump");
                     RWT_changed = MWT_changed = Flow_changed = 0;
                     SRC(9);                                                HACONFIG; HAPOWER;                                                    VALUE_F(Power2);
                   } else return 0;
