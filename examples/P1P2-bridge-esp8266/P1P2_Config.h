@@ -5,6 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
+ * 20231223 v0.9.45 remove BINDATA, improve TZ
  * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
  * 20230702 v0.9.40 add NTP-based time stamps, add H-link2 decoding
  * 20230611 v0.9.38 H-link2 branch merge into main
@@ -121,9 +122,8 @@
 #define SERIALSPEED 115200
 #define DEBUG_OVER_SERIAL // send debugging output over serial (to be captured over USB)
 #define MQTT_INPUT_HEXDATA // use hex data from P1P2/R/xxx instead of serial input (for ESP01S_MQTT)
-//#define MQTT_INPUT_BINDATA // use raw data from P1P2/X/xxx instead of serial input (for ESP01S_MQTT)
-// if MQTT_INPUT_HEXDATA and/or MQTT_INPUT_BINDATA is defined, the serial input to the ESP (from ATmega) is ignored and data from either or both of
-// the defined R/X topics is used for processing (subject to (outputMode & 0x4000) and (outputMode & 0x8000) respectively):
+// if MQTT_INPUT_HEXDATA is defined, the serial input to the ESP (from ATmega) is ignored and data from
+// the defined R topics is used for processing (subject to (outputMode & 0x4000))
 // The 4th IPv4 byte of the topic to subscribe to can be set using 5th parameter in the 'B' command.
 // no ethernet, no ESP8266 BSP modification needed
 #undef INIT_ESP_HW_ID
@@ -181,7 +181,6 @@ char haPostfix[5] = "_xxx";
 // MQTT topics
 #define MQTT_KEY_PREFIXIP   7
 char mqttHexdata[11]     = "P1P2/R/xxx";
-char mqttBindata[11]     = "P1P2/X/xxx";
 char mqttSignal[11]      = "P1P2/S/xxx";
 char mqttCommands[11]    = "P1P2/W/xxx";
 char mqttCommandsNoIP[7] = "P1P2/W";
@@ -189,9 +188,6 @@ char mqttJsondata[11]    = "P1P2/J/xxx";
 char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
 #ifdef MQTT_INPUT_HEXDATA
 char mqttInputHexData[11]= "P1P2/R";  // default accepts input from any P1P2/R/#; can be changed to P1P2/R/xxx via 'B' command
-#endif
-#ifdef MQTT_INPUT_BINDATA
-char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#; can be changed to P1P2/X/xxx via 'B' command
 #endif
 #define MQTT_KEY_PREFIXCAT 11 // location in prefix for category identification
 #define MQTT_KEY_PREFIXSRC 13 // location in prefix for source identification
@@ -239,11 +235,11 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
                                // 0x0100 ESP to output raw data over serial
                                // 0x0200 to output mqtt individual parameter data over serial
                                // 0x0400 to output json data over serial
-                               // 0x0800 to output raw bin data over P1P2/X/xxx
+                               // 0x0800 (reserved)
                                // 0x1000 to output scope-mode output also over P1P2/R/xxx (prefix: C)
                                // 0x2000 to output error data also over P1P2/R/xxx (prefix: *)
                                // 0x4000 to use P1P2/R/xxx as input (requires MQTT_INPUT_HEXDATA)
-                               // 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)
+                               // 0x8000 (reserved)
                                // 0x10000 to include non-HACONFIG parameters in P1P2/P/#
                                // 0x20000 to include non-HACONFIG parameters in P1P2/P/#
                                // 0x40000 to restart ESP after MQTT reconnect
@@ -281,7 +277,7 @@ char mqttInputBinData[11]= "P1P2/X";  // default accepts input from any P1P2/X/#
 #else /* TH_SERIES */
 #define HB 65      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
 #endif /* TH_SERIES */
-#define MQTT_RB 1024 // size of ring buffer for MQTT_INPUT_HEXDATA/MQTT_INPUT_BINDATA
+#define MQTT_RB 1024 // size of ring buffer for MQTT_INPUT_HEXDATA
 
 #define REBOOT_REASON_NOTSTORED 0xFE
 #define REBOOT_REASON_NOTSUPPORTED 0xFF

@@ -112,15 +112,6 @@ P1P2/S122 * [ESP] Uptime 2
 ...
 ```
 
-#### P1P2/X/# (binary packet data)
-
-Example output:
-```
-P1P2/X/122 @�
-P1P2/X/122 @#��
-...
-```
-
 #### P1P2/J/# json channel
 
 Json data channel. Example output:
@@ -170,11 +161,11 @@ Commands to be executed by P1P2MQTT can be given over P1P2/W/\<xxx\> or via teln
   - 0x0100 ESP to output raw data over serial
   - 0x0200 to output mqtt individual parameter data over serial
   - 0x0400 to output json data over serial
-  - 0x0800 to output raw binary data over P1P2/X/#
+  - 0x0800 (reserved)
   - 0x1000 output timing data (if scope mode is set to 1) via P1P2/R/xxx (with prefixes C and c)
   - 0x2000 output packets with errors also over P1P2/R/xxx (with prefix \*)
   - 0x4000 to use P1P2/R/xxx as input instead of serial (requires MQTT_INPUT_HEXDATA)
-  - 0x8000 to use P1P2/X/xxx as input instead of serial (requires MQTT_INPUT_BINDAT)
+  - 0x8000 (reserved)
   - 0x10000 to include non-HACONFIG parameters in P1P2/P/#
 - "V" Display verbosity (and displays software version + compile date/time of both P1P2MQTT and P1P2Monitor)
 - "Vx" Sets verbosity (and displays software version + compile date/time of both P1P2MQTT and P1P2Monitor)  (for verbosity levels 0-4, see [P1P2Monitor-commands.md](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Monitor-commands.md); level 9: ESP8266 ignoring serial input (safe mode))

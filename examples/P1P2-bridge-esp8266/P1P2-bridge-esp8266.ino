@@ -17,6 +17,7 @@
  * ESP_Telnet 2.0.0 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
+ * 20231223 v0.9.45 remove BINDATA, improve TZ
  * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
  * 20230611 v0.9.38 H-link data support
  * 20230604 v0.9.37 support for P1P2MQTT bridge v1.2; separate hwID for ESP and ATmega
@@ -473,18 +474,6 @@ void onMqttConnect(bool sessionPresent) {
   printfSerial("Subscribed to %s with result %i", mqttCommandsNoIP, result);
   result = mqttClient.subscribe("homeassistant/status", MQTT_QOS);
   printfSerial("Subscribed to homeassistant/status with result %i", result);
-#ifdef MQTT_INPUT_BINDATA
-  //result = mqttClient.subscribe("P1P2/X/#", MQTT_QOS);
-  //printfSerial("Subscribed to X/# with result %i", result);
-  if (!mqttInputBinData[MQTT_KEY_PREFIXIP - 1]) {
-    mqttInputBinData[MQTT_KEY_PREFIXIP - 1] = '/';
-    mqttInputBinData[MQTT_KEY_PREFIXIP] = '#';
-    mqttInputBinData[MQTT_KEY_PREFIXIP + 1] = '\0';
-  }
-  result = mqttClient.subscribe(mqttInputBinData, MQTT_QOS);
-  printfSerial("Subscribed to %s with result %i", mqttInputBinData, result);
-  mqttInputBinData[MQTT_KEY_PREFIXIP - 1] = '\0';
-#endif
 #ifdef MQTT_INPUT_HEXDATA
   //result = mqttClient.subscribe("P1P2/R/#", MQTT_QOS);
   //printfSerial("Subscribed to R/# with result %i", result);
@@ -550,11 +539,11 @@ char MQTT_commandString[MAX_COMMAND_LENGTH + 1];
 bool telnetCommandReceived = false;
 char telnetCommandString[MAX_COMMAND_LENGTH];
 char readBuffer[RB];
-#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+#ifdef MQTT_INPUT_HEXDATA
 char MQTT_readBuffer[MQTT_RB];
 volatile uint16_t MQTT_readBufferH = 0;
 volatile uint16_t MQTT_readBufferT = 0;
-#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
+#endif /* MQTT_INPUT_HEXDATA */
 static char* rb_buffer = readBuffer;
 static uint16_t serial_rb = 0;
 static int c;
@@ -687,17 +676,6 @@ void handleCommand(char* cmdString) {
                   delay(1000);
                 }
               }
-#ifdef MQTT_INPUT_BINDATA
-              if (n > 4) {
-                mqttInputBinData[MQTT_KEY_PREFIXIP - 1] = mqttInputByte4 ? '/' : '\0';
-                mqttInputBinData[MQTT_KEY_PREFIXIP] = (EEPROM_state.EEPROMnew.mqttInputByte4 / 100) + '0';
-                mqttInputBinData[MQTT_KEY_PREFIXIP + 1] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 100) / 10 + '0';
-                mqttInputBinData[MQTT_KEY_PREFIXIP + 2] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 10) + '0';
-                printfTopicS("mqttInputBinData set to %s", mqttInputBinData);
-              } else {
-                printfTopicS("mqttInputBinData %s", mqttInputBinData);
-              }
-#endif
 #ifdef MQTT_INPUT_HEXDATA
               if (n > 4) {
                 mqttInputHexData[MQTT_KEY_PREFIXIP - 1] = mqttInputByte4 ? '/' : '\0';
@@ -833,11 +811,11 @@ void handleCommand(char* cmdString) {
                 printfTopicS("%ix 0x0100 ESP to output raw data over serial", (outputMode >> 8) & 0x01);
                 printfTopicS("%ix 0x0200 to output mqtt individual parameter data over serial", (outputMode >> 9) & 0x01);
                 printfTopicS("%ix 0x0400 to output json data over serial", (outputMode >> 10) & 0x01);
-                printfTopicS("%ix 0x0800 to output raw bin data over P1P2/X/xxx", (outputMode >> 11) & 0x01);
+                printfTopicS("%ix 0x0800 (reserved)", (outputMode >> 11) & 0x01);
                 printfTopicS("%ix 0x1000 to output timing data also over P1P2/R/xxx (prefix: C) and via telnet", (outputMode >> 12) & 0x01);
                 printfTopicS("%ix 0x2000 to output error data also over P1P2/R/xxx (prefix: *)", (outputMode >> 13) & 0x01);
                 printfTopicS("%ix 0x4000 to use P1P2/R/xxx as input (requires MQTT_INPUT_HEXDATA)", (outputMode >> 14) & 0x01);
-                printfTopicS("%ix 0x8000 to use P1P2/X/xxx as input (requires MQTT_INPUT_BINDATA)", (outputMode >> 15) & 0x01);
+                printfTopicS("%ix 0x8000 (reserved)", (outputMode >> 15) & 0x01);
                 printfTopicS("%ix 0x10000 to include non-HACONFIG parameters in P1P2/P/# ", (outputMode >> 16) & 0x01);
                 printfTopicS("%ix 0x20000 to add all pseudo parameters to HA in P1P2/P/# ", (outputMode >> 17) & 0x01);
                 printfTopicS("%ix 0x40000 to restart ESP after MQTT reconnect ", (outputMode >> 18) & 0x01);
@@ -954,7 +932,7 @@ static byte pseudo0D = 0;
 static byte pseudo0E = 0;
 static byte pseudo0F = 0;
 
-#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+#ifdef MQTT_INPUT_HEXDATA
 void MQTT_readBuffer_writeChar (const char c) {
   MQTT_readBuffer[MQTT_readBufferH] = c;
   if (++MQTT_readBufferH >= MQTT_RB) MQTT_readBufferH = 0;
@@ -1004,31 +982,6 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
       }
     }
   }
-#ifdef MQTT_INPUT_BINDATA
-  if ((!strcmp(topic, mqttInputBinData)) || (!mqttInputBinData[MQTT_KEY_PREFIXIP - 1]) && !strncmp(topic, mqttInputBinData, MQTT_KEY_PREFIXIP - 1)) {
-    // topic is either P1P2/X (or P1P2/X/xxx if xxx=mqttInputByte4 is defined)
-    if (index == 0) MQTT_drop = false;
-    if ((outputMode & 0x8000) && mqttSetupReady) {
-      uint16_t MQTT_readBufferH_new = MQTT_readBufferH + 3 + (total << 1); // 2 for "R ", 2 per byte, 1 for '\n'
-      if (((MQTT_readBufferH_new >= MQTT_RB)  && ((MQTT_readBufferT > MQTT_readBufferH) || (MQTT_readBufferT <= (MQTT_readBufferH_new - MQTT_RB)))) ||
-          ((MQTT_readBufferH_new  < MQTT_RB)  &&  (MQTT_readBufferT > MQTT_readBufferH) && (MQTT_readBufferT <= MQTT_readBufferH_new))) {
-        // buffer overrun
-        printfSerial("Mqtt packet input buffer overrun, dropped, index %i len %i total %i", index, len, total);
-        MQTT_drop = true;
-      } else if (!MQTT_drop) {
-        if (index == 0) {
-          MQTT_readBuffer_writeChar('R');
-          MQTT_readBuffer_writeChar(' ');
-        }
-        for (uint16_t i = 0; i < len; i++) MQTT_readBuffer_writeHex(payload[i]);
-        if (index + len == total) MQTT_readBuffer_writeChar('\n');
-      }
-    } else {
-      // ignore based on outputMode
-    }
-    return;
-  }
-#endif /* MQTT_INPUT_BINDATA */
 #ifdef MQTT_INPUT_HEXDATA
   if ((!strcmp(topic, mqttInputHexData)) || (!mqttInputHexData[MQTT_KEY_PREFIXIP - 1]) && !strncmp(topic, mqttInputHexData, MQTT_KEY_PREFIXIP - 1)) {
     // topic is either P1P2/R (or P1P2/R/xxx if xxx=mqttInputByte4 is defined)
@@ -1091,7 +1044,6 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
   }
   Serial_print(F("* [ESP] Unknown MQTT topic received: "));
   Serial_println(topic);
-  Serial_println(mqttControlHA);
 }
 
 #ifdef TELNET
@@ -1416,9 +1368,6 @@ void setup() {
   mqttHexdata[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
   mqttHexdata[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
   mqttHexdata[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
-  mqttBindata[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
-  mqttBindata[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
-  mqttBindata[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
   mqttJsondata[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
   mqttJsondata[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
   mqttJsondata[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
@@ -1496,14 +1445,6 @@ void setup() {
     }
   }
 
-#ifdef MQTT_INPUT_BINDATA
-  if (EEPROM_state.EEPROMnew.mqttInputByte4) {
-    mqttInputBinData[MQTT_KEY_PREFIXIP - 1] = '/';
-    mqttInputBinData[MQTT_KEY_PREFIXIP] = (EEPROM_state.EEPROMnew.mqttInputByte4 / 100) + '0';
-    mqttInputBinData[MQTT_KEY_PREFIXIP + 1] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 100) / 10 + '0';
-    mqttInputBinData[MQTT_KEY_PREFIXIP + 2] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 10) + '0';
-  }
-#endif
 #ifdef MQTT_INPUT_HEXDATA
   if (EEPROM_state.EEPROMnew.mqttInputByte4) {
     mqttInputHexData[MQTT_KEY_PREFIXIP - 1] = '/';
@@ -1767,15 +1708,12 @@ void writePseudoPacket(byte* WB, byte rh)
   }
   WB[rh] = crc;
   if (crc_gen) snprintf(pseudoWriteBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", crc);
-#if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
+#ifndef MQTT_INPUT_HEXDATA
   if (outputMode & 0x0001) clientPublishMqtt(mqttHexdata, pseudoWriteBuffer);
-#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
+#endif /* MQTT_INPUT_HEXDATA */
   if (outputMode & 0x0100) clientPublishSerial(mqttHexdata, pseudoWriteBuffer);
   pseudoWriteBuffer[22] = 'R';
   if (outputMode & 0x0010) clientPublishTelnet(mqttHexdata, pseudoWriteBuffer + 22);
-#if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
-  if ((outputMode & 0x0800) && (mqttConnected)) mqttClient.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) WB, rh + 1);
-#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
   if (outputMode & 0x0666) process_for_mqtt_json(WB, rh);
 }
 
@@ -1979,12 +1917,12 @@ void loop() {
     // ignore first line and too-long lines
     // readBuffer does not include '\n' but may include '\r' if Windows provides serial input
     // read serial input OR MQTT_readBuffer input until and including '\n', but do not store '\n'
-#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+#ifdef MQTT_INPUT_HEXDATA
     while (((c = MQTT_readBuffer_readChar()) >= 0) && (c != '\n') && (serial_rb < RB)) {
       *rb_buffer++ = (char) c;
       serial_rb++;
     }
-#else /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
+#else /* MQTT_INPUT_HEXDATA */
     if (!ignoreSerial) {
       while (((c = Serial.read()) >= 0) && (c != '\n') && (serial_rb < RB)) {
         *rb_buffer++ = (char) c;
@@ -2002,7 +1940,7 @@ void loop() {
     } else {
       c = -1;
     }
-#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
+#endif /* MQTT_INPUT_HEXDATA */
     // ((c == '\n' and serial_rb > 0))  and/or  serial_rb == RB)  or  c == -1
     if (c >= 0) {
       if ((c == '\n') && (serial_rb < RB)) {
@@ -2055,18 +1993,15 @@ void loop() {
               }
 // if (outputMode & ??) add timestring TODO to readBuffer
               if ((!crc_gen) || (crc == readHex[rh])) {
-#if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
+#ifndef MQTT_INPUT_HEXDATA
                 if (outputMode & 0x0001) clientPublishMqtt(mqttHexdata, readBuffer); // TODO
-#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
+#endif /* MQTT_INPUT_HEXDATA */
                 if (outputMode & 0x0100) clientPublishSerial(mqttHexdata, readBuffer); // TODO
 
                 readBuffer[22] = 'R';
                 if (outputMode & 0x0010) clientPublishTelnet(mqttHexdata, readBuffer + 22);
 
 
-#if !((defined MQTT_INPUT_BINDATA) || (defined MQTT_INPUT_HEXDATA))
-                if ((outputMode & 0x0800) && (mqttConnected)) mqttClient.publish((const char*) mqttBindata, MQTT_QOS, false, (const char*) readHex, rh + 1);
-#endif /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
                 if (outputMode & 0x0666) process_for_mqtt_json(readHex, rh);
 #ifdef PSEUDO_PACKETS
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0D)) pseudo0D = 9; // Insert pseudo packet 40000D in output serial after 00000D
@@ -2142,7 +2077,7 @@ void loop() {
       pseudo0D = 0;
       readHex[0] = 0x40;
       readHex[1] = 0x00;
-#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+#ifdef MQTT_INPUT_HEXDATA
       readHex[2] = 0x09;
 #else
       readHex[2] = 0x0D;
@@ -2173,7 +2108,7 @@ void loop() {
       pseudo0E = 0;
       readHex[0]  = 0x40;
       readHex[1]  = 0x00;
-#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+#ifdef MQTT_INPUT_HEXDATA
       readHex[2] = 0x0A;
 #else
       readHex[2] = 0x0E;
@@ -2204,7 +2139,7 @@ void loop() {
       pseudo0F = 0;
       readHex[0] = 0x40;
       readHex[1] = 0x00;
-#if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
+#ifdef MQTT_INPUT_HEXDATA
       readHex[2] = 0x0B;
 #else
       readHex[2] = 0x0F;

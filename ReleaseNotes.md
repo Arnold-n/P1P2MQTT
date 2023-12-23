@@ -3,6 +3,7 @@
 v0.9.45
 
 - USE_TZ option, centralize timestamp
+- remove bindata
 
 v0.9.44
 
