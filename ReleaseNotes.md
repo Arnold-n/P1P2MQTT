@@ -1,5 +1,9 @@
 **Release notes**
 
+v0.9.45
+
+- USE_TZ option, centralize timestamp
+
 v0.9.44
 
 - improves counter request mechanism

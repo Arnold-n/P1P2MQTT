@@ -58,7 +58,6 @@
 #include <ESP8266mDNS.h>
 #include <EEPROM.h>
 #include <time.h>
-#include <TZ.h>
 
 #ifdef WEBSERVER
 #include "P1P2_ESP8266HTTPUpdateServer/P1P2_ESP8266HTTPUpdateServer.h"
@@ -66,10 +65,16 @@ ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
 #endif /* WEBSERVER */
 
+#ifdef USE_TZ
+#include <TZ.h>
 //const char* MY_TZ[2] = {TZ_Europe_Amsterdam, TZ_Europe_London};
-const char* MY_TZ[2] = { "CET-1CEST,M3.5.0/02,M10.5.0/03"   , "GMT0BST,M3.5.0/1,M10.5.0" };
+const char* MY_TZ[2] = { "CET-1CEST,M3.5.0/02,M10.5.0/03"   , "GMT0BST,M3.5.0/1,M10.5.0" }; // TODO add other time zones
 time_t now;
 tm tm;
+#define PREFIX_LENGTH_TZ 29 // "* [ESP] date_time" total 29 bytes incl null
+#else
+#define PREFIX_LENGTH_TZ 9  // "* [ESP] " total 9 bytes incl null
+#endif /* USE_TZ */
 
 #ifdef AVRISP
 #include <SPI.h>
@@ -356,16 +361,21 @@ void clientPublishMqtt(char* key, char* value, bool retain = MQTT_RETAIN) {
     Mqtt_msgSkipNotConnected++;
   }
 }
+// timeString = sprint_value but addDate ensures we don't change it when not allowed
 
-#define PREFIX_LENGTH_TZ 29 // "* [ESP] date_time" total 29 bytes incl null
+char sprint_value[SPRINT_VALUE_LEN + PREFIX_LENGTH_TZ];
 
 void clientPublishTelnet(char* key, char* value, bool addDate = true) {
   if (telnetConnected) {
+#ifdef USE_TZ
     if (addDate) {
-      char timeString[PREFIX_LENGTH_TZ];
-      snprintf_P(timeString, PREFIX_LENGTH_TZ, PSTR("[ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-      telnet.print(timeString);
+      sprint_value[PREFIX_LENGTH_TZ - 1] = '\0';
+      telnet.print(sprint_value + 2);
     }
+#else /* USE_TZ */
+    // even if addDate is true, do not add date if USE_TZ is not defined
+    telnet.print("[ESP] ");
+#endif /* USE_TZ */
     if (key) {
       telnet.print(key);
       telnet.print(' ');
@@ -382,14 +392,12 @@ void clientPublishSerial(char* key, char* value) {
   Serial_println(value);
 }
 
-char sprint_value[SPRINT_VALUE_LEN + PREFIX_LENGTH_TZ];
 uint32_t Sprint_buffer_overflow = 0;
 
 // printfTopicS publishes string, always prefixed by NTP-date, via Mqtt topic P1P2/S, telnet, and/or serial, depending on connectivity (and TODO?: depending on j-mask setting)
 
 #define printfTopicS(formatstring, ...) { \
-  uint8_t slen = snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("* [ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);\
-  if (snprintf_P(sprint_value + slen, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
+  if (snprintf_P(sprint_value + PREFIX_LENGTH_TZ - 1, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
     Sprint_buffer_overflow++; \
   }; \
   clientPublishSerial(mqttSignal, sprint_value);\
@@ -398,8 +406,7 @@ uint32_t Sprint_buffer_overflow = 0;
 };
 
 #define printfTopicS_MON(formatstring, ...) { \
-  uint8_t slen = snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("* [MON] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);\
-  if (snprintf_P(sprint_value + slen, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
+  if (snprintf_P(sprint_value + PREFIX_LENGTH_TZ - 1, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
     Sprint_buffer_overflow++; \
   }; \
   clientPublishSerial(mqttSignal, sprint_value);\
@@ -410,8 +417,7 @@ uint32_t Sprint_buffer_overflow = 0;
 // printfSerial publishes only via serial (for OTA)
 
 #define printfSerial(formatstring, ...) { \
-  uint8_t slen = snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("** [ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);\
-  if (snprintf_P(sprint_value + slen, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
+  if (snprintf_P(sprint_value + PREFIX_LENGTH_TZ - 1, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
     Sprint_buffer_overflow++; \
   }; \
   clientPublishSerial(mqttSignal, sprint_value);\
@@ -1649,7 +1655,9 @@ void setup() {
   }
   delay(1000);
   mqttSetupReady = true;
+#ifdef USE_TZ
   configTime(MY_TZ[0], MY_NTP_SERVER);
+#endif /* USE_TZ */
   clientPublishMqtt("P1P2/Z", mqttSignal + MQTT_KEY_PREFIXIP);
 }
 
@@ -1722,7 +1730,11 @@ void process_for_mqtt_json(byte* rb, int n) {
 byte timeStamp = 30;
 
 #define MAXRH 23
+#ifdef USE_TZ
 #define PWB (23*2+36) // max pseudopacket 23 bytes (excl CRC byte), 33 bytes for timestamp-prefix, 1 byte for terminating null, 2 for CRC byte
+#else /* USE_TZ */
+#define PWB (23*2+16) // max pseudopacket 23 bytes (excl CRC byte), 13 bytes for prefix, 1 byte for terminating null, 2 for CRC byte
+#endif /* USE_TZ */
 
 void writePseudoPacket(byte* WB, byte rh)
 // rh is pseudo packet size (without CRC byte)
@@ -1732,7 +1744,18 @@ void writePseudoPacket(byte* WB, byte rh)
     printfTopicS("rh > %i", MAXRH);
     return;
   }
-  snprintf_P(pseudoWriteBuffer, 33, PSTR("R %04i-%02i-%02i_%02i:%02i:%02i P         "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec); // TODO ??? TZ ????
+//#ifdef USE_TZ
+  // snprintf_P(pseudoWriteBuffer, 33, PSTR("R %04i-%02i-%02i_%02i:%02i:%02i P         "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+  sprint_value[PREFIX_LENGTH_TZ - 1] = '\0';
+  snprintf_P(pseudoWriteBuffer, 33, PSTR("R%sP         "), sprint_value + 7);
+
+// 0 2 4 6 8
+// * [ESP] nill
+// * [ESP] 00:00:00-1900:00:00 nill
+
+// #else /* USE_TZ */
+//   snprintf_P(pseudoWriteBuffer, 13, PSTR("R P         "));
+// #endif /* USE_TZ */
   uint8_t crc = crc_feed;
   for (uint8_t i = 0; i < rh; i++) {
     uint8_t c = WB[i];
@@ -1764,8 +1787,13 @@ void loop() {
   // OTA
   ArduinoOTA.handle();
 
+#ifdef USE_TZ
   time(&now);
   localtime_r(&now, &tm);
+  snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("* [ESP] %04i-%02i-%02i_%02i:%02i:%02i "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+#else
+  snprintf_P(sprint_value, PREFIX_LENGTH_TZ, PSTR("* [ESP] "));
+#endif /* USE_TZ */
 
 #ifdef WEBSERVER
   httpServer.handleClient();
@@ -1954,26 +1982,21 @@ void loop() {
 #if defined MQTT_INPUT_BINDATA || defined MQTT_INPUT_HEXDATA
     while (((c = MQTT_readBuffer_readChar()) >= 0) && (c != '\n') && (serial_rb < RB)) {
       *rb_buffer++ = (char) c;
-      if (!serial_rb) {
-        if (c == 'R') {
-          snprintf_P(&readBuffer[1], 21, PSTR(" %04i-%02i-%02i_%02i:%02i:%02i"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-          serial_rb += 20;
-          rb_buffer += 20;
-        }
-      }
       serial_rb++;
     }
 #else /* MQTT_INPUT_BINDATA || MQTT_INPUT_HEXDATA */
     if (!ignoreSerial) {
       while (((c = Serial.read()) >= 0) && (c != '\n') && (serial_rb < RB)) {
         *rb_buffer++ = (char) c;
+#ifdef USE_TZ
         if (!serial_rb) {
           if ((c == 'R') || (c == 'C') || (c == 'c')) {
-            snprintf_P(&readBuffer[1], 21, PSTR(" %04i-%02i-%02i_%02i:%02i:%02i"), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+            strlcpy(readBuffer + 1, sprint_value + 7, 20);
             serial_rb += 20;
             rb_buffer += 20;
           }
         }
+#endif /* USE_TZ */
         serial_rb++;
       }
     } else {

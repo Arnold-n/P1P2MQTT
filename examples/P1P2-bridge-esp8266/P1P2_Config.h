@@ -82,6 +82,8 @@
 
 // Other options below should be OK
 
+#define USE_TZ // undefine USE_TZ to prevent NTP server calls
+
 // if ethernet adapter is detected, but does not connect (no cable/other issue), time-out in seconds until fall-back to WiFi (if NoWiFi = 0) or until restart (if NoWiFi = 1)
 #define ETHERNET_CONNECTION_TIMEOUT 60
 
