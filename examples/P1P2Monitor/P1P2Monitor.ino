@@ -38,6 +38,7 @@
  * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20231223 v0.9.45 remove unneeded GH commands
  * 20230604 v0.9.38 H-link2 support added to main branch
  * 20230604 v0.9.37 support for ATmega serial enable/disable via PD4, required for P1P2MQTT bridge v1.2
  * 20230108 v0.9.31 fix nr_param check
@@ -412,24 +413,21 @@ int scanhex(char* s, uint16_t &b) {
   return sscanf(s,"%4x",&b);
 }
 
-static byte crc_gen = CRC_GEN;
-static byte crc_feed = CRC_FEED;
-
 void writePseudoPacket(byte* WB, byte rh)
 {
   if (verbose) Serial.print(F("R "));
   if (verbose & 0x01) Serial.print(F("P         "));
-  uint8_t crc = crc_feed;
+  uint8_t crc = CRC_FEED;
   for (uint8_t i = 0; i < rh; i++) {
     uint8_t c = WB[i];
     if (c <= 0x0F) Serial.print('0');
     Serial.print(c, HEX);
-    if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
-      crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
+    if (CRC_GEN != 0) for (uint8_t i = 0; i < 8; i++) {
+      crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ CRC_GEN) : (crc >> 1));
       c >>= 1;
     }
   }
-  if (crc_gen) {
+  if (CRC_GEN) {
     if (crc <= 0x0F) Serial.print('0');
     Serial.print(crc, HEX);
   }
@@ -850,28 +848,6 @@ void loop() {
                       }
                       break;
 #endif /* F_SERIES */
-            case 'g':
-            case 'G': if (verbose) Serial_print(F("* Crc_gen "));
-                      if (scanhex(RSp, temphex) == 1) {
-                        crc_gen = temphex;
-                        if (!verbose) break;
-                        Serial_print(F("set to "));
-                      }
-                      Serial_print(F("0x"));
-                      if (crc_gen <= 0x0F) Serial_print('0');
-                      Serial_println(crc_gen, HEX);
-                      break;
-            case 'h':
-            case 'H': if (verbose) Serial_print(F("* Crc_feed "));
-                      if (scanhex(RSp, temphex) == 1) {
-                        crc_feed = temphex;
-                        if (!verbose) break;
-                        Serial_print(F("set to "));
-                      }
-                      Serial_print(F("0x"));
-                      if (crc_feed <= 0x0F) Serial_print('0');
-                      Serial_println(crc_feed, HEX);
-                      break;
             case 'v':
             case 'V': Serial_print(F("* Verbose "));
                       if (scanint(RSp, temp) == 1) {
@@ -991,7 +967,7 @@ void loop() {
                       if (verbose) Serial_println();
                       if (P1P2Serial.writeready()) {
                         if (wb) {
-                          P1P2Serial.writepacket(WB, wb, sd, crc_gen, crc_feed);
+                          P1P2Serial.writepacket(WB, wb, sd, CRC_GEN, CRC_FEED);
                         } else {
                           Serial_println(F("* Refusing to write empty packet"));
                         }
@@ -1489,7 +1465,7 @@ void loop() {
   while (P1P2Serial.packetavailable()) {
     uint16_t delta;
     errorbuf_t readError = 0;
-    int nread = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, crc_gen, crc_feed);
+    int nread = P1P2Serial.readpacket(RB, delta, EB, RB_SIZE, CRC_GEN, CRC_FEED);
     if (nread > RB_SIZE) {
       Serial_println(F("* Received packet longer than RB_SIZE"));
       nread = RB_SIZE;
@@ -1675,7 +1651,7 @@ void loop() {
             //      in which case the 4000B* reply arrives after the 000013* request
             //      (and in thoses cases the 000013* request is ignored)
             //      (NOTE!: if KLICDA_DELAY is chosen incorrectly, such as 5 ms in some example systems, this results in incidental bus collisions)
-            P1P2Serial.writepacket(WB, 4, KLICDA_DELAY, crc_gen, crc_feed);
+            P1P2Serial.writepacket(WB, 4, KLICDA_DELAY, CRC_GEN, CRC_FEED);
           } else {
             Serial_println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
             if (writeRefused < 0xFF) writeRefused++;
@@ -1722,7 +1698,7 @@ void loop() {
           WB[3] = (counterRequest - 1);
           F030forcounter = true;
           if (P1P2Serial.writeready()) {
-            P1P2Serial.writepacket(WB, 4, F03XDELAY, crc_gen, crc_feed);
+            P1P2Serial.writepacket(WB, 4, F03XDELAY, CRC_GEN, CRC_FEED);
           } else {
             Serial_println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
             if (writeRefused < 0xFF) writeRefused++;
@@ -1831,7 +1807,7 @@ void loop() {
           int d = F03XDELAY;
           bool wr = 0;
           byte w;
-          if (crc_gen) n--; // omit CRC from received-byte-counter
+          if (CRC_GEN) n--; // omit CRC from received-byte-counter
           if (n > WB_SIZE) {
             n = WB_SIZE;
             Serial_print(F("* Surprise: received 00Fx3x packet of size "));
@@ -2216,7 +2192,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
           }
           if (wr) {
             if (P1P2Serial.writeready()) {
-              P1P2Serial.writepacket(WB, n, d, crc_gen, crc_feed);
+              P1P2Serial.writepacket(WB, n, d, CRC_GEN, CRC_FEED);
               parameterWritesDone += wr_req;
               wr_req = 0;
             } else {
@@ -2327,7 +2303,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
         }
 #endif /* GENERATE_FAKE_ERRORS */
         byte c = RB[i];
-        if (crc_gen && (verbose == 1) && (i == nread - 1)) {
+        if (CRC_GEN && (verbose == 1) && (i == nread - 1)) {
           Serial_print(F(" CRC="));
         }
         if (c < 0x10) Serial_print('0');
@@ -2390,7 +2366,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
       if (verbose < 4) {
         for (int i = 0; i < nread; i++) {
           byte c = RB[i];
-          if (crc_gen && (verbose == 1) && (i == nread - 1)) {
+          if (CRC_GEN && (verbose == 1) && (i == nread - 1)) {
             Serial_print(F(" CRC="));
           }
           if (c < 0x10) Serial_print(F("0"));

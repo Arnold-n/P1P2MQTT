@@ -4,6 +4,7 @@ v0.9.45
 
 - USE_TZ option, centralize timestamp
 - remove bindata
+- CRC commands G/H removed
 
 v0.9.44
 

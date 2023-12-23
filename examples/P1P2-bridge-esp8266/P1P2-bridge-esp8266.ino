@@ -228,8 +228,6 @@ AsyncMqttClient mqttClient;
 uint32_t maxLoopTime = 0;
 long int espUptime=0;
 bool shouldSaveConfig = false;
-static byte crc_gen = CRC_GEN;
-static byte crc_feed = CRC_FEED;
 
 #if defined AVRISP || defined WEBSERVER
 const char* P1P2_host = "P1P2";
@@ -845,11 +843,7 @@ void handleCommand(char* cmdString) {
     case '\0':break;
     case '*': break;
     case 'v':
-    case 'V':
-    case 'g':
-    case 'G':
-    case 'h':
-    case 'H': // commands v/g/h handled both by P1P2-bridge-esp8266 and P1P2Monitor
+    case 'V': // command v handled both by P1P2-bridge-esp8266 and P1P2Monitor
               switch (cmdString[0]) {
                 case 'v':
                 case 'V': printfTopicS(WELCOMESTRING);
@@ -895,26 +889,13 @@ void handleCommand(char* cmdString) {
                             }
                           }
                           break;
-                case 'g':
-                case 'G': if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
-                            crc_gen = temphex;
-                            printfTopicS("CRC_gen set to 0x%02X", crc_gen);
-                          } else {
-                            printfTopicS("CRC_gen 0x%02X", crc_gen);
-                          }
-                          break;
-                case 'h':
-                case 'H': if (sscanf((const char*) (cmdString + 1), "%2x", &temphex) == 1) {
-                            crc_feed = temphex;
-                            printfTopicS("CRC_feed set to 0x%02X", crc_feed);
-                          } else {
-                            printfTopicS("CRC_feed 0x%02X", crc_feed);
-                          }
-                          break;
                 default : break;
               }
               // fallthrough for v/g/h commands handled both by P1P2-bridge-esp8266 and P1P2Monitor
-              // 'c' 'C' 'p' 'P' 'e' 'E' 'f' 'F' 't' 'T" 'o' 'O" 'u' 'U" 'x' 'X" 'w' 'W" 'k' 'K' 'l' 'L' 'q' 'Q' 'm' 'M' 'z' 'Z' 'r' 'R' 'n' 'N' 'y' 'Y' handled by P1P2Monitor (except for 'f' 'F" for H-link)
+              // character usage:
+              // ESP A B  D      G H I J                 S     V
+              // MON     C   E F . .     K L M   O         T U V W X      (M only for E-series)
+              // OLD                         M N   P Q R             Y Z  (M only for F-series)
     default : // printfTopicS("To ATmega: ->%s<-", cmdString);
               Serial.print(F(SERIAL_MAGICSTRING));
               Serial.println((char *) cmdString);
@@ -1697,17 +1678,17 @@ void writePseudoPacket(byte* WB, byte rh)
 // #else /* USE_TZ */
 //   snprintf_P(pseudoWriteBuffer, 13, PSTR("R P         "));
 // #endif /* USE_TZ */
-  uint8_t crc = crc_feed;
+  uint8_t crc = CRC_FEED;
   for (uint8_t i = 0; i < rh; i++) {
     uint8_t c = WB[i];
     snprintf(pseudoWriteBuffer + 2 + timeStamp + (i << 1), 3, "%02X", c);
-    if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
-      crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
+    if (CRC_GEN != 0) for (uint8_t i = 0; i < 8; i++) {
+      crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ CRC_GEN) : (crc >> 1));
       c >>= 1;
     }
   }
   WB[rh] = crc;
-  if (crc_gen) snprintf(pseudoWriteBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", crc);
+  if (CRC_GEN) snprintf(pseudoWriteBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", crc);
 #ifndef MQTT_INPUT_HEXDATA
   if (outputMode & 0x0001) clientPublishMqtt(mqttHexdata, pseudoWriteBuffer);
 #endif /* MQTT_INPUT_HEXDATA */
@@ -1980,19 +1961,19 @@ void loop() {
               printfTopicS("Unexpected input buffer full/overflow, received %i, ignoring remainder", rh);
               rh = RB;
             }
-            if ((rh > 1) || (rh == 1) && !crc_gen) {
-              if (crc_gen) rh--;
+            if ((rh > 1) || (rh == 1) && !CRC_GEN) {
+              if (CRC_GEN) rh--;
               // rh is packet length (not counting CRC byte readHex[rh])
-              uint8_t crc = crc_feed;
+              uint8_t crc = CRC_FEED;
               for (uint8_t i = 0; i < rh; i++) {
                 uint8_t c = readHex[i];
-                if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
-                  crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
+                if (CRC_GEN != 0) for (uint8_t i = 0; i < 8; i++) {
+                  crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ CRC_GEN) : (crc >> 1));
                   c >>= 1;
                 }
               }
 // if (outputMode & ??) add timestring TODO to readBuffer
-              if ((!crc_gen) || (crc == readHex[rh])) {
+              if ((!CRC_GEN) || (crc == readHex[rh])) {
 #ifndef MQTT_INPUT_HEXDATA
                 if (outputMode & 0x0001) clientPublishMqtt(mqttHexdata, readBuffer); // TODO
 #endif /* MQTT_INPUT_HEXDATA */

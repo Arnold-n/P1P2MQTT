@@ -97,13 +97,16 @@ Commands for raw data writing to the bus (only for reverse engineering purposes)
 - O  display current delaytimeout value, and
 - Ox sets new delay timeout value in ms, to be used immediately (default 2500).
 
-## Miscellaneous
+## Miscellaneous commands:
 
 Supported but advised not to use, not really needed (some may be removed in a future version):
-- G  display current crc_gen value,
-- Gx sets crc_gen (default 0xD9) (we have not seen any other values so no need to change),
-- H  display current crc_feed value,
-- Hx sets crc_feed (default 0x00) (we have not seen any other values so no need to change),
 - X  display current echo status (determines whether bytes written will be echoed on the serial line, and also whether bus errors will be detected during writing),
 - Xx sets echo status on/off (recommended to keep on to detect bus errors), and
 - K instruct ATmega328P to reset itself.
+
+## Removed commands:
+
+- G  display current crc_gen value,
+- Gx sets crc_gen (default 0xD9) (we have not seen any other values so no need to change),
+- H  display current crc_feed value,
+- Hx sets crc_feed (default 0x00) (we have not seen any other values so no need to change).

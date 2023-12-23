@@ -172,20 +172,19 @@ Commands to be executed by P1P2MQTT can be given over P1P2/W/\<xxx\> or via teln
 - "U" Display scope mode (0 off, 1 on)
 - "Ux" Sets scope mode (0 off (default), 1 on)
 
-Further, supported but advised not to use, and not really needed (some may be removed in a future version); these commands are handled by both CPUs:
-- "G"  Display current crc_gen value
-- "Gx" Sets crc_gen (default 0xD9) (we have not seen any other values so no need to change)
-- "H"  Display current crc_feed value
-- "Hx" Sets crc_feed (default 0x00) (we have not seen any other values so no need to change)
-
 No longer supported:
 - "Ux" Display-unknown mode on/off, replaced by 0x0008 contribution in J command
 - "U"  Display display-unknown mode
 - ("U"  command is now used to switch scope-mode in P1P2Monitor)
+- "G"  Display current crc_gen value
+- "Gx" Sets crc_gen (default 0xD9) (we have not seen any other values so no need to change)
+- "H"  Display current crc_feed value
+- "Hx" Sets crc_feed (default 0x00) (we have not seen any other values so no need to change)
+- ('H' command will be used to set bridge name and HA device name)
 
 #### P1P2Monitor commands (forwarded by P1P2MQTT)
 
-All other commands received by P1P2MQTT (as well as the CRC-related G and H commands) are forwarded to P1P2Monitor on the ATmega328P. A full list of commands supported by P1P2Monitor is specified [here](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Monitor-commands.md) but in practice you will only need the following ones:
+All other commands received by P1P2MQTT are forwarded to P1P2Monitor on the ATmega328P. A full list of commands supported by P1P2Monitor is specified [here](https://github.com/Arnold-n/P1P2Serial/blob/main/P1P2Monitor-commands.md) but in practice you will only need the following ones:
  - "L1" to start auxiliary controller ("L" state info maintained in EEPROM)
  - "L0" to stop auxiliary controller
  - "C2" to start requesting counters ("C" state info maintained in EEPROM)
