@@ -105,7 +105,7 @@ typedef struct EEPROMSettingsOld {
   int  mqttPort;
 };
 
-#define NR_RESERVED 46
+#define NR_RESERVED 13
 
 typedef struct EEPROMSettingsNew {
   // EEPROM values for EEPROM_SIGNATURE_OLD2
@@ -128,7 +128,10 @@ typedef struct EEPROMSettingsNew {
   char static_gw[16];
   char static_nm[16];
   byte useSensorPrefixHA;
+  char bridgeName[16];
+  char deviceName[16];
   byte reserved[NR_RESERVED];
+  byte useBridgeName;
 };
 
 union EEPROMSettingsUnion {
@@ -258,6 +261,8 @@ const byte Compile_Options = 0 // multi-line statement
 ;
 
 bool telnetConnected = false;
+char bridgeName[16];
+byte bridgeNameLength;
 
 #ifdef TELNET
 ESPTelnet telnet;
@@ -362,7 +367,11 @@ void clientPublishMqtt(char* key, char* value, bool retain = MQTT_RETAIN) {
 }
 // timeString = sprint_value but addDate ensures we don't change it when not allowed
 
-char sprint_value[SPRINT_VALUE_LEN + PREFIX_LENGTH_TZ];
+#ifdef USE_TZ
+char sprint_value[SPRINT_VALUE_LEN + PREFIX_LENGTH_TZ] = "* [ESP]                     ";
+#else /* USE_TZ */
+char sprint_value[SPRINT_VALUE_LEN + PREFIX_LENGTH_TZ] = "* [ESP] ";
+#endif /* USE_TZ */
 
 void clientPublishTelnet(char* key, char* value, bool addDate = true) {
   if (telnetConnected) {
@@ -405,12 +414,14 @@ uint32_t Sprint_buffer_overflow = 0;
 };
 
 #define printfTopicS_MON(formatstring, ...) { \
+  strncpy(sprint_value + 3, "MON", 3);\
   if (snprintf_P(sprint_value + PREFIX_LENGTH_TZ - 1, SPRINT_VALUE_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__) > SPRINT_VALUE_LEN - 2) { \
     Sprint_buffer_overflow++; \
   }; \
   clientPublishSerial(mqttSignal, sprint_value);\
   clientPublishMqtt(mqttSignal, sprint_value);\
   clientPublishTelnet(0, sprint_value + 2, false);\
+  strncpy(sprint_value + 3, "ESP", 3);\
 };
 
 // printfSerial publishes only via serial (for OTA)
@@ -475,14 +486,14 @@ void onMqttConnect(bool sessionPresent) {
 #ifdef MQTT_INPUT_HEXDATA
   //result = mqttClient.subscribe("P1P2/R/#", MQTT_QOS);
   //printfSerial("Subscribed to R/# with result %i", result);
-  if (!mqttInputHexData[MQTT_KEY_PREFIXIP - 1]) {
-    mqttInputHexData[MQTT_KEY_PREFIXIP - 1] = '/';
-    mqttInputHexData[MQTT_KEY_PREFIXIP] = '#';
-    mqttInputHexData[MQTT_KEY_PREFIXIP + 1] = '\0';
+  if (!mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC - 1]) {
+    mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC - 1] = '/';
+    mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC] = '#';
+    mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC + 1] = '\0';
   }
   result = mqttClient.subscribe(mqttInputHexData, MQTT_QOS);
   printfSerial("Subscribed to %s with result %i", mqttInputHexData, result);
-  mqttInputHexData[MQTT_KEY_PREFIXIP - 1] = '\0';
+  mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC - 1] = '\0';
 #endif
   mqttConnected = true;
 }
@@ -552,6 +563,8 @@ static uint32_t ATmega_uptime_prev = 0;
 static byte saveRebootReason = REBOOT_REASON_UNKNOWN;
 
 WiFiManager wifiManager;
+IPAddress local_ip;
+char IPv4String[16] = "\0";
 
 void handleCommand(char* cmdString) {
 // handles a single command (not necessarily '\n'-terminated) received via telnet or MQTT (P1P2/W)
@@ -567,16 +580,6 @@ void handleCommand(char* cmdString) {
   int mqttInputByte4 = 0;
   int n;
   int result = 0;
-  IPAddress local_ip;
-#ifdef ETHERNET
-  if (ethernetConnected) {
-    local_ip = eth.localIP();
-  } else {
-#else
-  {
-#endif
-    local_ip = WiFi.localIP();
-  }
   switch (cmdString[0]) {
     case 'a': // reset ATmega
     case 'A': printfTopicS("Hard resetting ATmega...");
@@ -663,7 +666,7 @@ void handleCommand(char* cmdString) {
                 ESP.restart();
                 delay(100);
               }
-              printfTopicS("Local IP address: %i.%i.%i.%i", local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+              printfTopicS("Local IP address: %s", IPv4String);
               // TODO enable in future WiFiManager version: if (WiFi.isConnected()) printfTopicS("Connected to WiFi SSID %s", wifiManager.getWiFiSSID());
               // printfTopicS("Pass of AP is %s", wifiManager.getWiFiPass());
               if (n > 0) {
@@ -676,10 +679,10 @@ void handleCommand(char* cmdString) {
               }
 #ifdef MQTT_INPUT_HEXDATA
               if (n > 4) {
-                mqttInputHexData[MQTT_KEY_PREFIXIP - 1] = mqttInputByte4 ? '/' : '\0';
-                mqttInputHexData[MQTT_KEY_PREFIXIP] = (EEPROM_state.EEPROMnew.mqttInputByte4 / 100) + '0';
-                mqttInputHexData[MQTT_KEY_PREFIXIP + 1] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 100) / 10 + '0';
-                mqttInputHexData[MQTT_KEY_PREFIXIP + 2] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 10) + '0';
+                mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC - 1] = mqttInputByte4 ? '/' : '\0';
+                mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC] = (EEPROM_state.EEPROMnew.mqttInputByte4 / 100) + '0';
+                mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC + 1] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 100) / 10 + '0';
+                mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC + 2] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 10) + '0';
                 printfTopicS("mqttInputHexData set to %s", mqttInputHexData);
               } else {
                 printfTopicS("mqttInputHexData %s", mqttInputHexData);
@@ -780,6 +783,40 @@ void handleCommand(char* cmdString) {
               } else {
                 printfTopicS("static IPv4 netmask is %s", EEPROM_state.EEPROMnew.static_nm);
               }
+              // TODO check for valid IP ?
+              if (n > 0) {
+                printfTopicS("Restart required to use new settings");
+                delay(500);
+                ESP.restart();
+                delay(100);
+              }
+              break;
+
+    case 'g': // Set bridge and device name, each max 15 characters
+    case 'G': if ((n = sscanf((const char*) (cmdString + 1), "%i %15s %15s", &EEPROM_state.EEPROMnew.useBridgeName, &EEPROM_state.EEPROMnew.bridgeName, &EEPROM_state.EEPROMnew.deviceName)) > 0) {
+                if (n > 2) {
+                  printfTopicS("Writing new device and bridge name to EEPROM");
+                } else if (n > 1) {
+                  printfTopicS("Writing new bridge name to EEPROM");
+                }
+                EEPROM.put(0, EEPROM_state);
+                EEPROM.commit();
+              }
+              if (n > 0) {
+                printfTopicS("Use bridge name is set to %i", EEPROM_state.EEPROMnew.useBridgeName);
+              } else {
+                printfTopicS("Use bridge name is %i", EEPROM_state.EEPROMnew.useBridgeName);
+              }
+              if (n > 1) {
+                printfTopicS("Room name is set to %s", EEPROM_state.EEPROMnew.bridgeName);
+              } else {
+                printfTopicS("Room name is %s", EEPROM_state.EEPROMnew.bridgeName);
+              }
+              if (n > 2) {
+                printfTopicS("Device name is set to %s", EEPROM_state.EEPROMnew.deviceName);
+              } else {
+                printfTopicS("Device name is %s", EEPROM_state.EEPROMnew.deviceName);
+              }
               if (n > 0) {
                 printfTopicS("Restart required to use new settings");
                 delay(500);
@@ -866,7 +903,7 @@ void handleCommand(char* cmdString) {
                           } else {
                             printfTopicS("Warning: not connected to MQTT server");
                           }
-                          printfTopicS("MQTT Clientname = %s", MQTT_CLIENTNAME);
+                          printfTopicS("MQTT Clientname = %s", mqttClientName);
                           printfTopicS("MQTT User = %s", EEPROM_state.EEPROMnew.mqttUser);
                           // printfTopicS("MQTT Password = %s", EEPROM_state.EEPROMnew.mqttPassword);
                           printfTopicS("MQTT Server = %s", EEPROM_state.EEPROMnew.mqttServer);
@@ -907,7 +944,6 @@ void handleCommand(char* cmdString) {
               break;
   }
 }
-
 
 static byte pseudo0D = 0;
 static byte pseudo0E = 0;
@@ -964,7 +1000,7 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
     }
   }
 #ifdef MQTT_INPUT_HEXDATA
-  if ((!strcmp(topic, mqttInputHexData)) || (!mqttInputHexData[MQTT_KEY_PREFIXIP - 1]) && !strncmp(topic, mqttInputHexData, MQTT_KEY_PREFIXIP - 1)) {
+  if ((!strcmp(topic, mqttInputHexData)) || (!mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC - 1]) && !strncmp(topic, mqttInputHexData, MQTT_BRIDGE_NAME_IN_TOPIC - 1)) {
     // topic is either P1P2/R (or P1P2/R/xxx if xxx=mqttInputByte4 is defined)
     if (index == 0) MQTT_drop = false;
     if ((outputMode & 0x4000) && mqttSetupReady) {
@@ -1047,6 +1083,7 @@ static byte ignoreremainder = 2; // first line ignored - robustness
 #ifdef REBOOT_REASON
 uint8_t delayedRebootReasonReset = 0;
 #endif
+
 
 void setup() {
 #ifdef ETHERNET
@@ -1156,6 +1193,11 @@ void setup() {
     EEPROM_state.EEPROMnew.static_ip[0] = '\0';
     EEPROM_state.EEPROMnew.static_gw[0] = '\0';
     EEPROM_state.EEPROMnew.static_nm[0] = '\0';
+
+    EEPROM_state.EEPROMnew.bridgeName[0] = '\0';
+    strlcpy(EEPROM_state.EEPROMnew.deviceName, HA_DEVICE_NAME, 16);
+    EEPROM_state.EEPROMnew.useBridgeName = 2;
+
     for (int i = 0; i < NR_RESERVED; i++) EEPROM_state.EEPROMnew.reserved[i] = 0;
     EEPROM.put(0, EEPROM_state);
     EEPROM.commit();
@@ -1185,7 +1227,7 @@ void setup() {
   printfSerial("ESP reboot reason 0x%02X", saveRebootReason);
 #endif /* REBOOT_REASON */
 
-  IPAddress local_ip;
+//  IPAddress local_ip;
 
 #ifdef TELNET
 // setup telnet
@@ -1339,28 +1381,41 @@ void setup() {
   }
 #endif
 
-// Fill in 4th byte of IPv4 address to MQTT topics
-  mqttKeyPrefix[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
-  mqttKeyPrefix[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
-  mqttKeyPrefix[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
-  mqttCommands[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
-  mqttCommands[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
-  mqttCommands[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
-  mqttHexdata[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
-  mqttHexdata[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
-  mqttHexdata[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
-  mqttSignal[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
-  mqttSignal[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
-  mqttSignal[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
-  haDeviceName[HA_DEVICE_NAME_PREFIX] = (local_ip[3] / 100) + '0';
-  haDeviceName[HA_DEVICE_NAME_PREFIX + 1] = (local_ip[3] % 100) / 10 + '0';
-  haDeviceName[HA_DEVICE_NAME_PREFIX + 2] = (local_ip[3] % 10) + '0';
-  haDeviceID[HA_DEVICE_ID_PREFIX] = (local_ip[3] / 100) + '0';
-  haDeviceID[HA_DEVICE_ID_PREFIX + 1] = (local_ip[3] % 100) / 10 + '0';
-  haDeviceID[HA_DEVICE_ID_PREFIX + 2] = (local_ip[3] % 10) + '0';
-  haPostfix[HA_POSTFIX_PREFIX] = (local_ip[3] / 100) + '0';
-  haPostfix[HA_POSTFIX_PREFIX + 1] = (local_ip[3] % 100) / 10 + '0';
-  haPostfix[HA_POSTFIX_PREFIX + 2] = (local_ip[3] % 10) + '0';
+  snprintf_P(IPv4String, 16, PSTR("%d.%d.%d.%d"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+
+  if (!EEPROM_state.EEPROMnew.deviceName[0]) {
+    printfTopicS("No device name set; setting to \"P1P2MQTT_bridge\" and storing in EEPROM");
+    snprintf_P(EEPROM_state.EEPROMnew.deviceName, 16, PSTR("P1P2MQTT_bridge"));
+    EEPROM.put(0, EEPROM_state);
+    EEPROM.commit();
+  }
+
+  switch (EEPROM_state.EEPROMnew.useBridgeName) {
+    case 1 : // use user-configured bridgeName , unless bridgeName not defined, in that case fall-through to case 0
+             if (EEPROM_state.EEPROMnew.bridgeName[0]) {
+               strlcpy(bridgeName, EEPROM_state.EEPROMnew.bridgeName, 16);
+               break;
+             }
+    case 0 : // use IPv4 address, final byte only, for backwards compatibility
+             snprintf_P(bridgeName, 5, PSTR("%03i"), local_ip[3]);
+             break;
+    default: // use full IPv4 address, going forward
+             strlcpy(bridgeName, IPv4String, 16);
+             break;
+  }
+  bridgeNameLength = strlen(bridgeName);
+  strlcpy(mqttSignal     + MQTT_BRIDGE_NAME_IN_TOPIC,      bridgeName, 16);
+//  strlcpy(IPv4Topic      + MQTT_BRIDGE_NAME_IN_TOPIC,      IPv4String, 16);
+  strlcpy(IPv4Topic      + MQTT_BRIDGE_NAME_IN_TOPIC,      bridgeName, 16);
+  strlcpy(mqttCommands   + MQTT_BRIDGE_NAME_IN_TOPIC,      bridgeName, 16);
+  strlcpy(mqttHexdata    + MQTT_BRIDGE_NAME_IN_TOPIC,      bridgeName, 16);
+  strlcpy(mqttKeyPrefix  + MQTT_BRIDGE_NAME_IN_TOPIC,      bridgeName, 16);
+  strlcpy(mqttKeyPrefix  + strlen(mqttKeyPrefix), "/M/0/", 6);
+  strlcpy(haDeviceName   + HA_DEVICE_NAME_PREFIX,          bridgeName, 16);
+  strlcpy(haDeviceID     + HA_DEVICE_ID_PREFIX,            bridgeName, 16);
+  strlcpy(haPostfix      + HA_POSTFIX_PREFIX,              bridgeName, 16);
+  strlcpy(mqttClientName + MQTT_BRIDGE_NAME_IN_CLIENTNAME, bridgeName, 16);
+  strlcpy(OTA_HOSTNAME   + OTA_BRIDGE_NAME_IN_HOSTNAME,    bridgeName, 16);
 
 // MQTT client setup
   mqttClient.onConnect(onMqttConnect);
@@ -1368,16 +1423,11 @@ void setup() {
   mqttClient.onPublish(onMqttPublish);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.setServer(EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort);
-
-  MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP]     = (local_ip[3] / 100) + '0';
-  MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP + 1] = (local_ip[3] % 100) / 10 + '0';
-  MQTT_CLIENTNAME[MQTT_CLIENTNAME_IP + 2] = (local_ip[3] % 10) + '0';
-
-  mqttClient.setClientId(MQTT_CLIENTNAME);
+  mqttClient.setClientId(mqttClientName);
   mqttClient.setCredentials((EEPROM_state.EEPROMnew.mqttUser[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttUser, (EEPROM_state.EEPROMnew.mqttPassword[0] == '\0') ? 0 : EEPROM_state.EEPROMnew.mqttPassword);
   // mqttClient.setWill(MQTT_WILL_TOPIC, MQTT_WILL_QOS, MQTT_WILL_RETAIN, MQTT_WILL_PAYLOAD); // TODO
 
-  Serial_print(F("* [ESP] Clientname ")); Serial_println(MQTT_CLIENTNAME);
+  Serial_print(F("* [ESP] Clientname ")); Serial_println(mqttClientName);
   Serial_print(F("* [ESP] User ")); Serial_println(EEPROM_state.EEPROMnew.mqttUser);
   // Serial_print(F("* [ESP] Password ")); Serial_println(EEPROM_state.EEPROMnew.mqttPassword);
   Serial_print(F("* [ESP] Server ")); Serial_println(EEPROM_state.EEPROMnew.mqttServer);
@@ -1425,10 +1475,10 @@ void setup() {
 
 #ifdef MQTT_INPUT_HEXDATA
   if (EEPROM_state.EEPROMnew.mqttInputByte4) {
-    mqttInputHexData[MQTT_KEY_PREFIXIP - 1] = '/';
-    mqttInputHexData[MQTT_KEY_PREFIXIP] = (EEPROM_state.EEPROMnew.mqttInputByte4 / 100) + '0';
-    mqttInputHexData[MQTT_KEY_PREFIXIP + 1] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 100) / 10 + '0';
-    mqttInputHexData[MQTT_KEY_PREFIXIP + 2] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 10) + '0';
+    mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC - 1] = '/';
+    mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC] = (EEPROM_state.EEPROMnew.mqttInputByte4 / 100) + '0';
+    mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC + 1] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 100) / 10 + '0';
+    mqttInputHexData[MQTT_BRIDGE_NAME_IN_TOPIC + 2] = (EEPROM_state.EEPROMnew.mqttInputByte4 % 10) + '0';
   }
 #endif
 
@@ -1456,7 +1506,7 @@ void setup() {
     printfTopicS("noWiFi %i", noWiFi);
     printfTopicS("useStaticIP %i", useStaticIP);
     printfTopicS("Connected to MQTT server");
-    printfTopicS("MQTT Clientname = %s", MQTT_CLIENTNAME);
+    printfTopicS("MQTT Clientname = %s", mqttClientName);
     printfTopicS("MQTT User = %s", EEPROM_state.EEPROMnew.mqttUser);
     // printfTopicS("MQTT Password = %s", EEPROM_state.EEPROMnew.mqttPassword);
     printfTopicS("MQTT Server = %s", EEPROM_state.EEPROMnew.mqttServer);
@@ -1471,7 +1521,7 @@ void setup() {
 
 #ifdef TELNET
   if (telnetSuccess) {
-    printfSerial("Telnet running on %i.%i.%i.%i", local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+    printfSerial("Telnet running on %s", IPv4String);
   } else {
     printfSerial("Telnet error");
   }
@@ -1481,10 +1531,7 @@ void setup() {
   // port defaults to 8266
   // ArduinoOTA.setPort(8266);
   // Hostname defaults to esp8266-[ChipID]
-  OTA_HOSTNAME[OTA_HOSTNAME_PREFIXIP] = (local_ip[3] / 100) + '0';
-  OTA_HOSTNAME[OTA_HOSTNAME_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
-  OTA_HOSTNAME[OTA_HOSTNAME_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
-  ArduinoOTA.setHostname(OTA_HOSTNAME);
+  ArduinoOTA.setHostname(OTA_HOSTNAME); // TODO MDNS doesn't work due to webserver re-initing MDNS ?
   // No authentication by default
 #ifdef OTA_PASSWORD
   ArduinoOTA.setPassword(OTA_PASSWORD);
@@ -1546,7 +1593,7 @@ void setup() {
   // set RESET_PIN back to INPUT mode
   pinMode(RESET_PIN, INPUT);
   MDNS.addService("avrisp", "tcp", avrisp_port);
-  printfTopicS("AVRISP: ATmega programming: avrdude -c avrisp -p atmega328p -P net:%i.%i.%i.%i:%i -t # or -U ...", local_ip[0], local_ip[1], local_ip[2], local_ip[3], avrisp_port);
+  printfTopicS("AVRISP: ATmega programming: avrdude -c avrisp -p atmega328p -P net:%s:%i -t # or -U ...", IPv4String, avrisp_port);
   // listen for avrdudes
   avrprog->begin();
 #endif
@@ -1568,7 +1615,7 @@ void setup() {
 // Ready, report status
   printfTopicS("Setup ready");
   if (telnetSuccess) {
-    printfTopicS("TELNET: telnet %i.%i.%i.%i", local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+    printfTopicS("TELNET: telnet %s", IPv4String);
   } else {
     printfTopicS("Telnet setup failed.");
   }
@@ -1577,7 +1624,9 @@ void setup() {
 #ifdef USE_TZ
   configTime(MY_TZ[0], MY_NTP_SERVER);
 #endif /* USE_TZ */
-  clientPublishMqtt("P1P2/Z", mqttSignal + MQTT_KEY_PREFIXIP);
+//  clientPublishMqtt(IPv4Topic, mqttSignal + MQTT_BRIDGE_NAME_IN_TOPIC);
+  clientPublishMqtt(IPv4Topic, IPv4String);
+  printfTopicS("%s", IPv4String);
 }
 
 void process_for_mqtt(byte* rb, int n) {
@@ -1608,13 +1657,14 @@ void process_for_mqtt(byte* rb, int n) {
   }
 }
 
-byte timeStamp = 30;
-
 #define MAXRH 23
 #ifdef USE_TZ
+byte timeStamp = 30;
 #define PWB (23*2+36) // max pseudopacket 23 bytes (excl CRC byte), 33 bytes for timestamp-prefix, 1 byte for terminating null, 2 for CRC byte
 #else /* USE_TZ */
+byte timeStamp = 10;
 #define PWB (23*2+16) // max pseudopacket 23 bytes (excl CRC byte), 13 bytes for prefix, 1 byte for terminating null, 2 for CRC byte
+//#define PWB (23*2+36) // max pseudopacket 23 bytes (excl CRC byte), 13 bytes for prefix, 1 byte for terminating null, 2 for CRC byte
 #endif /* USE_TZ */
 
 void writePseudoPacket(byte* WB, byte rh)
@@ -1907,9 +1957,9 @@ void loop() {
             if ((serial_rb > 32) && ((readBuffer[22] == 'T') || (readBuffer[22] == 'P') || (readBuffer[22] == 'X'))) { // TODO +20 -> 32
               // skip 10-character time stamp
               rbp = 32;
-              timeStamp = 30; // TODO ????
+              //timeStamp = 30; // TODO ????
             } else {
-              timeStamp = 20; // TODO ???
+              //timeStamp = 20; // TODO ???
             }
             while (sscanf(readBuffer + rbp, "%2x%n", &rbtemp, &n) == 1) { // TODO
               if (rh < HB) readHex[rh] = rbtemp;

@@ -165,32 +165,35 @@
 
 // home assistant (including MQTT discovery)
 #define HA_PREFIX "homeassistant/sensor"   // homeassistant MQTT discovery prefix
-char haDeviceName[9] = "P1P2-xxx";         // becomes device name in HA
+char haDeviceName[21] = "P1P2-xxx";         // becomes device name in HA
 #define HA_DEVICE_NAME_PREFIX 5
-char haDeviceID[10] = "P1P2IDxxx";         // uniq device_id. Currently all sensors in one device_ID
+char haDeviceID[22] = "P1P2IDxxx";         // uniq device_id. Currently all sensors in one device_ID
 #define HA_DEVICE_ID_PREFIX 6
 #define HA_DEVICE_MODEL "P1P2MQTT_bridge"  // shows up as Device Info in HA
+#define HA_DEVICE_NAME  "P1P2MQTT_bridge"  // shows up as Device Group Name in HA
 #define HA_MF "NPC"
 #define HA_KEY_LEN 100
 #define HA_VALUE_LEN 600
-char haPostfix[5] = "_xxx";
+char haPostfix[17] = "_xxx";
 #define HA_POSTFIX_PREFIX 1
 #define HA_SENSOR_PREFIX "P1P2_"
 #define INIT_USE_SENSOR_PREFIX_HA 0
 
 // MQTT topics
-#define MQTT_KEY_PREFIXIP   7
-char mqttHexdata[11]     = "P1P2/R/xxx";
-char mqttSignal[11]      = "P1P2/S/xxx";
-char mqttCommands[11]    = "P1P2/W/xxx";
+#define MQTT_BRIDGE_NAME_IN_TOPIC 7
+#define MQTT_BRIDGE_NAME_IN_KEY_TOPIC 11
+char mqttHexdata[23]     = "P1P2/R/xxx";
+char mqttSignal[23]      = "P1P2/S/xxx";
+char IPv4Topic[28]       = "P1P2/Z/xxx";
+char mqttCommands[23]    = "P1P2/W/xxx";
 char mqttCommandsNoIP[7] = "P1P2/W";
-char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
+char mqttKeyPrefix[28]   = "P1P2/P/xxx/M/0/";
 #ifdef MQTT_INPUT_HEXDATA
 char mqttInputHexData[11]= "P1P2/R";  // default accepts input from any P1P2/R/#; can be changed to P1P2/R/xxx via 'B' command
 #endif
-#define MQTT_KEY_PREFIXCAT 11 // location in prefix for category identification
-#define MQTT_KEY_PREFIXSRC 13 // location in prefix for source identification
-#define MQTT_KEY_PREFIXLEN 15 // length of mqttKeyPrefix (excl '\0')
+#define MQTT_KEY_PREFIXCAT (bridgeNameLength + 8) // location in prefix for category identification
+#define MQTT_KEY_PREFIXSRC (bridgeNameLength + 10) // location in prefix for source identification
+#define MQTT_KEY_PREFIXLEN (bridgeNameLength + 12) // length of mqttKeyPrefix (excl '\0')
 
 // To avoid Mqtt/CPU overload and message loss, throttle mqt traffic after reboot
 #ifndef H_SERIES

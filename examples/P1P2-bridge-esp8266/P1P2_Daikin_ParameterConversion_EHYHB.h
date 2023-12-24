@@ -2591,7 +2591,6 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
 #else
     case 0x3E : return 0;
 #endif /* SAVESCHEDULE */
-// PSEUDO_PACKETS
 #include "P1P2_pseudo.h"
     default : UNKNOWN_BYTE // unknown PacketByte
   }
