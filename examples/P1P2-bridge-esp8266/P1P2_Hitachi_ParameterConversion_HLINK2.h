@@ -18,15 +18,14 @@
 //
 // The main conversion function here is bytes2keyvalue(..),
 // which is called for every individual byte of every payload.
-// It aims to calculate a <mqtt_key,mqtt_value> pair for json/mqtt output.
+// It aims to calculate a <mqtt_key,mqtt_value> pair for mqtt output.
 //
 // Its return value determines what to do with the result <mqtt_key,mqtt_value>:
 //
 // Return value:
 // 0 no value to return
-// 1 indicates that a new (mqtt_key,mqtt_value) pair can be output via serial, json, and/or mqtt
+// 1 indicates that a new (mqtt_key,mqtt_value) pair can be output via serial, telnet, and/or mqtt
 // 8 this byte should be treated on an individual bit basis by calling bits2keyvalue(.., bitNr) 8 times with 0 <= bitNr <= 7
-// 9 no value to return, but json message (if not empty) can be terminated and transmitted
 //
 // The core of the translation is formed by large nested switch statements.
 // Many of the macro's include break statements and make the core more readable.
@@ -580,7 +579,6 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 // VALUE_F(value)       for self-calculated float parameter value
 // VALUE_u32hex         for 4-byte hex value (used for sw version)
 // VALUE_header         for empty payload string
-// TERMINATEJSON        returns 9 to signal end of package, signal for json string termination
 
 #define VALUE_u8hex             { return       value_u8hex(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); break; }
 #define VALUE_u16hex_LE         { return      value_u16hex_LE(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
@@ -621,8 +619,6 @@ uint8_t value_timeString(char* mqtt_value, char* timestring) {
 #define VALUE_header            { return            value_trg(packetSrc, packetType, payloadIndex, payload, mqtt_key, mqtt_value, haConfig); }
 
 #define BITBASIS_UNKNOWN        { switch (bitNr) { case 8 : BITBASIS; default : UNKNOWN_BIT; } }
-#define TERMINATEJSON           { return 9; }
-
 #define BITBASIS                { return newPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, mqtt_key, haConfig, 1, 0) << 3; }
 // BITBASIS returns 8 if at least one bit of a byte changed, or if at least one bit of a byte hasn't been seen before, otherwise 0
 // value of byte and of seen status should not be saved (yet) (saveSeen=0), this is done on bit basis

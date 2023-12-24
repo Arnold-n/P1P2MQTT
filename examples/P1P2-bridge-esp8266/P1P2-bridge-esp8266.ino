@@ -1,7 +1,7 @@
-/* P1P2-bridge-esp8266json: Host application for esp8266 to interface to P1P2Monitor on Arduino Uno,
- *                          supports mqtt/json/wifi
- *                          Includes wifimanager, OTA
- *                          For protocol description, see SerialProtocol.md and MqttProtocol.md
+/* P1P2-bridge-esp8266: Host application for esp8266 to interface to P1P2Monitor on Arduino Uno,
+ *                      supports mqtt/wifi/ethernet
+ *                      Includes wifimanager, OTA
+ *                      For protocol description, see SerialProtocol.md and MqttProtocol.md
  *
  * Copyright (c) 2019-2022 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
@@ -17,7 +17,7 @@
  * ESP_Telnet 2.0.0 by  Lennart Hennigs (installed using Arduino IDE)
  *
  * Version history
- * 20231223 v0.9.45 remove BINDATA, improve TZ
+ * 20231224 v0.9.45 remove BINDATA, improve TZ, remove json output format
  * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
  * 20230611 v0.9.38 H-link data support
  * 20230604 v0.9.37 support for P1P2MQTT bridge v1.2; separate hwID for ESP and ATmega
@@ -800,15 +800,15 @@ void handleCommand(char* cmdString) {
                 printfTopicS("Outputmode 0x%04X is sum of", outputMode);
                 printfTopicS("%ix 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx", outputMode  & 0x01);
                 printfTopicS("%ix 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/xxx/#", (outputMode >> 1) & 0x01);
-                printfTopicS("%ix 0x0004 to output json data over mqtt P1P2/J/xxx", (outputMode >> 2) & 0x01);
-                printfTopicS("%ix 0x0008 to have mqtt/json include parameters even if functionality is unknown, warning: easily overloads ATmega/ESP (best to combine this with outputfilter >=1)", (outputMode >> 3) & 0x01);
+                printfTopicS("%ix 0x0004 (reserved)", (outputMode >> 2) & 0x01);
+                printfTopicS("%ix 0x0008 to have mqtt include parameters even if functionality is unknown, warning: easily overloads ATmega/ESP (best to combine this with outputfilter >=1)", (outputMode >> 3) & 0x01);
                 printfTopicS("%ix 0x0010 ESP to output raw data over telnet", (outputMode >> 4) & 0x01);
                 printfTopicS("%ix 0x0020 to output mqtt individual parameter data over telnet", (outputMode >> 5) & 0x01);
-                printfTopicS("%ix 0x0040 to output json data over telnet", (outputMode >> 6) & 0x01);
+                printfTopicS("%ix 0x0040 (reserved)", (outputMode >> 6) & 0x01);
                 printfTopicS("%ix 0x0080 (reserved for adding time string in R output)", (outputMode >> 7) & 0x01);
                 printfTopicS("%ix 0x0100 ESP to output raw data over serial", (outputMode >> 8) & 0x01);
                 printfTopicS("%ix 0x0200 to output mqtt individual parameter data over serial", (outputMode >> 9) & 0x01);
-                printfTopicS("%ix 0x0400 to output json data over serial", (outputMode >> 10) & 0x01);
+                printfTopicS("%ix 0x0400 (reserved)", (outputMode >> 10) & 0x01);
                 printfTopicS("%ix 0x0800 (reserved)", (outputMode >> 11) & 0x01);
                 printfTopicS("%ix 0x1000 to output timing data also over P1P2/R/xxx (prefix: C) and via telnet", (outputMode >> 12) & 0x01);
                 printfTopicS("%ix 0x2000 to output error data also over P1P2/R/xxx (prefix: *)", (outputMode >> 13) & 0x01);
@@ -1349,9 +1349,6 @@ void setup() {
   mqttHexdata[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
   mqttHexdata[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
   mqttHexdata[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
-  mqttJsondata[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
-  mqttJsondata[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
-  mqttJsondata[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
   mqttSignal[MQTT_KEY_PREFIXIP] = (local_ip[3] / 100) + '0';
   mqttSignal[MQTT_KEY_PREFIXIP + 1] = (local_ip[3] % 100) / 10 + '0';
   mqttSignal[MQTT_KEY_PREFIXIP + 2] = (local_ip[3] % 10) + '0';
@@ -1583,11 +1580,7 @@ void setup() {
   clientPublishMqtt("P1P2/Z", mqttSignal + MQTT_KEY_PREFIXIP);
 }
 
-static int jsonTerm = 1; // indicates whether json output was terminated
-int jsonStringp = 0;
-char jsonString[10000];
-
-void process_for_mqtt_json(byte* rb, int n) {
+void process_for_mqtt(byte* rb, int n) {
   char mqtt_value[MQTT_VALUE_LEN] = "\0";
   char mqtt_key[MQTT_KEY_LEN + MQTT_KEY_PREFIXLEN]; // = mqttKeyPrefix;
   if (!mqttConnected) Mqtt_disconnectSkippedPackets++;
@@ -1602,46 +1595,12 @@ void process_for_mqtt_json(byte* rb, int n) {
         // returns 0 if byte does not trigger any output
         // returns 1 if new mqtt_key,mqtt_value should be output
         // returns 8 if byte should be treated per bit
-        // returns 9 if json string should be terminated
-        if (kvrbyte == 9) {
-          if (jsonTerm == 0) {
-            // only terminate json string and publish if at least one parameter was written
-            jsonTerm = 1;
-            jsonString[jsonStringp++] = '}';
-            jsonString[jsonStringp++] = '\0';
-            if (outputMode & 0x0004) clientPublishMqtt(mqttJsondata, jsonString);
-            if (outputMode & 0x0040) clientPublishTelnet(mqttJsondata, jsonString);
-            if (outputMode & 0x0400) clientPublishSerial(mqttJsondata, jsonString);
-            jsonStringp = 1;
-          }
-        } else {
-          if (kvrbyte > 9) {
-            kvrbyte = 0;
-            printfTopicS("Warning: kvrbyte > 9 Src 0x%02X Tp 0x%02X Byte %i",rb[0], rb[2], i);
-          }
-          for (byte j = 0; j < kvrbyte; j++) {
-            int kvr = (kvrbyte == 8) ? bits2keyvalue(rb[0], rb[2], i - 3, rb + 3, mqtt_key, mqtt_value, j) : kvrbyte;
-            if (kvr) {
-              if (outputMode & 0x0002) clientPublishMqtt(mqtt_key, mqtt_value);
-              if (outputMode & 0x0020) clientPublishTelnet(mqtt_key, mqtt_value);
-              if (outputMode & 0x0200) clientPublishSerial(mqtt_key, mqtt_value);
-              // don't add another parameter if remaining space is not enough for mqtt_key, mqtt_value, and ',' '"', '"', ':', '}', and '\0'
-              if (jsonStringp + strlen(mqtt_value) + strlen(mqtt_key + MQTT_KEY_PREFIXLEN) + 6 <= sizeof(jsonString)) {
-                if (jsonTerm) {
-                  jsonString[jsonStringp++] = '{';
-                  jsonTerm = 0;
-                } else {
-                  jsonString[jsonStringp++] = ',';
-                }
-                jsonString[jsonStringp++] = '"';
-                strcpy(jsonString + jsonStringp, mqtt_key + MQTT_KEY_PREFIXLEN);
-                jsonStringp += strlen(mqtt_key + MQTT_KEY_PREFIXLEN);
-                jsonString[jsonStringp++] = '"';
-                jsonString[jsonStringp++] = ':';
-                strcpy(jsonString + jsonStringp, mqtt_value);
-                jsonStringp += strlen(mqtt_value);
-              }
-            }
+        for (byte j = 0; j < kvrbyte; j++) {
+          int kvr = (kvrbyte == 8) ? bits2keyvalue(rb[0], rb[2], i - 3, rb + 3, mqtt_key, mqtt_value, j) : kvrbyte;
+          if (kvr) {
+            if (outputMode & 0x0002) clientPublishMqtt(mqtt_key, mqtt_value);
+            if (outputMode & 0x0020) clientPublishTelnet(mqtt_key, mqtt_value);
+            if (outputMode & 0x0200) clientPublishSerial(mqtt_key, mqtt_value);
           }
         }
       }
@@ -1695,7 +1654,7 @@ void writePseudoPacket(byte* WB, byte rh)
   if (outputMode & 0x0100) clientPublishSerial(mqttHexdata, pseudoWriteBuffer);
   pseudoWriteBuffer[22] = 'R';
   if (outputMode & 0x0010) clientPublishTelnet(mqttHexdata, pseudoWriteBuffer + 22);
-  if (outputMode & 0x0666) process_for_mqtt_json(WB, rh);
+  if (outputMode & 0x0666) process_for_mqtt(WB, rh);
 }
 
 uint32_t espUptime_telnet = 0;
@@ -1983,7 +1942,7 @@ void loop() {
                 if (outputMode & 0x0010) clientPublishTelnet(mqttHexdata, readBuffer + 22);
 
 
-                if (outputMode & 0x0666) process_for_mqtt_json(readHex, rh);
+                if (outputMode & 0x0666) process_for_mqtt(readHex, rh);
 #ifdef PSEUDO_PACKETS
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0D)) pseudo0D = 9; // Insert pseudo packet 40000D in output serial after 00000D
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) pseudo0F = 9; // Insert pseudo packet 40000F in output serial after 00000F

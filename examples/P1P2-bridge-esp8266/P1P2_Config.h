@@ -5,7 +5,7 @@
  * WARNING: P1P2-bridge-esp8266 is end-of-life, and will be replaced by P1P2MQTT
  *
  * Version history
- * 20231223 v0.9.45 remove BINDATA, improve TZ
+ * 20231224 v0.9.45 remove BINDATA, improve TZ, remove json output format
  * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
  * 20230702 v0.9.40 add NTP-based time stamps, add H-link2 decoding
  * 20230611 v0.9.38 H-link2 branch merge into main
@@ -184,7 +184,6 @@ char mqttHexdata[11]     = "P1P2/R/xxx";
 char mqttSignal[11]      = "P1P2/S/xxx";
 char mqttCommands[11]    = "P1P2/W/xxx";
 char mqttCommandsNoIP[7] = "P1P2/W";
-char mqttJsondata[11]    = "P1P2/J/xxx";
 char mqttKeyPrefix[16]   = "P1P2/P/xxx/M/0/";
 #ifdef MQTT_INPUT_HEXDATA
 char mqttInputHexData[11]= "P1P2/R";  // default accepts input from any P1P2/R/#; can be changed to P1P2/R/xxx via 'B' command
@@ -226,15 +225,15 @@ char mqttInputHexData[11]= "P1P2/R";  // default accepts input from any P1P2/R/#
                                // outputmode is sum of:
                                // 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx
                                // 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/xxx/#
-                               // 0x0004 to output json data over mqtt P1P2/J/xxx
-                               // 0x0008 to have mqtt/json include parameters even if functionality is unknown, warning: easily overloads ATmega/ESP (best to combine this with outputfilter >=1)
+                               // 0x0004 (reserved)
+                               // 0x0008 to have mqtt include parameters even if functionality is unknown, warning: easily overloads ATmega/ESP (best to combine this with outputfilter >=1)
                                // 0x0010 ESP to output raw data over telnet
                                // 0x0020 to output mqtt individual parameter data over telnet
-                               // 0x0040 to output json data over telnet
+                               // 0x0040 (reserved)
                                // 0x0080 (reserved for time string in R output)
                                // 0x0100 ESP to output raw data over serial
                                // 0x0200 to output mqtt individual parameter data over serial
-                               // 0x0400 to output json data over serial
+                               // 0x0400 (reserved)
                                // 0x0800 (reserved)
                                // 0x1000 to output scope-mode output also over P1P2/R/xxx (prefix: C)
                                // 0x2000 to output error data also over P1P2/R/xxx (prefix: *)
