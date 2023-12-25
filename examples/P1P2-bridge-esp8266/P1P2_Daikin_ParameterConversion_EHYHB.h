@@ -55,6 +55,8 @@
 #define CAT_COUNTER      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'C'); } // kWh/hour counters
 #define CAT_PSEUDO2      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'B'); } // 2nd ESP operation
 #define CAT_PSEUDO       { if (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] != 'B') mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'A'; } // ATmega/ESP operation
+#define CAT_PSEUDO_SYSTEM2 {     (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'D'); } // 2nd ESP operation
+#define CAT_PSEUDO_SYSTEM  { if (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] != 'D') mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'C'; } // ATmega/ESP operation
 // unused #define CAT_TARGET       { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'D'); } // D desired
 // unused #define CAT_DAILYSTATS   { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'R'); } // Results per day (tbd)
 #define CAT_SCHEDULE     { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'E'); } // Schedule
@@ -122,7 +124,7 @@ bool scheduleMemSeen[2][SCHEDULE_MEM_SIZE] = {}; // 2 * 1166 = 2332 bytes
 #endif /* SAVESCHEDULE */
 
 #ifdef SAVEPACKETS
-#ifdef PSEUDO_PACKETS
+#ifdef PSEUDO_PACKETS_INTERNAL
 #define PCKTP_START  0x08
 #define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 to 0x16 0x20 0x21 0x60-0x9F mapped to 0x17-0x58
 #define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 3 + 18 + 48)
@@ -132,16 +134,16 @@ bool scheduleMemSeen[2][SCHEDULE_MEM_SIZE] = {}; // 2 * 1166 = 2332 bytes
 // 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  30,  31,  20,  21,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  6A,  6B,  6C,  6D,  6E,  6F,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  7A,  7B,  7C,  7D,  7E,  7F,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  8A,  8B,  8C,  8D,  8E,  8F,  90,  91,  92,  93,  94,  95,  96,  97,  98,  99,  9A,  9B,  9C,  9D,  9E,  9F
 const PROGMEM uint32_t nr_bytes[2] [PCKTP_ARR_SZ]     =
 {{  0,   0,   0,   0,   0,  20,  20,  20,  20,   8,  15,   3,  15,   6,   2,   6,   0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20 } ,
-{   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20 }};
+{  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  14,  19,   6,   0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20 }};
 
 const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ]     =
 {{  0,   0,   0,   0,   0,   0,  20,  40,  60,  80,  88, 103, 106, 121, 127, 129, 135, 155, 175, 195, 215, 235, 255, 275, 295, 315, 335, 355, 375, 395, 415, 435, 455, 475, 495, 515, 535, 555, 575, 595, 615, 635, 655, 675, 695, 715, 735, 755, 775, 795, 815, 835, 855, 875, 895, 915, 935, 955, 975, 995,1015,1035,1055,1075,1095,1115,1135,1155,1175,1195,1215,1235,1255,1275,1295,1315,1335,1355,1375,1395,1415,1435 } ,
-{1455,1455,1475,1495,1515,1515,1535,1555,1575,1595,1615,1635,1649,1668,1674,1674,1674,1694,1714,1734,1754,1774,1794,1814,1834,1854,1874,1894,1914,1934,1954,1974,1994,2014,2034,2054,2074,2094,2114,2134,2154,2174,2194,2214,2234,2254,2274,2294,2314,2334,2354,2374,2394,2414,2434,2454,2474,2494,2514,2534,2554,2574,2594,2614,2634,2654,2674,2694,2714,2734,2754,2774,2794,2814,2834,2854,2874,2894,2914,2934,2954,2974
- /* ,sizeValSeen=2994 */ }};
-#define sizeValSeen 2994
+{1455,1475,1495,1515,1535,1555,1575,1595,1615,1635,1655,1675,1689,1708,1714,1714,1714,1734,1754,1774,1794,1814,1834,1854,1874,1894,1914,1934,1954,1974,1994,2014,2034,2054,2074,2094,2114,2134,2154,2174,2194,2214,2234,2254,2274,2294,2314,2334,2354,2374,2394,2414,2434,2454,2474,2494,2514,2534,2554,2574,2594,2614,2634,2654,2674,2694,2714,2734,2754,2774,2794,2814,2834,2854,2874,2894,2914,2934,2954,2974,2994,3014
+ /* ,sizeValSeen=3034 */ }};
+#define sizeValSeen 3034
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
-#else /* PSEUDO_PACKETS */
+#else /* PSEUDO_PACKETS_INTERNAL */
 #define PCKTP_START  0x10
 #define PCKTP_END    0x15 // 0x10-0x15 and 0x31 mapped to 0x16
 #define PCKTP_ARR_SZ (PCKTP_END - PCKTP_START + 2)
@@ -152,7 +154,7 @@ const PROGMEM uint32_t bytestart[2][PCKTP_ARR_SZ] = { { 0, 20, 28, 43, 46, 61, 6
 #define sizeValSeen 172
 byte payloadByteVal[sizeValSeen]  = { 0 };
 byte payloadByteSeen[sizeValSeen] = { 0 };
-#endif /* PSEUDO_PACKETS */
+#endif /* PSEUDO_PACKETS_INTERNAL */
 #endif /* SAVEPACKETS */
 
 // for 0xB8 counters we store 36 bytes; 30 should suffice but not worth the extra code
@@ -210,6 +212,24 @@ void resetDataStructures(void) {
   }
   for (j = 0; j < 36; j++) cntByte[j] = 0xFF;
 #endif /* SAVEPACKETS */
+}
+
+int16_t power1 = 0, power2 = 0;
+
+void writePseudoSystemPackets(void) {
+  readHex[0]  = 0x40;
+  readHex[1]  = 0x00;
+#ifdef MQTT_INPUT_HEXDATA
+  readHex[2] = 0x08;
+#else
+  readHex[2] = 0x0C;
+#endif
+  readHex[3]  = (power1 >> 8) & 0xFF;
+  readHex[4]  = power1 & 0xFF;
+  readHex[5]  = (power2 >> 8) & 0xFF;
+  readHex[6]  = power2 & 0xFF;
+  for (byte i = 7; i < 23; i ++) readHex[i] = 0;
+  writePseudoPacket(readHex, 23);
 }
 
 bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte length, bool saveSeen, byte applyHysteresisType = 0, uint16_t applyHysteresis = 0) {
@@ -1136,7 +1156,8 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 // UNKNOWN_PARAM:       parameter function is unknown, mqtt_key will be "ParamSrc-0xXX-Type-0xXX-Nr-0xXXXX", value will be hex
 // VALUE_u8:            1-byte unsigned integer value at current location payload[i]
 // VALUE_s8:            1-byte signed integer value at current location payload[i]
-// VALUE_u16:           3-byte unsigned integer value at location payload[i - 1]..payload[i]
+// VALUE_u16:           2-byte unsigned integer value at location payload[i - 1]..payload[i]
+// VALUE_s16:           2-byte signed integer value at current location payload[i - 1]..payload[i]
 // VALUE_u24:           3-byte unsigned integer value at location payload[i-2]..payload[i]
 // VALUE_u32:           4-byte unsigned integer value at location payload[i-3]..payload[i]
 // VALUE_u8_add2k:      for 1-byte value (2000+payload[i]) (for year value)
@@ -1642,7 +1663,6 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
   maxOutputFilter = 9; // default all changes visible, unless changed below
   CAT_UNKNOWN; // cat unknown unless changed below
 
-  float Power1, Power2;
   static float LWT = 0, RWT = 0, MWT = 0, Flow = 0;
   static byte prevSec = 0xFF;
   static byte prevMin = 0xFF;
@@ -2247,28 +2267,40 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       default :               UNKNOWN_BYTE;
     }
-    // Packet types 0x3x from main controller (0x00) and from first auxiliary controller (0xF0)
-    // Code here assumes there is no secondary controller active (TODO: what if)
-    case 0x30 :                                                                                     CAT_MEASUREMENT;  // PacketType 30 will be used here to communicate power and COP calculations
-                switch (packetSrc) {
+    // Packet types 0x3x from main controller (0x00) and from auxiliary controller(s) (0xF0 / 0xF1 / 0xFF)
+    case 0x30 : switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case  0 : // bytes in 0x30 message do not seem to contain usable information
                   // as this is the final payload in a package
                   // we (ab)use this to communicate calculated power
                   // power produced by gas boiler / based on 4182 J/kg K, 1 kg/l
                   if (LWT_changed || MWT_changed || Flow_changed) {
-                    Power1 = (LWT - MWT) * Flow * 69.7;
-                    KEY("Heat_Production_Gasboiler");
-                    LWT_changed = 0;                                      HACONFIG; HAPOWER;
-                    SRC(9);                                                                                                                      VALUE_F(Power1);
-                  } else return 0;
+                    float floatPower1 = (LWT - MWT) * Flow * 69.7;
+                    if (floatPower1 > 32767) {
+                      power1 = 32767;
+                    } else if (floatPower1 < -32768) {
+                      power1 = -32768;
+                    } else {
+                      power1 = floatPower1;
+                    }
+                    pseudo0C = 9; // trigger output of power1
+                    LWT_changed = 0;
+                  }
+                  return 0;
         case  1 : // power produced by heat pump
                   if (RWT_changed || MWT_changed || Flow_changed) {
-                    Power2 = (MWT - RWT) * Flow * 69.7;
-                    KEY("Heat_Production_Heatpump");
+                    float floatPower2 = (MWT - RWT) * Flow * 69.7;
+                    if (floatPower2 > 32767) {
+                      power2 = 32767;
+                    } else if (floatPower2 < -32768) {
+                      power2 = -32768;
+                    } else {
+                      power2 = floatPower2;
+                    }
                     RWT_changed = MWT_changed = Flow_changed = 0;
-                    SRC(9);                                                HACONFIG; HAPOWER;                                                    VALUE_F(Power2);
-                  } else return 0;
+                    pseudo0C = 9; // trigger output of power2
+                  }
+                  return 0;
         default : // these bytes change but don't carry real information
                   // they are used to request or announce further 3x payloads
                   // so we return 0 to signal they don't need to be output
@@ -2591,6 +2623,19 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
 #else
     case 0x3E : return 0;
 #endif /* SAVESCHEDULE */
+    // PSEUDO_PACKETS_SYSTEM
+    case 0x08 :                                                            CAT_PSEUDO_SYSTEM2;
+    case 0x0C : SRC(9);                                                    CAT_PSEUDO_SYSTEM;
+                switch (packetSrc) {
+      case 0x40 : switch (payloadIndex) {
+        case  0 : return 0;
+        case  1 : KEY("Heat_Production_Gasboiler");                        HACONFIG; HAPOWER;                                                    VALUE_s16_LE;
+        case  2 : return 0;
+        case  3 : KEY("Heat_Production_Heatpump");                         HACONFIG; HAPOWER;                                                    VALUE_s16_LE;
+        default : return 0;
+      }
+      default : UNKNOWN_BYTE;
+    }
 #include "P1P2_pseudo.h"
     default : UNKNOWN_BYTE // unknown PacketByte
   }

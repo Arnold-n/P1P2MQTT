@@ -8,11 +8,9 @@
  *
  */
 
-#ifdef PSEUDO_PACKETS
+#ifdef PSEUDO_PACKETS_INTERNAL
 #define HAPCONFIG { haConfig = (outputMode >> 17) & 0x01; uom = 0; stateclass = 0;}; // HAPCONFIG requires j-mask to be 0x20000 otherwise pseudo parameters will not be visible in HA
 // ATmega/ESP pseudopackets
-    case 0x08 :
-    case 0x0C : return 0;
     case 0x09 :                                                            CAT_PSEUDO2;
     case 0x0D :                                                            CAT_PSEUDO;
                 haConfig = 0;
@@ -134,4 +132,4 @@
     }
 #else
     case 0x08 ... 0x0F : return 0;
-#endif /* PSEUDO_PACKETS */
+#endif /* PSEUDO_PACKETS_INTERNAL */

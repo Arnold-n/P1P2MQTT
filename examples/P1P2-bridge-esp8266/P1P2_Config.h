@@ -161,7 +161,8 @@
                // Unfortunately telnet output is synchronized, which may trigger some issues only when telnet is being used
                // undefine on open networks or if you experience problems
 
-#define PSEUDO_PACKETS // define to have P1P2-bridge-esp8266 output additional P1P2-like packets with internal state information
+#define PSEUDO_PACKETS_INTERNAL // define to have P1P2-bridge-esp8266 output additional P1P2-like packets with internal state information
+#define PSEUDO_PACKETS_SYSTEM   // define to have P1P2-bridge-esp8266 output additional P1P2-like packets with heat pump system information
 
 // home assistant (including MQTT discovery)
 #define HA_PREFIX "homeassistant/sensor"   // homeassistant MQTT discovery prefix

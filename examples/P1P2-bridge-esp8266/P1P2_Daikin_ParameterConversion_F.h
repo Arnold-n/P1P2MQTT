@@ -49,6 +49,8 @@
 #define CAT_COUNTER      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'C'); } // kWh/hour counters
 #define CAT_PSEUDO2      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'B'); } // 2nd ESP operation
 #define CAT_PSEUDO       { if (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] != 'B') mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'A'; } // ATmega/ESP operation
+#define CAT_PSEUDO_SYSTEM2 {     (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'D'); } // 2nd ESP operation
+#define CAT_PSEUDO_SYSTEM  { if (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] != 'D') mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'C'; } // ATmega/ESP operation
 #define CAT_TARGET       { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'D'); } // D desired
 #define CAT_DAILYSTATS   { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'R'); } // Results per day (tbd)
 #define CAT_UNKNOWN      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'U'); }
@@ -128,6 +130,18 @@ void resetDataStructures(void) {
     payloadByteSeen[j] = 0;
   }
 #endif /* SAVEPACKETS */
+}
+
+void writePseudoSystemPackets(void) {
+  readHex[0]  = 0x40;
+  readHex[1]  = 0x00;
+#ifdef MQTT_INPUT_HEXDATA
+  readHex[2] = 0x08;
+#else
+  readHex[2] = 0x0C;
+#endif
+  for (byte i = 3; i < 23; i ++) readHex[i] = 0;
+  writePseudoPacket(readHex, 23);
 }
 
 bool newPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_key, byte haConfig, byte length, bool saveSeen, byte applyHysteresisType = 0, uint16_t applyHysteresis = 0) {
@@ -885,7 +899,16 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       default   :               UNKNOWN_BYTE;
     }
-// PSEUDO_PACKETS
+    // PSEUDO_PACKETS_SYSTEM
+    case 0x08 :                                                            CAT_PSEUDO_SYSTEM2;
+    case 0x0C : SRC(9);                                                    CAT_PSEUDO_SYSTEM;
+                switch (packetSrc) {
+      case 0x40 : switch (payloadIndex) {
+        default : return 0;
+      }
+      default : UNKNOWN_BYTE;
+    }
+// PSEUDO_PACKETS_INTERNAL
 #include "P1P2_pseudo.h"
     default : UNKNOWN_BYTE // unknown PacketByte
   }

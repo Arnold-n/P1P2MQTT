@@ -433,6 +433,60 @@ uint32_t Sprint_buffer_overflow = 0;
   clientPublishSerial(mqttSignal, sprint_value);\
 };
 
+#define MAXRH 23
+#ifdef USE_TZ
+byte timeStamp = 30;
+#define PWB (23*2+36) // max pseudopacket 23 bytes (excl CRC byte), 33 bytes for timestamp-prefix, 1 byte for terminating null, 2 for CRC byte
+#else /* USE_TZ */
+byte timeStamp = 10;
+#define PWB (23*2+16) // max pseudopacket 23 bytes (excl CRC byte), 13 bytes for prefix, 1 byte for terminating null, 2 for CRC byte
+//#define PWB (23*2+36) // max pseudopacket 23 bytes (excl CRC byte), 13 bytes for prefix, 1 byte for terminating null, 2 for CRC byte
+#endif /* USE_TZ */
+
+static byte pseudo0C = 0;
+
+void writePseudoPacket(byte* WB, byte rh)
+// rh is pseudo packet size (without CRC byte)
+{
+  char pseudoWriteBuffer[PWB];
+  if (rh > MAXRH) {
+    printfTopicS("rh > %i", MAXRH);
+    return;
+  }
+//#ifdef USE_TZ
+  // snprintf_P(pseudoWriteBuffer, 33, PSTR("R %04i-%02i-%02i_%02i:%02i:%02i P         "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+  sprint_value[PREFIX_LENGTH_TZ - 1] = '\0';
+  snprintf_P(pseudoWriteBuffer, 33, PSTR("R%sP         "), sprint_value + 7);
+
+// 0 2 4 6 8
+// * [ESP] nill
+// * [ESP] 00:00:00-1900:00:00 nill
+
+// #else /* USE_TZ */
+//   snprintf_P(pseudoWriteBuffer, 13, PSTR("R P         "));
+// #endif /* USE_TZ */
+  uint8_t crc = CRC_FEED;
+  for (uint8_t i = 0; i < rh; i++) {
+    uint8_t c = WB[i];
+    snprintf(pseudoWriteBuffer + 2 + timeStamp + (i << 1), 3, "%02X", c);
+    if (CRC_GEN != 0) for (uint8_t i = 0; i < 8; i++) {
+      crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ CRC_GEN) : (crc >> 1));
+      c >>= 1;
+    }
+  }
+  WB[rh] = crc;
+  if (CRC_GEN) snprintf(pseudoWriteBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", crc);
+#ifndef MQTT_INPUT_HEXDATA
+  if (outputMode & 0x0001) clientPublishMqtt(mqttHexdata, pseudoWriteBuffer);
+#endif /* MQTT_INPUT_HEXDATA */
+  if (outputMode & 0x0100) clientPublishSerial(mqttHexdata, pseudoWriteBuffer);
+  pseudoWriteBuffer[22] = 'R';
+  if (outputMode & 0x0010) clientPublishTelnet(mqttHexdata, pseudoWriteBuffer + 22);
+  if (outputMode & 0x0666) process_for_mqtt(WB, rh);
+}
+
+byte readHex[HB];
+
 #define HA_KEY snprintf_P(ha_mqttKey, HA_KEY_LEN, PSTR("%s/%s/%s%c%c_%s/config"), HA_PREFIX, haDeviceID, useSensorPrefixHA ? HA_SENSOR_PREFIX : "", mqtt_key[-4], mqtt_key[-2], mqtt_key);
 
 #define HA_VALUE snprintf_P(ha_mqttValue, HA_VALUE_LEN, PSTR("{\"name\":\"%c%c_%s\",\"stat_t\":\"%s\",%s\"uniq_id\":\"%c%c_%s%s\",%s%s%s%s%s\"dev\":{\"name\":\"%s\",\"ids\":[\"%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}}"),\
@@ -1657,61 +1711,10 @@ void process_for_mqtt(byte* rb, int n) {
   }
 }
 
-#define MAXRH 23
-#ifdef USE_TZ
-byte timeStamp = 30;
-#define PWB (23*2+36) // max pseudopacket 23 bytes (excl CRC byte), 33 bytes for timestamp-prefix, 1 byte for terminating null, 2 for CRC byte
-#else /* USE_TZ */
-byte timeStamp = 10;
-#define PWB (23*2+16) // max pseudopacket 23 bytes (excl CRC byte), 13 bytes for prefix, 1 byte for terminating null, 2 for CRC byte
-//#define PWB (23*2+36) // max pseudopacket 23 bytes (excl CRC byte), 13 bytes for prefix, 1 byte for terminating null, 2 for CRC byte
-#endif /* USE_TZ */
-
-void writePseudoPacket(byte* WB, byte rh)
-// rh is pseudo packet size (without CRC byte)
-{
-  char pseudoWriteBuffer[PWB];
-  if (rh > MAXRH) {
-    printfTopicS("rh > %i", MAXRH);
-    return;
-  }
-//#ifdef USE_TZ
-  // snprintf_P(pseudoWriteBuffer, 33, PSTR("R %04i-%02i-%02i_%02i:%02i:%02i P         "), tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-  sprint_value[PREFIX_LENGTH_TZ - 1] = '\0';
-  snprintf_P(pseudoWriteBuffer, 33, PSTR("R%sP         "), sprint_value + 7);
-
-// 0 2 4 6 8
-// * [ESP] nill
-// * [ESP] 00:00:00-1900:00:00 nill
-
-// #else /* USE_TZ */
-//   snprintf_P(pseudoWriteBuffer, 13, PSTR("R P         "));
-// #endif /* USE_TZ */
-  uint8_t crc = CRC_FEED;
-  for (uint8_t i = 0; i < rh; i++) {
-    uint8_t c = WB[i];
-    snprintf(pseudoWriteBuffer + 2 + timeStamp + (i << 1), 3, "%02X", c);
-    if (CRC_GEN != 0) for (uint8_t i = 0; i < 8; i++) {
-      crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ CRC_GEN) : (crc >> 1));
-      c >>= 1;
-    }
-  }
-  WB[rh] = crc;
-  if (CRC_GEN) snprintf(pseudoWriteBuffer + 2 + timeStamp + (rh << 1), 3, "%02X", crc);
-#ifndef MQTT_INPUT_HEXDATA
-  if (outputMode & 0x0001) clientPublishMqtt(mqttHexdata, pseudoWriteBuffer);
-#endif /* MQTT_INPUT_HEXDATA */
-  if (outputMode & 0x0100) clientPublishSerial(mqttHexdata, pseudoWriteBuffer);
-  pseudoWriteBuffer[22] = 'R';
-  if (outputMode & 0x0010) clientPublishTelnet(mqttHexdata, pseudoWriteBuffer + 22);
-  if (outputMode & 0x0666) process_for_mqtt(WB, rh);
-}
-
 uint32_t espUptime_telnet = 0;
 static bool wasConnected = false;
 
 void loop() {
-  byte readHex[HB];
   // OTA
   ArduinoOTA.handle();
 
@@ -1764,6 +1767,7 @@ void loop() {
         printfTopicS("Uptime %li", espUptime);
       }
       if (!mqttClient.connected()) printfTopicS("MQTT is disconnected (%i s total %i s)", Mqtt_disconnectTime, Mqtt_disconnectTimeTotal);
+      pseudo0C++;
       pseudo0D++;
       pseudo0E++;
       pseudo0F++;
@@ -1993,12 +1997,15 @@ void loop() {
 
 
                 if (outputMode & 0x0666) process_for_mqtt(readHex, rh);
-#ifdef PSEUDO_PACKETS
+#ifdef PSEUDO_PACKETS_SYSTEM
+                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0D)) pseudo0C = 9; // Insert pseudo packet 40000D in output serial after 00000D
+#endif
+#ifdef PSEUDO_PACKETS_INTERNAL
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0D)) pseudo0D = 9; // Insert pseudo packet 40000D in output serial after 00000D
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) pseudo0F = 9; // Insert pseudo packet 40000F in output serial after 00000F
 #endif
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0E)) {
-#ifdef PSEUDO_PACKETS
+#ifdef PSEUDO_PACKETS_INTERNAL
                   pseudo0E = 9; // Insert pseudo packet 40000E in output serial after 00000E
 #endif
                   uint32_t ATmega_uptime = (readHex[3] << 24) || (readHex[4] << 16) || (readHex[5] << 8) || readHex[6];
@@ -2062,7 +2069,13 @@ void loop() {
     } else {
       // wait for more serial input
     }
-#ifdef PSEUDO_PACKETS
+#ifdef PSEUDO_PACKETS_SYSTEM
+    if (pseudo0C > 5) {
+      pseudo0C = 0;
+      writePseudoSystemPackets();
+    }
+#endif
+#ifdef PSEUDO_PACKETS_INTERNAL
     if (pseudo0D > 5) {
       pseudo0D = 0;
       readHex[0] = 0x40;
