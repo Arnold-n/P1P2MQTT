@@ -50,6 +50,13 @@
 #define CAT_UNKNOWN      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'U'); }
 
 #define SRC(x)           { (mqtt_key[MQTT_KEY_PREFIXSRC - MQTT_KEY_PREFIXLEN] = '0' + x); }
+// 2 indoor unit info
+// 8 IU and OU system info
+// 7 ?
+// 4 sender is Hitachi remote control or Airzone
+// 0 pseudopacket, ATmega (differs from Daikin convention)
+// 1 pseudopacket, ESP    (differs from Daikin convention)
+// 9 other
 
 #ifdef __AVR__
 
@@ -970,7 +977,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
   switch (packetType) {
     // PSEUDO_PACKETS_SYSTEM
     case 0x08 :                                                            CAT_PSEUDO_SYSTEM2;
-    case 0x0C : SRC(9);                                                    CAT_PSEUDO_SYSTEM;
+    case 0x0C : SRC(1);                                                    CAT_PSEUDO_SYSTEM;
                 switch (packetSrc) {
       case 0x40 : switch (payloadIndex) {
         case  0 : return 0;

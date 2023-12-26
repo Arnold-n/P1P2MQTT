@@ -56,6 +56,18 @@
 #define CAT_UNKNOWN      { (mqtt_key[MQTT_KEY_PREFIXCAT - MQTT_KEY_PREFIXLEN] = 'U'); }
 
 #define SRC(x)           { (mqtt_key[MQTT_KEY_PREFIXSRC - MQTT_KEY_PREFIXLEN] = '0' + x); }
+// 0 main controller to heat pump
+// 1 (reply)
+// 2 main controller to F0
+// 3 (reply)
+// 4 (reserved for main controller to F1)
+// 5 (reply)
+// 6 (reserved for main controller to FF)
+// 7 (reply)
+// 8 pseudo ATmega
+// 9 pseudo ESP (incl date_time, power)
+// A 80* messages (use value ('A' - '0'))
+// B boot message (use value ('B' - '0'))
 
 #ifdef __AVR__
 
@@ -542,11 +554,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     payloadPointer = &payload[payloadIndex];
   };
 
-  byte PS = packetSrc ? ((packetSrc == 0x80) ? 6 : 1) : 0;
+  byte PS = packetSrc ? ((packetSrc == 0x80) ? ('A' - '0') : 1) : 0;
   byte src = PS;
-  if ((packetType & 0xF0) == 0x30) src += 2;  // 2, 3 from/to auxiliary controller (use 4, 5 for 2nd auxiliary controller?)
-  if ((packetType & 0xF8) == 0x00) src = 7; // boot
+  if ((packetType & 0xF0) == 0x30) {
+    src += 2;  // 2-7 from/to auxiliary controller, 2-3 for F0
+    if (payload[-2] == 0xF1) src += 2; // 4-5 for F1 (not seen in F-series?)
+    if (payload[-2] == 0xFF) src += 4; // 6-7 for F2 (not seen in F-series?)
+  }
   if ((packetType & 0xF8) == 0x08) src = PS + 8; // pseudo-packets ESP / ATmega
+  if ((packetType & 0xF8) == 0x00) src = ('B' - '0'); // boot
   SRC(src); // set char in mqtt_key prefix
 
   switch (packetType) {
