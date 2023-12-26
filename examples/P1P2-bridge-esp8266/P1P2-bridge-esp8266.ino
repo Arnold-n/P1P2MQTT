@@ -1764,9 +1764,12 @@ void loop() {
       }
       if (espUptime >= espUptime_telnet + 10) {
         espUptime_telnet = espUptime_telnet + 10;
-        printfTopicS("Uptime %li", espUptime);
+        if (!mqttClient.connected()) {
+          printfTopicS("Uptime %li, MQTT is disconnected (%i s total %i s)", espUptime, Mqtt_disconnectTime, Mqtt_disconnectTimeTotal);
+        } else {
+          printfTopicS("Uptime %li", espUptime);
+        }
       }
-      if (!mqttClient.connected()) printfTopicS("MQTT is disconnected (%i s total %i s)", Mqtt_disconnectTime, Mqtt_disconnectTimeTotal);
       pseudo0C++;
       pseudo0D++;
       pseudo0E++;
@@ -1840,13 +1843,11 @@ void loop() {
   if (WiFi.isConnected() || ethernetConnected) {  // TODO for now: use initial ethernet connection status instead (ethernet cable disconnect is thus not detected)
     if (!mqttClient.connected()) {
       if (espUptime > reconnectTime) {
-        printfTopicS("MQTT Try to reconnect to MQTT server %s:%i (user %s/password *)", EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort, EEPROM_state.EEPROMnew.mqttUser);
         mqttClient.connect();
         delay(500);
         if (mqttClient.connected()) {
-          printfTopicS("Mqtt reconnected");
           if (outputMode & 0x40000) {
-            printfTopicS("Restart ESP after Mqtt reconnect (outputMode 0x40000)");
+            printfTopicS("Mqtt reconnected, Restarting ESP after Mqtt reconnect (outputMode 0x40000)");
 #ifdef REBOOT_REASON
             EEPROM_state.EEPROMnew.rebootReason = REBOOT_REASON_MQTT;
             EEPROM.put(0, EEPROM_state);
@@ -1855,8 +1856,9 @@ void loop() {
             delay(100);
             ESP.restart();
             delay(100);
+          } else {
+            printfTopicS("Mqtt reconnected - %s", WELCOMESTRING);
           }
-          printfTopicS(WELCOMESTRING);
           reconnectTime = espUptime;
           if (outputMode & 0x80000) {
             printfTopicS("Restart data communication after Mqtt reconnect (outputMode 0x80000)");
@@ -1865,7 +1867,7 @@ void loop() {
             resetDataStructures();
           }
         } else {
-          printfTopicS("Reconnect failed, retrying in 5 seconds"); // TODO
+          printfTopicS("Reconnect to MQTT server %s:%i (user %s/password *) failed, retrying in 5 seconds", EEPROM_state.EEPROMnew.mqttServer, EEPROM_state.EEPROMnew.mqttPort, EEPROM_state.EEPROMnew.mqttUser);
           reconnectTime = espUptime + 5;
         }
       }
