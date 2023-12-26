@@ -1584,7 +1584,7 @@ void setup() {
 // OTA
   // port defaults to 8266
   // ArduinoOTA.setPort(8266);
-  // Hostname defaults to esp8266-[ChipID]
+  // Hostname defaults to esp8266-[ChipID], we use P1P2MQTT_[bridgename]
   ArduinoOTA.setHostname(OTA_HOSTNAME); // TODO MDNS doesn't work due to webserver re-initing MDNS ?
   // No authentication by default
 #ifdef OTA_PASSWORD
