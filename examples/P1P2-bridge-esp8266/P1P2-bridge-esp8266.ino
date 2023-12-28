@@ -273,7 +273,7 @@ void onTelnetConnect(String ip) {
   Serial_print(ip);
   Serial_println(F(" connected"));
   telnet.print("\nWelcome " + telnet.getIP() + " to ");
-  telnet.print(F(WELCOMESTRING_TELNET));
+  telnet.print(F(WELCOMESTRING));
   telnet.print(" compiled ");
   telnet.print(__DATE__);
   telnet.print(" ");

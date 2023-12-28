@@ -142,7 +142,6 @@
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
 #define WELCOMESTRING "P1P2-bridge-esp8266 v0.9.45rc"
-#define WELCOMESTRING_TELNET "P1P2-bridge-esp8266 v0.9.45rc"
 #define HA_SW "0.9.45rc"
 #define SW_MAJOR_VERSION 0
 #define SW_MINOR_VERSION 9
