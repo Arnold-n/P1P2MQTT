@@ -71,6 +71,7 @@
 //#define E_SERIES // for Daikin E* heat pumps
 //#define F_SERIES // for Daikin F* VRV systems
 //#define H_SERIES // for Hitachi H-link systems
+//TESTREGEL
 //#define T_SERIES // for Toshiba TCC-link systems
 //#define MHI_SERIES // for Mitsubishi Heavy Industry systems
 
@@ -297,5 +298,7 @@ char mqttInputHexData[11]= "P1P2/R";  // default accepts input from any P1P2/R/#
 #define EEPROM_SIGNATURE_OLD2 "P1P2sih" // old signature for EEPROM initialization (user/password length 80/80, rebootReason)
 #define EEPROM_SIGNATURE_OLD3 "P1P2sii" // old signature for EEPROM initialization (user/password length 80/80, rebootReason, outputMode, outputFilter, mqttInputByte4, reserved-data)
 #define EEPROM_SIGNATURE_NEW  "P1P2sij" // new signature for EEPROM initialization (user/password length 80/80, rebootReason, outputMode, outputFilter, mqttInputByte4, hwId, EEPROM_version, reserved-data)
+
+#define BLUELED_PIN 2      // pin 17 GPIO 2
 
 #endif /* P1P2_Config */
