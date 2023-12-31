@@ -82,8 +82,7 @@ Header: 000010
 |17:6      | 0/1                | operation (off/on)       | bit
 |17:1      | 0/1                | booster (off/on)         | bit
 |17:others | 0                  | ?                        | bit
-|    18    | 3C                 | DHW target temperature   | u8 / f8.8?
-|    19    | 00                 | fractional part byte 18? |
+|  18-19   | 3C                 | DHW setpoint request (target temperature)   | f8s8
 
 ### Packet type 10: response
 
@@ -95,7 +94,7 @@ Header: 400010
 | 0:1      | 0/1                | Cooling mode (off/on)    | bit
 | 0:other  | 0                  | ?                        | bit
 | 1:7      | 0/1                | Operating mode gas?      | bit
-| 1:0      | 0                  | Operating mode?          | bit
+| 1:0      | 0                  | DHW (off/on)             | bit
 | 1:other  | 0                  | Operating mode?          | bit
 | 2:7      | 0/1                | DHW tank power (off/on)  | bit
 | 2:6      | 0/1                | Additional zone (off/on) | bit
@@ -108,8 +107,7 @@ Header: 400010
 | 3:4      | 0/1                | status 3-way valve (SHC/tank) | bit
 | 3:0      | 0/1                | status 3-way valve (off/on)   | bit
 | 3:others | 0                  | ?                        | bit
-| 4        | 3C                 | DHW target temperature| u8 / f8.8?
-| 5        | 00                 | +fractional part?        |
+| 4-5      | 3C                 | DHW target temperature   | f8s8
 | 6        | 0F                 | ?                        | u8 / flag8?
 | 7        | 00                 | ?
 | 8        | 14                 | Target room temperature  | u8 / f8.8?
@@ -233,8 +231,7 @@ Header: 400013
 
 | Byte(:bit) | Hex value observed | Description                 | Data type
 |:-----------|:-------------------|:----------------------------|:-
-|     0      | 3C                 | DHW target temperature (one packet delayed/from/via boiler?/ 0 in first packet after restart) | u8 / f8.8 ?
-|     1      | 00                 |  +fractional part?
+|   0-1      | 3C                 | DHW setpoint (delayed, from gasboiler? / target temperature)  | f8s8 ?
 |     2      | 01                 | ?
 |     3      | 40/D0              | ?
 |   3:5-0    | 0                  | ?                                  | bit
