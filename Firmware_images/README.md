@@ -1,26 +1,26 @@
-# Firmware images for P1P2-ESP-Interface
+# Firmware images for P1P2MQTT bridge
 
 The P1P2MQTT bridge (previously P1P2-ESP-interface) has 2 CPUs:
  - ATmega328P running P1P2Monitor
- - ESP8266 running P1P2-bridge-esp8266 (software will later be renamed by P1P2MQTT)
+ - ESP8266 running P1P2MQTT-bridge (previously P1P2-bridge-esp8266)
 
-A full upgrade involves flashing both CPUs.
+A full upgrade involves flashing both CPUs. Especially for v0.9.46 both CPUs must be flashed.
 
-## P1P2Monitor firmware for ATmega328 on P1P2-ESP-Interface
+## P1P2Monitor firmware for ATmega328
 
-These images are for the P1P2-ESP-interface (P1P2MQTT bridge) v1.0, v1.1 and v1.2. They do not work on the Arduino Uno.
+These images are for the P1P2MQTT bridge (previously called P1P2-ESP-interface). These images do not work on the Arduino Uno.
 
 P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and FDY/FDYQ/FXMQ F-series. Monitoring is also available for certain F-series models (using the generic F-series firmware).
 
-[P1P2Monitor v0.9.45 for Daikin E-series](P1P2Monitor-v0.9.45-Eseries-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.46 for Daikin E-series](P1P2Monitor-v0.9.46-Daikin-E.ino.hex)
 
-[P1P2Monitor v0.9.45 for Daikin F-series (model selectable with M command:)](P1P2Monitor-v0.9.45-Fseries-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.46 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.46-Daikin-F.ino.hex)
 
-[P1P2Monitor v0.9.45 (experimental for Hitachi models)](P1P2Monitor-v0.9.45-Hseries-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.46 (experimental for Hitachi models)](P1P2Monitor-v0.9.46-Hitachi.ino.hex)
 
-[P1P2Monitor v0.9.45 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.45-MHIseries-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.46 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.46-MHI.ino.hex)
 
-[P1P2Monitor v0.9.45 (experimental for Toshiba models)](P1P2Monitor-v0.9.45-Tseries-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.46 (experimental for Toshiba models)](P1P2Monitor-v0.9.46-Toshiba.ino.hex)
 
 To flash this image OTA (Linux CLI):
 
@@ -39,19 +39,19 @@ avrdude.exe -c avrisp -p m328p  -P net:<IPv4>:328 -e -Uflash:w:<hex-file>:i
 If you have trouble installing avrdude, you may prefer to wait for a later P1P2-bridge-esp8266 version which will support P1P2Monitor updates via a webserver running on the ESP.
 
 
-## P1P2-bridge-esp8266 firmware for ESP8266 on P1P2-ESP-Interface
+## P1P2MQTT-bridge firmware for ESP8266
 
-[P1P2-bridge-esp8266 v0.9.45 (P1P2-ESP-Interface version) for Daikin E-series](P1P2-bridge-esp8266-v0.9.45-Eseries-P1P2MQTT-bridge.ino.bin)
+[P1P2MQTT-bridge v0.9.46 for Daikin E-series](P1P2MQTT-bridge-v0.9.46-Daikin-E.ino.bin)
 
-[P1P2-bridge-esp8266 v0.9.45 (P1P2-ESP-Interface version) for Daikin F-series](P1P2-bridge-esp8266-v0.9.45-Fseries-P1P2MQTT-bridge.ino.bin)
+[P1P2MQTT-bridge v0.9.46 for Daikin F-series](P1P2MQTT-bridge-v0.9.46-Daikin-F.ino.bin)
 
-[P1P2-bridge-esp8266 v0.9.45 (P1P2-ESP-Interface version) for Hitachi models (experimental)](P1P2-bridge-esp8266-v0.9.45-Hseries-P1P2MQTT-bridge.ino.bin)
+[P1P2MQTT-bridge v0.9.46 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.46-Hitachi.ino.bin)
 
-[P1P2-bridge-esp8266 v0.9.45 (P1P2-ESP-Interface version) for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2-bridge-esp8266-v0.9.45-MHIseries-P1P2MQTT-bridge.ino.bin)
+[P1P2MQTT-bridge v0.9.46 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.46-MHI.ino.bin)
 
 (for Toshiba, use Hitachi code for now).
 
-Note to users of the older v1.0 version of the P1P2-ESP-interface: please do not erase the flash area of the ESP8266 when flashing these images; if you do, you will need to reset the hardware identifier back to 0 using the 'P31 0' command (or you will not be able to flash the ATmega328P).
+Note to users of the original v1.0 version: please do not erase the flash memory of the ESP8266 when flashing these images; if you do, you will need to reset the hardware identifier back to 0 using the 'P31 0' command (or you will not be able to flash the ATmega328P).
 
 To flash this image OTA (browser):
 
@@ -83,9 +83,9 @@ yourpath\Arduino-master\tools\espota.py -i <IPv4> -p 8266 --auth=P1P2MQTT -f <bi
 
 ## P1P2MQTT-HomeWizard
 
-To provide electricity meter data from an HomeWizards WiFi-enabled MID meter, via MQTT, to the P1P2MQTT bridge, a separate ESP8266 is required. Any ESP8266 with 1MB memory will do, like a ESP01S (using the USB programmer for power), or a WeMos module.
+To provide electricity meter data from an HomeWizards WiFi-enabled MID meter, via MQTT, to the P1P2MQTT bridge, a separate ESP8266 is required. Any ESP8266 with 1MB memory will do, like an ESP01S (using the USB programmer for power), or a WeMos module.
 
-[P1P2MQTT-HomeWizard-kWh-bridge-v0.9.45.ino.bin](P1P2MQTT-HomeWizard-kWh-bridge-v0.9.45.ino.bin)
+[P1P2MQTT-HomeWizard-kWh-bridge-v0.9.46.ino.bin](P1P2MQTT-HomeWizard-kWh-bridge-v0.9.46.ino.bin)
 
 ## FOSS notice
 
