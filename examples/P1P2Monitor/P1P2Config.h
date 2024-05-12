@@ -1,8 +1,9 @@
 /* P1P2Config.h
  *
- * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
+ * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
- * 20230702 v0.9.40 increase Hitachi buffer size
+ * 20240512 v0.9.46 simultaneous writes, (fake) room temperature sensor, MHI increased buffer size, check-sum, and MHI-protocol data conversion, removed OLD_COMMAND support
+ * 20230702 v0.9.40 increase buffer size for Hitachi
  * 20230611 v0.9.39 do init Daikin fields in H-link2 version too
  * 20230611 v0.9.38 H-link2 branch merged into main branch
  * 20230604 v0.9.37 support for ATmega serial enable/disable via PD4, required for P1P2MQTT bridge v1.2
@@ -27,32 +28,30 @@
  *
  */
 
-#define EEPROM_SUPPORT   // adds EEPROM support to store verbose, counterrepeatingrequest, and CONTROL_ID
-#define PSEUDO_PACKETS   // adds pseudopacket to serial output with ATmega status info for P1P2-bridge-esp8266
+#ifndef MHI_SERIES
+#define PSEUDO_PACKETS   // adds pseudopacket to serial output with ATmega status info
+#endif
 
 //#include "Arduino.h"
 
 // Define serial speed
 // Use 115200 for Arduino Uno/Mega2560 (serial over USB)
-// Use 250000 for P1P2-ESP-interface, for direct serial connection between ATmega and ESP8266
+// Use 250000 for P1P2MQTT bridge, for direct serial connection between ATmega and ESP8266
 //
-#define COMBIBOARD // define this for Uno+ESP combiboard, determines SERIALSPEED (250k instead of 115k2) and SERIAL_MAGICSTRING. Ignored if F_CPU=8MHz (as used in P1P2-ESP-Interface)
+#define COMBIBOARD // define this for Uno+ESP combiboard, determines SERIALSPEED (250k instead of 115k2) and SERIAL_MAGICSTRING. Ignored if F_CPU=8MHz (as used in P1P2MQTT bridge)
 
-// define only one of E_SERIES and F_SERIES and H_SERIES:
-//#define E_SERIES // for Daikin E* heat pumps
-//#define F_SERIES // for Daikin F* VRV systems, defining this enables "L5" and a reply to (only) 00F030; for experimenting with particular models and "L1" mode, uncomment line for your model:
-//#define H_SERIES // for H-link2 systems
-//#define T_SERIES // for Toshiba systems
-//#define FDY
-//#define FDYQ
-//#define FXMQ
+// define only one of *_SERIES:
+//#define E_SERIES   // for Daikin E* heat pumps
+//#define F_SERIES   // for Daikin F* VRV systems
+//#define H_SERIES   // for Hitachi H-link2 systems
+//#define M_SERIES   // for Mitsubishi systems (not supported yet)
+//#define MHI_SERIES // for MHI (Mitsubishi Heavy Industries) systems
+//#define S_SERIES   // for Sanyo systems (not supported yet)
+//#define T_SERIES   // for Toshiba systems
 
 #if (defined E_SERIES || defined F_SERIES)
 #define EF_SERIES
 #define MONITORCONTROL   // enables P1P2 bus writing (as auxiliary controller and/or for requesting counters)
-#ifdef E_SERIES
-#define OLD_COMMANDS // still support commands like 'Z' until we run out of ATmega program memory
-#endif
 #endif /* (defined E_SERIES || defined F_SERIES) */
 
 #if (defined T_SERIES || defined H_SERIES)
@@ -69,24 +68,19 @@
 // do not #define SERIAL_MAGICSTRING
 #endif
 #else /* F_CPU <= 8MHz */
-// Assume on P1P2-ESP-Interface hardware, 8MHz ATmega328P(B), use 250000 Baud and SERIAL_MAGICSTRING
+// Assume on P1P2MQTT bridge hardware, 8MHz ATmega328P(B), use 250000 Baud and SERIAL_MAGICSTRING
 #define SERIALSPEED 250000
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "P1P2Monitor-v0.9.45rc"
+#define WELCOMESTRING "P1P2Monitor v0.9.46"
 #define SW_MAJOR_VERSION 0
 #define SW_MINOR_VERSION 9
-#define SW_PATCH_VERSION 45
+#define SW_PATCH_VERSION 46
 
-#define INIT_VERBOSE 3
-// Set verbosity level
-// verbose = 0: very limited reporting, raw data only (no R prefix); other data starts with *
-// verbose = 1: interactive behavior, maximal reporting (*/R prefix)
-// verbose = 2: status reports via pseudo packet, limited reporting, used in P1P2-ESP-interface (*/R prefix) for P1P2-bridge-esp8266/P1P2MQTT (default)
-// verbose = 3: as verbose 2, but with timing info added (also works with P1P2-bridge-esp8266/P1P2MQTT) for real packets
-//                   (format: 10-character "T 65.535: " for real packets and "P         " for pseudopackets)
-// verbose = 4: no raw/pseudopacket data output, only maximal reporting
+#ifdef MHI_SERIES
+#define INIT_MHI_FORMAT 1 // 1 (default) for conversion from/to 3-bit-per-byte format with check-sum, 0 for raw data
+#endif /* MHI_SERIES */
 
 #define COUNTERREPEATINGREQUEST 0 // Change this to 1 to trigger a counter request cycle at the start of each minute
                                   //   By default this works only as, and only if there is no other, first auxiliary controller (F0)
@@ -111,38 +105,68 @@
 #define CONTROL_ID_1    0xF1     // second auxiliary controller address
 
 // EEPROM saves state of
-// -CONTROL_ID (whether P1P2Monitor acts as auxiliary controller, and which one) (not for H-link2)
-// -counterrepeatingrequest (whether P1P2Monitor repeatedly requests counters) (not for H-link2)
+// -Daikin CONTROL_ID (whether P1P2Monitor acts as auxiliary controller, and which one) (Daikin only)
+// -Daikin counterrepeatingrequest (whether P1P2Monitor repeatedly requests counters) (Daikin E_SERIES only)
 // -verbose (verbosity level)
-// -brand  0=unknown 
-//         1=Daikin
-//         2=Hitachi
-//         3=Mitsubishi
-//         4=MHI
-//         5=Panasonic
-//         6=Sanyo
-//         7=Toshiba
+// -MHI format conversion on/off
+// -MHI inter-byte pause allowance
+// -brand  0=unknown
+//         1=Daikin (E_SERIES and F_SERIES)
+//         2=Hitachi (H_SERIES)
+//         3=Mitsubishi (M_SERIES)
+//         4=MHI (MHI_SERIES)
+//         5=Panasonic (P_SERIES)
+//         6=Sanyo (S_SERIES)
+//         7=Toshiba (T_SERIES)
 // -model (currently for Daikin only):
 //         0=undefined/unknown
 //         1=F-series generic,
 //         2=EKH/Altherma, EKH, EWYQ?
 //         3=major versions CA/CB/Altherma 3
 //         4-9 reserved for other major versions
-//         10=F-series, major version B,C,L(some) 
-//         11=F-series, major version L(some),P,A 
+//         10=F-series, major version B,C,L(some)
+//         11=F-series, major version L(some),P,A
 //         12=F-series, major version M
 //         20-29 reserved for EKH*/Altherma 2/ perhaps EWYQ,EWAQ
 //         30-39 reserved for Altherma 3 models
 //
 // to reset EEPROM to settings in P1P2Config.h, either erase EEPROM, or change EEPROM_SIGNATURE in P1P2Config.h
-#define EEPROM_SIGNATURE "P1P2SIG01" // change this every time you wish to re-init EEPROM settings to the settings in P1P2Config.h
-#define EEPROM_ADDRESS_CONTROL_ID      0x00 // 1 byte for CONTROL_ID (Daikin-specific)
-#define EEPROM_ADDRESS_COUNTER_STATUS  0x01 // 1 byte for counterrepeatingrequest (Daikin-specific)
-#define EEPROM_ADDRESS_VERBOSITY       0x02 // 1 byte for verbose
-#define EEPROM_ADDRESS_BRAND           0x03 // 1 byte for brand
-#define EEPROM_ADDRESS_MODEL           0x04 // 1 byte for model
-                                            // 0x05 .. 0x0F reserved
-#define EEPROM_ADDRESS_SIGNATURE       0x10 // should be highest, in view of unspecified strlen(EEPROM_SIGNATURE)
+#ifdef E_SERIES
+#define EEPROM_SIGNATURE "P1P2SIG01"
+#elif defined F_SERIES
+#define EEPROM_SIGNATURE "P1P2-F"
+#elif defined H_SERIES
+#define EEPROM_SIGNATURE "P1P2-H"
+#elif defined M_SERIES
+#define EEPROM_SIGNATURE "P1P2-M"
+#elif defined MHI_SERIES
+#define EEPROM_SIGNATURE "P1P2-MHI"
+#elif defined S_SERIES
+#define EEPROM_SIGNATURE "P1P2-S"
+#elif defined T_SERIES
+#define EEPROM_SIGNATURE "P1P2-T"
+#else
+#define EEPROM_SIGNATURE "P1P2OTHER"
+#endif
+
+#define EEPROM_ADDRESS_CONTROL_ID          0x00 // 1 byte for CONTROL_ID (Daikin-specific)
+#define EEPROM_ADDRESS_COUNTER_STATUS      0x01 // 1 byte for counterrepeatingrequest (Daikin-specific)
+#define EEPROM_ADDRESS_BRAND               0x03 // 1 byte for brand
+#define EEPROM_ADDRESS_MODEL               0x04 // 1 byte for model
+#define EEPROM_ADDRESS_ERROR_MASK          0x05 // 1 byte for error mask
+#if defined MHI_SERIES || defined TH_SERIES
+#define EEPROM_ADDRESS_ALLOW               0x06 // 1 byte for MHI max inter-byte pause
+#endif /* MHI_SERIES || TH_SERIES */
+#ifdef MHI_SERIES
+#define EEPROM_ADDRESS_MHI_FORMAT          0x07 // 1 byte for raw/MHI setting
+#endif /* MHI_SERIES */
+#ifdef EF_SERIES
+#define EEPROM_ADDRESS_WRITE_BUDGET_PERIOD 0x06 // 1 byte for write budget period
+#define EEPROM_ADDRESS_INITIAL_WRITE_BUDGET 0x07 // 1 byte for initial write budget
+#endif /* EF_SERIES */
+                                                // 0x08 and 0x0A-0x0F reserved
+#define EEPROM_ADDRESS_VERSION             0x09
+#define EEPROM_ADDRESS_SIGNATURE           0x10 // should be last, in view of unspecified strlen(EEPROM_SIGNATURE)
 
 #ifdef E_SERIES
 #define INIT_BRAND 1
@@ -160,13 +184,17 @@
 #define INIT_BRAND 6
 #define INIT_MODEL 0
 #endif
+#ifdef MHI_SERIES
+#define INIT_BRAND 4
+#define INIT_MODEL 0
+#endif
 
 #ifdef EF_SERIES
 // Write budget: thottle parameter writes to limit flash memory wear
-#define TIME_WRITE_PERMISSION 3600 // on avg max one write per 3600s allowed
-#define MAX_WRITE_PERMISSION   100 // budget never higher than 100 (don't allow to burn more than 100 writes at once) // 8-bit, so max 254; 255 is "infinity" (i.e. no budget limit)
-#define INIT_WRITE_PERMISSION   10 // initial write budget upon boot (255 = unlimited; recommended: 10)
-#define WR_CNT 1                   // number of write repetitions for writing a paramter. 1 should work reliably, no real need for higher value
+#define INIT_WRITE_BUDGET_PERIOD 60 // on avg max one write per 60m allowed
+#define MAX_WRITE_BUDGET        100 // budget never incremented beyond this value (so don't allow to burn more than 100 writes at once)
+#define INIT_WRITE_BUDGET        10 // initial write budget upon boot (255 = unlimited; recommended: 10)
+#define WR_CNT 1                    // number of write repetitions for writing a paramter. 1 should work reliably, no real need for higher value
 
 // Error budget: P1P2Monitor should not see any errors except upon start falling into a packet
 // so if P1P2Monitor sees see too many errors, it stops writing
@@ -183,6 +211,15 @@
 // P1/P2 read buffer size to store raw data and error codes read from P1P2bus; 1 extra for reading back CRC byte; 24 might be enough
 #define RB_SIZE 33
 #endif /* EF_SERIES */
+
+#ifdef MHI_SERIES
+// serial read buffer size for reading from serial port, max line length on serial input is 150 (2 characters per byte, plus some)
+#define RS_SIZE 110
+// MHI: should be >22, tbd
+#define WB_SIZE 41
+// MHI: should be >22, tbd
+#define RB_SIZE 41
+#endif /* MHI_SERIES */
 
 #ifdef TH_SERIES
 // serial read buffer size for reading from serial port, max line length on serial input is 150 (2 characters per byte, plus some)
@@ -202,9 +239,15 @@
 #ifdef EF_SERIES
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
 #else /* EF_SERIES */
-#define CRC_GEN 0x00    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid; no CRC for Hitachi/Toshiba
+#define CRC_GEN 0x00    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid; no CRC check for Hitachi/Toshiba (CS not checked in lib)
 #endif /* EF_SERIES */
-#define CRC_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is checked when reading or added when writing
+#define CRC_CS_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is checked when reading or added when writing (in case of Hitachi/Toshiba/MHI)
+
+#ifdef MHI_SERIES
+#define CS_GEN 1        // Use (addition) checksum generator/verification for MHI
+#else
+#define CS_GEN 0        // Use (addition) checksum generator/verification for MHI
+#endif /* MHI_SERIES */
 
 #ifdef EF_SERIES
 // auxiliary controller timings
@@ -215,7 +258,7 @@
 #define ENABLE_INSERT_MESSAGE // enables L99 to restart Daikin system and enables W command to insert messages in 40F030 (3x if ENABLE_INSERT_ME$SAGE_3x also defined) slot during L1 operation, use with care!
 #define ENABLE_INSERT_MESSAGE_3x // enables L99 to restart Daikin system and enables W command to insert messages in 40F03x slot during L1 operation, use with even more care!
 #define F030DELAY_INSERT 25    // Time delay for inserted message; 25 seems OK, but if bus collisions occur, try 5
-#define RESTART_NR_MESSAGES 1 // nr of restart messages to be sent (should be 1, perhaps 2, not more)
+#define RESTART_NR_MESSAGES 2 // nr of restart messages to be sent (1 is sometimes not enough, 2 OK?)
 #define RESTART_PACKET_TYPE 0x12
 #define RESTART_PACKET_PAYLOAD_BYTE 12
 #define RESTART_PACKET_BYTE 0x20

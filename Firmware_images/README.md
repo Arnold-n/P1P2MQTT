@@ -12,19 +12,15 @@ These images are for the P1P2-ESP-interface (P1P2MQTT bridge) v1.0, v1.1 and v1.
 
 P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and FDY/FDYQ/FXMQ F-series. Monitoring is also available for certain F-series models (using the generic F-series firmware).
 
-[P1P2Monitor v0.9.42 for Daikin E-series](P1P2Monitor-v0.9.42-Eseries-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.45 for Daikin E-series](P1P2Monitor-v0.9.45-Eseries-P1P2MQTT-bridge.ino.hex)
 
-[P1P2Monitor v0.9.42 for Daikin F-series (no control)](P1P2Monitor-v0.9.42-Fseries-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.45 for Daikin F-series (model selectable with M command:)](P1P2Monitor-v0.9.45-Fseries-P1P2MQTT-bridge.ino.hex)
 
-[P1P2Monitor v0.9.42 (only for Daikin FDY)](P1P2Monitor-v0.9.42-FDY-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.45 (experimental for Hitachi models)](P1P2Monitor-v0.9.45-Hseries-P1P2MQTT-bridge.ino.hex)
 
-[P1P2Monitor v0.9.42 (only for Daikin FDYQ)](P1P2Monitor-v0.9.42-FDYQ-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.45 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.45-MHIseries-P1P2MQTT-bridge.ino.hex)
 
-[P1P2Monitor v0.9.42 (only for Daikin FXMQ and some other daikin F-series models)](P1P2Monitor-v0.9.42-FXMQ-P1P2MQTT-bridge.ino.hex)
-
-[P1P2Monitor v0.9.42 (experimental for Hitachi models)](P1P2Monitor-v0.9.42-Hseries-P1P2MQTT-bridge.ino.hex)
-
-[P1P2Monitor v0.9.42 (experimental for Toshiba models)](P1P2Monitor-v0.9.42-Tseries-P1P2MQTT-bridge.ino.hex)
+[P1P2Monitor v0.9.45 (experimental for Toshiba models)](P1P2Monitor-v0.9.45-Tseries-P1P2MQTT-bridge.ino.hex)
 
 To flash this image OTA (Linux CLI):
 
@@ -45,15 +41,17 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 
 ## P1P2-bridge-esp8266 firmware for ESP8266 on P1P2-ESP-Interface
 
-[P1P2-bridge-esp8266 v0.9.43 (P1P2-ESP-Interface version) for Daikin E-series](P1P2-bridge-esp8266-v0.9.43-Eseries-P1P2MQTT-bridge.ino.bin)
+[P1P2-bridge-esp8266 v0.9.45 (P1P2-ESP-Interface version) for Daikin E-series](P1P2-bridge-esp8266-v0.9.45-Eseries-P1P2MQTT-bridge.ino.bin)
 
-[P1P2-bridge-esp8266 v0.9.42 (P1P2-ESP-Interface version) for Daikin F-series](P1P2-bridge-esp8266-v0.9.42-Fseries-P1P2MQTT-bridge.ino.bin)
+[P1P2-bridge-esp8266 v0.9.45 (P1P2-ESP-Interface version) for Daikin F-series](P1P2-bridge-esp8266-v0.9.45-Fseries-P1P2MQTT-bridge.ino.bin)
 
-[P1P2-bridge-esp8266 v0.9.42 (P1P2-ESP-Interface version) for Hitachi models (experimental)](P1P2-bridge-esp8266-v0.9.42-Hseries-P1P2MQTT-bridge.ino.bin)
+[P1P2-bridge-esp8266 v0.9.45 (P1P2-ESP-Interface version) for Hitachi models (experimental)](P1P2-bridge-esp8266-v0.9.45-Hseries-P1P2MQTT-bridge.ino.bin)
 
-[P1P2-bridge-esp8266 v0.9.42 (P1P2-ESP-Interface version) for Toshiba models (experimental)](P1P2-bridge-esp8266-v0.9.42-Tseries-P1P2MQTT-bridge.ino.bin)
+[P1P2-bridge-esp8266 v0.9.45 (P1P2-ESP-Interface version) for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2-bridge-esp8266-v0.9.45-MHIseries-P1P2MQTT-bridge.ino.bin)
 
-Note to users of the older v1.0 version of the P1P2-ESP-interface: please do not erase the flash area of the ESP8266 when flashing these images; if you do, you will need to reset the hardware identifier back to 0 using the 'B' command (or you will not be able to flash the ATmega328P).
+(for Toshiba, use Hitachi code for now).
+
+Note to users of the older v1.0 version of the P1P2-ESP-interface: please do not erase the flash area of the ESP8266 when flashing these images; if you do, you will need to reset the hardware identifier back to 0 using the 'P31 0' command (or you will not be able to flash the ATmega328P).
 
 To flash this image OTA (browser):
 
@@ -82,6 +80,12 @@ yourpath\Arduino-master\tools\espota.py -i <IPv4> -p 8266 --auth=P1P2MQTT -f <bi
 ```
 yourpath\Arduino-master\tools\espota.py -i <IPv4> -p 8266 --auth=P1P2MQTT -f <bin-file>
 ```
+
+## P1P2MQTT-HomeWizard
+
+To provide electricity meter data from an HomeWizards WiFi-enabled MID meter, via MQTT, to the P1P2MQTT bridge, a separate ESP8266 is required. Any ESP8266 with 1MB memory will do, like a ESP01S (using the USB programmer for power), or a WeMos module.
+
+[P1P2MQTT-HomeWizard-kWh-bridge-v0.9.45.ino.bin](P1P2MQTT-HomeWizard-kWh-bridge-v0.9.45.ino.bin)
 
 ## FOSS notice
 

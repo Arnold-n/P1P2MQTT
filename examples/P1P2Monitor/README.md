@@ -1,5 +1,5 @@
 **P1P2Monitor**
 
-This program is designed to run on an ATmega328P(B) on an Arduino Uno or as part of the P1P2-ESP-Interface.
+This program is designed to run on an ATmega328P at 8MHz in the P1P2MQTT bridge.
 
-Command explanation can be found [here](https://github.com/Arnold-n/P1P2Serial/P1P2Monitor-commands.md).
+Command explanation can be found [here](https://github.com/Arnold-n/P1P2MQTT/doc/P1P2Monitor-commands.md).

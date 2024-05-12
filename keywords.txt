@@ -1,12 +1,12 @@
 #######################################
-# Syntax Coloring Map For P1P2Serial
+# Syntax Coloring Map For P1P2MQTT
 #######################################
 
 #######################################
 # Datatypes (KEYWORD1)
 #######################################
 
-P1P2Serial	KEYWORD1	P1P2Serial
+P1P2MQTT	KEYWORD1	P1P2MQTT
 
 #######################################
 # Methods and Functions (KEYWORD2)

@@ -1,15 +1,15 @@
-## Project licenses
+## Project license
 
-This software is licensed under the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International license [(CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/) with additional permissive exceptions as indicated below. Under this license the software is
+- The P1P2Monitor software and the P1P2MQTT library are licensed under the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International license [(CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/) with additional permissive exceptions as indicated below. Under this license the software is
   - free for personal use,
   - further distribution is allowed only in unmodified form ("ND") and only for non-commercial use ("NC") and any distribution requires attribution ("BY"),
   - commercial redistribution is not allowed ("NC") at all without explicit prior written approval from the project owner,
-  - with exception 1: you may distribute any modifications but only under the same license in the form of a direct or indirect fork on github of this project, thus ensuring everyone easy access to your modifications under the same license conditions, and
+  - with exception 1: you may distribute any modifications but only under the same license in the form of a direct or indirect public fork on github of this project, thus ensuring everyone easy access to your modifications, under the same license conditions, and
   - with exception 2: the "NC" and "ND" limitations no longer apply if the project is no longer maintained for at least 3 years, the project will then be deemed available under the Creative Commons ShareAlike 4.0 International [(CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).
 
 Contributions to this project are very welcome: feedback, P1/P2 bus logs, documentation, reverse engineering notes, or code. Code contributions are to be done under the project license, which is the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International license [(CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/) with additional exceptions as indicated above.
 
-Additionally, upon contributing any code you are herewith asked and deemed to waive the NoDerivatives limitation towards the project and its users, to enable further development of the project. Also, upon contributing any code you are herewith asked and deemed to waive the NonCommercial limitation towards the project owner. This makes it possible for me to make and sell (factory-made) P1P2-ESP-Interfaces and other hardware for this project. It is more material- and cost-efficient if these boards are made centrally (I have invested a lot of time and failed experiments in making small, efficient, reliable circuitry).
+Also, upon contributing any code you are herewith asked and deemed to waive the NonCommercial and NoDerivatives limitations towards the project owner. This makes it possible for me to make and sell (factory-made) P1P2MQTT bridges and other hardware for this project. It is more material- and cost-efficient if these boards are made centrally, and to continue this project (I have invested a lot of time and failed experiments in making small, efficient, reliable circuitry).
 
 ## CC-BY-NC-ND 4.0 license
 
