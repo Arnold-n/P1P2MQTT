@@ -229,7 +229,7 @@
         case    8 : KEY1_PUB_CONFIG_CHECK_ENTITY("ESP_Ethernet_Connected");                                                                                               VALUE_u8hex;
         case    9 : KEY1_PUB_CONFIG_CHECK_ENTITY("ESP_Telnet_Connected");                                                                                                 VALUE_u8;
         case   10 : switch (bitNr) {
-          case  8 : bcnt = 27; BITBASIS;
+          case  8 : bcnt = 0; BITBASIS;
           case  0 : HACONFIG; CAT_SETTING; KEYBIT_PUB_CONFIG_PUB_ENTITY("ESP_EEPROM_Saved");
           case  1 : HACONFIG; CAT_SETTING; KEYBIT_PUB_CONFIG_PUB_ENTITY("ESP_Factory_Reset_Scheduled");
           case  5 : HACONFIG; CAT_SETTING; QOS_AVAILABILITY; KEYBIT_PUB_CONFIG_PUB_ENTITY("ESP_Throttling");

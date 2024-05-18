@@ -419,9 +419,11 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,   0,  20,  40,  60,  
 #define sizePayloadByteVal  829
 #define sizePayloadByteSeen 104 // ceil(829/8)
 
+#define sizePayloadBitsSeen 1
+
 #elif defined MHI_SERIES
 
-#define sizePayloadBitsSeen 2
+#define sizePayloadBitsSeen 0x14
 
 // no pseudo packet translation yet due to packetSrc conflict
 
@@ -486,15 +488,22 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,  16,  32,  48,  64  /
 //
 // ..
 
-#define sizePayloadBitsSeen 9 // for Hitachi, but not for Toshiba
+// 21:
+// ..
+// 29:
+//
+//
+// 2A: 21 00 1C 0..24
 
-#define PCKTP_ARR_SZ 0x2A
-//byte pti                                      =   0..F  (0..7 for 000008..00000F, 8..F for 400008..40000F)                           10-14                           15-1E                                             1F-20
-//byte pti                                      =    0    1    2    3    4    5    6    7    8    9   0A   0B   0C   0D   0E   0F      10   11   12   13   14          15   16   17   18   19   1A   1B   1C   1D   1E   1F   20   21  22  23  24  25  26  27  28  29
-const PROGMEM uint32_t nr_bytes[PCKTP_ARR_SZ]  = {  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,      7,  14,  20,  35,  41,         37,  37,  37,  37,  37,  19,  37,  37,  37,  37,  37,  37,  50, 50, 50, 50, 50, 50, 50, 50, 50 };
-const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ] = {   0,  20,  40,  60,  80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300,    320, 327, 341, 361, 396,/*rst*/ 320, 357, 394, 431, 468, 505, 524, 561, 598, 635, 672, 709, 746,796,846,896,946,996,1046,1096,1146, /* , 746 -> 1196 */ };
-#define sizePayloadByteVal 1196
-#define sizePayloadByteSeen 150 // ceil(1196/8)
+#define sizePayloadBitsSeen 10 // for Hitachi, but not for Toshiba
+
+#define PCKTP_ARR_SZ 0x2B
+//byte pti                                      =   0..F  (0..7 for 000008..00000F, 8..F for 400008..40000F)                           10-14                           15-1E                                             1F-20                                               2A
+//byte pti                                      =    0    1    2    3    4    5    6    7    8    9   0A   0B   0C   0D   0E   0F      10   11   12   13   14          15   16   17   18   19   1A   1B   1C   1D   1E   1F   20   21  22  23  24  25  26  27  28  29        2A // 25->24 when CS_GEN implemented
+const PROGMEM uint32_t nr_bytes[PCKTP_ARR_SZ]  = {  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,      7,  14,  20,  35,  41,         37,  37,  37,  37,  37,  19,  37,  37,  37,  37,  37,  37,  50, 50, 50, 50, 50, 50, 50, 50, 50,       25     };
+const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ] = {   0,  20,  40,  60,  80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300,    320, 327, 341, 361, 396,/*rst*/ 320, 357, 394, 431, 468, 505, 524, 561, 598, 635, 672, 709, 746,796,846,896,946,996,1046,1096,1146,    1196        /* , 746 -> 1221 */ };
+#define sizePayloadByteVal 1221
+#define sizePayloadByteSeen 153 // ceil(1221/8)
 
 #elif defined W_SERIES
 
@@ -522,6 +531,7 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     =
    0,   0,  20,  40,  /* sizePayloadByteVal=60 */ };
 #define sizePayloadByteVal  60
 #define sizePayloadByteSeen 8 // ceil(60/8)
+#define sizePayloadBitsSeen 1
 
 #endif /* *_SERIES */
 
@@ -589,9 +599,7 @@ typedef struct mqttSaveStruct {
   byte paramSeen[2][sizeParamSeen];
   byte cntByte [36]; // for 0xB8 counters we store 36 bytes; 30 should suffice but not worth the extra code
 #endif /* E_SERIES */
-#if defined E_SERIES || defined MHI_SERIES || defined H_SERIES
   byte payloadBitsSeen[sizePayloadBitsSeen];
-#endif /* E/H/MHI_SERIES */
 };
 
 // local
@@ -742,11 +750,9 @@ void resetDataStructures(void) {
   }
   for (byte j = 0; j < 36; j++) M.cntByte[j] = 0xFF;
 #endif /* E_SERIES */
-#if defined E_SERIES || defined H_SERIES || defined MHI_SERIES
   for (byte j = 0; j < sizePayloadBitsSeen; j++) {
     M.payloadBitsSeen[j] = 0;
   }
-#endif /* E/H/MHI_SERIES */
 #ifdef SAVESCHEDULE
   byte i;
   uint16 j;
@@ -1127,6 +1133,8 @@ byte calculatePti(const byte packetSrc, const byte packetType)
     case 0x4909 : pti = 0x27; break;
     case 0x4923 : pti = 0x28; break;
     case 0x4930 : pti = 0x29; break;
+    // new in v0.9.47
+    case 0x211C : pti = 0x2A; break;
     default     : break;
   }
 
@@ -1284,7 +1292,6 @@ uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIn
     }
   }
 
-#if defined E_SERIES || defined H_SERIES || defined MHI_SERIES
   if (byteBasis) {
     newBits = (M.payloadByteSeen[pi2 >> 3] & (1 << (pi2 & 0x07))) ? 0 : 1;
   } else {
@@ -1294,10 +1301,6 @@ uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIn
     }
     newBits =  M.payloadBitsSeen[bcnt] ^ 0xFF;
   }
-#endif /* E_SERIES || H_SERIES || MHI_SERIES */
-#ifdef F_SERIES
-  newBits = (M.payloadByteSeen[pi2 >> 3] & (1 << (pi2 & 0x07))) ? 0 : 1;
-#endif /* F_SERIES */
 
   uint16_t pi2i = pi2;
   if (length) {
@@ -1331,7 +1334,7 @@ void registerUnseenByte(byte packetSrc, byte packetType, byte payloadIndex)
 }
 #endif /* !H_SERIES */
 
-#if defined E_SERIES || defined H_SERIES || defined MHI_SERIES
+/* not needed (yet)
 void registerUnseenBit(byte bcnt, byte bitNr)
 {
   if (bcnt >= sizePayloadBitsSeen) {
@@ -1340,7 +1343,7 @@ void registerUnseenBit(byte bcnt, byte bitNr)
   }
   M.payloadBitsSeen[bcnt] &= (0xFF ^ (1 << bitNr));
 }
-#endif /* *_SERIES */
+*/
 
 #ifdef MHI_SERIES
 uint8_t publishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value, byte length) {
@@ -1384,13 +1387,11 @@ uint8_t publishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, by
 
 uint8_t publishEntityBits(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value) {
   if (clientPublish(mqtt_value, haQos)) {
-#if defined E_SERIES || defined H_SERIES || defined MHI_SERIES
     if (bcnt >= sizePayloadBitsSeen) {
       printfTopicS("bcnt %i > size ", bcnt);
       return 0;
     }
     M.payloadBitsSeen[bcnt] |= bitsMask;
-#endif /* *_SERIES */
     M.payloadByteVal[pi2] &= (0xFF ^ bitsMask);
     M.payloadByteVal[pi2] |= payload[payloadIndex] & bitsMask;
     pubHaEntityBits &= (0xFFFF ^ (bitsMask | (bitsMask << 8)));
@@ -1399,13 +1400,11 @@ uint8_t publishEntityBits(byte packetSrc, byte packetType, byte payloadIndex, by
 }
 
 uint8_t doNotPublishEntityBits(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value) {
-#if defined E_SERIES || defined H_SERIES || defined MHI_SERIES
   if (bcnt >= sizePayloadBitsSeen) {
     printfTopicS("bcnt %i > size ", bcnt);
     return 0;
   }
   M.payloadBitsSeen[bcnt] |= bitsMask;
-#endif /* *_SERIES */
   M.payloadByteVal[pi2] &= (0xFF ^ bitsMask);
   M.payloadByteVal[pi2] |= payload[payloadIndex] & bitsMask;
   pubHaEntityBits &= (0xFFFF ^ (bitsMask | (bitsMask << 8)));
@@ -2787,7 +2786,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    0 : switch (bitNr) {
-          case    8 : bcnt = 0; BITBASIS;
+          case    8 : bcnt = 27; BITBASIS;
           case    0 : SUBDEVICE("_Mode");
                       HACONFIG;
                       // CHECK(1) already done by BITBASIS
@@ -5217,7 +5216,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case 0x20:                                                                                                          KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown-892D--20");                          VALUE_u8; // useless
 */
         case 0x21: switch (bitNr) {
-          case 8: bcnt = 0; BITBASIS;
+          case 8: bcnt = 9; BITBASIS;
           case 0:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("892D-21-0");
           case 1:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("892D-21-1-OUnitOn");
           case 2:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("892D-21-2");

@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20240518 v0.9.47 fix bcnt code
  * 20240515 v0.9.46 HA control, improve TZ, remove bindata and json output format, rewrote mqtt/telnet/buffering, remove MQTT_INPUT_HEXDATA
  * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
  * 20230702 v0.9.40 add NTP-based time stamps, add H-link2 decoding
@@ -105,8 +106,8 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "P1P2MQTT bridge v0.9.46"
-#define HA_SW "0.9.46"
+#define WELCOMESTRING "P1P2MQTT bridge v0.9.47"
+#define HA_SW "0.9.47"
 
 #define ARDUINO_OTA
 #define WEBSERVER // adds local webserver to update firmware of ESP
