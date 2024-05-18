@@ -961,10 +961,10 @@ void writePseudoSystemPacket0D(void) {
 #endif /* E_SERIES */
 }
 
-uint8_t clientPublish(const char* mqtt_value) {
+uint8_t clientPublish(const char* mqtt_value, uint8_t qos) {
   topicCharSpecificSlash('P'); // slash to add entityname
   if (EE.outputMode & 0x0020) clientPublishTelnet(mqttTopic, mqtt_value);
-  if (EE.outputMode & 0x0002) return clientPublishMqtt(mqttTopic, MQTT_QOS_DATA, MQTT_RETAIN_DATA, mqtt_value);
+  if (EE.outputMode & 0x0002) return clientPublishMqtt(mqttTopic, qos, MQTT_RETAIN_DATA, mqtt_value);
   return 1;
 }
 
@@ -1344,7 +1344,7 @@ void registerUnseenBit(byte bcnt, byte bitNr)
 
 #ifdef MHI_SERIES
 uint8_t publishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value, byte length) {
-  if (clientPublish(mqtt_value) && (pi2 >= 0)) {
+  if (clientPublish(mqtt_value, haQos) && (pi2 >= 0)) {
     M.payloadByteSeen[pi2 >> 3] |= (1 << (pi2 & 0x07));
     uint16_t pi2i = pi2;
     for (int8_t i = payloadIndex; i + length > payloadIndex; i--) {
@@ -1360,7 +1360,7 @@ uint8_t publishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, by
 }
 #else /* MHI_SERIES */
 uint8_t publishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value, byte length) {
-  if (clientPublish(mqtt_value) && (pi2 >= 0)) {
+  if (clientPublish(mqtt_value, haQos) && (pi2 >= 0)) {
 #ifdef E_SERIES
     if (packetType == 0xB8) {
       M.cntByte[pi2] = payload[payloadIndex] & 0x7F;
@@ -1383,7 +1383,7 @@ uint8_t publishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, by
 #endif /* MHI_SERIES */
 
 uint8_t publishEntityBits(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value) {
-  if (clientPublish(mqtt_value)) {
+  if (clientPublish(mqtt_value, haQos)) {
 #if defined E_SERIES || defined H_SERIES || defined MHI_SERIES
     if (bcnt >= sizePayloadBitsSeen) {
       printfTopicS("bcnt %i > size ", bcnt);
@@ -1482,7 +1482,7 @@ void registerSeenParam() {
 
 uint8_t publishEntityParam(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, const char* mqtt_value, byte paramValLength) {
   uint16_t ptbv = valstart[ppti] + paramNr * parnr_bytes[ppti];
-  if (clientPublish(mqtt_value)) {
+  if (clientPublish(mqtt_value, haQos)) {
     for (byte i = payloadIndex + 1 - paramValLength; i <= payloadIndex - ((paramPacketType == 0x39) ? 3 : 0); i++) M.paramVal[ppts][ptbv++] = payload[i];
     M.paramSeen[ppts][ptbs >> 3] |= (1 << (ptbs & 0x07));
   } // else retry later
@@ -1632,7 +1632,7 @@ uint8_t value_u16div100_LE(byte packetSrc, byte packetType, byte payloadIndex, b
 
 uint8_t value_header(byte packetSrc, byte packetType, char* mqtt_value) {
   snprintf(mqtt_value, MQTT_VALUE_LEN, "Empty_Payload_%02X00%02X", packetSrc, packetType);
-  clientPublish(mqtt_value);
+  clientPublish(mqtt_value, haQos);
   return 0;
 }
 
@@ -1662,7 +1662,7 @@ uint8_t value_s_bit(byte packetSrc, byte packetType, byte payloadIndex, byte* pa
 
 uint8_t value_s_nosave(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, int v) {
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", v);
-  clientPublish(mqtt_value);
+  clientPublish(mqtt_value, haQos);
 }
 
 uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, float v, int length = 0) {
@@ -1701,7 +1701,7 @@ uint8_t value_f8s8_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* 
 uint8_t value_textString(char* mqtt_value, char* textString) {
   registerSeenByte(); // record that config was published
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%s", textString);
-  clientPublish(mqtt_value);
+  clientPublish(mqtt_value, haQos);
   return 0;
 }
 
@@ -2357,7 +2357,7 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
 
         case 0x0003 : SUBDEVICE("_DHW");         CAT_SETTING;                                                               PARAM_KEY("Setpoint_DHW_1");                                               PARAM_VALUE_u16div10_BE; // = 0x13-0x40-0
         case 0x0004 : SUBDEVICE("_DHW");         CAT_SETTING;                                                               PARAM_KEY("Setpoint_DHW_2");                                               PARAM_VALUE_u16div10_BE;
-        case 0x0005 : SUBDEVICE("_DHW");         CAT_TEMP;                                 HYST_S16_BE(1);                  PARAM_KEY("Temperature_DHW_Tank");                                         PARAM_VALUE_s16div10_BE; // R5T DHW_tank temp
+        case 0x0005 : SUBDEVICE("_DHW");         CAT_TEMP;                                 HYST_S16_BE(1);                  PARAM_KEY("Temperature_R5T_DHW_Tank");                                     PARAM_VALUE_s16div10_BE; // R5T DHW_tank temp
         case 0x0006 :                            CAT_SETTING;                                                               PARAM_KEY("LWT_Heating_Main");                                             PARAM_VALUE_u16div10_BE; // writable
         case 0x0007 :                            CAT_SETTING;                                                               PARAM_KEY("LWT_Cooling_Main");                                             PARAM_VALUE_u16div10_BE;
         case 0x0008 :                            CAT_SETTING;                                                PRECISION(0);  PARAM_KEY("LWT_Deviation_Heating_Main");                                   PARAM_VALUE_s16div10_BE;
@@ -2793,6 +2793,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       // CHECK(1) already done by BITBASIS
                       CHECKBIT;
                       KEY("Altherma_On"); // was Climate_LWT; in LWT mode, determines on/off (in RT mode, Climate_Room determines on/off)
+                      QOS_SWITCH;
                       if (pubHaBit) {
                         HADEVICE_SWITCH;
                         HADEVICE_SWITCH_PAYLOADS("E35002F00 35003100", "E35002F01 35003101");
@@ -2813,8 +2814,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       bcnt = 1; BITBASIS;
           case    0 : SUBDEVICE("_Mode"); KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_Heating_Request"); // =? Space_CH_Op_or_BPH // was Climate_LWT_OnOff
           case    1 : SUBDEVICE("_Mode"); KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_Cooling_Request");
-          case    7 : return 0;
-//        case    7 : SUBDEVICE("_Mode");                            HACONFIG; KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_Room");   // determines on/off in RT mode
+          case    7 : SUBDEVICE("_Mode");                                      KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_Room");   // determines on/off in RT mode, usually equals _Mode
 /*
           case    7 : SUBDEVICE("_Mode");
                       HACONFIG;
@@ -2845,8 +2845,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    7 : return 0;
         case    8 : HACONFIG;
                     HATEMP1;
-                    //CHECK(2);
                     SUBDEVICE("_Room");
+                    QOS_CLIMATE;
                     KEY2_PUB_CONFIG_CHECK_ENTITY("Room_Heating_Setpoint");
                     VALUE_f8s8_LE;
         case    9 : switch (bitNr) {
@@ -2862,6 +2862,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       CHECKBITS(6, 7);
                       SUBDEVICE("_Quiet");
                       KEY("Quiet_Level");
+                      QOS_SELECT;
                       if (pubHa) {
                         HADEVICE_SELECT;
                         HADEVICE_SELECT_OPTIONS("\"Quiet Level 0\",\"Quiet Level 1\",\"Quiet Level 2\",\"Quiet Level 3\"", "'0':'Quiet Level 0','1':'Quiet Level 1','2':'Quiet Level 2','3':'Quiet Level 3'");
@@ -2893,6 +2894,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   16 : SUBDEVICE("_Room");
                     HACONFIG;
                     HATEMP1;
+                    QOS_CLIMATE;
                     KEY2_PUB_CONFIG_CHECK_ENTITY("Room_Cooling_Setpoint");
                     VALUE_f8s8_LE;
         case   17 : if (!(M.R.useDHW & 0x02)) return 0;
@@ -2904,6 +2906,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       // CHECK(1) already done by BITBASIS
                       CHECKBIT;
                       KEY("DHW_Boost"); // was Climate_LWT
+                      QOS_SWITCH;
                       if (pubHaBit) {
                         HADEVICE_SWITCH;
                         HADEVICE_SWITCH_PAYLOADS("E35004800", "E35004801");
@@ -2922,11 +2925,12 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     HATEMP1;
                     HACONFIG;
                     SUBDEVICE("_DHW");
+                    QOS_CLIMATE;
                     if (pubHa) {
                       HADEVICE_CLIMATE;
                       HADEVICE_CLIMATE_TEMPERATURE("S/0/DHW_Setpoint", 30, M.R.DHWsetpointMaxX10 * 0.1, 1)
                       HADEVICE_CLIMATE_MODES("S/1/DHW", "\"off\",\"heat\"", "'0':'off','1':'heat'")
-                      if (M.R.useDHW & 0x01) HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_DHW_Tank")
+                      if (M.R.useDHW & 0x01) HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R5T_DHW_Tank")
                       HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'E360003%04X'|format((value*10)|int)}}");
                       HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E350040%02X 35003E%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                       HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3223,6 +3227,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case    6 : HACONFIG;
                       CHECKBITS(6, 7);
                       KEY("Program_WD_Abs");
+                      QOS_SELECT;
                       if (pubHa) {
                         SUBDEVICE("_Mode");
                         HADEVICE_SELECT;
@@ -3268,14 +3273,13 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       case 0x00 :
                   switch (payloadIndex) {
         case    0 : return 0;
-        case    1 : SUBDEVICE("_LWT");                               HACONFIG; HATEMP1;                                     KEY2_PUB_CONFIG_CHECK_ENTITY("Abs_Heating");                               VALUE_f8_8_LE; // or f8s8? // in Abs mode
+        case    1 : SUBDEVICE("_LWT");                               HACONFIG; HATEMP1;                 QOS_CLIMATE;        KEY2_PUB_CONFIG_CHECK_ENTITY("Abs_Heating");                               VALUE_f8_8_LE; // or f8s8? // in Abs mode
         case    2 : return 0;
-        case    3 : SUBDEVICE("_LWT");                               HACONFIG; HATEMP1;                                     KEY2_PUB_CONFIG_CHECK_ENTITY("Abs_Cooling");                               VALUE_f8_8_LE; // or f8s8? // in Abs mode
+        case    3 : SUBDEVICE("_LWT");                               HACONFIG; HATEMP1;                 QOS_CLIMATE;        KEY2_PUB_CONFIG_CHECK_ENTITY("Abs_Cooling");                               VALUE_f8_8_LE; // or f8s8? // in Abs mode
         case    4 : return 0;
         case    5 : HACONFIG;
                     HATEMP1;
                     SUBDEVICE("_LWT2");
-                    //CHECK(2); // PUB_CONFIG
                     if (KEEPCONFIG || EE.haSetup || M.R.numberOfLWTzonesX10) {
                       KEY2_PUB_CONFIG_CHECK_ENTITY("Abs_Heating_Add");
                     } else {
@@ -3286,19 +3290,19 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    7 : HACONFIG;
                     HATEMP1;
                     SUBDEVICE("_LWT2");
-                    //CHECK(2); // PUB_CONFIG
                     if (KEEPCONFIG || EE.haSetup || M.R.numberOfLWTzonesX10) {
                       KEY2_PUB_CONFIG_CHECK_ENTITY("Abs_Cooling_Add");
                     } else {
                       KEY2_DEL_CONFIG_CHECK_ENTITY("Abs_Cooling_Add");
                     }
                     VALUE_f8_8_LE; // or f8s8? // in Abs mode
-        case    8 : SUBDEVICE("_LWT");                               HACONFIG; HATEMP1;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Deviation_Heating");                         VALUE_s4abs1c;
-        case    9 : SUBDEVICE("_LWT");                               HACONFIG; HATEMP1;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Deviation_Cooling");                         VALUE_s4abs1c; // guess
+        case    8 : SUBDEVICE("_LWT");                               HACONFIG; HATEMP1;                 QOS_CLIMATE;        KEY1_PUB_CONFIG_CHECK_ENTITY("Deviation_Heating");                         VALUE_s4abs1c;
+        case    9 : SUBDEVICE("_LWT");                               HACONFIG; HATEMP1;                 QOS_CLIMATE;        KEY1_PUB_CONFIG_CHECK_ENTITY("Deviation_Cooling");                         VALUE_s4abs1c; // guess
         case   10 :
                     SUBDEVICE("_LWT2");   
                     HACONFIG;
                     HATEMP1;
+                    QOS_CLIMATE;
                     if (KEEPCONFIG || EE.haSetup || M.R.numberOfLWTzonesX10) {
                       KEY1_PUB_CONFIG_CHECK_ENTITY("Deviation_Heating_Add");
                     } else {
@@ -3309,6 +3313,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     SUBDEVICE("_LWT2");   
                     HACONFIG;
                     HATEMP1;
+                    QOS_CLIMATE;
                     if (KEEPCONFIG || EE.haSetup || M.R.numberOfLWTzonesX10) {
                       KEY1_PUB_CONFIG_CHECK_ENTITY("Deviation_Cooling_Add");
                     } else {
@@ -3371,6 +3376,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     PUB_CONFIG; // first as sensor, then as numberbox, so HARESET2 to restart
                     HARESET2;
                     KEY("Gas");
+                    QOS_NUMBER;
                     if (pubHa) {
                       HADEVICE_NUMBER;
                       HADEVICE_NUMBER_RANGE(0.01, 990, 0.01);
@@ -3673,6 +3679,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                   // RT heating
                   HACONFIG;
                   CHECK(1);
+                  QOS_CLIMATE;
                   if (pubHa) {
                     HATEMP1;
                     SUBDEVICE("_Room");
@@ -3703,6 +3710,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case 1 : // RT cooling
                   HACONFIG;
                   CHECK(1);
+                  QOS_CLIMATE;
                   if (pubHa) {
                     HATEMP1;
                     SUBDEVICE("_Room");
@@ -3734,6 +3742,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case 2 : // LWT_heating
                   HACONFIG;
                   CHECK(1);
+                  QOS_CLIMATE;
                   if (pubHa) {
                     HATEMP1;
                     SUBDEVICE("_LWT");
@@ -3787,6 +3796,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case 3 : // LWT cooling main zone
                   HACONFIG;
                   CHECK(1);
+                  QOS_CLIMATE;
                   if (pubHa) {
                     HATEMP1;
                     SUBDEVICE("_LWT");
@@ -3844,6 +3854,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case 4 : // LWT_heating add zone
                   HACONFIG;
                   CHECK(1);
+                  QOS_CLIMATE;
                   if (pubHa) {
                     HATEMP1;
                     SUBDEVICE("_LWT2");   
@@ -3900,6 +3911,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case 5 : // LWT cooling add zone
                   HACONFIG;
                   CHECK(1);
+                  QOS_CLIMATE;
                   if (pubHa) {
                     HATEMP1;
                     SUBDEVICE("_LWT2");   
@@ -4377,6 +4389,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     HACONFIG;
                     CHECK(1);
                     KEY("Heating_Cooling_Auto");
+                    QOS_SELECT;
                     if (pubHa) {
                       SUBDEVICE("_Mode");
                       HADEVICE_SELECT;
@@ -4390,6 +4403,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    1 : HACONFIG;
                     CHECK(1);
                     KEY("RT_LWT");
+                    QOS_SELECT;
                     if (pubHa) {
                       SUBDEVICE("_FieldSettings");
                       HADEVICE_SELECT;
@@ -4405,10 +4419,12 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     CHECK(1);
                     KEY("RT");
                     CHECK_ENTITY;
+                    QOS_AVAILABILITY;
                     VALUE_u8;
         case    3 : HACONFIG;
                     CHECK(1);
                     KEY("RT_Modulation");
+                    QOS_SELECT;
                     if (pubHa) {
                       SUBDEVICE("_FieldSettings");
                       HADEVICE_SELECT;
@@ -4423,6 +4439,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    4 : HACONFIG;
                     CHECK(1);
                     KEY("RT_Modulation_Max");
+                    QOS_NUMBER;
                     if (pubHa) {
                       SUBDEVICE("_FieldSettings");
                       HADEVICE_NUMBER;
@@ -4438,6 +4455,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    5 : HACONFIG;
                     CHECK(1);
                     KEY("Number_Of_Zones");
+                    QOS_SELECT; // and QOS_AVAILABILITY
                     if (pubHa) {
                       SUBDEVICE("_FieldSettings");
                       HADEVICE_SELECT;
@@ -4453,6 +4471,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    8 : HACONFIG;
                     CHECK(1);
                     KEY("Overshoot");
+                    QOS_NUMBER;
                     if (pubHa) {
                       SUBDEVICE("_FieldSettings");
                       HADEVICE_NUMBER;
@@ -4468,6 +4487,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     CHECK(1);
                     SUBDEVICE("_Quiet");
                     KEY("Quiet_Mode");
+                    QOS_SELECT;
                     if (pubHa) {
                       HADEVICE_SELECT;
                       HADEVICE_SELECT_OPTIONS("\"Auto\",\"Always off\",\"On\"", "'0':'Auto','1':'Always off','2':'On'");
@@ -4481,6 +4501,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     CHECK(1);
                     SUBDEVICE("_Quiet");
                     KEY("Quiet_Level_When_On");
+                    QOS_SELECT;
                     if (pubHa) {
                       HADEVICE_SELECT;
                       HADEVICE_SELECT_OPTIONS("\"Level 1\",\"Level 2\",\"Level 3\"", "'0':'Level 1','1':'Level 2','2':' Level 3'");
@@ -4603,8 +4624,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                 switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case    0 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Power_Request");                             VALUE_u8;
-        case    1 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode");                     VALUE_u8;
-        case    2 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Actual_Operating_Mode");                     VALUE_u8;
+        case    1 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode_0");                   VALUE_u8;
+        case    2 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Actual_Operating_Mode_0");                   VALUE_u8;
         case    3 : SUBDEVICE("_Setpoints");     CAT_TEMP;           HACONFIG; HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Temperature");                      VALUE_u8;
         case    4 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_4");                          VALUE_u8;
         case    5 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed");                                 VALUE_u8;
@@ -4622,21 +4643,21 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       case 0x40 : switch (payloadIndex) {
         case    0 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Power");                                     VALUE_u8;
-        case    1 : SUBDEVICE("_Unknown");       CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_1");                          VALUE_u8;
-        case    2 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode");                     VALUE_u8;
-        case    3 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Actual_Operating_Mode");                     VALUE_u8;
-        case    4 : SUBDEVICE("_Setpoints");     CAT_TEMP;           HACONFIG; HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Temperature");                      VALUE_u8;
-        case    5 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_5");                          VALUE_u8;
-        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed");                                 VALUE_u8;
-        case    7 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_7");                          VALUE_u8;
-        case    8 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_8");                          VALUE_u8;
-        case    9 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_9");                          VALUE_u8;
-        case   10 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_10");                         VALUE_u8;
-        case   11 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_11");                         VALUE_u8;
-        case   12 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_12");                         VALUE_u8;
-        case   13 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_13");                         VALUE_u8;
-        case   14 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("System_Status");                             VALUE_u8;
-        case   15 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_000010_15");                         VALUE_u8;
+        case    1 : SUBDEVICE("_Unknown");       CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_1");                          VALUE_u8;
+        case    2 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode_1");                   VALUE_u8;
+        case    3 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Actual_Operating_Mode_1");                   VALUE_u8;
+        case    4 : SUBDEVICE("_Setpoints");     CAT_TEMP;           HACONFIG; HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Temperature_1");                    VALUE_u8;
+        case    5 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_5");                          VALUE_u8;
+        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_1");                               VALUE_u8;
+        case    7 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_7");                          VALUE_u8;
+        case    8 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_8");                          VALUE_u8;
+        case    9 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_9");                          VALUE_u8;
+        case   10 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_10");                         VALUE_u8;
+        case   11 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_11");                         VALUE_u8;
+        case   12 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_12");                         VALUE_u8;
+        case   13 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_13");                         VALUE_u8;
+        case   14 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("System_Status_1");                           VALUE_u8;
+        case   15 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_15");                         VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
       default   :               UNKNOWN_BYTE;
@@ -4800,6 +4821,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     SUBDEVICE("_Mode");
                     CHECK(1);
                     KEY("Power");
+                    QOS_SWITCH;
                     if (pubHa) {
                       HADEVICE_SWITCH;
                       HADEVICE_SWITCH_PAYLOADS("F380000", "F380001");
@@ -4808,7 +4830,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     CHECK_ENTITY;
                     VALUE_u8;
         case    1 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F038_1");                          VALUE_u8;
-        case    2 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode");                     VALUE_u8;
+        case    2 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                           QOS_CLIMATE;       KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode");                     VALUE_u8;
         case    3 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Actual_Operating_Mode");                     VALUE_u8;
         case    4 : // Setpoint_Cooling
                     HACONFIG;
@@ -4817,6 +4839,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     SUBDEVICE("_Setpoints");
                     CHECK(1);
                     KEY("Setpoint_Cooling");
+                    QOS_CLIMATE;
                     if (pubHa) {
                       HADEVICE_CLIMATE;
                       // temps, byte 6 in 40F038
@@ -4841,7 +4864,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     CHECK_ENTITY;
                     VALUE_u8;
         case    5 : SUBDEVICE("_Unknown");       CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Error_Setting_1_Q");                         VALUE_u8;
-        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Cooling");                         VALUE_u8;
+        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                        QOS_CLIMATE;          KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Cooling");                         VALUE_u8;
         case    7 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F038_7");                          VALUE_u8;
         case    8 : // Setpoint_Heating
                     HACONFIG;
@@ -4850,6 +4873,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     SUBDEVICE("_Setpoints");
                     CHECK(1);
                     KEY("Setpoint_Heating");
+                    QOS_CLIMATE;
                     if (pubHa) {
                       HADEVICE_CLIMATE;
                       // temps, byte 6 in 40F038
@@ -4873,7 +4897,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     CHECK_ENTITY;
                     VALUE_u8;
         case    9 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Error_Setting_2_Q");                         VALUE_u8;
-        case   10 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Heating");                         VALUE_u8;
+        case   10 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                         QOS_CLIMATE;         KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Heating");                         VALUE_u8;
         case   11 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F038_11");                         VALUE_u8;
         case   12 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F038_12");                         VALUE_u8;
         case   13 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F038_13");                         VALUE_u8;
@@ -4887,14 +4911,14 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       case 0x40 : switch (payloadIndex) {
         case    0 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Power");                                     VALUE_u8;
-        case    1 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode");                     VALUE_u8;
-        case    2 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG; HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Cooling");                          VALUE_u8;
+        case    1 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode_3");                   VALUE_u8;
+        case    2 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG; HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Cooling_3");                        VALUE_u8;
         case    3 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Error_Setting_1_Q");                         VALUE_u8;
-        case    4 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Cooling");                         VALUE_u8;
+        case    4 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Cooling_1");                       VALUE_u8;
         case    5 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_40F038_5");                          VALUE_u8;
-        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG; HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Heating");                          VALUE_u8;
+        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG; HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Heating_3");                        VALUE_u8;
         case    7 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Error_Setting_2_Q");                         VALUE_u8;
-        case    8 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Heating");                         VALUE_u8;
+        case    8 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Heating_1");                       VALUE_u8;
         case    9 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_40F038_9");                          VALUE_u8;
         case   10 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_40F038_10");                         VALUE_u8;
         case   11 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Clear_Error_Code");                          VALUE_u8;
@@ -4939,6 +4963,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     SUBDEVICE("_Mode");
                     CHECK(1);
                     KEY("Power");
+                    QOS_SWITCH;
                     if (pubHa) {
                       HADEVICE_SWITCH;
                       HADEVICE_SWITCH_PAYLOADS("F3B0000", "F3B0001");
@@ -4947,7 +4972,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     CHECK_ENTITY;                                                                                                                                                                      VALUE_u8;
                     VALUE_u8;
         case    1 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F03B_1");                          VALUE_u8;
-        case    2 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode");                     VALUE_u8;
+        case    2 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                          QOS_CLIMATE;        KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode");                     VALUE_u8;
         case    3 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Actual_Operating_Mode");                     VALUE_u8;
         case    4 : // Setpoint_Cooling
                     HACONFIG;
@@ -4956,6 +4981,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     SUBDEVICE("_Setpoints");
                     CHECK(1);
                     KEY("Setpoint_Cooling");
+                    QOS_CLIMATE;
                     if (pubHa) {
                       HADEVICE_CLIMATE;
                       // temps, byte 6 in 40F038
@@ -4979,7 +5005,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     CHECK_ENTITY;
                     VALUE_u8;
         case    5 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Error_Setting_1_Q");                         VALUE_u8;
-        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Cooling");                         VALUE_u8;
+        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                          QOS_CLIMATE;        KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Cooling");                         VALUE_u8;
         case    7 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F03B_7");                          VALUE_u8;
         case    8 : // Setpoint_Heating
                     HACONFIG;
@@ -4988,6 +5014,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     SUBDEVICE("_Setpoints");
                     CHECK(1);
                     KEY("Setpoint_Heating");
+                    QOS_CLIMATE;
                     if (pubHa) {
                       HADEVICE_CLIMATE;
                       // temps, byte 6 in 40F038
@@ -5011,7 +5038,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     CHECK_ENTITY;
                     VALUE_u8;
         case    9 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Error_Setting_2_Q");                         VALUE_u8;
-        case   10 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Heating");                         VALUE_u8;
+        case   10 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                            QOS_CLIMATE;      KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Heating");                         VALUE_u8;
         case   11 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F03B_11");                         VALUE_u8;
         case   12 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F03B_12");                         VALUE_u8;
         case   13 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_00F03B_13");                         VALUE_u8;
@@ -5025,14 +5052,14 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       case 0x40 : switch (payloadIndex) {
         case    0 :                              CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Power");                                     VALUE_u8;
-        case    1 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode");                     VALUE_u8;
-        case    2 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG; HATEMP1;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Cooling");                          VALUE_u8;
+        case    1 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Target_Operating_Mode_3");                   VALUE_u8;
+        case    2 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG; HATEMP1;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Cooling_3");                        VALUE_u8;
         case    3 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Error_Setting_1_Q");                         VALUE_u8;
-        case    4 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Cooling");                         VALUE_u8;
+        case    4 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Cooling_1");                       VALUE_u8;
         case    5 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_40F03B_5");                          VALUE_u8;
-        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG; HATEMP1;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Heating");                          VALUE_u8;
+        case    6 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG; HATEMP1;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("Setpoint_Heating_3");                        VALUE_u8;
         case    7 : SUBDEVICE("_Mode");          CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Error_Setting_2_Q");                         VALUE_u8;
-        case    8 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Heating");                         VALUE_u8;
+        case    8 : SUBDEVICE("_Setpoints");     CAT_SETTING;        HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Fan_Speed_Heating_1");                       VALUE_u8;
         case    9 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_40F03B_9");                          VALUE_u8;
         case   10 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_40F03B_10");                         VALUE_u8;
         case   11 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_40F03B_11");                         VALUE_u8;

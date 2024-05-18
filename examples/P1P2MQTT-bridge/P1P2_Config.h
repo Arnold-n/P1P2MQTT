@@ -145,11 +145,11 @@
 #define THROTTLE_VALUE 100 // start with 100% skipping, linearly decreasing 1% each THROTTLE_STEP seconds down to 0% skipping, must be multiple of THROTTLE_STEP_P
 #elif defined F_SERIES
 #define THROTTLE_STEP_S 1  // in seconds (higher=slower)
-#define THROTTLE_STEP_P 5  // in percentage (higher=faster)
+#define THROTTLE_STEP_P 1  // in percentage (higher=faster)
 #define THROTTLE_VALUE 100 // start with 100% skipping, linearly decreasing 1% each THROTTLE_STEP seconds down to 0% skipping, must be multiple of THROTTLE_STEP_P
 #else
 #define THROTTLE_STEP_S 1  // in seconds (higher=slower)
-#define THROTTLE_STEP_P 2 // in percentage (higher=faster)
+#define THROTTLE_STEP_P 1 // in percentage (higher=faster)
 #define THROTTLE_VALUE 100 // start with 100% skipping, linearly decreasing 1% each THROTTLE_STEP seconds down to 0% skipping, must be multiple of THROTTLE_STEP_P
 #endif /* H_SERIES */
 
@@ -181,7 +181,7 @@
 #define RX_BUFFER_SIZE 4096 // to avoid serial buffer overruns (512 is too small)
 #define MQTT_MIN_FREE_MEMORY 6000 // Must be more than 4kB, MQTT messages will not be transmitted if available memory is below this value
 #define MQTT_QOS_HEX 0 // QOS = 1 is not needed for hex data messages
-#define MQTT_QOS_DATA 0 // QOS = 1 is too slow for regular data messages
+#define MQTT_QOS_DATA 0 // QOS = 1 is too slow for regular data messages, only use for certain messages related to HA controls
 #define MQTT_QOS_SIGNAL 0 // QOS = 1 is not needed for textual messages
 #define MQTT_QOS_WILL 1
 #define MQTT_QOS_CONFIG 0

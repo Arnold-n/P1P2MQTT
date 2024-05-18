@@ -88,6 +88,21 @@ typedef enum {
 #define HADEVICE_TEXT      { haDevice = HA_TEXT;      }
 #define HADEVICE_CLIMATE   { haDevice = HA_CLIMATE;   }
 
+#define QOS_DATA_AVAILABILITY 1
+#define QOS_DATA_CLIMATE 1
+#define QOS_DATA_SELECT 1
+#define QOS_DATA_SWITCH 1
+#define QOS_DATA_NUMBER 1
+#define QOS_DATA_TEXT 1
+
+byte haQos = 0;
+#define QOS_AVAILABILITY   { haQos = QOS_DATA_AVAILABILITY; }
+#define QOS_CLIMATE        { haQos = QOS_DATA_CLIMATE;      }
+#define QOS_SELECT         { haQos = QOS_DATA_SELECT;       }
+#define QOS_SWITCH         { haQos = QOS_DATA_SWITCH;       }
+#define QOS_NUMBER         { haQos = QOS_DATA_NUMBER;       }
+#define QOS_TEXT           { haQos = QOS_DATA_TEXT;         }
+
 const char* haPrefixString[] = {
     "undef",
     "sensor",
@@ -283,8 +298,8 @@ const char* numberModeString[] = {
 char extraAvailabilityString[EXTRA_AVAILABILITY_STRING_LEN];
 uint16_t extraAvailabilityStringLength = 0;
 
-#define HARESET   { haConfig = 0; HADEVICE_SENSOR; HAENTITYCATEGORY_NONE; haEntity = ENTITY_NONE; HABUTTONDEVICECLASS_NONE; HAENTITYCATEGORY_NONE; HANUMBERMODE_NONE; haPrecision = 4; haConfigMessage[0] = '{'; haConfigMessage[1] = '\0'; haConfigMessageLength = 1; /* extraString[0] = '\0'; extraStringLength = 0; */ useSrc = 0; extraAvailabilityStringLength = 0; extraAvailabilityString[0] = '\0';}
-#define HARESET2  { haConfigMessage[0] = '{'; haConfigMessage[1] = '\0'; haConfigMessageLength = 1; extraAvailabilityStringLength = 0; extraAvailabilityString[0] = '\0';}
+#define HARESET   { haQos = MQTT_QOS_DATA; haConfig = 0; HADEVICE_SENSOR; HAENTITYCATEGORY_NONE; haEntity = ENTITY_NONE; HABUTTONDEVICECLASS_NONE; HAENTITYCATEGORY_NONE; HANUMBERMODE_NONE; haPrecision = 4; haConfigMessage[0] = '{'; haConfigMessage[1] = '\0'; haConfigMessageLength = 1; /* extraString[0] = '\0'; extraStringLength = 0; */ useSrc = 0; extraAvailabilityStringLength = 0; extraAvailabilityString[0] = '\0';}
+#define HARESET2  { haQos = MQTT_QOS_DATA; haConfigMessage[0] = '{'; haConfigMessage[1] = '\0'; haConfigMessageLength = 1; extraAvailabilityStringLength = 0; extraAvailabilityString[0] = '\0';}
 #define HACONFIG  { haConfig = 1; }
 
 #define HANONE         { haEntity = ENTITY_NONE;          PRECISION(1); }

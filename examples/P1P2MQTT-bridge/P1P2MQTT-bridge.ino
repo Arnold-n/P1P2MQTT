@@ -946,7 +946,7 @@ uint16_t haConfigTopicLengthMax = 0;
 #define checkHaConfigTopicLength {  if (haConfigTopicLength > haConfigTopicLengthMax) haConfigTopicLengthMax = haConfigTopicLength; \
                                     if (haConfigTopicLength >= HA_KEY_LEN) { printfTopicS("haConfigTopic too long %i >= %i", haConfigTopicLength, HA_KEY_LEN); return 0; } }
 
-bool clientPublishMqtt(const char* key, bool qos, bool retain, const char* value = nullptr) {
+bool clientPublishMqtt(const char* key, uint8_t qos, bool retain, const char* value = nullptr) {
   if (mqttConnected) {
     byte i = 0;
     while ((ESP.getMaxFreeBlockSize() < MQTT_MIN_FREE_MEMORY) && (i++ < (qos ? MAXWAIT_QOS : MAXWAIT))) {
@@ -971,7 +971,7 @@ bool clientPublishMqtt(const char* key, bool qos, bool retain, const char* value
   }
 }
 
-void clientPublishMqttChar(const char key, bool qos, bool retain, const char* value = nullptr) {
+void clientPublishMqttChar(const char key, uint8_t qos, bool retain, const char* value = nullptr) {
   topicCharSpecific(key);
   clientPublishMqtt(mqttTopic, qos, retain, value);
 }
@@ -1164,6 +1164,12 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
                          // value_template for all-except-button
     default            : break;
   }
+
+  // add qos
+  if (haQos) {
+    haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"qos\":1"), mqttTopic);
+    checkHaConfigMessageLength;
+  } 
 
   // command_topic and command_template for number switch button select text, done via initial string before calling this function, idem for
   // min/max/step/mode for number
@@ -3074,7 +3080,7 @@ void process_for_mqtt(byte* rb, int n) {
 #ifdef E_SERIES
                                       || ((rb[0] == 0x00) && ((rb[2] == 0x31) || (rb[2] == 0x12)))               // time packets should be handled in right order
                                       || ((rb[0] == 0x40) && (rb[2] == 0xB8) && ((rb[3] & 0xFE) == 0x00))        // 0000B800/0000B801 should not be throttled
-                                      || ((rb[0] == 0x00) && (rb[2] == 0x0F)                            )        // 0000F  should not be throttled
+                                      || ((rb[0] == 0x40) && (rb[2] == 0x0F)                            )        // 40000F  should not be throttled
 #endif /* E_SERIES */
                                                                                                  ) {
 #ifdef MHI_SERIES

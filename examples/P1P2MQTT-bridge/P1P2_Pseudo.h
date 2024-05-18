@@ -24,6 +24,7 @@
         case    5 : HACONFIG;
                     CHECK(1);
                     KEY("Model");
+                    QOS_SELECT;
                     if (pubHa) {
                       SUBDEVICE("_Bridge");
                       HADEVICE_SELECT;
@@ -78,6 +79,7 @@
                     HATEMP1;
                     KEY("RToffset_Room");
                     CHECK(2);
+                    QOS_NUMBER;
                     if (pubHa) {
                       HADEVICE_NUMBER;
                       HADEVICE_NUMBER_RANGE(-3.00, 3.00, 0.1);
@@ -91,6 +93,7 @@
                     HATEMP2;
                     KEY("R1Toffset_Mid");
                     CHECK(1);
+                    QOS_NUMBER;
                     if (pubHa) {
                       HADEVICE_NUMBER;
                       HADEVICE_NUMBER_RANGE(-1.00, 1.00, 0.01);
@@ -104,6 +107,7 @@
                     HATEMP2;
                     KEY("R2Toffset_LWT");
                     CHECK(1);
+                    QOS_NUMBER;
                     if (pubHa) {
                       HADEVICE_NUMBER;
                       HADEVICE_NUMBER_RANGE(-1.00, 1.00, 0.01);
@@ -117,6 +121,7 @@
                     HATEMP2;
                     KEY("R4Toffset_RWT");
                     CHECK(1);
+                    QOS_NUMBER;
                     if (pubHa) {
                       HADEVICE_NUMBER;
                       HADEVICE_NUMBER_RANGE(-1.00, 1.00, 0.01);
@@ -150,6 +155,7 @@
                     CAT_SETTING;
                     CHECK(1);
                     KEY("Write_Budget");
+                    QOS_NUMBER;
                     if (pubHa) {
                       HADEVICE_NUMBER;
                       HADEVICE_NUMBER_RANGE(0, 255, 1);
@@ -163,6 +169,7 @@
                     CAT_SETTING;
                     CHECK(1);
                     KEY("Write_Budget_Period");
+                    QOS_NUMBER;
                     if (pubHa) {
                       HADEVICE_NUMBER;
                       HADEVICE_NUMBER_RANGE(15, 255, 1);
@@ -184,6 +191,7 @@
                     maxOutputFilter = 9; // overrule = 1
                     CHECK(1);
                     KEY("Control_Function");
+                    QOS_AVAILABILITY;
                     if (pubHa) {
                       HADEVICE_SWITCH;
                       HADEVICE_SWITCH_PAYLOADS("L0", "L1");
@@ -196,12 +204,14 @@
                     maxOutputFilter = 9; // overrule = 1
                     CHECK(1);
                     KEY("Counter_Request_Function");
+                    QOS_AVAILABILITY;
                     if (pubHa) {
                       HADEVICE_SWITCH;
                       HADEVICE_SWITCH_PAYLOADS("C0", "C2");
                       PUB_CONFIG;
                     }
-                    CHECK_ENTITY;                                                                                                                                         VALUE_u8;
+                    CHECK_ENTITY;
+                    VALUE_u8;
         case   13 : KEY1_PUB_CONFIG_CHECK_ENTITY("Auxiliary_Slots_Cnt");                                                                                                  VALUE_u8;
 #endif /* E_SERIES */
         case   14 : return 0;
@@ -222,7 +232,7 @@
           case  8 : bcnt = 27; BITBASIS;
           case  0 : HACONFIG; CAT_SETTING; KEYBIT_PUB_CONFIG_PUB_ENTITY("ESP_EEPROM_Saved");
           case  1 : HACONFIG; CAT_SETTING; KEYBIT_PUB_CONFIG_PUB_ENTITY("ESP_Factory_Reset_Scheduled");
-          case  5 : HACONFIG; CAT_SETTING; KEYBIT_PUB_CONFIG_PUB_ENTITY("ESP_Throttling");
+          case  5 : HACONFIG; CAT_SETTING; QOS_AVAILABILITY; KEYBIT_PUB_CONFIG_PUB_ENTITY("ESP_Throttling");
 #ifdef E_SERIES
           case  2 : HACONFIG; CAT_SETTING; KEYBIT_PUB_CONFIG_PUB_ENTITY("ESP_Waiting_For_Counters_D13");
           case  3 : HACONFIG;
@@ -230,6 +240,7 @@
                     CHECKBIT;
                     SUBDEVICE("_Setup");
                     KEY("HA_Setup"); // was Climate_LWT
+                    QOS_SWITCH;
                     if (pubHaBit) {
                       HADEVICE_SWITCH;
                       HADEVICE_SWITCH_PAYLOADS("P" xstr(PARAM_HA_SETUP) " 0", "P" xstr(PARAM_HA_SETUP) " 1");
@@ -237,7 +248,7 @@
                     }
                     CHECK_ENTITY;
                     VALUE_flag8;
-          case  4 : SUBDEVICE("_Mode"); HACONFIG; CAT_SETTING; KEYBIT_PUB_CONFIG_PUB_ENTITY("Heating_Only");
+          case  4 : SUBDEVICE("_Mode"); HACONFIG; CAT_SETTING; QOS_AVAILABILITY; KEYBIT_PUB_CONFIG_PUB_ENTITY("Heating_Only");
 #endif /* E_SERIES */
           default : return 0;
         }
