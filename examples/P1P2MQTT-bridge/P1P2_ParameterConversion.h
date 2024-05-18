@@ -394,7 +394,7 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     =
  1120,1137, /* sizePayloadByteVal=1143 */ };
 #define sizePayloadByteVal 1143
 #define sizePayloadByteSeen 143 // ceil(1143/8)
-#define sizePayloadBitsSeen 28
+#define sizePayloadBitsSeen 29
 
 #ifdef SAVESCHEDULE
 #define SCHEDULE_MEM_START 0x0250
@@ -2288,6 +2288,10 @@ byte handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte* p
         case 0x0050 :                                                                                                       PARAM_KEY("DHW_Demand");                                                   PARAM_VALUE_u8; // DHW demand (DHW flow sensor)
         case 0x0055 :                                                                                                       PARAM_KEY("Climate_WD_Program_2");                                         PARAM_VALUE_u8; // A.3.1.1.1 Abs+dev / WD+dev / Abs+prog / WD+prog
         case 0x0056 :                                                                                                       PARAM_KEY("Climate_WD_Program_3");                                         PARAM_VALUE_u8; // Abs+dev / WD+dev / Abs+prog / WD+prog // bits 0-1 separately? for Climate_Mode_Wd and Climate_Mode_use_deviation
+        case 0x005D :                                                                                                       PARAM_KEY("External_Thermostat_Heating");                                  PARAM_VALUE_u8; // external thermostat relay inputs (X2M-1,2,1a,2a)
+        case 0x005E :                                                                                                       PARAM_KEY("External_Thermostat_Cooling");                                  PARAM_VALUE_u8;
+        case 0x005F :                                                                                                       PARAM_KEY("External_Thermostat_Heating_Add");                              PARAM_VALUE_u8;
+        case 0x0060 :                                                                                                       PARAM_KEY("External_Thermostat_Cooling_Add");                              PARAM_VALUE_u8;
         case 0x009D :                                                                                                       PARAM_KEY("Counter_Schedules");                                            PARAM_VALUE_u8; // increments at scheduled changes
         case 0x013A ... 0x0145 : return 0;                                                                                                                                                                             // characters for product name
         case 0x00A2 : return 0;                                                                                                                                                                                        // useless? sequence counter
@@ -3179,8 +3183,16 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                                                  CAT_SETTING; // PacketSrc 40 PacketType12 system settings and operation
                   switch (payloadIndex) {
         case    1 :                                                                                                         KEY1_PUB_CONFIG_CHECK_ENTITY("Reboot_Related_Q12-40-1");                   VALUE_u8hex; // 0x00 0x40
+        case    9 : switch (bitNr) {
+          case    8 : bcnt = 28; BITBASIS;
+          case    2 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("External_Thermostat_Heating"); // 0x35-5D:0x01
+          case    1 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("External_Thermostat_Cooling"); // 0x35-5E:0x01
+          case    0 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("External_Thermostat_Heating_Add"); // 0x35-5F:0x01
+          default   : UNKNOWN_BIT;
+        }
         case   10 : switch (bitNr) {
           case    8 : bcnt = 19; BITBASIS;
+          case    7 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("External_Thermostat_Cooling_Add"); // 0x35-60:0x01
           case    4 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Preferential_Mode");
 //        case    0 : copied to param 0x35 nr 90
           default   : UNKNOWN_BIT;
