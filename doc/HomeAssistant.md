@@ -1,5 +1,7 @@
 # Set up Home Assistant with the P1P2MQTT bridge
 
+This page describes how to configure your P1P2MQTT bridge and Home Assistant (HA).
+
 Text in *italics* applies only to Daikin Altherma/E-series models.
 
 ##### Set up MQTT server
@@ -7,8 +9,6 @@ Text in *italics* applies only to Daikin Altherma/E-series models.
 An MQTT server is required. If you do not have one yet, you can set it up in HA under `Settings`/`Add-ons`/`ADD-ON STORE`. Find `Mosquitto broker`, `INSTALL` it, enable the Watchdog, and click `START`.
 
 Under `Settings`/`People`, click blue button (lower right corner) `ADD PERSON`, enter user name `P1P2`, switch `Allow person to login` on, click `CREATE`, set password to `P1P2` (or preferably something better), and click `CREATE`.
-
-You can find the IPv4 address of the MQTT server in HA under `Settings`/`System`/`Network`/`Configure network interfaces`/`3-dots`/`IP-information`.
 
 ##### Power off Daikin system
 
@@ -26,13 +26,15 @@ A WiFi Access Point with SSID `P1P2` should become available.
 
 Connect to the AP `P1P2` (default password `P1P2P3P4`) and enter WiFi credentials, and do not forget to also provide MQTT server credentials at the same time.
 
+If you use the MQTT server from HA and do not know its IPv4 address, it can be found under `Settings`/`System`/`Network`/`Configure network interfaces`/`3-dots`/`IP-information`. Default port is 1883, MQTT user is `P1P2` and MQTT password is what you entered yourself.
+
 ##### Add MQTT integration
 
-Under `Settings`/`Devices & Services`, click (lower right) blue button `ADD INTEGRATION`, search for MQTT, select `MQTT`, enter MQTT server details, user and password, and `SUBMIT`.
+In HA, under `Settings`/`Devices & Services`, click (lower right) blue button `ADD INTEGRATION`, search for MQTT, select `MQTT`, enter MQTT server details, user and password, and `SUBMIT`.
 
 ##### Wait for auto-discovery
 
-HA will start to recognize several controls and entities under various devices called `HC_*`, visible under `Settings`/`Devices & Services`/`MQTT`/`devices`.
+HA will start to recognize several controls and entities under various devices called `HC_*`, visible under `Settings`/`Devices & Services`/`MQTT`/`devices`. Give it some time to find all controls and entities.
 
 Some entities become visible only when the bridge is operating in auxiliary control mode *and in counter request mode*. These modes can be switched on with the `Control_Function` switch *and the `Counter_Request_Function`* switch in the `HC_Bridge` device. After switching on, wait at least 10 minutes for all entities to be recognized in HA, then proceed to add the following subdevices to your HA dashboards.
 
