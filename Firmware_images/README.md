@@ -41,7 +41,7 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 
 ## P1P2MQTT-bridge firmware for ESP8266
 
-[P1P2MQTT-bridge v0.9.47 for Daikin E-series](P1P2MQTT-bridge-v0.9.47-Daikin-E.ino.bin)
+[P1P2MQTT-bridge v0.9.48 for Daikin E-series](P1P2MQTT-bridge-v0.9.48-Daikin-E.ino.bin)
 
 [P1P2MQTT-bridge v0.9.47 for Daikin F-series](P1P2MQTT-bridge-v0.9.47-Daikin-F.ino.bin)
 
