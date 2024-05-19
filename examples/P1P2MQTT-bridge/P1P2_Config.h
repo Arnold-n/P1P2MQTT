@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20240519 v0.9.50 make factory reset and production/consumption counter update only available if haSetup is active
  * 20240519 v0.9.49 fix haConfigMsg max length
  * 20240518 v0.9.47 fix bcnt code
  * 20240515 v0.9.46 HA control, improve TZ, remove bindata and json output format, rewrote mqtt/telnet/buffering, remove MQTT_INPUT_HEXDATA
@@ -107,8 +108,8 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "P1P2MQTT bridge v0.9.49"
-#define HA_SW "0.9.49"
+#define WELCOMESTRING "P1P2MQTT bridge v0.9.50"
+#define HA_SW "0.9.50"
 
 #define ARDUINO_OTA
 #define WEBSERVER // adds local webserver to update firmware of ESP

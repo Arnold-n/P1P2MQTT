@@ -693,6 +693,7 @@ byte  createButtonsSwitches(void) {
   HADEVICE_BUTTON;
   HADEVICE_BUTTON_CLASS("update");
   HADEVICE_BUTTON_COMMAND("D7");
+  HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
   if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
 
   HARESET;
@@ -710,6 +711,7 @@ byte  createButtonsSwitches(void) {
   HADEVICE_BUTTON;
   //  HADEVICE_BUTTON_CLASS("*");
   HADEVICE_BUTTON_COMMAND("D13");
+  HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
   if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
 
   HARESET;
