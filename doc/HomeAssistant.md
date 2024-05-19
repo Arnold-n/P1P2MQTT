@@ -40,7 +40,7 @@ Some entities become visible only when the bridge is operating in auxiliary cont
 
 | Device (E-series)|#  | Function                                                   | # |Controls
 |:-----------------|--:|:----------------------------------------------------------|---:|:---------------|
-| HC_Bridge        | 4 | Settings and status of P1P2MQTT bridge                     | 5  | `Control_Function`<br>`Counter_Request_Function`<br>`Restart_*`<br>`EEPROM_*``Factory_Reset_*`<br>`MQTT_*`
+| HC_Bridge        | 4 | Settings and status of P1P2MQTT bridge                     | 5  | `Control_Function`<br>`Counter_Request_Function`<br>`Restart_*`<br>`EEPROM_*` `MQTT_Rebuild`
 | HC_Sensors       |16 | Temperature, flow, water pressure (*)                      | n/a|
 | HC_Room          |12 | Room temperature setpoints                                 |  1  | `Room_Heating`<br>`Room_Cooling` (*)
 | HC_LWT           |15 | Leaving Water Temperature setpoints main zone              |  2  | `LWT_ABS_Heating`<br>`LWT_ABS_Cooling`<br>`LWT_Deviation_Heating`<br>`LWT_Deviation_Cooling` (*)
@@ -54,7 +54,7 @@ Some entities become visible only when the bridge is operating in auxiliary cont
 | HC_COP           | 9 | COP calculations
 | HC_Meters        |(S)| Hours/kWh counters (`C2` mode recommended to update counters)
 | HC_Unknown       |(S)| Some unknown entities
-| HC_Setup         |(S)| Single control entity for HA setup                         | (C)| `HA_Setup`
+| HC_Setup         |(S)| Single control entity for HA setup                         | (C)| `HA_Setup` <br> `Factory_Reset_*` <br> `MQTT_Delete_`
 
 (Numbering # 1-17 is a suggestion how to order devices on a single dashboard in a 3-column configuration for PC use; for HA app another order may be more appropriate) <br>
 
@@ -201,6 +201,8 @@ If you want to delete old MQTT topics (after an update from an earlier firmware,
 | Same as for HC_LWT, with _Add added      | Idem as for HC_LWT, but for additional zone
 
 ##### HC_Quiet
+
+On (some?) newer Altherma 3 R models, Quiet\_Level monitors the current quiet status but controls do not work.
 
 | Function                                 | Description
 |:-----------------------------------------|:----------------------------------------------------------|

@@ -48,7 +48,7 @@
 #define CAT_FIELDSETTING  { mqttTopic[ mqttTopicCatChar ] = 'F'; } // field settings
 #define CAT_COUNTER       { mqttTopic[ mqttTopicCatChar ] = 'C'; } // kWh/hour/start counters
 #define CAT_PSEUDO        { mqttTopic[ mqttTopicCatChar ] = 'A'; } // ATmega/ESP operation
-#define CAT_PSEUDO_SYSTEM { mqttTopic[ mqttTopicCatChar ] = 'C'; } // system operation (COP etc)
+#define CAT_PSEUDO_SYSTEM { mqttTopic[ mqttTopicCatChar ] = 'C'; } // system operation (COP etc) // conflicts with CAT_COUNTER, but no real need to change - otherwise could be 'B'
 #define CAT_SCHEDULE      { mqttTopic[ mqttTopicCatChar ] = 'E'; } // Schedule
 #define CAT_UNKNOWN       { mqttTopic[ mqttTopicCatChar ] = 'U'; }
 #define SRC(x)            { mqttTopic[ mqttTopicSrcChar ] = '0' + x; }
@@ -166,11 +166,6 @@ char timeString1[20] = "Mo 2000-00-00 00:00";    // reads time from packet type 
 char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 0x31 (+weekday from packet 12)
 
 //==================================================================================================================
-
-#define HACONFIGMESSAGE_ADD(formatstring, ...) { \
-  haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__); \
-  checkHaConfigMessageLength; \
-}
 
 #define EXTRA_AV_STRING_ADD(formatstring, ...) { \
   extraAvailabilityStringLength += snprintf_P(extraAvailabilityString + extraAvailabilityStringLength, EXTRA_AVAILABILITY_STRING_LEN - extraAvailabilityStringLength, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__); \
@@ -664,12 +659,23 @@ byte  createButtonsSwitches(void) {
   if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
 
   HARESET;
-  KEY("MQTT_Delete_Rebuild");
-  SUBDEVICE("_Bridge");
+  KEY("MQTT_Delete_Own_Rebuild");
+  SUBDEVICE("_Setup");
   HADEVICE_BUTTON;
   HADEVICE_BUTTON_CLASS("update");
   HADEVICE_BUTTON_COMMAND("D12");
   HADEVICE_AVAILABILITY("S\/9\/ESP_Throttling", 0, 1);
+  HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
+  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+
+  HARESET;
+  KEY("MQTT_Delete_All_Rebuild");
+  SUBDEVICE("_Setup");
+  HADEVICE_BUTTON;
+  HADEVICE_BUTTON_CLASS("update");
+  HADEVICE_BUTTON_COMMAND("D14");
+  HADEVICE_AVAILABILITY("S\/9\/ESP_Throttling", 0, 1);
+  HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
   if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
 
   HARESET;
@@ -690,7 +696,7 @@ byte  createButtonsSwitches(void) {
 
   HARESET;
   KEY("Factory_Reset_ESP_After_Restart");
-  SUBDEVICE("_Bridge");
+  SUBDEVICE("_Setup");
   HADEVICE_BUTTON;
   HADEVICE_BUTTON_CLASS("update");
   HADEVICE_BUTTON_COMMAND("D7");
@@ -699,7 +705,7 @@ byte  createButtonsSwitches(void) {
 
   HARESET;
   KEY("Factory_Reset_ESP_Cancel");
-  SUBDEVICE("_Bridge");
+  SUBDEVICE("_Setup");
   HADEVICE_BUTTON;
   HADEVICE_BUTTON_CLASS("restart");
   HADEVICE_BUTTON_COMMAND("D8");

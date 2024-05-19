@@ -87,8 +87,7 @@
 #define MDNS_NAME_LEN ( DEVICE_NAME_LEN + BRIDGE_NAME_LEN )
 
 // MQTT delete
-#define DELETE_STEP 3 // seconds between MQTT delete-steps
-#define DELETE_STRING "P1P2MQTT"
+#define DELETE_STEP 2 // seconds between MQTT delete-steps
 
 // MQTT topics
 #define MQTT_PREFIX "P1P2"                      // prefix for all MQTT topics

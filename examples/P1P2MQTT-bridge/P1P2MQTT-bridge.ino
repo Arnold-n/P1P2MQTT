@@ -15,6 +15,7 @@
  * ArduinoJson 6.11.3 by Benoit Blanchon
  *
  * Version history
+ * 20240519 v0.9.51 onMqtt improved (D12 fixes + lower mem)
  * 20240519 v0.9.49 fix haConfigMsg max length
  * 20240515 v0.9.46 HA/MQTT discovery climate controls, remove BINDATA, improve TZ, remove json output format, add W_SERIES for HomeWizard electricity meter bridge
  * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
@@ -941,11 +942,6 @@ uint32_t mqttPublished = 0;
 #define ignoreSerial (EE.outputMode & 0x8000)
 
 volatile bool Skipped = false;
-char haConfigTopic[HA_KEY_LEN];
-uint16_t haConfigTopicLength = 0;
-uint16_t haConfigTopicLengthMax = 0;
-#define checkHaConfigTopicLength {  if (haConfigTopicLength > haConfigTopicLengthMax) haConfigTopicLengthMax = haConfigTopicLength; \
-                                    if (haConfigTopicLength >= HA_KEY_LEN) { printfTopicS("haConfigTopic too long %i >= %i", haConfigTopicLength, HA_KEY_LEN); return 0; } }
 
 bool clientPublishMqtt(const char* key, uint8_t qos, bool retain, const char* value = nullptr) {
   if (mqttConnected) {
@@ -1057,11 +1053,36 @@ void writePseudoPacket(byte* WB, byte rh)
 
 byte readHex[HB];
 
+char haConfigTopic[HA_KEY_LEN];
+uint16_t haConfigTopicLength = 0;
+uint16_t haConfigTopicLengthMax = 0;
+
 char haConfigMessage[HA_VALUE_LEN];
 uint16_t haConfigMessageLength = 0;
 uint16_t haConfigMessageLengthMax = 0;
-#define checkHaConfigMessageLength {  if (haConfigMessageLength > haConfigMessageLengthMax) haConfigMessageLengthMax = haConfigMessageLength; \
-                                      if (haConfigMessageLength >= HA_VALUE_LEN) { printfTopicS("haConfigMsg too long %i > %i", haConfigMessageLength, HA_VALUE_LEN); return 0; } }
+
+#define HACONFIGTOPIC(formatstring, ...) { \
+  haConfigTopicLength = snprintf_P(haConfigTopic, HA_KEY_LEN, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__); \
+  if (haConfigTopicLength > haConfigTopicLengthMax) haConfigTopicLengthMax = haConfigTopicLength; \
+  if (haConfigTopicLength >= HA_KEY_LEN) { \
+    printfTopicS("haConfigTopic too long %i >= %i (%.20s)", haConfigTopicLength, HA_KEY_LEN, haConfigTopic); \
+    return 0; \
+  } \
+}
+
+#define HACONFIGMESSAGE_ADD(formatstring, ...) { \
+  haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(formatstring) __VA_OPT__(,) __VA_ARGS__); \
+  if (haConfigMessageLength > haConfigMessageLengthMax) haConfigMessageLengthMax = haConfigMessageLength; \
+  if (haConfigMessageLength >= HA_VALUE_LEN) { \
+    char* nameP; \
+    if ((nameP = strstr_P(haConfigMessage, PSTR("name\":\""))) != NULL) { \
+      nameP = nameP + 7; \
+    } else { \
+      nameP = haConfigMessage; \
+    } \
+    printfTopicS("haConfigMsg too long %i >= %i (%.25s)", haConfigMessageLength, HA_VALUE_LEN, nameP); return 0; \
+  } \
+}
 
 bool publishHomeAssistantConfig(const char* deviceSubName,
                                 const hadevice haDevice,
@@ -1087,15 +1108,14 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
   snprintf_P(entityName + strlen(entityName), ENTITY_UNIQ_ID_LEN - strlen(entityName), PSTR("%s"), mqttTopic + mqttTopicPrefixLength);
   if (useSrc) snprintf_P(entityName + strlen(entityName), ENTITY_UNIQ_ID_LEN - strlen(entityName), PSTR("_%c"), mqttTopic[mqttTopicSrcChar]);
 
-  haConfigTopicLength = snprintf_P(haConfigTopic, HA_KEY_LEN, PSTR("%s/%s/%s/%s/config"),
+  HACONFIGTOPIC("%s/%s/%s/%s/config",
     /* home assistant prefix */ EE.haConfigPrefix, haPrefixString[haDevice],
     /* node_id */ EE.bridgeName,
     /* object_id = uniq_id = entity ID */ entityUniqId);
-  checkHaConfigTopicLength;
 
   topicCharSpecific('L');
-  haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength,
-    PSTR("\"name\":\"%s\",\"uniq_id\":\"%s\",\"avty\":[{\"topic\":\"%s\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\"}%s],\"avty_mode\":\"all\",\"dev\":{\"name\":\"%s%s\",\"ids\":[\"%s%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}"),
+
+  HACONFIGMESSAGE_ADD("\"name\":\"%s\",\"uniq_id\":\"%s\",\"avty\":[{\"topic\":\"%s\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\"}%s],\"avty_mode\":\"all\",\"dev\":{\"name\":\"%s%s\",\"ids\":[\"%s%s\"],\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\"}",
     /* name        */  entityName, //mqttTopic + mqttTopicPrefixLength, useSrcString,
     /* uniq_id */      entityUniqId,
     /* avty/topic1 */       mqttTopic, // (L)
@@ -1107,35 +1127,29 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
       /* mf */           HA_MF,
       /* mdl */          HA_DEVICE_MODEL,
       /* sw */           HA_SW);
-  checkHaConfigMessageLength;
+
 
   if (haEntityCategory) {
-    haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"ent_cat\":\"%s\""), haEntityCategoryString[haEntityCategory]);
-    checkHaConfigMessageLength;
+    HACONFIGMESSAGE_ADD(",\"ent_cat\":\"%s\"", haEntityCategoryString[haEntityCategory]);
   }
 
   // icon (for some: also device_class unit-of-meas and/or stateclass) determined by entity
   if (haEntity) {
-    haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"ic\":\"%s\""), haIconString[haEntity]);
-    checkHaConfigMessageLength;
+    HACONFIGMESSAGE_ADD(",\"ic\":\"%s\"", haIconString[haEntity]);
     switch (haDevice) {
       case HA_SENSOR :    // state_class
                           //if (haPrecision) {
-                            haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"sug_dsp_prc\":%d"), haPrecision);
-                            checkHaConfigMessageLength;
+                            HACONFIGMESSAGE_ADD(",\"sug_dsp_prc\":%d", haPrecision);
                           //}
 
-                          haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"stat_cla\":\"%s\""), haStateClassString[haStateClass[haEntity]]);
-                          checkHaConfigMessageLength;
+                          HACONFIGMESSAGE_ADD(",\"stat_cla\":\"%s\"", haStateClassString[haStateClass[haEntity]]);
                           // fall-through
       case HA_NUMBER :    // unit-of-measure
-                          haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"unit_of_meas\":\"%s\""), haUomString[haEntity]);
-                          checkHaConfigMessageLength;
+                          HACONFIGMESSAGE_ADD(",\"unit_of_meas\":\"%s\"", haUomString[haEntity]);
                           // fall-through
       case HA_BINSENSOR : // device_class
                           if (haDeviceClassString[haEntity][0]) {
-                            haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"dev_cla\":\"%s\""), haDeviceClassString[haEntity]);
-                            checkHaConfigMessageLength;
+                            HACONFIGMESSAGE_ADD(",\"dev_cla\":\"%s\"", haDeviceClassString[haEntity]);
                           }
                           // fall-through
       default :           break;
@@ -1144,33 +1158,29 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
 
   // device_class (only for button)
   if ((haDevice == HA_BUTTON) && haButtonDeviceClass) {
-    haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"dev_cla\":%s\""), haButtonDeviceClassString[haButtonDeviceClass]);
-    checkHaConfigMessageLength;
+    HACONFIGMESSAGE_ADD(",\"dev_cla\":%s\"", haButtonDeviceClassString[haButtonDeviceClass]);
   }
 
   // status_topic
   topicCharSpecificSlash('P'); // slash to add entityname
   switch (haDevice) {
     case HA_BINSENSOR  : // pl_of pl_on
-                         haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"pl_off\":0,\"pl_on\":1"));
-                         checkHaConfigMessageLength;
+                         HACONFIGMESSAGE_ADD(",\"pl_off\":0,\"pl_on\":1");
                          // fall-through
     case HA_SELECT     : // fall-through
     case HA_TEXT       : // fall-through
     case HA_SENSOR     : // fall-through
     case HA_NUMBER     : // fall-through
     case HA_SWITCH     : // state_topic based on mqttTopic (P)
-                         haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"stat_t\":\"%s\""), mqttTopic);
-                         checkHaConfigMessageLength;
+                         HACONFIGMESSAGE_ADD(",\"stat_t\":\"%s\"", mqttTopic);
                          // value_template for all-except-button
     default            : break;
   }
 
   // add qos
   if (haQos) {
-    haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR(",\"qos\":1"), mqttTopic);
-    checkHaConfigMessageLength;
-  } 
+    HACONFIGMESSAGE_ADD(",\"qos\":1");
+  }
 
   // command_topic and command_template for number switch button select text, done via initial string before calling this function, idem for
   // min/max/step/mode for number
@@ -1178,8 +1188,7 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
   // min/max/mode/pattern for text
   // hvac topics
 
-  haConfigMessageLength += snprintf_P(haConfigMessage + haConfigMessageLength, HA_VALUE_LEN - haConfigMessageLength, PSTR("}"));
-  checkHaConfigMessageLength;
+  HACONFIGMESSAGE_ADD("}");
 #define DELAY_HA 50
   delay(DELAY_HA);
 
@@ -1211,11 +1220,10 @@ bool deleteHomeAssistantConfig(const char* deviceSubName,
   snprintf_P(entityName + strlen(entityName), ENTITY_UNIQ_ID_LEN - strlen(entityName), PSTR("%s"), mqttTopic + mqttTopicPrefixLength);
   if (useSrc) snprintf_P(entityName + strlen(entityName), ENTITY_UNIQ_ID_LEN - strlen(entityName), PSTR("_%c"), mqttTopic[mqttTopicSrcChar]);
 
-  haConfigTopicLength = snprintf_P(haConfigTopic, HA_KEY_LEN, PSTR("%s/%s/%s/%s/config"),
+  HACONFIGTOPIC("%s/%s/%s/%s/config",
     /* home assistant prefix */ EE.haConfigPrefix, haPrefixString[haDevice],
     /* node_id */ EE.bridgeName,
     /* object_id = uniq_id = entity ID */ entityUniqId);
-  checkHaConfigTopicLength;
 
 #define DELAY_HA_NULL 10
   delay(DELAY_HA_NULL);
@@ -1388,44 +1396,66 @@ void loadMQTT() {
 }
 
 
+uint16_t mqttDeleted = 0;
+uint16_t mqttDeleteDetected = 0;
+uint16_t mqttDeleteOverrun = 0;
+uint8_t deleteSpecific = 0;
+uint8_t mqttDeletingMax = 0;
+uint8_t mqttDeletePrefixLength = 0;
 
-uint16_t cleanCntDetected = 0;
-uint16_t cleanCntBuffered = 0;
-uint16_t cleanCntDeleted = 0;
+#define SUBSCRIBE_TOPIC_LEN 100
+char deleteSubscribeTopic[ SUBSCRIBE_TOPIC_LEN ];
 
-void mqttSubscribeToDelete() {
-  // subscribe to homeassistant 
-  cleanCntDetected = 0;
-  cleanCntBuffered = 0;
-  cleanCntDeleted = 0;
-  int result = mqttClient.subscribe("homeassistant/#", MQTT_QOS_DELETE);
-  saveTopic();
-  topicCharGenericHash('P');
-  result = mqttClient.subscribe(mqttTopic, MQTT_QOS_DELETE);
-  topicCharGenericHash('M');
-  result = mqttClient.subscribe(mqttTopic, MQTT_QOS_DELETE);
-  topicCharGenericHash('L');
-  result = mqttClient.subscribe(mqttTopic, MQTT_QOS_DELETE);
-  topicCharGenericHash('Z');
-  result = mqttClient.subscribe(mqttTopic, MQTT_QOS_DELETE);
-  restoreTopic();
+void mqttSubscribeToDelete(bool specific) {
+  // subscribe to homeassistant
+  mqttDeleted = 0;
+  mqttDeleteDetected = 0;
+  mqttDeleteOverrun = 0;
+#define DUAL_STRING_FOR_DEVICE_NAME_IF_USED EE.useDeviceNameInTopic ? EE.deviceName : "", EE.useDeviceNameInTopic ? "/" : ""
+#define DUAL_STRING_FOR_BRIDGE_NAME_IF_USED EE.useBridgeNameInTopic ? EE.bridgeName : "", EE.useBridgeNameInTopic ? "/" : ""
+  if (specific) {
+    switch (mqttDeleting) {
+      case          1 ... DEL0                 : snprintf_P(deleteSubscribeTopic, SUBSCRIBE_TOPIC_LEN, PSTR("%s/%c/%s%s%s%s#"), EE.mqttPrefix, haDeleteCat[ mqttDeleting - 1 ], DUAL_STRING_FOR_DEVICE_NAME_IF_USED, DUAL_STRING_FOR_BRIDGE_NAME_IF_USED);
+                                                 break;
+      case (1 + DEL0) ... (DEL0 + DEL1)        : snprintf_P(deleteSubscribeTopic, SUBSCRIBE_TOPIC_LEN, PSTR("%s/%s/%s%s#"), EE.haConfigPrefix, haPrefixString[ mqttDeleting - DEL0 ], DUAL_STRING_FOR_BRIDGE_NAME_IF_USED);
+                                                 break;
+      case (4 + DEL1) ... (DEL0 + DEL1 + DEL2) : snprintf_P(deleteSubscribeTopic, SUBSCRIBE_TOPIC_LEN, PSTR("%s/P/%s%s%s%s%s"), EE.mqttPrefix, DUAL_STRING_FOR_DEVICE_NAME_IF_USED, DUAL_STRING_FOR_BRIDGE_NAME_IF_USED, haDeleteString[ mqttDeleting - DEL0 - DEL1 - 1 ]);
+                                                 break;
+    }
+    mqttDeletePrefixLength = strlen(deleteSubscribeTopic) - 2;
+    mqttDeletingMax = DEL0 + DEL1 + DEL2;
+  } else {
+    switch (mqttDeleting) {
+      case                           1 ... DEL0                      : snprintf_P(deleteSubscribeTopic, SUBSCRIBE_TOPIC_LEN, PSTR("%s/%c/#"), EE.mqttPrefix, haDeleteCat[ mqttDeleting - 1 ], EE.deviceName, EE.bridgeName);
+                                                                       mqttDeletePrefixLength = strlen(deleteSubscribeTopic) - 2;
+                                                                       break;
+      case (1 + DEL0)                  ... (DEL0 + DEL1)             : snprintf_P(deleteSubscribeTopic, SUBSCRIBE_TOPIC_LEN, PSTR("%s/%s/#"), EE.haConfigPrefix, haPrefixString[ mqttDeleting - DEL0 ]);
+                                                                       mqttDeletePrefixLength = strlen(deleteSubscribeTopic) - 2;
+                                                                       break;
+      case (1 + DEL0 + DEL1)           ... (DEL0 + DEL1 + DEL2)      : snprintf_P(deleteSubscribeTopic, SUBSCRIBE_TOPIC_LEN, PSTR("%s/P/+/+/%s"), EE.mqttPrefix, haDeleteString[ mqttDeleting - DEL0 - DEL1 - 1]);
+                                                                       mqttDeletePrefixLength = strlen(EE.mqttPrefix) + 2;
+                                                                       break;
+      case (1 + DEL0 + DEL1 + DEL2)    ... (DEL0 + DEL1 + 2 * DEL2)  : snprintf_P(deleteSubscribeTopic, SUBSCRIBE_TOPIC_LEN, PSTR("%s/P/+/%s"), EE.mqttPrefix, haDeleteString[ mqttDeleting - DEL0 - DEL1 - DEL2 - 1]);
+                                                                       mqttDeletePrefixLength = strlen(EE.mqttPrefix) + 2;
+                                                                       break;
+      case (1 + DEL0 + DEL1 + 2 * DEL2) ... (DEL0 + DEL1 + 3 * DEL2) : snprintf_P(deleteSubscribeTopic, SUBSCRIBE_TOPIC_LEN, PSTR("%s/P/%s"), EE.mqttPrefix, haDeleteString[ mqttDeleting - DEL0 - DEL1  - 2 * DEL2 - 1]);
+                                                                       mqttDeletePrefixLength = strlen(EE.mqttPrefix) + 2;
+                                                                       break;
+    }
+    mqttDeletingMax = DEL0 + DEL1 + 3 * DEL2;
+  }
+  printfTopicS("Deleting step %i/%i subscribing to %s", mqttDeleting, mqttDeletingMax, deleteSubscribeTopic);
+  mqttClient.subscribe(deleteSubscribeTopic, MQTT_QOS_DELETE);
 }
 
 uint16_t mqttUnsubscribeToDelete() {
-  // subscribe to homeassistant 
-  mqttClient.unsubscribe("homeassistant");
-  printfTopicS("Topics to be deleted: detected %i buffered %i deleted %i", cleanCntDetected, cleanCntBuffered, cleanCntDeleted);
-  saveTopic();
-  topicCharGenericHash('P');
-  mqttClient.unsubscribe(mqttTopic);
-  topicCharGenericHash('M');
-  mqttClient.unsubscribe(mqttTopic);
-  topicCharGenericHash('L');
-  mqttClient.unsubscribe(mqttTopic);
-  topicCharGenericHash('Z');
-  mqttClient.unsubscribe(mqttTopic);
-  restoreTopic();
-  return (cleanCntDetected - cleanCntDeleted);
+  printfTopicS("Deleted/detected %i/%i overrun %i", mqttDeleted, mqttDeleteDetected, mqttDeleteOverrun);
+  mqttClient.unsubscribe(deleteSubscribeTopic);
+  // printfTopicS("Unsubscribing from %s", deleteSubscribeTopic);
+  if (!mqttDeleteOverrun) {
+    if (++mqttDeleting > mqttDeletingMax) mqttDeleting = 0;
+  }
+  return (mqttDeleting ? 1 : 0);
 }
 
 void loadData() {
@@ -1742,7 +1772,7 @@ void printModifyParam(byte paramNr, bool modParam = false, int32_t newValue = 0,
                                             buildMqttTopic(); // lazy coding, is only needed for mqttPrefix, useDeviceNameInTopic, deviceName, useBridgeNameInTopic, bridgeName
                                             break;
       default                             : break;
-    } 
+    }
   }
 
 
@@ -1772,7 +1802,7 @@ void printModifyParam(byte paramNr, bool modParam = false, int32_t newValue = 0,
 }
 
 void reconnectMQTT() {
-  // TODO enable in future WiFiManager version: 
+  // TODO enable in future WiFiManager version:
   // if (WiFi.isConnected()) printfTopicS("Connected to WiFi SSID %s", wifiManager.getWiFiSSID());
   // disable ATmega serial output on v1.2
   digitalWrite(ATMEGA_SERIAL_ENABLE, LOW);
@@ -1965,8 +1995,8 @@ void handleCommand(char* cmdString) {
               // fall-through
     case '<': printfTopicS("< %s", cmdString + 1);
               break;
-    case '-': // printfTopicS("Deleting topic %s", cmdString + 1);
-              cleanCntDeleted++;
+    case '-': //printfTopicS("Deleting topic %s", cmdString + 1);
+              mqttDeleted++;
               clientPublishMqtt(cmdString + 1, MQTT_QOS_DELETE, MQTT_RETAIN_DELETE /* nullmessage */);
               break;
     case 'a': // reset ATmega
@@ -2016,10 +2046,18 @@ void handleCommand(char* cmdString) {
                 case 2 : printfTopicS("Resetting maxLoopTime");
                          maxLoopTime = 0;
                          break;
-                case 4 : printfTopicS("Reconnecting to MQTT");
+                case 4 : if (mqttDeleting) {
+                           printfTopicS("Please wait until mqtt-delete action is finished");
+                           break;
+                         }
+                         printfTopicS("Reconnecting to MQTT");
                          reconnectMQTT();
                          // fall-through to 3
-                case 3 : printfTopicS("Resetting data structures, throttle");
+                case 3 : if (mqttDeleting) {
+                           printfTopicS("Please wait until mqtt-delete action is finished");
+                           break;
+                         }
+                         printfTopicS("Resetting data structures, throttle");
                          throttleStepTime = espUptime + THROTTLE_STEP_S;
                          throttleValue = THROTTLE_VALUE;
                          pseudo0F = 9;
@@ -2031,7 +2069,8 @@ void handleCommand(char* cmdString) {
                          break;
                 case 6 : loadEEPROM();
                          pseudo0F = 9;
-                         printfTopicS("Loading data from EEPROM (reversing modifications); may require D4 to reconnect to MQTT server");
+                         // some changes are not immediately effective, TODO: improve
+                         printfTopicS("Loading data from EEPROM (reversing modifications); may require D4 to reconnect to MQTT server and D0 to take full effect");
                          configTZ();
 #ifdef E_SERIES
                          configOffset();
@@ -2070,9 +2109,10 @@ void handleCommand(char* cmdString) {
                            printfTopicS("Please wait until throttling is ready - then reissue D12");
                          } else {
                            digitalWrite(ATMEGA_SERIAL_ENABLE, LOW);
-                           printfTopicS("Deleting homeassistant and MQTT entities and resetting and rebuilding MQTT topics and HA configuration");
+                           printfTopicS("Deleting own homeassistant and MQTT entities and resetting and rebuilding MQTT topics and HA configuration");
                            mqttDeleting = 1;
-                           mqttSubscribeToDelete();
+                           deleteSpecific = 1;
+                           mqttSubscribeToDelete(deleteSpecific);
                            M.R.RTCdataLength = 0; // invalidate RCT data
                            ESP.rtcUserMemoryWrite(RTC_REGISTER, reinterpret_cast<uint32_t *>(&M.R), sizeof(M.R));
                            mqttUnsubscribeTime = espUptime + DELETE_STEP;
@@ -2097,6 +2137,19 @@ void handleCommand(char* cmdString) {
                          }
                          break;
 #endif /* E_SERIES */
+                case 14: if (throttleValue) {
+                           printfTopicS("Please wait until throttling is ready - then reissue D14");
+                         } else {
+                           digitalWrite(ATMEGA_SERIAL_ENABLE, LOW);
+                           printfTopicS("Deleting ALL homeassistant and MQTT entities and resetting and rebuilding MQTT topics and HA configuration");
+                           mqttDeleting = 1;
+                           deleteSpecific = 0;
+                           mqttSubscribeToDelete(deleteSpecific);
+                           M.R.RTCdataLength = 0; // invalidate RCT data
+                           ESP.rtcUserMemoryWrite(RTC_REGISTER, reinterpret_cast<uint32_t *>(&M.R), sizeof(M.R));
+                           mqttUnsubscribeTime = espUptime + DELETE_STEP;
+                         }
+                         break;
                 case 99: // no argument, fall-through to:
                 default: printfTopicS("D0: restart ESP (+initDataRTC/resetData in case of factoryreset)");
                          printfTopicS("D1: reset ESP");
@@ -2110,10 +2163,11 @@ void handleCommand(char* cmdString) {
                          printfTopicS("D9: reset wifiManager settings and restart ESP");
                          printfTopicS("D10: unSeen");
                          printfTopicS("D11: initDataRTC, resetData");
-                         printfTopicS("D12: delete and rebuild retained MQTT config/data (deletes old data from all bridges)");
+                         printfTopicS("D12: delete own and rebuild retained MQTT config/data (deletes old data from all bridges)");
 #ifdef E_SERIES
                          printfTopicS("D13: set consumption/production counters for COP before/after bridge installation");
 #endif /* E_SERIES */
+                         printfTopicS("D14: delete all and rebuild retained MQTT config/data (deletes old data from all bridges)");
                          reportState();
                          break;
               }
@@ -2298,33 +2352,41 @@ bool OTAbusy = 0;
 void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessageProperties& properties,
                    const size_t& len, const size_t& index, const size_t& total) {
   (void) payload;
-  static bool MQTT_drop = false;
+  static bool MQTT_drop_remainder = false;
   static size_t index_expected = 0;
 
+  if (!len) return; // ignore null messages
   if (OTAbusy) return;
+
   // check index, len, total, handle fragmentation, collect MQTT_payload, create null-terminated copy
-  if (index == 0) MQTT_drop = false;
-  if (!len) {
-    return;
-  } else if (index + len > MQTT_PAYLOAD_LEN) {
-    delayedPrintfTopicS("Received MQTT payload index %i length %i total %i, longer than max MQTT_PAYLOAD_LEN %i", index, len, total, MQTT_PAYLOAD_LEN);
-    MQTT_drop = true;
-    return;
-  } else if (index && (index != index_expected)) {
+  if (index == 0) MQTT_drop_remainder = false;
+  if (!MQTT_drop_remainder && index && (index != index_expected)) {
     delayedPrintfTopicS("Missed part of payload on topic %i", topic);
-    MQTT_drop = true;
-    return;
-  } else {
-   if (!MQTT_drop) memcpy(MQTT_payload + index, payload, len);
-    if (index + len != total) {
-      index_expected = index + len;
-      return;
-    }
+    MQTT_drop_remainder = true;
   }
-  MQTT_payload[ total ] = '\0'; // ensure that (in case it is a string) it is null-terminated
-
-
-  // continue only for fully received payload
+  index_expected = index + len;
+  bool deleteTopic = 0;
+  if (mqttDeleting && !strncmp(topic, deleteSubscribeTopic, mqttDeletePrefixLength)) {
+    if (mqttDeleteOverrun) return;
+    if (!properties.retain) return;
+    deleteTopic = 1;
+    MQTT_drop_remainder = true;
+  }
+  if (!MQTT_drop_remainder && (total > MQTT_PAYLOAD_LEN)) {
+    delayedPrintfTopicS("Received MQTT payload index %i length %i total %i, longer than max MQTT_PAYLOAD_LEN %i", index, len, total, MQTT_PAYLOAD_LEN);
+    MQTT_drop_remainder = true;
+  }
+  if (!MQTT_drop_remainder) memcpy(MQTT_payload + index, payload, len);
+  if (index + len != total) return;
+  // index + len == total
+  // drop msg if incomplete or too long, unless it starts with homeassistant (for delete process)
+  if (MQTT_drop_remainder) {
+    if (!deleteTopic) return;
+    MQTT_payload[ 0 ] = '\0'; // too long or deleting -> empty string (not really needed, just in case for later code changes)
+  } else {
+    MQTT_payload[ total ] = '\0'; // ensure that string is null-terminated
+  }
+  // continue only for fully received payload which are not too long and/or are to be deleted
 
   // save current mqttTopic before changing it, restore it before returning!
   saveTopic();
@@ -2345,6 +2407,42 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
     }
     if (mqttBufferFullReported > 1) mqttBufferFullReported = 1;
     mqttBufferWriteString(MQTT_payload, total);
+    mqttBuffer_writeChar('\n');
+    restoreTopic();
+    return;
+  }
+
+  // /homeassistant/status
+  if (!strcmp(topic, "homeassistant/status")) {
+    if (!strcmp(MQTT_payload, "online")) {
+      if (mqttDeleting) {
+      delayedPrintfTopicS("Detected homeassistant/status online - ignored due to ongoing mqtt delete action");
+      } else {
+        delayedPrintfTopicS("Detected homeassistant/status online");
+        throttleStepTime = espUptime + THROTTLE_STEP_S;
+        throttleValue = THROTTLE_VALUE;
+        pseudo0F = 9;
+        resetDataStructures();
+      }
+    } else if (!strcmp(MQTT_payload, "offline")) {
+      delayedPrintfTopicS("Detected homeassistant/status offline");
+    } else {
+    }
+    restoreTopic();
+    return;
+  }
+
+  // store topic if to be deleted
+  if (deleteTopic) {
+    if (mqttBufferFree < strlen(topic) + 2 + MQTT_BUFFER_SPARE2) {
+      // No space to buffer, signal buffer overrun so delete action for this topic will be repeated
+      mqttDeleteOverrun = 1;
+      restoreTopic();
+      return;
+    }
+    mqttDeleteDetected++;
+    mqttBuffer_writeChar('-');
+    mqttBufferWriteString(topic, strlen(topic));
     mqttBuffer_writeChar('\n');
     restoreTopic();
     return;
@@ -2399,70 +2497,7 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
   }
 #endif /* E_SERIES */
 
-  // /homeassistant/status
-  if (!strcmp(topic, "homeassistant/status")) {
-    if (!strcmp(MQTT_payload, "online")) {
-      delayedPrintfTopicS("Detected homeassistant/status online");
-      throttleStepTime = espUptime + THROTTLE_STEP_S;
-      throttleValue = THROTTLE_VALUE;
-      pseudo0F = 9;
-      resetDataStructures();
-    } else if (!strcmp(MQTT_payload, "offline")) {
-      delayedPrintfTopicS("Detected homeassistant/status offline");
-    } else {
-    }
-    restoreTopic();
-    return;
-  }
-
-  byte deleteTopic = 0;
-  // delete homeassistant/# messages - note: deletes msgs from all bridges
-  if (!strncmp(topic, EE.haConfigPrefix, strlen(EE.haConfigPrefix))) {
-    deleteTopic = 1;
-  }
-  topicCharGeneric('M');
-  if (!strncmp(topic, mqttTopic, strlen(mqttTopic))) {
-    deleteTopic = 1;
-  }
-  topicCharGeneric('L');
-  if (!strncmp(topic, mqttTopic, strlen(mqttTopic))) {
-    deleteTopic = 1;
-  }
-  topicCharGeneric('P');
-  if (!strncmp(topic, mqttTopic, strlen(mqttTopic))) {
-    deleteTopic = 1;
-  }
-  topicCharGeneric('Z');
-  if (!strncmp(topic, mqttTopic, strlen(mqttTopic))) {
-    deleteTopic = 1;
-  }
-
-  if (deleteTopic) {
-    // if retained
-    if (properties.retain) {
-      // only delete if topic includes DELETE_STRING ("P1P2MQTT")
-      if (strstr_P(topic, PSTR(DELETE_STRING)) != NULL) {
-        cleanCntDetected++;
-        if (mqttBufferFree < strlen(topic) + 2 + MQTT_BUFFER_SPARE2) {
-          // No space to buffer
-          restoreTopic();
-          return;
-        }
-        if (mqttBufferFullReported > 1) mqttBufferFullReported = 1;
-        cleanCntBuffered++;
-        mqttBuffer_writeChar('-');
-        mqttBufferWriteString(topic, strlen(topic));
-        mqttBuffer_writeChar('\n');
-      // not needed for homeassistant, needed for others: restoreTopic();
-      }
-    }
-
-    restoreTopic();
-    return;
-  }
-
-  // mqttSaveTopic 'B'/../'a'
-
+  // mqttSaveTopic 'A'-'Z'/'a'-'z'
   topicCharBin(mqttSaveTopicChar);
   if (!strcmp(topic, mqttTopic)) {
     if (mqttSaveBytesLeft <= MQTT_SAVE_BLOCK_SIZE) {
@@ -2496,8 +2531,8 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
     return;
   }
 
-  // unknown topic
-  delayedPrintfTopicS("Unknown MQTT topic received %s (not %s?) %s", topic, mqttTopic, MQTT_payload);
+  // unknown topic received
+  delayedPrintfTopicS("Unknown MQTT topic received %s payload %s", topic, MQTT_payload);
   restoreTopic();
 }
 
@@ -3225,6 +3260,13 @@ void loop() {
 
       if (!fallback && (Mqtt_disconnectTime > MQTT_DISCONNECT_TRY_FALLBACK)) {
         printfTopicS("Attempting fall back to 2nd MQTT server");
+        if (mqttDeleting) {
+          printfTopicS("Stop mqtt delete action");
+          mqttUnsubscribeToDelete();
+          digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
+          ignoreRemainder = 2; // in view of change of ignoreSerial caused by mqttDeleting change
+          mqttDeleting = 0;
+        }
         // disconnect
         mqttClient.clearQueue();
         mqttClient.disconnect(true);
@@ -3334,11 +3376,15 @@ void loop() {
     // mqtt (re)connected
     clientPublishMqttChar('L', MQTT_QOS_WILL, MQTT_RETAIN_WILL, "online");
     if (EE.outputMode & 0x0800) { // only if 0x0800
-      delayedPrintfTopicS("Restart data communication after Mqtt reconnect");
-      resetDataStructures();
-      throttleStepTime = espUptime + THROTTLE_STEP_S;
-      throttleValue = THROTTLE_VALUE;
-      pseudo0F = 9;
+      if (mqttDeleting) {
+        delayedPrintfTopicS("Mqtt reconnect - continue mqtt delete");
+      } else {
+        delayedPrintfTopicS("Restart data communication after Mqtt reconnect");
+        resetDataStructures();
+        throttleStepTime = espUptime + THROTTLE_STEP_S;
+        throttleValue = THROTTLE_VALUE;
+        pseudo0F = 9;
+      }
     }
     mqttSubscribe();
     mqttConnected = 1;
@@ -3387,11 +3433,11 @@ void loop() {
         if (mqttDeleting && (espUptime >= mqttUnsubscribeTime)) {
           // unsubscribe
           if (mqttUnsubscribeToDelete()) {
-             delay(300); // TODO
-             mqttSubscribeToDelete();
+             delay(300);
+             mqttSubscribeToDelete(deleteSpecific);
              mqttUnsubscribeTime = espUptime + DELETE_STEP;
           } else {
-            mqttDeleting = 0;
+            // already done: mqttDeleting = 0;
             ignoreRemainder = 2; // in view of change of ignoreSerial caused by mqttDeleting change
             // create deleted messages
             snprintf_P(mqtt_value, 16, PSTR("%d.%d.%d.%d"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);

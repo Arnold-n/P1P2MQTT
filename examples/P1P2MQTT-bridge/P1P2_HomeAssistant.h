@@ -337,4 +337,36 @@ habuttondeviceclass haButtonDeviceClass = BUTTONDEVICECLASS_NONE;
 haentitycategory haEntityCategory = ENTITYCATEGORY_NONE;
 hanumbermode haNumberMode = NUMBERMODE_NONE;
 
+// delete topics (D12/D14):
+#define DEL0  3 // # of categories in haDeleteCat
+#define DEL1  8 // # of homeassistant subtopics in haPrefixString (without undef)
+#define DEL2 12 // # of topics below
+
+const char haDeleteCat[] = { 'M', 'L', 'Z' };
+
+const char* haDeleteString[] = {
+/*
+    "homeassistant/sensor",
+    "homeassistant/binary_sensor",
+    "homeassistant/number",
+    "homeassistant/switch",
+    "homeassistant/button",
+    "homeassistant/select",
+    "homeassistant/text",
+    "homeassistant/climate",
+*/
+    "C/9/#",
+    "C/1/#",
+    "C/9/#",
+    "S/0/#",
+    "S/1/#",
+    "S/8/#",
+    "S/9/#",
+    "A/#",
+    "M/#",
+    "T/#",
+    "F/2/#",
+    "#",
+};
+
 #endif /* P1P2_HomeAssistant */
