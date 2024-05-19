@@ -56,7 +56,8 @@ Some entities become visible only when the bridge is operating in auxiliary cont
 | HC_Unknown       |(S)| Some unknown entities
 | HC_Setup         |(S)| Single control entity for HA setup                         | (C)| `HA_Setup`
 
- # 1-17 is a suggestions to order devices on a single dashboard in a 3-column configuration for PC use; for HA app another order may be more appropriate <br>
+(Numbering # 1-17 is a suggestion how to order devices on a single dashboard in a 3-column configuration for PC use; for HA app another order may be more appropriate) <br>
+
 (D) Suggest to use separate DHW dashboard <br>
 (S) Suggest to use separate dashboard <br>
 (C) Can be controlled from MQTT integration, no need to add to dashboard <br>
