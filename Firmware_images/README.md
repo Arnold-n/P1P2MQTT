@@ -41,13 +41,13 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 
 ## P1P2MQTT-bridge firmware for ESP8266
 
-[P1P2MQTT-bridge v0.9.48 for Daikin E-series](P1P2MQTT-bridge-v0.9.48-Daikin-E.ino.bin)
+[P1P2MQTT-bridge v0.9.49 for Daikin E-series](P1P2MQTT-bridge-v0.9.49-Daikin-E.ino.bin)
 
-[P1P2MQTT-bridge v0.9.47 for Daikin F-series](P1P2MQTT-bridge-v0.9.47-Daikin-F.ino.bin)
+[P1P2MQTT-bridge v0.9.49 for Daikin F-series](P1P2MQTT-bridge-v0.9.49-Daikin-F.ino.bin)
 
-[P1P2MQTT-bridge v0.9.47 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.47-Hitachi.ino.bin)
+[P1P2MQTT-bridge v0.9.49 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.49-Hitachi.ino.bin)
 
-[P1P2MQTT-bridge v0.9.47 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.47-MHI.ino.bin)
+[P1P2MQTT-bridge v0.9.49 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.49-MHI.ino.bin)
 
 (for Toshiba, use Hitachi code for now).
 
