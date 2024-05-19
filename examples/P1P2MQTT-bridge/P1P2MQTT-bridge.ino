@@ -15,6 +15,7 @@
  * ArduinoJson 6.11.3 by Benoit Blanchon
  *
  * Version history
+ * 20240519 v0.9.49 fix haConfigMsg max length
  * 20240515 v0.9.46 HA/MQTT discovery climate controls, remove BINDATA, improve TZ, remove json output format, add W_SERIES for HomeWizard electricity meter bridge
  * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
  * 20230611 v0.9.38 H-link data support
@@ -613,7 +614,7 @@ Wiznet5500lwIP eth(ETH_CS_PIN);
  using TCPClient = WiFiClient;
  using TCPServer = WiFiServer;
 
-char MQTT_payload[ MQTT_PAYLOAD_LEN + 1]; // +1 for '\0'
+char MQTT_payload[ MQTT_PAYLOAD_LEN + 1 ]; // +1 for '\0'
 char mqttBuffer[MQTT_BUFFER_SIZE];
 volatile uint16_t mqttBufferHead = 0;
 volatile uint16_t mqttBufferHead2 = 0;
@@ -1239,7 +1240,6 @@ bool bTotalAvailable = false;   // indicates if bTotal is available
 
 #include "P1P2_ParameterConversion.h"
 
-#define MQTT_SAVE_BLOCK_SIZE (MQTT_PAYLOAD_LEN >> 1)
 #define MQTT_SAVE_TOPIC_CHAR 'A'
 
 #define doubleResetAddress 0x20

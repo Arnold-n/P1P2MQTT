@@ -3,6 +3,7 @@
  * Copyright (c) 2023-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20240519 v0.9.49 fix haConfigMsg max length
  * 20240515 v0.9.46 separated HA configuration from P1P2_Config.h
  * ..
  */
@@ -61,7 +62,7 @@ char deviceUniqId[ DEVICE_NAME_HA_LEN ]; // defined once in setup(), depends on 
 #ifdef F_SERIES
 #define HA_VALUE_LEN 2000
 #else
-#define HA_VALUE_LEN 1334 // max seen 1234
+#define HA_VALUE_LEN 1500 // max seen 1359
 #endif
 
 // home assistant MQTT integration prefix

@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20240519 v0.9.49 fix haConfigMsg max length
  * 20240518 v0.9.47 fix bcnt code
  * 20240515 v0.9.46 HA control, improve TZ, remove bindata and json output format, rewrote mqtt/telnet/buffering, remove MQTT_INPUT_HEXDATA
  * 20230806 v0.9.41 restart after MQTT reconnect, Eseries water pressure, Fseries name fix, web server for ESP update
@@ -106,8 +107,8 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "P1P2MQTT bridge v0.9.48"
-#define HA_SW "0.9.48"
+#define WELCOMESTRING "P1P2MQTT bridge v0.9.49"
+#define HA_SW "0.9.49"
 
 #define ARDUINO_OTA
 #define WEBSERVER // adds local webserver to update firmware of ESP
@@ -216,7 +217,8 @@
 #define MQTT_BUFFER_SIZE 2048 // size of ring buffer for MQTT/telnet input handling
 #define MQTT_BUFFER_SPARE 256  // keep a part of buffer reserved for MQTT topic W and telnet input and clean-up
 #define MQTT_BUFFER_SPARE2 128 // during clean-up, keep a part of buffer reserved for MQTT topic W and telnet input
-#define MQTT_PAYLOAD_LEN 1334 // max length of MQTT message
+#define MQTT_PAYLOAD_LEN 1500 // max length of MQTT message that can be received
+#define MQTT_SAVE_BLOCK_SIZE 512 // length of P1P2/M/# save-data messages, should not be more than (MQTT_PAYLOAD_LEN >> 1)
 #define MQTT_CMDBUFFER_MINFREE 200 // incoming R messages should respect min buffer for commands
 
 #define REBOOT_REASON_UNKNOWN 0x00      // reset button / power-up / crash
