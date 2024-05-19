@@ -110,3 +110,277 @@ If the P1P2MQTT bridge cannot be put in `Control_Function` (if the switch bounce
 If some controls or entities appear to be missing, you can *switch `HA_Setup` on again (no need to save this) and* press `MQTT_Rebuild` (under `HC_Bridge`) to repeat the MQTT configuration topics for Home Assistant, and re-add devices to your dashboard.
 
 If you want to delete old MQTT topics (after an update from an earlier firmware, or if you change the topic structure, device name or bridge name yourself), you can press `MQTT_Delete_Rebuild` (under `HC_Bridge`) to delete all MQTT topics from all bridges and recreate new ones.
+
+#### Control and entity overview (Daikin Altherma / E-series)
+
+##### HC_Setup
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| HA_Setup                                 | Enables proper initial set-up of HA dashboards (or otherwise controls may be incomplete), enables button for locking production/consumption counters for COP_Before_Bridge/COP_After_Bridge calculations, and enables factory_reset button. After setup, strongly recommended to switch to off. No need to add to any dashboard.
+
+##### HC_Bridge
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Control_Function                         | Determines whether P1P2MQTT bridge operates in auxiliary control mode. Not needed for monitoring, but required for controlling your system
+| Counter_Request_Function                 | Determines whether P1P2MQTT bridge will request kWh/hour/start counters once every minute. Violates P1/P2 timing protocol, but works on most systems
+| EEPROM_ESP_Save_Changes                  | Saves changes made (offsets, Cons_Prod_Counters) to ESP EEPROM
+| EEPROM_ESP_Set_Cons_Prod_Counters        | If not already done automatically, pressing this button will store the current consumption/production counters for calculation of COP_Before_Bridge and COP_After_Bridge enabling you to monitor improvements of your system's average COP; to save changes, also press EEPROM_ESP_Save_Changes. Button is disabled if HA_Setup is switched off.
+| EEPROM_ESP_Undo_Changes                  | Undo changes made to EEPROM (not possible after saving)
+| Factory_Reset_ESP_After_Restart          | Use with care! This will schedule a factory reset on the next ESP restart. It will then reset all ESP-stored values to their original value, including device name, bridge name, AP and MQTT server credentials, and more. Can be cancelled with Factory_Reset_ESP_Cancel but cannot be undone after ESP restart.  Button is disabled if HA_Setup is switched off.
+| Factory_Reset_ESP_Cancel                 | Unschedule any scheduled factory reset
+|MQTT_Rebuild                              | Retransmits all Home Assistant configuration messages; can be used if HA missed one or more of these messages.
+|MQTT_Delete_Rebuild                       | Idem, but first deletes all Home Assistant configuration messages from (any of) your P1P2MQTT bridge(s), followed by a rebuild of this bridge (but not any others if you have multiple). Useful after a firmware upgrade to delete old entities. Button is disabled for ca 2 minutes after ESP restart of after a MQTT reconnect.
+| R1Toffset_Mid                            | Correction value for temperature sensor R1T (after heat exchanger, before gas boiler or backup heater). If your system is not heating or cooling, but water flow is high, R1T and R2T and R4T should give the same temperature reading. Many users report temperature differences, leading to wrong heat production and wrong COP calculations. Tune these values such that Power_Heatpump and Power_Gasboiler (/BUH) are minimal when flow is high (during the start-up phase of your system)
+| R2Toffset_LWT                            | Correction value for temperature sensor R2T (leaving water temperature)
+| R4Toffset_RWT                            | Correction value for temperature sensor R4T (return water temperature)
+| Restart_P1P2Monitor_ATmega               | Restarts ATmega. Should not be needed, but can be used to quickly increase write budget
+| Restart_P1P2MQTT_ESP                     | Restarts ESP. Does factory_reset if scheduled. Should not be needed, but can be attempted in case of communication or other problems.
+| RToffset_Room                            | Can be used to offset reported room temperature settings, has no other effects
+| Write_Budget                             | Write budget limits the amount of control operations to reduce memory wear; can be increased manually if needed
+| Write_Budget_Period                      | Write budget is regularly increased, by default once every hour. Period is in minutes. For Daikin E-systems, it is likely that flash wear levling is implemented to it is likely safe to reduce the period
+| Error_Budget                             | Indicates how many read errors are accepted before switching Control_Function and Counter_Request_Function off. Should be 20, or a bit lower after a system restart. Errors should not be present, except for a few messages when the Daikin system restarts.
+| ESP_EEPROM_Saved                         | Indicates whether all changes made have been saved to EEPROM
+| ESP_Ectory_Reset_Scheduled               | Indicates if a factory reset is scheduled for the next ESP reset
+| ESP_Throttling                           | Indicates that the ESP is throttling data - messages can be missing or delayed. Happens after an ESP restart or after a MQTT disconnect/reconnect action
+| ESP_Waiting_For_Counters_D13             | Indicates that the ESP is waiting for consumption/production counters to store these counters for COP_Before_Bridge/COP_After_Bridge calculation. Counters will be read when (1) Counter_Request_Function is switched on, (2) Daikin system is restarted, (3) room thermostat requests counters, or (4) EEPROM_ESP_Set_Cons_Prod_Counters is pressed.
+| V_Interfce                               | Reports voltage on P1/P2 interface for bus-powered devices. For bridges powered from a DC power supply, reports DC voltage.
+| Writes_Refused_Budget                    | Indicates how many writes have been refused due to missing write budget; should be 0
+| Writes_Refused_Busy                      | Indicates how many writes have been refused due to lack of buffering; should be 0
+
+##### HC_Mode
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Altherma_On                              | Switches Daikin on/off
+| Daikin_Defrost_Request                   | Requests Daikin to defrost; Daikin may schedule a defrost depending on environmental conditions
+| Heating_Cooling_Auto                     | Switches system between Heating, Cooling, and Auto
+| Program_WD_Abs                           | Switches system between Abs (absolute LWT), WD (weather-dependent LWT), Abs+prog (+clock program), or WD+prog
+| BUH_2                                    | Shows status of 2nd backup heater 
+| Circulation_Pump                         | Shows status of circulation pump for LWT
+| Climate_Cooling                          | Shows whether climate for cooling is active
+| Climate_HC_Auto                          | Shows whether climate will change automatically between heating and cooling
+| Climate_Heating                          | Shows whether climate for heating is active
+| Compressor                               | Shows whether compressor is on
+| Date_Time_Daikin                         | Reports Daikin internal time
+| Defrost_Active                           | Reports whether outdoor unit is defrosting
+| ErrorCode1/2/Subcode                     | Shows Daikin error report. Encoding largely unknown. If you see any error, please share codes and the error code on your room thermostat
+| Gasboiler_Active                         | Shows whether gas boiler (on all-electric: backup heater) is active
+| Heating_Only                             | Indicates that system has no cooling option
+| Preferential_Mode                        | Indicates that preferential mode on hybrid system is actived (switch on X5M-3,4)
+| Valve_Zone_Add                           | ? Indicates status of valve for additional zone
+| Valve_Zone_Main                          | ? Indicates status of valve for main zone
+
+##### HC_Room
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Room_Heating                             | In RT mode, controls room temperature setpoint, on/off, and reports room temperature
+| Room_Cooling                             | In RT mode, controls room temperature setpoint, on/off, and reports room temperature
+| Room_Heating_Setpoint                    | Setpoint for room temperature if in heating mode
+| Room_Cooling_Setpoint                    | Setpoint for room temperature if in cooling mode
+| Room_Setpoint                            | Currently active setpoint for room temperature
+
+##### HC_LWT
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Abs_Heating_Add or Deviation_Heating_Add | In LWT/Abs mode, control for on/off and for absolute setpoint of leaving water temperature. In LWT/WD mode, controls deviation from WD setpoint. Also reports actual LWT temperature.
+| Abs_Cooling_Add or Deviation_Cooling_Add | Idem for cooling
+| Abs_Heating                              | Absolute LWT setpoint heating mode
+| Abs_Cooling                              | Absolute LWT setpoint cooling mode
+| Deviation_Heating                        | Deviation from WD curve if in heating mode
+| Deviation_Cooling                        | Deviation from WD curve if in cooling mode
+| LWT_Setpoint                             | Currently active LWT setpoint
+
+##### HC_LWT2
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Same as for HC_LWT, with _Add added      | Idem as for HC_LWT, but for additional zone
+
+##### HC_Quiet
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Quiet_Level                              | Switches unit to quiet level 0 (off), 1, 2, or 3 (most silent). Can be used to limit power consumption
+| Quiet_Level_When_On                      | Quiet level when selected on room thermostat
+| Quiet_Mode                               | Switches quiet mode on or off
+
+##### HC_Prices
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Gas                                      | Can be used to modify gas price
+| Electricity                              | Shows current electricity price (based on clock programs, predetermined low/mid/high prices can only be modified via field settings)
+
+##### HC_FieldSettings
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Daikin_Restart_Careful                   | Restarts Daikin. Disabled if Daikin is on. Also restarts ESP and ATmega (unless separately powered). Required to make field setting changes effective.
+| Number_of_Zones                          | Indicates whether additional zone is used. Corresponds to menu A.2.1.8 or field setting [7-02].
+| Overshoot                                | Maximum allowed LWT overshoot. Unfortunately cannot be changed on hybrid systems (even though max is reported to be 4, it refuses to change this value). Default value of 1 leads to cycling. Recommended to set to 4 on all-electric systems. Corresponds to field setting [9-04].
+| RT_LWT                                   | Switches between RT (room temperature) and LWT (leaving water temperature) mode. In RT mode, LWT control is not possible via room thermostat, but is still possible via P1P2MQTT bridge (in selected Abs or WD mode).
+| various entities                         | overview of all current field settings with description and menu entry (based on hybrid model), for example:
+| 0_0D_A47_DHW_WD_Curve_High_Amb           |
+| 0_0E_A47_DHW_WD_Curve_Low_Amb            |
+| 1_0A_A64_Averaging_Time                  |
+| C_03_Bivalent_Activation_Temperature     |
+
+##### HC_Power
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Consumption_BUH                          | (not supported yet) gas consumption gas boiler or electricity consumption backup heater
+| Consumption_Heatpump                     | External electricity meter input as reported via MQTT P1P2/P/meter/bridge0/Electricity_Power in Watt
+| Production_Gasboiler                     | Gas boiler or backup heater heat production (flow * delta-T, with offset correction on temperature sensors)
+| Production_Heatpump                      | Heat pump (without backup heater) heat production (flow * delta-T, with offset correction on temperature sensors)
+
+##### HC_COP
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| COP_Lifetime                             | Average COP over lifetime of Daikin, based on Daikin reported kWh counters
+| COP_Before_Bridge                        | Average COP over lifetime of Daikin until P1P2MQTT bridge locked consumtion/production counters (EEPROM_ESP_Set_Cons_Prod_Counters)
+| COP_Before_Bridge                        | Average COP over lifetime of Daikin afterP1P2MQTT bridge locked consumtion/production counters
+| COP_Realtime                             | Real-time COP based on Production_Heatpump/Consumption_Heatpump
+
+##### HC_Meters
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Various                                  | kWh/hours/start counters, only updated every minute if Counter_Request_Function is on, otherwise only if room thermostat asks for these counters, for example:
+| Electricity_Consumed_Backup_DHW          |
+| Electricity_Consumed_Backup_Heating      |
+| Electricity_Consumed_Compressor_Heating  |
+| Electricity_Consumed_Compressor_Cooling  |
+| Energy_Produced_Compressor_Cooling       |
+| Hours_Backup1_DHW                        |
+| Hours_Circulation_Pump                   |
+| Hours_Compressor_Heating                 |
+| Starts_Compressor                        |
+| Starts_Gasboiler                         |
+
+##### HC_Sensors
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Flow                                     | Water circulation flow (some systems report 0.0, making production calculation impossible)
+| Temperature_Outside                      | Outside temperature for WD calculation, based on external temperature sensor or outside unit
+| Temperature_Outside_Unit                 | Outside unit temperature
+| Temperature_R1T_HP2Gas_Water             | Water temperature after heat exchanger and before backup heater or gas boiler
+| Temperature_R2T_Leaving_Water            | Leaving water temperature (after backup heater or gas boiler)
+| Temperature_R4T_Return_Waterr            | Return water temperature
+| Temperature_Refrigerant_2                | Refrigerant temperature after water/water heat exchanger
+| Temperature_Room                         | Temperature reported by room thermostat
+| Water_Pressure                           | Circulation water pressure (only supported by a few systems)
+
+##### HC_DHW
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| DHW_Setpoint                             | Controls on/off status and DHW setpoint
+| DHW_Boost                                | Controls boost status
+| DHW                                      | Current on/off status
+| DHW_Demand                               | Domestic hot water flow sensor for hybrid gas boiler (not supported on tank systems?)
+| DHW_Related_Q                            | ?
+| DHW_Setpoint                             | Hot water setpoint
+
+
+#### Control and entity overview (Daikin AC / F-series)
+
+This section is still very much raw format and likely to contains errors; too many entities are currently reported in HA, also for further reverse engineering. Some simplification of the HA interface and further reverse engineering is required. Feedback is welcome.
+
+##### HC_Setup
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| HA_Setup                                 | Enables proper initial set-up of HA dashboards (or otherwise controls may be incomplete), and enables factory_reset button. After setup, strongly recommended to switch to off. No need to add to any dashboard.
+
+##### HC_Bridge
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Control_Function                         | Determines whether P1P2MQTT bridge operates in auxiliary control mode. Not needed for monitoring, but required for controlling your system
+| Model                                    | Allows protocol selection based on major version of Daikin unit; control works only correct configured
+| Model_suggestion                         | Recommended protocol selection
+| EEPROM_ESP_Save_Changes                  | Saves changes made to ESP EEPROM
+| EEPROM_ESP_Undo_Changes                  | Undo changes made to EEPROM (not possible after saving)
+| Factory_Reset_ESP_After_Restart          | Use with care! This will schedule a factory reset on the next ESP restart. It will then reset all ESP-stored values to their original value, including device name, bridge name, AP and MQTT server credentials, and more. Can be cancelled with Factory_Reset_ESP_Cancel but cannot be undone after ESP restart. Button is disabled if HA_Setup is switched off.
+| Factory_Reset_ESP_Cancel                 | Unschedule any scheduled factory reset
+|MQTT_Rebuild                              | Retransmits all Home Assistant configuration messages; can be used if HA missed one or more of these messages.
+|MQTT_Delete_Rebuild                       | Idem, but first deletes all Home Assistant configuration messages from (any of) your P1P2MQTT bridge(s), followed by a rebuild of this bridge (but not any others if you have multiple). Useful after a firmware upgrade to delete old entities.
+| Restart_P1P2Monitor_ATmega               | Restarts ATmega. Should not be needed, but can be used to quickly increase write budget
+| Restart_P1P2MQTT_ESP                     | Restarts ESP. Does factory_reset if scheduled. Should not be needed, but can be attempted in case of communication or other problems.
+| Write_Budget                             | Write budget limits the amount of control operations to reduce memory wear; can be increased manually if needed
+| Write_Budget_Period                      | Write budget is regularly increased, by default once every hour. Period is in minutes. For Daikin E-systems, it is likely that flash wear levling is implemented to it is likely safe to reduce the period
+| Error_Budget                             | Indicates how many read errors are accepted before switching Control_Function and Counter_Request_Function off. Should be 20, or a bit lower after a system restart. Errors should not be present, except for a few messages when the Daikin system restarts.
+| ESP_EEPROM_Saved                         | Indicates whether all changes made have been saved to EEPROM
+| ESP_Ectory_Reset_Scheduled               | Indicates if a factory reset is scheduled for the next ESP reset
+| ESP_Throttling                           | Indicates that the ESP is throttling data - messages can be missing or delayed. Happens after an ESP restart or after a MQTT disconnect/reconnect action
+| V_Interfce                               | Reports voltage on P1/P2 interface for bus-powered devices. For bridges powered from a DC power supply, reports DC voltage.
+| Writes_Refused_Budget                    | Indicates how many writes have been refused due to missing write budget; should be 0
+| Writes_Refused_Busy                      | Indicates how many writes have been refused due to lack of buffering; should be 0
+
+##### HC_Mode
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Power_Request                            | Power request from room thermostat
+| Power                                    | System on/off status
+| Heatpump_On                              | Heat pump status
+| Target_Operating_Mode                    | Target operating mode from room thermostat to aux controller
+| Target_Operating_Mode_0                  | Target operating mode from room thermostat to indoor unit
+| Target_Operating_Mode_1                  | Target operating mode by indoor unit
+| Actual_Operating_Mode                    | Actual operating mode from room thermostat to aux controller
+| Actual_Operating_Mode_0                  | Actual operating mode from room thermostat to indoor unit
+| Actual_Operating_Mode_1                  | Actual operating mode by indoor unit
+| System_Status                            | Status stand-by/compressor/fan/off
+| Zone_Status                              | ?
+
+##### HC_Setpoints
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Setpoint_Heating                         | Controls room temperature setpoint in heating mode
+| Setpoint_Cooling                         | Controls room temperature setpoint in cooling mode
+| Setpoint_Temperature                     | Current setpoint for room temperature
+| Setpoint_Temperature_1                   | Setpoint for room temperature copied back by indoor unit
+| Fan_Speed                                | Setpoint for fan speed
+| Fan_Speed_1                              | Setpoint for fan speed copied back by indoor unit
+| Fan_Speed_Cooling                        | Setpoint for fan speed cooling from room thermostat to aux controller
+| Fan_Speed_Heating                        | Setpoint for fan speed heating from room thermostat to aux controller
+
+##### HC_Sensors
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Temperature_Inside_Air_Intake            | Air intake temperature
+| Temperature_Heat_Exchanger               | 
+
+##### HC_Thermistors
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Th1                                      | Temperature sensor, function?
+| Th2                                      | Temperature sensor, function?
+| Th3                                      | Temperature sensor, function?
+| Th4                                      | Temperature sensor, function?
+| Th5                                      | Temperature sensor, function?
+| Th6                                      | Temperature sensor, function?
+
+##### HC_Filter
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Filter_Related                           | ? 000011-3
+| Filter_Alarm_Reset_Q                     | ?
+
+##### HC_Unknown
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| Unknown_xxxxxx_xx                        | Many individual protocol bytes, function unknown, for reverse engineering purposes
+| Error_Setting_1_Q                        | Function unknown, for reverse engineering purposes
