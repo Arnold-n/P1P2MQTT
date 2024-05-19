@@ -28,7 +28,7 @@ To flash this image OTA (Linux CLI):
 avrdude -c avrisp -p atmega328p  -P net:<IPv4>:328 -e -Uflash:w:<hex-file>:i
 ```
 
-If you are running P1P2-bridge-esp8266 v0.9.42 or later and are on a local network segment, you may use P1P2.local instead of &lt;IPv4>.
+If you are running P1P2-bridge-esp8266 v0.9.42 or later and are on a local network segment, you may use P1P2MQTT\_bridge0.local instead of &lt;IPv4>.
 
 To flash this image OTA (Windows CLI, using avrdude 7.0 for Windows):
 
@@ -41,13 +41,13 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 
 ## P1P2MQTT-bridge firmware for ESP8266
 
-[P1P2MQTT-bridge v0.9.50 for Daikin E-series](P1P2MQTT-bridge-v0.9.50-Daikin-E.ino.bin)
+[P1P2MQTT-bridge v0.9.51 for Daikin E-series](P1P2MQTT-bridge-v0.9.51-Daikin-E.ino.bin)
 
-[P1P2MQTT-bridge v0.9.50 for Daikin F-series](P1P2MQTT-bridge-v0.9.50-Daikin-F.ino.bin)
+[P1P2MQTT-bridge v0.9.51 for Daikin F-series](P1P2MQTT-bridge-v0.9.51-Daikin-F.ino.bin)
 
-[P1P2MQTT-bridge v0.9.50 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.50-Hitachi.ino.bin)
+[P1P2MQTT-bridge v0.9.51 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.51-Hitachi.ino.bin)
 
-[P1P2MQTT-bridge v0.9.50 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.50-MHI.ino.bin)
+[P1P2MQTT-bridge v0.9.51 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.51-MHI.ino.bin)
 
 (for Toshiba, use Hitachi code for now).
 
@@ -57,7 +57,7 @@ To flash this image OTA (browser):
 
 As of v0.9.41: browse to the webserver on the ESP: http://&lt;IPv4>/update (note: https not supported) and upload and install the new firmware image.
 
-As of v0.9.42: browse to the webserver on the ESP: http://P1P2.local/update (note: https not supported) and upload and install the new firmware image.
+As of v0.9.42: browse to the webserver on the ESP: http://P1P2MQTT_bridge0.local/update (note: https not supported) and upload and install the new firmware image.
 
 To flash this image OTA (Linux CLI):
 
@@ -85,7 +85,7 @@ yourpath\Arduino-master\tools\espota.py -i <IPv4> -p 8266 --auth=P1P2MQTT -f <bi
 
 To provide electricity meter data from an HomeWizards WiFi-enabled MID meter, via MQTT, to the P1P2MQTT bridge, a separate ESP8266 is required. Any ESP8266 with 1MB memory will do, like an ESP01S (using the USB programmer for power), or a WeMos module.
 
-[P1P2MQTT-HomeWizard-kWh-bridge-v0.9.50.ino.bin](P1P2MQTT-HomeWizard-kWh-bridge-v0.9.50.ino.bin)
+[P1P2MQTT-HomeWizard-kWh-bridge-v0.9.51.ino.bin](P1P2MQTT-HomeWizard-kWh-bridge-v0.9.51.ino.bin)
 
 ## FOSS notice
 

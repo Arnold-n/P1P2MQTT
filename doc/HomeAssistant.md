@@ -4,6 +4,16 @@ This page describes how to configure your P1P2MQTT bridge and Home Assistant (HA
 
 Text in *italics* applies only to Daikin Altherma/E-series models.
 
+##### Firmware update from earlier version
+
+As a new user you may skip this section.
+
+You can delete old MQTT topics and rebuild the new ones with the MQTT_Delete_Own_Rebuild button in HC_Bridge; this button may be unavailable until the bridge is running for 2 minutes. Deleting/rebuilding may take ~5 minutes. If upgrading from v0.9.44 or older, use MQTT_All_Delete_Rebuild because of the different topic structure, but be aware that this also deletes all homeassistant-config messages from other devices (if any) on the same MQTT server.
+
+The EEPROM data in the ESP includes MQTT server credentials and should survive a firmware update, but if that fails (especially for rc candidates shared by mail), you may encounter a bridge which connects to WiFi but not to MQTT. In that case you can either
+-telnet to the bridge, and use the commands `P7 IPv4-MQTT-server`, and if necessary also `P8 MQTT-port-nr`, `P9 MQTT-username` and `P10 MQTT-password`, or
+-double-tap the reset-button until the blue LED lights up, connect to the AP  with SSID `P1P2` and password `P1P2P3P4`, and enter WiFi and MQTT server credentials.
+
 ##### Set up MQTT server
 
 An MQTT server is required. If you do not have one yet, you can set it up in HA under `Settings`/`Add-ons`/`ADD-ON STORE`. Find `Mosquitto broker`, `INSTALL` it, enable the Watchdog, and click `START`.
