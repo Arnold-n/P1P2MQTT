@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20240519 v0.9.49 hysteresis-check for V_Interface
  * 20240515 v0.9.46 full HA MQTT discovery and control, lots of other changes
  * 20231019 v0.9.43 solves resetDataStructure bug (counter in HA not visible, introduced in v0.9.41)
  * 20230604 v0.9.37 add heating/cooling/auto setting report
@@ -826,6 +827,7 @@ typedef enum {
   HYSTERESIS_TYPE_F8_8_BE,
   HYSTERESIS_TYPE_F8_8_LE,
   HYSTERESIS_TYPE_F8S8_LE,
+  HYSTERESIS_TYPE_U8,
   HYSTERESIS_TYPE_U16_LE,
   HYSTERESIS_TYPE_S16_LE,
   HYSTERESIS_TYPE_U16_BE,
@@ -837,6 +839,7 @@ typedef enum {
 } hysttype;
 
 #define HYST_RESET     { applyHysteresisType = HYSTERESIS_TYPE_NONE;   applyHysteresis = 0; }
+#define HYST_U8(x)     { applyHysteresisType = HYSTERESIS_TYPE_U8;     applyHysteresis = x; }
 #define HYST_U16_LE(x) { applyHysteresisType = HYSTERESIS_TYPE_U16_LE; applyHysteresis = x; }
 #define HYST_U16_BE(x) { applyHysteresisType = HYSTERESIS_TYPE_U16_BE; applyHysteresis = x; }
 #define HYST_U32_LE(x) { applyHysteresisType = HYSTERESIS_TYPE_U32_LE; applyHysteresis = x; }
@@ -1267,6 +1270,11 @@ uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIn
 //                                     skipHysteresis = ((newValue <= oldValue + (int16_t) applyHysteresis) && (newValue + (int16_t) applyHysteresis >= oldValue));
 //                                   }
 //                                   break;
+      case HYSTERESIS_TYPE_U8:       { uint8_t oldValue = u_payloadValue_LE(M.payloadByteVal + pi2, 1);
+                                       uint8_t newValue = u_payloadValue_LE(payload + payloadIndex, 1);
+                                       skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue + applyHysteresis >= oldValue));
+                                     }
+                                     break;
       case HYSTERESIS_TYPE_U16_LE:   { uint16_t oldValue = u_payloadValue_LE(M.payloadByteVal + pi2, 2);
                                        uint16_t newValue = u_payloadValue_LE(payload + payloadIndex, 2);
                                        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue + applyHysteresis >= oldValue));
