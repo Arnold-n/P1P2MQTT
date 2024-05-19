@@ -3,6 +3,7 @@
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20240519 v0.9.51 field settings added, quiet_mode re-enabled for 0x0100 outputmode
  * 20240519 v0.9.49 hysteresis-check for V_Interface
  * 20240515 v0.9.46 full HA MQTT discovery and control, lots of other changes
  * 20231019 v0.9.43 solves resetDataStructure bug (counter in HA not visible, introduced in v0.9.41)
@@ -1891,6 +1892,10 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x17 : FIELDKEY("1_08_A3114_LWT_Cooling_Main_WD_Curve_Low_Amb_LWT"); // [9_03] - [9_02]
     case 0x18 : FIELDKEY("1_09_A3114_LWT_Cooling_Main_WD_Curve_High_Amb_LWT"); // [9_03] - [9_02]
     case 0x19 : FIELDKEY("1_0A_A64_Averaging_Time"); // 0: no avg, 1 (default) 12 h, 2 24h, 3 48h, 4 72h
+    case 0x1A : FIELDKEY("1_0B_9I_Delta_T_Heating_Main"); // version E
+    case 0x1B : FIELDKEY("1_0C_9I_Delta_T_Heating_Add");
+    case 0x1C : FIELDKEY("1_0D_9I_Delta_T_Cooling_Main");
+    case 0x1D : FIELDKEY("1_0E_9I_Delta_T_Cooling_Add");
     // field settings [2_XX]
     case 0x1E : FIELDKEY("2_00_A442_DHW_Disinfection_Operation_Day");
     case 0x1F : FIELDKEY("2_01_A441_DHW_Disinfection");
@@ -1902,6 +1907,9 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x27 : FIELDKEY("2_09_A323_Ext_Room_Sensor_Offset"); // -5 .. 5 step 0.5
     case 0x28 : FIELDKEY("2_0A_A322_Room_Temperature_Offset"); // -5 .. 5 step 0.5
     case 0x29 : FIELDKEY("2_0B_A65_Ext_Amb_Sensor_Offset"); // -5..5 step 0.5
+    case 0x2A : FIELDKEY("2_0C_9I_Emitter_Type_Main"); // version E
+    case 0x2B : FIELDKEY("2_0D_9I_Emitter_Type_Add");
+    case 0x2C : FIELDKEY("2_0E_9I_Maximum_Current");
     // field settings [3_XX]
     case 0x2D : FIELDKEY("3_00_A61_Auto_Restart_Allowed"); // 1 No, 1 default Yes
     case 0x2E : FIELDKEY("3_01_Unspecified_3_01_rw_0");
@@ -1946,8 +1954,8 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x55 : FIELDKEY("5_0A_A6361_Power_Consumption_Control_kW_Value_2");
     case 0x56 : FIELDKEY("5_0B_A6361_Power_Consumption_Control_kW_Value_3");
     case 0x57 : FIELDKEY("5_0C_A6361_Power_Consumption_Control_kW_Value_4");
-    case 0x58 : FIELDKEY("5_0D_Unspecified_5_0D_ro_1");
-    case 0x59 : FIELDKEY("5_0E_Unspecified_5_0E_ro_0");
+    case 0x58 : FIELDKEY("5_0D_Unspecified_5_0D_ro_1"); // version E: 230/400V identification, depends on model
+    case 0x59 : FIELDKEY("5_0E_Unspecified_5_0E_ro_0"); // version E: 1
     // field settings [6_XX]
     case 0x5A : FIELDKEY("6_00_Temp_Diff_Determining_On"); // 0-20 step 1 default 2
     case 0x5B : FIELDKEY("6_01_Temp_Diff_Determining_Off"); // 0-20 step 1 default 2
@@ -1976,6 +1984,8 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x6C : FIELDKEY("7_03_PE_Factor"); // PE factor 0-6, step 0.1, default 2.5
     case 0x6D : FIELDKEY("7_04_A67_Savings_Mode_Ecological"); // 0 economical 1 ecological
     case 0x6E : FIELDKEY("7_05_Unspecified_7_05_ro_0");
+    case 0x6F : FIELDKEY("7_06_9I_Compressor_Forced_Off"); // version E
+    case 0x70 : FIELDKEY("7_07_9I_BBR16_Activation");
     // field settings [8_XX]
     case 0x78 : FIELDKEY("8_00_DHW_Running_Time_Min"); // 0-20 min step 1 min default 5 min
     case 0x79 : FIELDKEY("8_01_DHW_Running_Time_Max"); // 5-95 min step 5 min default 30 min
@@ -2019,13 +2029,13 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x93 : FIELDKEY("9_0C_Room_Temperature_Hysteresis"); // 1-6 step 0.5 default 1.0C
     case 0x94 : FIELDKEY("9_0D_Pump_Speed_Limitation"); // some models? (0-8, 0: 100%, 1-4: 80-50%, 5-8 80-50% ??, default 6)
     case 0x95 : FIELDKEY("9_0E_Unknown"); // some models?
-    // field settings [A_XX]
+    // field settings [A_XX] // no longer documented/present on version E
     case 0x96 : FIELDKEY("A_00_Unspecified_A_00_0"); // 0-(0)-0 or 0-(1)-7  for src=2? oth=01/09. Stepbits=01.
     case 0x97 : FIELDKEY("A_01_Unspecified_A_01_0"); // 0-(0)-0 or 0-(1)-7  for src=2?
     case 0x98 : FIELDKEY("A_02_Unspecified_A_02_0"); // 0-(0)-0 or 0-(1)-7  for src=2?
     case 0x99 : FIELDKEY("A_03_Unspecified_A_03_0"); // 0-(0)-0 or 0-(1)-7  for src=2?
     case 0x9A : FIELDKEY("A_04_Unspecified_A_04_0"); // 0-(0)-0 or 0-(1)-7  for src=2?
-    // field settings [B_XX]
+    // field settings [B_XX] // no longer documented/present on version E
     case 0xA5 : FIELDKEY("B_00_Unspecified_B_00_0");
     case 0xA6 : FIELDKEY("B_01_Unspecified_B_01_0");
     case 0xA7 : FIELDKEY("B_02_Unspecified_B_02_0");
@@ -2074,7 +2084,8 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
                   UNSEEN_BYTE_00_10_19_CLIMATE_DHW;
                   M.R.useDHW = (M.R.useDHW & 0x01) | (payload[payloadIndex - 3] & 0x3F ? 0x02 : 0x00); // DHW operation: 0x02
                 }
-                HADEVICE_BINSENSOR;    FIELDKEY("E_05_A221_DHW_Operation"); // 0-1 whether DHW is installed
+                HADEVICE_BINSENSOR;
+                FIELDKEY("E_05_A221_DHW_Operation"); // 0-1 whether DHW is installed
     case 0xD8 : if ((M.R.useDHW & 0x01) != (payload[payloadIndex - 3] ? 0x01 : 0x00)) {
                   UNSEEN_BYTE_00_10_19_CLIMATE_DHW;
                   M.R.useDHW = (M.R.useDHW & 0x02) | (payload[payloadIndex - 3] & 0x3F ? 0x01 : 0x00); // tank installed: 0x01
@@ -2082,12 +2093,13 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
                 HADEVICE_BINSENSOR;
                 FIELDKEY("E_06_A222_DHW_Tank_Installed"); // 0-1
     case 0xD9 : FIELDKEY("E_07_A223_DHW_Tank_Type"); // 4 do-not-change
-    case 0xDA : FIELDKEY("E_08_Power_Saving_Enabled"); // 0: Disabled, 1 (default): Enabled
+    case 0xDA : FIELDKEY("E_08_Power_Saving_Enabled"); // 0: Disabled, 1 (default): Enabled, Warning: should be disabled for 24-hour averaging unless separate outdoor sensor is present
     case 0xDB : FIELDKEY("E_09_Unspecified_E_09_rw_0");
     case 0xDC : FIELDKEY("E_0A_Unspecified_E_0A_ro_0");
-    case 0xDD : FIELDKEY("E_0B_Unspecified_E_0B_ro_0");
+    case 0xDD : FIELDKEY("E_0B_Unspecified_E_0B_ro_0"); // version E: Bizone kit installed
     case 0xDE : FIELDKEY("E_0C_Unspecified_E_0C_ro_0");
-    case 0xDF : FIELDKEY("E_0D_Unspecified_E_0D_ro_0");
+    case 0xDF : FIELDKEY("E_0D_Unspecified_E_0D_ro_0"); // version E: is glycol present in system?
+    case 0xE0 : FIELDKEY("E_0E_Unspecified_0");
     // field settings [F_XX]
     case 0xE1 : FIELDKEY("F_00_Pump_Operation_Outside_Range_Allowed"); // 0: (default) disabled, 1: enabled
     case 0xE2 : FIELDKEY("F_01_A332_Cooling_Amb_Temperature_Min"); // space cooling On temp 10-35 def 20
@@ -2889,7 +2901,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         }
         case   10 : switch (bitNr) {
           case    8 : bcnt = 4; BITBASIS;
-          case    2 : return 0; // implied by Quiet_Mode based on 0x3A/0x0D info
+          case    2 : // implied by Quiet_Mode based on 0x3A/0x0D info, so no HACONFIG, but re-enable for J0010 outputmode;
                       CHECKBIT;
                       KEY("Quiet_Mode");
                       PUB_CONFIG;
@@ -2903,6 +2915,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           default   : UNKNOWN_BIT;
         }
         case   13 :                              CAT_UNKNOWN;                                                               KEY1_PUB_CONFIG_CHECK_ENTITY("Reboot_Related_Q10-00-13");                  VALUE_u8hex;
+//      case   14 : // returns 0x08 or 0x00 on newer version E systems
         case   15 : return 0;
         case   16 : SUBDEVICE("_Room");
                     HACONFIG;
@@ -3063,8 +3076,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case    1 :
                     SUBDEVICE("_Sensors");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(20);                KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Room_Wall"); {float roomTemp = FN_f8_8_LE(payloadPointer) + EE.RToffset * 0.01; VALUE_F_L(roomTemp, 2);}
         case    7 :                                                                                                         KEY1_PUB_CONFIG_CHECK_ENTITY("Reboot_Related_Q11-00-7");                   VALUE_u8hex;
-        // case   8 : // some EHV types
-        // case   9 : // some EHV types
+        // case   8 : // some version E types
+        // case   9 : // some version E types
         default   : UNKNOWN_BYTE;
       }
       case 0x40 : switch (payloadIndex) {
@@ -3282,8 +3295,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case   12 : return 0;
         case   13 : if (!payloadByte && !payload[payloadIndex - 1]) return 0;
                                                                                                                             KEY2_PUB_CONFIG_CHECK_ENTITY("SW_Version_Outside_Unit");                   VALUE_u16hex_LE;
-        // case  14 : // some EHV types
-        // case  15 : // some EHV types
+        // case  14 : // some version E types
+        // case  15 : // some version E types
         default :   UNKNOWN_BYTE;
       }
       default   : UNKNOWN_BYTE;
@@ -3408,9 +3421,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     }
                     CHECK_ENTITY;
                     VALUE_u16div100_LE; // 16 or 24 bit?
-        // case   6 : // some EHV types
-        // case   7 : // some EHV types
-        // case   8 : // some EHV types
+        // case   6 : // some version E types // TODO byte 6 is param-nr 0x00-0x19, byte 7-8 is value?
+        // case   7 : // some version E types
+        // case   8 : // some version E types
         default :   UNKNOWN_BYTE;
       }
 
