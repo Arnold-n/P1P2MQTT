@@ -484,15 +484,16 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,  16,  32,  48,  64  /
 // Hitachi type 4
 //
 // ..
-
 // 21:
 // ..
 // 29:
 //
+// Hitachi type 5
 //
-// 2A: 21 00 1C 0..24
+// 13: 89 00 2D but different entities from Hitachi type 1 nr 13
+// 2A: 21 00 1C
 
-#define sizePayloadBitsSeen 10 // for Hitachi, but not for Toshiba
+#define sizePayloadBitsSeen 12 // for Hitachi, but not for Toshiba
 
 #define PCKTP_ARR_SZ 0x2B
 //byte pti                                      =   0..F  (0..7 for 000008..00000F, 8..F for 400008..40000F)                           10-14                           15-1E                                             1F-20                                               2A
@@ -5362,6 +5363,20 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     }
     // 0x21 : sender is certainly the indoor unit
     case 0x21: switch (packetType) {
+      case 0x1C: switch (payloadIndex) { // new v0.9.51
+        case   7 : switch (bitNr) {
+          case   8 : bcnt = 10; BITBASIS;
+          case   0 : HACONFIG;                                                                                                KEYBIT_PUB_CONFIG_PUB_ENTITY("Power_On");
+          default: UNKNOWN_BIT;
+        }
+        case   8 : switch (bitNr) {
+          case   8 : bcnt = 11; BITBASIS;
+          case 1 ... 2 : HACONFIG;                                                                                            KEYBITS_PUB_CONFIG_PUB_ENTITY(1, 2, "Fanmode"); // 01 = high, 02 = medium, 03 = low
+          default: UNKNOWN_BIT;
+        }
+        case    9 : HACONFIG;                                                                                                 KEY1_PUB_CONFIG_CHECK_ENTITY("Temperature");   VALUE_u8;
+        default   : UNKNOWN_BYTE;
+      }
       case 0x29: switch (payload[4])  { // payload[4] can be 0xF1..0xF5, currently do not decode
         default: switch (payloadIndex) {
           case 37: return 0; // do not report checksum
