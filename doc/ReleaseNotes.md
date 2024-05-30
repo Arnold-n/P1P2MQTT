@@ -1,5 +1,25 @@
 **Release notes**
 
+v0.9.52
+
+- Increase time-out for external electricity meter input over MQTT
+- Do not erase MQTT credentials in case of factory reset
+- enable tank temperature setting default on
+- support Src=0x41 for Daikin F series
+
+v0.9.49
+
+- increase max HA config message size
+
+v0.9.48
+
+- Daikin E: add external thermostat relay input decoding
+
+v0.9.47
+
+- add Hitachi packet 21001C decoding
+- Hitachi: fix bcnt bitbasis decoding
+
 v0.9.46
 
 This version comes with a lot of changes, a few of which may break existing set-ups. Please let me know if you encounter any issue or bug.

@@ -41,13 +41,13 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 
 ## P1P2MQTT-bridge firmware for ESP8266
 
-[P1P2MQTT-bridge v0.9.51 for Daikin E-series](P1P2MQTT-bridge-v0.9.51-Daikin-E.ino.bin)
+[P1P2MQTT-bridge v0.9.52 for Daikin E-series](P1P2MQTT-bridge-v0.9.52-Daikin-E.ino.bin)
 
-[P1P2MQTT-bridge v0.9.51 for Daikin F-series](P1P2MQTT-bridge-v0.9.51-Daikin-F.ino.bin)
+[P1P2MQTT-bridge v0.9.52 for Daikin F-series](P1P2MQTT-bridge-v0.9.52-Daikin-F.ino.bin)
 
-[P1P2MQTT-bridge v0.9.51 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.51-Hitachi.ino.bin)
+[P1P2MQTT-bridge v0.9.52 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.52-Hitachi.ino.bin)
 
-[P1P2MQTT-bridge v0.9.51 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.51-MHI.ino.bin)
+[P1P2MQTT-bridge v0.9.52 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.52-MHI.ino.bin)
 
 (for Toshiba, use Hitachi code for now).
 
@@ -85,7 +85,7 @@ yourpath\Arduino-master\tools\espota.py -i <IPv4> -p 8266 --auth=P1P2MQTT -f <bi
 
 To provide electricity meter data from an HomeWizards WiFi-enabled MID meter, via MQTT, to the P1P2MQTT bridge, a separate ESP8266 is required. Any ESP8266 with 1MB memory will do, like an ESP01S (using the USB programmer for power), or a WeMos module.
 
-[P1P2MQTT-HomeWizard-kWh-bridge-v0.9.51.ino.bin](P1P2MQTT-HomeWizard-kWh-bridge-v0.9.51.ino.bin)
+[P1P2MQTT-HomeWizard-kWh-bridge-v0.9.52.ino.bin](P1P2MQTT-HomeWizard-kWh-bridge-v0.9.52.ino.bin)
 
 ## FOSS notice
 
