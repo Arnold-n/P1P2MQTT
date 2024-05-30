@@ -30,13 +30,6 @@ char deviceUniqId[ DEVICE_NAME_HA_LEN ]; // defined once in setup(), depends on 
 #define INIT_DEVICE_SHORT_NAME_HA "HC"
 #define DEVICE_SHORT_NAME_HA_LEN (8+1)            // used if none of deviceName/bridgeName are used in device name for HA
 
-// MQTT topics for external electricity meter(s) and/or gas
-#define MQTT_ELECTRICITY_POWER     "P1P2/P/meter/U/9/Electricity_Power"
-#define MQTT_ELECTRICITY_TOTAL     "P1P2/P/meter/U/9/Electricity_Total"
-#define MQTT_ELECTRICITY_BUH_POWER "P1P2/P/meter/U/9/Electricity_BUH_Power"
-#define MQTT_ELECTRICITY_BUH_TOTAL "P1P2/P/meter/U/9/Electricity_BUH_Total"
-#define MQTT_INPUT_TOPIC_LEN (80+1)
-
 #ifdef W_SERIES
 #define INIT_METER_URL "http://192.168.4.81/api/v1/data" // can be changed with P command
 #endif /* W_SERIES */

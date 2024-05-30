@@ -67,6 +67,16 @@
 #define MQTT_CLIENTNAME DEVICE_NAME "_" BRIDGE_NAME
 #define MQTT_CLIENTNAME_LEN ( DEVICE_NAME_LEN + BRIDGE_NAME_LEN )
 
+// MQTT topics for external electricity meter(s) and/or gas
+#define MQTT_ELECTRICITY_POWER     "P1P2/P/meter/U/9/Electricity_Power"
+#define MQTT_ELECTRICITY_TOTAL     "P1P2/P/meter/U/9/Electricity_Total"
+#define MQTT_ELECTRICITY_BUH_POWER "P1P2/P/meter/U/9/Electricity_BUH_Power"
+#define MQTT_ELECTRICITY_BUH_TOTAL "P1P2/P/meter/U/9/Electricity_BUH_Total"
+#define POWER_TIME_OUT 60   // in s, minimum update frequency external meter input for realtime power consumption
+#define ENERGY_TIME_OUT 300 // in s, minimum update frequency external meter input for total energy consumed
+
+#define MQTT_INPUT_TOPIC_LEN (80+1)
+
 // 2nd MQTT server (fallback)
 
 #define MQTT2_SERVER "192.168.4.12"

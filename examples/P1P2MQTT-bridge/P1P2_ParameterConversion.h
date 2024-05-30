@@ -3678,19 +3678,19 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                   //
                   // heating(/cooling) energy produced by heat pump and gas boiler / based on 4182 J/kg K, 1 kg/l
                   {
-                    if ((espUptime - ePowerTime > 15) && ePowerAvailable) {
+                    if ((espUptime - ePowerTime > POWER_TIME_OUT) && ePowerAvailable) {
                       ePowerAvailable = false;
                       ePower = 0;
                     }
-                    if ((espUptime - eTotalTime > 120) && eTotalAvailable) {
+                    if ((espUptime - eTotalTime > ENERGY_TIME_OUT) && eTotalAvailable) {
                       eTotalAvailable = false;
                     }
 
-                    if ((espUptime - bPowerTime > 15)  && bPowerAvailable) {
+                    if ((espUptime - bPowerTime > POWER_TIME_OUT)  && bPowerAvailable) {
                       bPowerAvailable = false;
                       bPower = 0;
                     }
-                    if ((espUptime - bTotalTime > 120)  && bTotalAvailable) {
+                    if ((espUptime - bTotalTime > ENERGY_TIME_OUT)  && bTotalAvailable) {
                       bTotalAvailable = false;
                     }
                     float floatPower = (M.R.LWT - M.R.MWT) * M.R.Flow * 69.7;

@@ -109,8 +109,8 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "P1P2MQTT bridge v0.9.51"
-#define HA_SW "0.9.51"
+#define WELCOMESTRING "P1P2MQTT bridge v0.9.52"
+#define HA_SW "0.9.52"
 
 #define ARDUINO_OTA
 #define WEBSERVER // adds local webserver to update firmware of ESP
@@ -236,6 +236,7 @@
 // EEPROM signature
 #define EEPROM_SIGNATURE_LEN (9+1)
 
+#define EEPROM_SIGNATURE_COMMON "P1P2" // to maintain mqtt server details
 #define EEPROM_SIGNATURE_OLD4 "P1P2sij"
 #ifdef E_SERIES
 #define EEPROM_SIGNATURE_NEW  "P1P2sEz" // new signature for EEPROM initialization (user/password length 80/80, rebootReason, outputMode, outputFilter, mqttInputByte4, hwId, EEPROM_version, reserved-data)

@@ -1871,21 +1871,29 @@ void loadEEPROM() {
     delayedPrintfTopicS("Converting EEPROM data");
     EE.EE_version = 0;
     EE.EE_size = sizeof(EE);
-    strlcpy(EE.signature,    EEPROM_SIGNATURE_NEW, sizeof(EE.signature));
-    EE.mqttServer[15] = '\0'; // just in case
+    strlcpy(EE.signature, EEPROM_SIGNATURE_NEW, sizeof(EE.signature));
+    EE.mqttServer[ MQTT_SERVER_LEN - 1 ] = '\0'; // just in case
     EE.outputMode = INIT_OUTPUTMODE; // change outputMode definition, use new version
     saveEEPROM();
   }
 
   if (strcmp(EE.signature, EEPROM_SIGNATURE_NEW)) {
+    if (strncmp(EE.signature, EEPROM_SIGNATURE_COMMON, strlen(EEPROM_SIGNATURE_COMMON))) {
+      delayedPrintfTopicS("Init MQTT credentials");
+      strlcpy(EE.mqttUser,     MQTT_USER,            sizeof(EE.mqttUser));
+      strlcpy(EE.mqttPassword, MQTT_PASSWORD,        sizeof(EE.mqttPassword));
+      strlcpy(EE.mqttServer,   MQTT_SERVER,          sizeof(EE.mqttServer));
+      if (sscanf(MQTT_PORT, "%i", &EE.mqttPort) != 1) EE.mqttPort = 1883;
+    } else {
+      delayedPrintfTopicS("Maintain MQTT credentials");
+      EE.mqttServer[ MQTT_SERVER_LEN - 1 ] = '\0';
+      EE.mqttUser[ MQTT_USER_LEN - 1 ] = '\0';
+      EE.mqttPassword[ MQTT_PASSWORD_LEN - 1 ] = '\0';
+    }
     delayedPrintfTopicS("Init EEPROM with NEW signature");
+    strlcpy(EE.signature,    EEPROM_SIGNATURE_NEW, sizeof(EE.signature));
     EE.EE_version = 0;
     EE.EE_size = sizeof(EE);
-    strlcpy(EE.signature,    EEPROM_SIGNATURE_NEW, sizeof(EE.signature));
-    strlcpy(EE.mqttUser,     MQTT_USER,            sizeof(EE.mqttUser));
-    strlcpy(EE.mqttPassword, MQTT_PASSWORD,        sizeof(EE.mqttPassword));
-    strlcpy(EE.mqttServer,   MQTT_SERVER,          sizeof(EE.mqttServer));
-    if (sscanf(MQTT_PORT, "%i", &EE.mqttPort) != 1) EE.mqttPort = 1883;
     EE.outputMode = INIT_OUTPUTMODE;
     EE.outputFilter = INIT_OUTPUTFILTER;
     EE.ESPhwID = INIT_ESP_HW_ID;
@@ -2011,7 +2019,7 @@ void handleCommand(char* cmdString) {
               ATmega_dummy_for_serial();
               ATmega_uptime_prev = 0;
               break;
-    case 'd': // reset ESP
+    case 'd': // Various options: reset ESP, data structures, factory reset
     case 'D': n = (sscanf((const char*) (cmdString + 1), "%d", &temp) == 1);
               switch ((n > 0) ? temp : 99) {
                 case 11: printfTopicS("Init Data, reset Data, no restart");
@@ -2080,8 +2088,8 @@ void handleCommand(char* cmdString) {
                            printfTopicS("Changes pending, rejecting factory reset. To abandon changes and perform factory reset: D6, then retry D7");
                            break;
                          }
-                         printfTopicS("Schedule factory reset on restart (undo: D8 / confirm,clean-RTC/MQTT-data,restart ESP: D0)");
-                         EE.signature[0]++; // invalidate signature
+                         printfTopicS("Schedule factory reset (except MQTT credentials) on restart (undo: D8 / confirm,clean-RTC/MQTT-data,restart ESP: D0)");
+                         strlcpy(EE.signature, EEPROM_SIGNATURE_COMMON, sizeof(EE.signature)); // maintain only MQTT server credentials
                          saveEEPROM();
                          factoryReset = 1;
                          pseudo0F = 9;
