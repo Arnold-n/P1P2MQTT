@@ -68,11 +68,11 @@ For other brands and for models that are not (yet) supported, the interface only
 
 ### Daikin systems
 
-Daikin systems can be identified by their series identifier, shich is the first letter of the indoor unit or monolblock unit (E or F, or R for Rotex). It is often E for daikin heat pump systems, R for similar Rotex heat pump systems, and F for VRV/Sky Air systems.
+Daikin systems can be identified by their series identifier, which is the first letter of the indoor unit or monoblock unit (E or F, or R for Rotex). It is often E for daikin heat pump systems, R for similar Rotex heat pump systems, and F for VRV/Sky Air systems. Some systems starting with a C are also supported.
 
-The system generation can be identified by a single letter or two letters after the capacity code, this represents the major version number (A, B, C, CA, CB, D, E, ..).
+The system can be further identified by generation, which is a single letter or two letters after the capacity code, this represents the major version number (A, B, C, CA, CB, D, E, ..).
 
-#### Daikin(/Rotex) E-series 
+#### Daikin(/Rotex) E-series
 
 Recent Altherma 3 (full-electric and hybrid) systems are generally supported. Version CA, CB, D, and newer are supported. Older versions AA, AB, AC, and BB can only be monitored and can likely not be controlled. Version AD can perhaps be controlled. Some systems (EWYQ, EKH\*) are very limited and can only be monitored.
 
@@ -93,6 +93,10 @@ Although electrically supported, no information on the protocol is available yet
 The Altherma 3 R ECH2O models with a E\*P30E\* or E\*P50\*E code use P1/P2 and are supported by the P1P2MQTT bridge.
 
 Other older Altherma 3R ECH2O models with a E\*P50D\* code originate from Rotex and use CANbus to connect to the RoCon+HP controller and are not supported by the P1P2MQTT bridge. These models are perhaps supported by the [pyHPSU project](https://github.com/zanac/pyHPSU).
+
+#### Daikin Fit, Goodman, Amana
+
+Daikin models starting with a D are not supported. These include Daikin Fit models in the USA, originating from Amana and Goodman which were acquired by Daikin. These models do not use P1/P2 as thermostat interface. Perhaps they use RS485, for which [Net485](https://github.com/kpishere/Net485) could be useful.
 
 #### Rotex
 
