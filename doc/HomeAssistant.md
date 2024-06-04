@@ -246,7 +246,7 @@ On (some?) newer Altherma 3 R models, Quiet\_Level monitors the current quiet st
 | Function                                 | Description
 |:-----------------------------------------|:----------------------------------------------------------|
 | Consumption_BUH                          | (not supported yet) gas consumption gas boiler or electricity consumption backup heater
-| Consumption_Heatpump                     | External electricity meter input as reported via MQTT P1P2/P/meter/bridge0/Electricity_Power in Watt
+| Consumption_Heatpump                     | External electricity meter input as reported via MQTT P1P2/P/meter/U/9/Electricity_Power in Watt
 | Production_Gasboiler                     | Gas boiler or backup heater heat production (flow * delta-T, with offset correction on temperature sensors)
 | Production_Heatpump                      | Heat pump (without backup heater) heat production (flow * delta-T, with offset correction on temperature sensors)
 
