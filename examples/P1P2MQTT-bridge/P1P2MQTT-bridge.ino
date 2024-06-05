@@ -1881,13 +1881,10 @@ void loadEEPROM() {
   if (!strcmp(EE.signature, EEPROM_SIGNATURE_OLD4)) {
     delayedPrintfTopicS("Converting EEPROM data");
     EE.EE_version = 0;
-    EE.EE_size = sizeof(EE);
     strlcpy(EE.signature, EEPROM_SIGNATURE_NEW, sizeof(EE.signature));
     EE.mqttServer[ MQTT_SERVER_LEN - 1 ] = '\0'; // just in case
     EE.outputMode = INIT_OUTPUTMODE; // change outputMode definition, use new version
-    saveEEPROM();
   }
-
   if (strcmp(EE.signature, EEPROM_SIGNATURE_NEW)) {
     if (strncmp(EE.signature, EEPROM_SIGNATURE_COMMON, strlen(EEPROM_SIGNATURE_COMMON))) {
       delayedPrintfTopicS("Init MQTT credentials");
@@ -1904,7 +1901,6 @@ void loadEEPROM() {
     delayedPrintfTopicS("Init EEPROM with NEW signature");
     strlcpy(EE.signature,    EEPROM_SIGNATURE_NEW, sizeof(EE.signature));
     EE.EE_version = 0;
-    EE.EE_size = sizeof(EE);
     EE.outputMode = INIT_OUTPUTMODE;
     EE.outputFilter = INIT_OUTPUTFILTER;
     EE.ESPhwID = INIT_ESP_HW_ID;
@@ -1913,13 +1909,10 @@ void loadEEPROM() {
     EE.static_ip[0] = '\0';
     EE.static_gw[0] = '\0';
     EE.static_nm[0] = '\0';
-    saveEEPROM();
   }
-
   if (EE.EE_version < 1) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 1");
     EE.EE_version = 1;
-    EE.EE_size = sizeof(EE);
     strlcpy(EE.wifiManager_SSID, WIFIMAN_SSID1, WIFIMAN_SSID_LEN);
     strlcpy(EE.wifiManager_password, WIFIMAN_PASSWORD, WIFIMAN_PASSWORD_LEN);
     strlcpy(EE.mdnsName, MDNS_NAME, MDNS_NAME_LEN);
@@ -1956,27 +1949,21 @@ void loadEEPROM() {
 #endif /* E_SERIES */
 #define RESERVED_TEXT ""
     strlcpy(EE.reservedText, RESERVED_TEXT, RESERVED_LEN);
-    saveEEPROM();
   }
   if (EE.EE_version < 2) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 2");
     EE.EE_version = 2;
-    EE.EE_size = sizeof(EE);
     EE.useR1T = 0;
-    saveEEPROM();
   }
   if (EE.EE_version < 3) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 3");
     EE.EE_version = 3;
-    EE.EE_size = sizeof(EE);
     EE.useTZ = 2;
     EE.userTZ[0] = '\0';
-    saveEEPROM();
   }
   if (EE.EE_version < 4) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 4");
     EE.EE_version = 4;
-    EE.EE_size = sizeof(EE); // EE_size never used - TODO
 #ifdef E_SERIES
     EE.electricityConsumedCompressorHeating1 = 0;
     EE.energyProducedCompressorHeating1 = 0;
@@ -1987,10 +1974,10 @@ void loadEEPROM() {
   if (EE.EE_version < 5) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 5");
     EE.EE_version = 5;
-    EE.EE_size = sizeof(EE);
 #ifdef E_SERIES
     EE.minuteTimeStamp = 0;
 #endif /* E_SERIES */
+    EE.EE_size = sizeof(EE); // EE_size never used - and not really needed, relying on EE_version and EE.signature
     saveEEPROM();
   }
 }
