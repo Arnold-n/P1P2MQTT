@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20240605 v0.9.53 replace KLICDA by configurable counterCycleStealDelay
  * 20240512 v0.9.46 simultaneous writes, (fake) room temperature sensor, MHI increased buffer size, check-sum, and MHI-protocol data conversion, removed OLD_COMMAND support
  * 20230702 v0.9.40 increase buffer size for Hitachi
  * 20230611 v0.9.39 do init Daikin fields in H-link2 version too
@@ -73,10 +74,10 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "P1P2Monitor v0.9.46"
-#define SW_MAJOR_VERSION 0
+#define WELCOMESTRING "P1P2Monitor v0.9.53rc"
+#define SW_PATCH_VERSION 53
 #define SW_MINOR_VERSION 9
-#define SW_PATCH_VERSION 46
+#define SW_MAJOR_VERSION 0
 
 #ifdef MHI_SERIES
 #define INIT_MHI_FORMAT 1 // 1 (default) for conversion from/to 3-bit-per-byte format with check-sum, 0 for raw data
@@ -84,16 +85,17 @@
 
 #define COUNTERREPEATINGREQUEST 0 // Change this to 1 to trigger a counter request cycle at the start of each minute
                                   //   By default this works only as, and only if there is no other, first auxiliary controller (F0)
-				  //   The counter request is done after the (unanswered) 00F030*, unless KLICDA is defined
-				  //   Requesting counters can also be done or changed manually using the 'C' command
+				  //   The counter request is done after the (unanswered) 00F030*, if this slot is available
+				  //   Counter configuration setting can be done 'C' command
 				  //
-//#define KLICDA                    // If KLICDA is defined,
-                                  //   the counter request (if defined) is not done in the F0 pause but is done after the 400012* response
+				  //   Alternatively, if counter cycle steal delay ('Q' command) is not zero,
+                                  //   the counter request is done in the pause after the 400012* response
                                   //   This works for systems were the usual pause between 400012* and 000013* is around 47ms (+/- 20ms timer resolution)
 				  //   So this may only work without bus collission on these systems, use with care!
-#define KLICDA_DELAY 9            // If KLICDA is defined, the counter request is inserted at KLICDA_delay ms after the 400012* response
-                                  //   This value needs to be selected carefully to avoid bus collission between the 4000B8* response and the next 000013* request
+				  //   The counter request is inserted at counterCycleRequestDelay ms after the 400012* response
+                                  //   The delay value needs to be selected carefully to avoid bus collission between the 4000B8* response and the next 000013* request
 				  //   A value around 9ms works for my system; use with care, and check your logs for bus collissions or other errors
+                                  //   (in case of bus collision or read errors, the bridge will switch off cycle stealing mode and will switch off control mode)
 
 // set CTRL adapter ID; if not used, installer mode becomes unavailable on main controller
 #define CTRL_ID_1 0xB4 // LAN adapter ID in 0x31 payload byte 7
@@ -161,8 +163,10 @@
 #define EEPROM_ADDRESS_MHI_FORMAT          0x07 // 1 byte for raw/MHI setting
 #endif /* MHI_SERIES */
 #ifdef EF_SERIES
-#define EEPROM_ADDRESS_WRITE_BUDGET_PERIOD 0x06 // 1 byte for write budget period
+#define EEPROM_ADDRESS_WRITE_BUDGET_PERIOD  0x06 // 1 byte for write budget period
 #define EEPROM_ADDRESS_INITIAL_WRITE_BUDGET 0x07 // 1 byte for initial write budget
+#define EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY 0x08 // 1 byte for counter cycle stealing delay (0=off, 9 seems to work om some models, use with care!)
+
 #endif /* EF_SERIES */
                                                 // 0x08 and 0x0A-0x0F reserved
 #define EEPROM_ADDRESS_VERSION             0x09
@@ -202,7 +206,7 @@
 #define TIME_ERRORS_PERMITTED 3600 // on avg max one error per 3600s allowed (otherwise writing will be switched off)
 #define MAX_ERRORS_PERMITTED    20 // budget never higher than this (don't allow too many errors before we switch writing off) // 8-bit, so max 255
 #define INIT_ERRORS_PERMITTED   10 // initial error budget upon boot
-#define MIN_ERRORS_PERMITTED     5 // don't start control unless error budget is at least this value
+#define MIN_ERRORS_PERMITTED     2 // don't start control unless error budget is at least this value
 
 // serial read buffer size for reading from serial port, max line length on serial input is 99 (3 characters per byte, plus 'W" and '\r\n')
 #define RS_SIZE 99

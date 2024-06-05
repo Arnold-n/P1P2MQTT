@@ -2348,7 +2348,7 @@ void handleCommand(char* cmdString) {
                           break;
                 default : break;
               }
-              // fallthrough for various commands handled both by P1P2MQTT-bridge and P1P2Monitor
+              // fallthrough for 'V' command handled both by P1P2MQTT-bridge and P1P2Monitor
     default : // printfTopicS("To ATmega: ->%s<-", cmdString);
               Serial.print(F(SERIAL_MAGICSTRING));
               Serial.println((char *) cmdString);

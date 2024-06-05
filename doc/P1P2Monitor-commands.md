@@ -38,21 +38,24 @@ Warnings:
  - If SERIAL\_MAGICSTRING is defined, each line must start with this string.
  - The first command line received over serial by P1P2Monitor after its reboot will - on purpose - be ignored for robustness reasons. If you communicate directly over serial (not via P1P2MQTT), a good habit is to send a dummy line `*` as first command. If you use P1P2MQTT, the code on the ESP will take care of this.
 
-### Basic commands
+### Summary of most useful commands
 
 The most useful commands:
  - `L1` to start P1P2Monitor acting as an auxiliary controller
  - `L0` to stop P1P2Monitor acting as an auxiliary controller
- - `C2` to start requesting counters every minute
- - `C0` to stop requesting counters every minute
- - `E` or `F` for parameter writing (as of v0.9.14) (for E and F series, respectively), more information in [Commands-Eseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Eseries.md) or [Commands-Fseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Fseries.md).
+ - `C2` (Daikin E only) to start requesting counters every minute
+ - `C0` (Daikin E only) to stop requesting counters every minute
+ - `E` (Daikin E only) or `F` for parameter writing, more information in [Commands-Eseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Eseries.md) or [Commands-Fseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Fseries.md)
+ - `F` (Daikin F only) for parameter writing, more information in [Commands-Eseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Eseries.md) or [Commands-Fseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Fseries.md)
+ - 'F' (Daikin E only) to set fake room temperature sensor (`F1 205` sets reported room temperature to 20.5C)
 
 ### Monitor commands:
 
 - `V`  Show P1P2Monitor version and status information
 - `U`  Shows scope mode (default 0 off, 1 on),
 - `Ux` Sets scope mode (default 0 off, 1 on); adds timing info for the start of some of the packets read via serial output and R topic, and
-- `K` instruct ATmega328P to reset itself.
+- `K` instructs ATmega328P to reset itself.
+- `E` (not for Daikin E) to set error mask; mask is default 0x3B on Hitachi to ignore PE/UC reports which are expected; mask is default 0x7F (all) for other brands)
 
 ## Auxiliary controller commands:
 
@@ -62,10 +65,15 @@ The most useful commands:
 - `L5` (F-series only) switches auxiliary controller mode partially on: only 00F030 messages are responded to. This enable monitoring which 00F03x packets will be requested. Not saved to EEPROM,
 - `L99` (E-series only) restarts Daikin system, use with care!
 - `L`  displays current controller\_id (0x00 = off; 0xF0/0xF1 is first/secondary auxiliary controller),
-- `C1` triggers single cycle of 6 B8 packets to request (energy/operation/starts) counters from heat pump,
+
+## Counter-request commands (Daikin E only):
+
+- `C1` triggers single cycle of 6 B8 packets to request (energy/operation/start) counters from heat pump; counters are requested in time slot intended for 40F030 reply
 - `C2` like C1, but keeps repeating every new minute,
 - `C0` stop requesting counters, and
 - `C`  show counter-repeating-request status.
+- 'Q9' (Daikin E only) to cycle-steal the pause after 400012 message for doing a counter-request; this works on certain systems but could give bus collissions on others, use with care. Upon bus collission detection Q9 and auxiliary control mode will be switched off
+- 'Q0' (Daikin E only) to stop cycle-stealing
 
 ## Raw data commands:
 

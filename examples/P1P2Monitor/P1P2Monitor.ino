@@ -36,9 +36,10 @@
  *              Support for parameter setting in P1P2Monitor is rather simple. There is no buffering, so enough time (a few seconds)
  *              is needed in between commands.
  *
- * Copyright (c) 2019-2023 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
+ * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20240605 v0.9.53 replace KLICDA by configurable counterCycleStealDelay
  * 20240512 v0.9.46 remove unneeded 'G' 'H' and OLD_COMMANDS, adding MHI support, remove verbosity levels, F-series model-suggestions, multiple write-commands
  * 20230604 v0.9.38 H-link2 support added to main branch
  * 20230604 v0.9.37 support for ATmega serial enable/disable via PD4, required for P1P2MQTT bridge v1.2
@@ -131,9 +132,6 @@ const byte Compile_Options = 0 // multi-line statement
 #ifdef MONITORCONTROL
 +0x01
 #endif
-#ifdef KLICDA
-+0x02
-#endif
 #ifdef PSEUDO_PACKETS
 +0x04
 #endif
@@ -180,8 +178,10 @@ void initEEPROM() {
 #endif /* MHI_SERIES || TH_SERIES */
   }
   if (EEPROM.read(EEPROM_ADDRESS_ERROR_MASK) == 0xFF) EEPROM.update(EEPROM_ADDRESS_ERROR_MASK, ERROR_MASK);
+#ifdef E_SERIES
+  if (EEPROM.read(EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY) == 0xFF) EEPROM.update(EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY, 0);
+#endif /* E_SERIES */
   // EEPROM_version 0x00 adds WRITE_BUDGET_PERIOD
-
   if (EEPROM.read(EEPROM_ADDRESS_VERSION) == 0xFF) {
     EEPROM.update(EEPROM_ADDRESS_VERSION, 0);
 #ifdef EF_SERIES
@@ -248,6 +248,9 @@ uint16_t parameterWritesDone = 0;
 // if -1 than no Fx request or response seen (relevant to detect whether F1 controller is supported or not)
 static int8_t FxAbsentCnt[4] = { -1, -1, -1, -1};
 #endif /* #F_SERIES */
+#ifdef E_SERIES
+uint8_t counterCycleStealDelay = 0;
+#endif /* E_SERIES */
 
 static char RS[RS_SIZE];
 static byte WB[WB_SIZE];
@@ -283,9 +286,6 @@ void printWelcomeString(byte ign) {
 #ifdef MONITORCONTROL
   Serial.print(F(" +control"));
 #endif /* MONITORCONTROL */
-#ifdef KLICDA
-  Serial.print(F(" +klicda"));
-#endif /* KLICDA */
 #ifdef OLDP1P2LIB
   Serial.print(F(" OLDP1P2LIB"));
 #else
@@ -334,13 +334,14 @@ void printWelcomeString(byte ign) {
   if (errorMask < 0x10) Serial.print('0');
   Serial.println(errorMask, HEX);
 #endif /* MHI || TH_SERIES */
-// Initial parameters
-#ifdef KLICDA
-#ifdef KLICDA_DELAY
-  Serial.print(F("* KLICDA_DELAY="));
-  Serial.println(KLICDA_DELAY);
-#endif /* KLICDA_DELAY */
-#endif /* KLICDA */
+#ifdef E_SERIES
+  if (counterCycleStealDelay) {
+    Serial.print(F("* Counter cycle steal delay active: "));
+    Serial.println(counterCycleStealDelay);
+  } else {
+    Serial.println(F("* Counter cycle stealing inactive"));
+  }
+#endif /* E_SERIES */
 }
 
 #define ADC_busy (0x40 & ADCSRA)
@@ -393,6 +394,7 @@ void setup() {
 #endif /* EF_SERIES */
 #ifdef E_SERIES
   counterRepeatingRequest = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
+  counterCycleStealDelay = EEPROM.read(EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY);
 #endif /* E_SERIES */
 #ifdef MHI_SERIES
   mhiFormat  = EEPROM.read(EEPROM_ADDRESS_MHI_FORMAT);
@@ -475,17 +477,22 @@ void writePseudoPacket(byte* WB, byte rh)
 }
 
 #ifdef EF_SERIES
-void stopControlAndCounters() {
-          if (CONTROL_ID) Serial_println(F("* Switching control functionality off (also after ATmega reboot)"));
-          CONTROL_ID = CONTROL_ID_NONE;
-          EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+void stopControlAndCounters(bool stopCycleStealing) {
+  if (CONTROL_ID) Serial_println(F("* Switching control functionality off (also after next ATmega reboot)"));
+  CONTROL_ID = CONTROL_ID_NONE;
+  EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
 #ifdef E_SERIES
-          if (counterRepeatingRequest) Serial_println(F("* Switching counter request function off (also after ATmega reboot)"));
-          counterRepeatingRequest = 0;
-          counterRequest = 0;
-          EEPROM.update(EEPROM_ADDRESS_COUNTER_STATUS, counterRepeatingRequest);
+  if (counterRepeatingRequest) Serial_println(F("* Switching counter request function off (also after next ATmega reboot)"));
+  counterRepeatingRequest = 0;
+  counterRequest = 0;
+  EEPROM.update(EEPROM_ADDRESS_COUNTER_STATUS, counterRepeatingRequest);
+  if (stopCycleStealing) {
+    Serial_println(F("* Switching counter cycle stealing off (also after next ATmega reboot)"));
+    counterCycleStealDelay = 0;
+    EEPROM.update(EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY, 0);
+  }
 #endif /* E_SERIES */
-          for (byte i = 0; i < WR_MAX; i++) wr_cnt[i] = 0;
+  for (byte i = 0; i < WR_MAX; i++) wr_cnt[i] = 0;
 }
 #endif /* EF_SERIES */
 
@@ -879,7 +886,7 @@ void loop() {
 byte scanned = 0;
 byte scannedTotal = 0;
 byte wr_busy = 0;
-          switch (*(RSp - 1)) {
+          switch (*(RSp - 1)) { // in use by ESP: adhjps (v), in use by ATmega: cefgiklmnoqtuvwx, available: bryz
             case '\0': // Serial_println(F("* Empty line received"));
                       break;
             case '*': // Serial_print(F("* Received: "));
@@ -931,7 +938,6 @@ byte wr_busy = 0;
                       {
                         int l;
                         int n;
-                        float roomFloat;
                         if ((l = sscanf(RSp, "%hhd%n", &insertRoomTemperature, &n)) > 0) {
                           switch (insertRoomTemperature) {
                             default : // fall-through
@@ -949,11 +955,51 @@ byte wr_busy = 0;
                           break;
                         }
                         if (insertRoomTemperature) {
-                          Serial_print("on: ");
+                          Serial_print(F("on: "));
                         } else {
-                          Serial_print("off: ");
+                          Serial_print(F("off: "));
                         }
                         Serial_println(roomTemperature * 0.1);
+                      }
+                      break;
+            case 'q':
+            case 'Q': if (CONTROL_ID) {
+                        Serial_println(F("* Counter cycle stealing should not be necessary in L1 mode, refusing command, use C2 instead"));
+                        break;
+                      }
+                      {
+                        int l;
+                        int n;
+                        if ((l = sscanf(RSp, "%hhd%n", &counterCycleStealDelay, &n)) > 0) {
+                          if (counterCycleStealDelay) {
+                            if (counterRepeatingRequest) {
+                              Serial_println(F("* Repetitive requesting of counter values already active, will not enable counter cycle stealing"));
+                              break;
+                            }
+                            if (counterRequest && !counterCycleStealDelay) {
+                              Serial_println(F("* Previous single counter request not finished yet"));
+                              break;
+                            }
+                            Serial_print(F("* Counter cycle stealing will be active with delay set to (recommended: 9) "));
+                            Serial_println(counterCycleStealDelay);
+                            Serial_println(F("* Setting errorsPermitted to 2 for safety"));
+                            errorsPermitted = 2;
+                            counterRequest = 1;
+                          } else {
+                            Serial_println(F("* Counter cycle stealing will be switched off"));
+                            Serial_println(F("* Setting errorsPermitted back to initial value"));
+                            errorsPermitted = INIT_ERRORS_PERMITTED;
+                            counterRequest = 0;
+                          }
+                          EEPROM.update(EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY, counterCycleStealDelay);
+                          break;
+                        }
+                        if (counterCycleStealDelay) {
+                          Serial_print(F("* Counter cycle stealing is active with delay "));
+                          Serial_println(counterCycleStealDelay);
+                        } else {
+                          Serial_println(F("* Counter cycle stealing is switched off"));
+                        }
                       }
                       break;
 #else
@@ -969,7 +1015,7 @@ byte wr_busy = 0;
                       if (errorMask < 0x10) Serial_print('0');
                       Serial_println(errorMask, HEX);
                       break;
-#endif /* H_SERIES */
+#endif /* E_SERIES */
 #ifdef F_SERIES
             case 'f':
             case 'F': if (!(CONTROL_ID && controlLevel)) {
@@ -1133,7 +1179,7 @@ byte wr_busy = 0;
                       }
 #endif /* EF_SERIES */
                       // for non-Daikin systems, and for Daikin systems in L0 mode, just schedule a packet write, use with care
-                      Serial_print(F("* Writing: "));
+                      Serial_print(F("* Scheduling write: "));
                       wb = 0;
                       while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
                         WB[wb++] = wbtemp;
@@ -1386,11 +1432,15 @@ byte wr_busy = 0;
             case 'C': if (scanint(RSp, temp) == 1) {
                         if (temp) {
                           if ((FxAbsentCnt[0] != F0THRESHOLD) && (FxAbsentCnt[1] != F0THRESHOLD) && (FxAbsentCnt[3] != F0THRESHOLD)) {
-                            Serial_println(F("* No free controller slot found (yet). Counter functionality cannot enabled"));
+                            Serial_println(F("* No free controller slot found (yet). Counter functionality will not enabled"));
                             break;
                           }
                           if (errorsPermitted < MIN_ERRORS_PERMITTED) {
-                            Serial_println(F("* Errorspermitted too low; counter functinality not enabled"));
+                            Serial_println(F("* Errorspermitted too low; counter functionality will not enabled"));
+                            break;
+                          }
+                          if (counterCycleStealDelay) {
+                            Serial_println(F("* Counter cycle steal active, regular counter functionality will not enabled"));
                             break;
                           }
                         }
@@ -1496,7 +1546,7 @@ byte wr_busy = 0;
     for (int i = 0; i < nread; i++) readError |= EB[i];
     if (skipPackets) {
       if ((skipPackets == SKIP_PACKETS) && !delta) {
-        Serial_print(F("* Always skipping first packet if delta == 0, readerror = 0x"));
+        Serial_print(F("* Always skipping first packet if delta == 0. readerror = 0x"));
         Serial_println(readError, HEX);
         skipPackets--;
         break;
@@ -1649,7 +1699,7 @@ byte wr_busy = 0;
         errorsPermitted--;
         if (!errorsPermitted) {
           Serial_println(F("* WARNING: too many read errors detected"));
-          stopControlAndCounters();
+          stopControlAndCounters(1);
         }
       }
 #endif /* EF_SERIES */
@@ -1663,7 +1713,7 @@ byte wr_busy = 0;
         // obtain day-of-week, hour, minute
         Tmin = RB[6];
         if (Tmin != Tminprev) {
-          if (counterRepeatingRequest && !counterRequest) counterRequest = 1;
+          if ((counterRepeatingRequest || counterCycleStealDelay) && !counterRequest) counterRequest = 1;
           Tminprev = Tmin;
         }
       }
@@ -1671,78 +1721,78 @@ byte wr_busy = 0;
         compressor = RB[21] & 0x01;
       }
 
-#ifdef KLICDA
-      // request one counter per cycle in short pause after first 0012 msg at start of each minute
-      if ((nread > 4) && (RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x12)) {
-        if (counterRequest) {
-          WB[0] = 0x00;
-          WB[1] = 0x00;
-          WB[2] = 0xB8;
-          WB[3] = (counterRequest - 1);
-          if (P1P2MQTT.writeready()) {
-            // write KLICDA_DELAY ms after 400012 message
-            // pause after 400012 is around 47 ms for some systems which is long enough for a 0000B8*/4000B8* counter request/response pair
-            // in exceptional cases (1 in 300 in my system) the pause after 400012 is only 27ms,
-            //      in which case the 4000B* reply arrives after the 000013* request
-            //      (and in thoses cases the 000013* request is ignored)
-            //      (NOTE!: if KLICDA_DELAY is chosen incorrectly, such as 5 ms in some example systems, this results in incidental bus collisions)
-            P1P2MQTT.writepacket(WB, 4, KLICDA_DELAY, CRC_GEN, CRC_CS_FEED);
-          } else {
-            Serial_println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
-            if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
+      if (counterCycleStealDelay) {
+        // request one counter per cycle in short pause after first 0012 msg at start of each minute
+        if ((nread > 4) && (RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x12)) {
+          if (counterRequest) {
+            WB[0] = 0x00;
+            WB[1] = 0x00;
+            WB[2] = 0xB8;
+            WB[3] = (counterRequest - 1);
+            if (P1P2MQTT.writeready()) {
+              // write counterCycleStealDelay ms after 400012 message
+              // pause after 400012 is around 47 ms for some systems which is long enough for a 0000B8*/4000B8* counter request/response pair
+              // in exceptional cases (1 in 300 in my system) the pause after 400012 is only 27ms,
+              //      in which case the 4000B* reply arrives after the 000013* request
+              //      (and in thoses cases the 000013* request is ignored)
+              //      (NOTE!: if counterCycleStealDelay is chosen incorrectly, such as 5 ms in some example systems, this results in incidental bus collisions)
+              P1P2MQTT.writepacket(WB, 4, counterCycleStealDelay, CRC_GEN, CRC_CS_FEED);
+            } else {
+              Serial_println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
+              if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
+            }
+            if (++counterRequest == 7) counterRequest = 0; // wait until next new minute; change 0 to 1 to continuously request counters for increased resolution
           }
-          if (++counterRequest == 7) counterRequest = 0; // wait until next new minute; change 0 to 1 to continuously request counters for increased resolution
         }
-      }
-#else /* KLICDA */
-      // check number of auxiliary controller slots (F_max), and how many already done in this cycle (F_prev)
-      if ((RB[0] == 0x00) && ((RB[1] & 0xF0) == 0xF0) && (RB[2] == 0x30)) {
-        byte auxCtrl = RB[1] & 0x03;
-        if (F_prev < 0) {
-          // do nothing, just after reset, or after detection error in this cycle
-          // Serial_println(F("* Earlier F_prev error, or ignore first cycle"));
-        } else if ((F_prevDet >> auxCtrl) & 0x01) {
-          // repeated message, should not happen unless communication error or after Daikin restart, skip this cycle, reset data structures
-          // Serial_println(F("* F_prev error"));
-          F_prev = -1;
+      } else {
+        // check number of auxiliary controller slots (F_max), and how many already done in this cycle (F_prev)
+        if ((RB[0] == 0x00) && ((RB[1] & 0xF0) == 0xF0) && (RB[2] == 0x30)) {
+          byte auxCtrl = RB[1] & 0x03;
+          if (F_prev < 0) {
+            // do nothing, just after reset, or after detection error in this cycle
+            // Serial_println(F("* Earlier F_prev error, or ignore first cycle"));
+          } else if ((F_prevDet >> auxCtrl) & 0x01) {
+            // repeated message, should not happen unless communication error or after Daikin restart, skip this cycle, reset data structures
+            // Serial_println(F("* F_prev error"));
+            F_prev = -1;
+            F_prevDet = 0;
+          } else {
+            F_prev++;
+            F_prevDet |= (1 << auxCtrl);
+          }
+        }
+        if ((RB[0] == 0x00) && ((RB[1] & 0xF0) != 0xF0)) {
+          if (F_prev > F_max) {
+            F_max = F_prev;
+            // Serial_print(F("* F_max set to "));
+            // Serial_println(F_max);
+          }
+          F_prev = 0;
           F_prevDet = 0;
-        } else {
-          F_prev++;
-          F_prevDet |= (1 << auxCtrl);
         }
-      }
-      if ((RB[0] == 0x00) && ((RB[1] & 0xF0) != 0xF0)) {
-        if (F_prev > F_max) {
-          F_max = F_prev;
-          // Serial_print(F("* F_max set to "));
-          // Serial_println(F_max);
-        }
-        F_prev = 0;
-        F_prevDet = 0;
-      }
-      // insert counterRequest messages at end of each (or each 4th) cycle
-      if (counterRequest && (nread > 4) && (RB[0] == 0x00) && ((RB[1] == 0xFF) || ((RB[1] & 0xFE)  == 0xF0)) && (RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x03] == F0THRESHOLD) && (F_prev == F_max)) {
-        // non-empty 00Fx30 request message received, slot has no other aux controller active, and this is the last 00Fx30 request message in this cycle
-        // For CONTROL_ID != 0 and F_max==1, use 1-in-4 mechanism
-        if (div4) {
-          div4--;
-        } else {
-          WB[0] = 0x00;
-          WB[1] = 0x00;
-          WB[2] = 0xB8;
-          WB[3] = (counterRequest - 1);
-          F030forcounter = true;
-          if (P1P2MQTT.writeready()) {
-            P1P2MQTT.writepacket(WB, 4, F03XDELAY, CRC_GEN, CRC_CS_FEED);
+        // insert counterRequest messages at end of each (or each 4th) cycle
+        if (counterRequest && (nread > 4) && (RB[0] == 0x00) && ((RB[1] == 0xFF) || ((RB[1] & 0xFE)  == 0xF0)) && (RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x03] == F0THRESHOLD) && (F_prev == F_max)) {
+          // non-empty 00Fx30 request message received, slot has no other aux controller active, and this is the last 00Fx30 request message in this cycle
+          // For CONTROL_ID != 0 and F_max==1, use 1-in-4 mechanism
+          if (div4) {
+            div4--;
           } else {
-            Serial_println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
-            if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
+            WB[0] = 0x00;
+            WB[1] = 0x00;
+            WB[2] = 0xB8;
+            WB[3] = (counterRequest - 1);
+            F030forcounter = true;
+            if (P1P2MQTT.writeready()) {
+              P1P2MQTT.writepacket(WB, 4, F03XDELAY, CRC_GEN, CRC_CS_FEED);
+            } else {
+              Serial_println(F("* Refusing to write counter-request packet while previous packet wasn't finished"));
+              if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
+            }
+            if (++counterRequest == 7) counterRequest = 0;
+            if (CONTROL_ID && (F_max == 1)) div4 = 3;
           }
-          if (++counterRequest == 7) counterRequest = 0;
-          if (CONTROL_ID && (F_max == 1)) div4 = 3;
         }
       }
-#endif /* KLICDA */
 #endif /* E_SERIES */
       if ((nread > 4) && (RB[0] == 0x40) && (((RB[1] & 0xFE) == 0xF0) || (RB[1] == 0xFF)) && ((RB[2] & 0x30) == 0x30)) {
         // non-empty 40Fx3x auxiliary controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < F03XDELAY/F030DELAY (- margin)
@@ -1755,7 +1805,7 @@ byte wr_busy = 0;
             Serial_print(F("* Warning: another aux controller answering to address 0x"));
             Serial_print(RB[1], HEX);
             Serial_println(F(" detected"));
-            stopControlAndCounters();
+            stopControlAndCounters(0);
           }
         }
       } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30) && !F030forcounter)  {
