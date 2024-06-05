@@ -257,7 +257,7 @@
         case   13 : KEY2_PUB_CONFIG_CHECK_ENTITY("ESP_Mem_Free");                                                                                                         VALUE_u16_LE;
         case   14 : KEY1_PUB_CONFIG_CHECK_ENTITY("ESP_Serial_Input_Errors_Data_Short");;                                                                                  VALUE_u8;
         case   15 : KEY1_PUB_CONFIG_CHECK_ENTITY("ESP_Serial_Input_Errors_CRC");                                                                                          VALUE_u8;
-        case   16 : KEY1_PUB_CONFIG_CHECK_ENTITY("WiFi_RSSI");                                                                                                            VALUE_s8_ratelimited;
+        case   16 : HACONFIG; HYST_S8(3); KEY1_PUB_CONFIG_CHECK_ENTITY("WiFi_RSSI");                                                                                      VALUE_s8;
         case   17 : KEY1_PUB_CONFIG_CHECK_ENTITY("WiFi_Status");                                                                                                          VALUE_u8;
         case   19 : KEY2_PUB_CONFIG_CHECK_ENTITY("MQTT_Messages_Skipped_Low_Mem");                             HAEVENTS;                                                  VALUE_u16_LE;
         default   : return 0;

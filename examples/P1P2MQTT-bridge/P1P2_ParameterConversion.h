@@ -838,6 +838,7 @@ typedef enum {
   HYSTERESIS_TYPE_F8_8_LE,
   HYSTERESIS_TYPE_F8S8_LE,
   HYSTERESIS_TYPE_U8,
+  HYSTERESIS_TYPE_S8,
   HYSTERESIS_TYPE_U16_LE,
   HYSTERESIS_TYPE_S16_LE,
   HYSTERESIS_TYPE_U16_BE,
@@ -850,6 +851,7 @@ typedef enum {
 
 #define HYST_RESET     { applyHysteresisType = HYSTERESIS_TYPE_NONE;   applyHysteresis = 0; }
 #define HYST_U8(x)     { applyHysteresisType = HYSTERESIS_TYPE_U8;     applyHysteresis = x; }
+#define HYST_S8(x)     { applyHysteresisType = HYSTERESIS_TYPE_S8;     applyHysteresis = x; }
 #define HYST_U16_LE(x) { applyHysteresisType = HYSTERESIS_TYPE_U16_LE; applyHysteresis = x; }
 #define HYST_U16_BE(x) { applyHysteresisType = HYSTERESIS_TYPE_U16_BE; applyHysteresis = x; }
 #define HYST_U32_LE(x) { applyHysteresisType = HYSTERESIS_TYPE_U32_LE; applyHysteresis = x; }
@@ -1285,6 +1287,11 @@ uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIn
                                        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue + applyHysteresis >= oldValue));
                                      }
                                      break;
+      case HYSTERESIS_TYPE_S8:       { int8_t oldValue = u_payloadValue_LE(M.payloadByteVal + pi2, 1);
+                                       int8_t newValue = u_payloadValue_LE(payload + payloadIndex, 1);
+                                       skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue + applyHysteresis >= oldValue));
+                                     }
+                                     break;
       case HYSTERESIS_TYPE_U16_LE:   { uint16_t oldValue = u_payloadValue_LE(M.payloadByteVal + pi2, 2);
                                        uint16_t newValue = u_payloadValue_LE(payload + payloadIndex, 2);
                                        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue + applyHysteresis >= oldValue));
@@ -1558,13 +1565,6 @@ uint8_t value_udiv1000_LE(byte packetSrc, byte packetType, byte payloadIndex, by
 // signed integers, LE
 
 uint8_t value_s8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value) {
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int8_t) payload[payloadIndex]);
-  return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
-}
-
-byte RSSIcnt = 0xFF;
-uint8_t value_s8_ratelimited(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value) {
-  if (++RSSIcnt) return 0;
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int8_t) payload[payloadIndex]);
   return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
 }
@@ -2203,7 +2203,6 @@ uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramN
 #define VALUE_u32_LE             { value_u_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 4);                              return 0; }
 #define VALUE_u32div1000_LE      { value_udiv1000_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 4);                       return 0; }
 #define VALUE_s8                 { value_s8(packetSrc, packetType, payloadIndex, payload, mqtt_value);                                   return 0; }
-#define VALUE_s8_ratelimited     { value_s8_ratelimited(packetSrc, packetType, payloadIndex, payload, mqtt_value);                       return 0; }
 #define VALUE_s8                 { value_s_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);                              return 0; }
 #define VALUE_bits(n1, n2)       { value_bits(packetSrc, packetType, payloadIndex, payload, mqtt_value, n1, n2);                         return 0; }
 #define VALUE_bits_nopub(n1, n2)       { value_bits_nopub(packetSrc, packetType, payloadIndex, payload, mqtt_value, n1, n2);                         return 0; }
