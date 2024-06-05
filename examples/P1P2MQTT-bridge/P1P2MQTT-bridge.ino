@@ -1045,7 +1045,7 @@ void writePseudoPacket(byte* WB, byte rh)
   WB[rh] = crc;
   if (CRC_GEN) snprintf(pseudoWriteBuffer + TZ_PREFIX_LEN + 3+ (rh << 1), 3, "%02X", crc);
 #endif /* MHI_SERIES */
-  if (EE.outputMode & 0x0001) clientPublishMqttChar('R', MQTT_QOS_HEX, MQTT_RETAIN_HEX, pseudoWriteBuffer);
+  if (EE.outputMode & 0x0004) clientPublishMqttChar('R', MQTT_QOS_HEX, MQTT_RETAIN_HEX, pseudoWriteBuffer);
   // pseudoWriteBuffer[22] = 'R';
   if (EE.outputMode & 0x0010) printfTelnet_MON("R %s", pseudoWriteBuffer + 22);
   if ((EE.outputMode & 0x0022) && !mqttDeleting) process_for_mqtt(WB, rh);
@@ -2269,9 +2269,9 @@ void handleCommand(char* cmdString) {
                 printModifyParam(PARAM_JMASK, 1, temp, 0);
               } else {
                 printfTopicS("Outputmode 0x%04X is sum of", EE.outputMode);
-                printfTopicS("%ix 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/xxx", EE.outputMode  & 0x01);
+                printfTopicS("%ix 0x0001 to output raw packet data (excluding pseudo-packets) over mqtt P1P2/R/xxx", EE.outputMode  & 0x01);
                 printfTopicS("%ix 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/xxx/#", (EE.outputMode >> 1) & 0x01);
-                printfTopicS("%ix 0x0004 (reserved)", (EE.outputMode >> 2) & 0x01);
+                printfTopicS("%ix 0x0004 to output pseudo packet data over mqtt P1P2/R/xxx", (EE.outputMode >>2) & 0x01);
                 printfTopicS("%ix 0x0008 to have mqtt include parameters even if functionality is unknown, warning: easily overloads ATmega/ESP (best to combine this with outputfilter >=1)", (EE.outputMode >> 3) & 0x01); // -> outputUnknown
                 printfTopicS("%ix 0x0010 ESP to output raw data over telnet", (EE.outputMode >> 4) & 0x01);
                 printfTopicS("%ix 0x0020 to output mqtt individual parameter data over telnet", (EE.outputMode >> 5) & 0x01);
@@ -3537,8 +3537,9 @@ void loop() {
               if ((!CRC_GEN) || (crc == readHex[rh]))
 #endif /* MHI_SERIES */
               {
-                if (EE.outputMode & 0x0001) clientPublishMqttChar('R', MQTT_QOS_HEX, MQTT_RETAIN_HEX, readBuffer);
-                // readBuffer[22] = 'R';
+                if (((EE.outputMode & 0x0001) && (readBuffer[22] != 'P')) || ((EE.outputMode & 0x0004) && (readBuffer[22] == 'P')) ) {
+                  clientPublishMqttChar('R', MQTT_QOS_HEX, MQTT_RETAIN_HEX, readBuffer);
+                }
                 if (EE.outputMode & 0x0010) printfTelnet_MON("R %s", readBuffer + 22);
                 if ((EE.outputMode & 0x0022) && !mqttDeleting) process_for_mqtt(readHex, rh);
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0E)) pseudo0B = pseudo0C = 9; // Insert pseudo packet 40000B/0C in output serial after 00000E
@@ -3588,7 +3589,7 @@ void loop() {
             if (EE.outputMode & 0x0040) printfTelnet_MON("%c %s", readBuffer[0], readBuffer + 22);
             if (EE.outputMode & 0x1000) clientPublishMqttChar('R', MQTT_QOS_HEX, MQTT_RETAIN_HEX, readBuffer);
           } else if (readBuffer[0] == 'D') {
-            // duplicated data
+            // duplicated data (thus this is not pseudo data)
             if (EE.outputMode & 0x0001) clientPublishMqttChar('R', MQTT_QOS_HEX, MQTT_RETAIN_HEX, readBuffer);
           } else if (readBuffer[0] == 'E') {
             // data with errors

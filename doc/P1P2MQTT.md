@@ -141,12 +141,12 @@ Commands to be executed by P1P2MQTT can be given over P1P2/W/\<xxx\> or via teln
   - 3 like 2, without date/time
 - `J`  Display output mode and options
 - `Jx` Sets output mode, with `x` sum of:
-  - 0x0001 to output raw packet data (including pseudo-packets) over mqtt P1P2/R/#
-  - 0x0002 to output mqtt individual parameter data over mqtt P1P2/P/#
-  - 0x0004 (reserved)
-  - 0x0008 to have mqtt include parameters even if functionality is unknown, may overload ATmega/ESP
+  - 0x0001 to output raw P1/P2 packet data over MQTT topic P1P2/R/#
+  - 0x0002 to output individual parameter data over MQTT topic P1P2/P/#
+  - 0x0004 to output pseudo packet data over MQTT topic P1P2/R/#
+  - 0x0008 to have MQTT include parameters even if functionality is unknown, may overload ATmega/ESP
   - 0x0010 ESP to output raw data over telnet
-  - 0x0020 to output mqtt individual parameter data over telnet
+  - 0x0020 to output MQTT individual parameter data over telnet
   - 0x0040 ESP to output timing info over telnet
   - 0x0080 (reserved)
   - 0x0100 to include non-HACONFIG parameters in P1P2/P/# 
