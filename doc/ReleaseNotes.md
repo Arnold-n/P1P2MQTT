@@ -1,26 +1,38 @@
 **Release notes**
 
-v0.9.52
+v0.9.53 P1P2Monitor
+- Buffered writes
+- 'KLICDA'-style counter request by cycle stealing supported, configurable via 'q' command
+
+v0.9.53 P1P2MQTT bridge
+- tank-installed and cooling-capacity assumed by default until field setting is observed
+- P48 option to update timestamps once/minute only
+- V_Interface is now voltage
+- pseudo hex data output is now outputmode 0x0004
+- avoid double-reset AP after configuration in AP
+- minor fixes
+
+v0.9.52 P1P2MQTT bridge
 
 - Increase time-out for external electricity meter input over MQTT
 - Do not erase MQTT credentials in case of factory reset
 - enable tank temperature setting default on
 - support Src=0x41 for Daikin F series
 
-v0.9.49
+v0.9.49 P1P2MQTT bridge
 
 - increase max HA config message size
 
-v0.9.48
+v0.9.48 P1P2MQTT bridge
 
 - Daikin E: add external thermostat relay input decoding
 
-v0.9.47
+v0.9.47 P1P2MQTT bridge
 
 - add Hitachi packet 21001C decoding
 - Hitachi: fix bcnt bitbasis decoding
 
-v0.9.46
+v0.9.46 PP2Monitor/P1P2MQTT bridge
 
 This version comes with a lot of changes, a few of which may break existing set-ups. Please let me know if you encounter any issue or bug.
 
