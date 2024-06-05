@@ -3,6 +3,7 @@
  * Copyright (c) 2023-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20240605 v0.9.53 V_Interface entity is voltage
  * 20240519 v0.9.49 fix haConfigMsg max length
  * 20240515 v0.9.46 separated HA configuration from P1P2_Config.h
  * ..
@@ -129,6 +130,7 @@ typedef enum {
   ENTITY_PRESSURE,
   ENTITY_COST,
   ENTITY_COP,
+  ENTITY_VOLTAGE,
 } haentity;
 
 const char* haIconString[] = {
@@ -149,6 +151,7 @@ const char* haIconString[] = {
   "mdi:water",
   "mdi:currency-eur",
   "mdi:poll",
+  "mdi:volt", // TODO
 };
 
 const char* haUomString[] = {
@@ -169,6 +172,7 @@ const char* haUomString[] = {
   "bar",
   "€/kWh",
   " ",  // graph for unit-less COP
+  "V",
 };
 
 typedef enum {
@@ -195,6 +199,7 @@ const         byte haStateClass[] = {
   HASTATECLASS_MEASUREMENT,
   HASTATECLASS_MEASUREMENT,
   HASTATECLASS_TOTAL,
+  HASTATECLASS_MEASUREMENT,
   HASTATECLASS_MEASUREMENT,
 };
 
@@ -224,6 +229,7 @@ const char* haDeviceClassString[] = {
   "pressure",
   "",          // Euro/kWh cost
   "",
+  "voltage",
 // other options:
 //  "monetary",
 //  "problem",
@@ -315,6 +321,7 @@ uint16_t extraAvailabilityStringLength = 0;
 #define HAPRESSURE     { haEntity = ENTITY_PRESSURE;      PRECISION(1); }
 #define HACOST         { haEntity = ENTITY_COST;          PRECISION(2); }
 #define HACOP          { haEntity = ENTITY_COP;           PRECISION(3); }
+#define HAVOLTAGE      { haEntity = ENTITY_VOLTAGE;       PRECISION(1); }
 
 #define PRECISION(x)   { haPrecision = (x); }
 

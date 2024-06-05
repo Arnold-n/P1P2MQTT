@@ -5,6 +5,7 @@
  * handles only 0E/0F pseudo-packets
  *
  * version history
+ * 20240605 v0.9.53 V_Interface entity is voltage
  * 20240519 v0.9.49 hysteresis-check for V_Interface
  * 20240515 v0.9.46 separated common pseudo code handling into P1P2_Pseudo.h
  *
@@ -186,8 +187,8 @@
         case    6 : HACONFIG; KEY1_PUB_CONFIG_CHECK_ENTITY("Error_Budget");                                                                                               VALUE_u8;
         case    7 : return 0;
         case    8 :           KEY2_PUB_CONFIG_CHECK_ENTITY("P1P2_Monitor_Counter_Parameter_Writes");                                                                      VALUE_u16_LE;
-        case    9 : SUBDEVICE("_Bridge"); KEY1_PUB_CONFIG_CHECK_ENTITY("Control_Level_If_Active");                                                                        VALUE_u8;
-        case   10 : SUBDEVICE("_Bridge"); KEY1_PUB_CONFIG_CHECK_ENTITY("Control_ID");                                                                                     VALUE_u8hex;
+        case    9 :           KEY1_PUB_CONFIG_CHECK_ENTITY("Control_Level_If_Active");                                                                                    VALUE_u8;
+        case   10 :           KEY1_PUB_CONFIG_CHECK_ENTITY("Control_ID");                                                                                                 VALUE_u8hex;
         case   11 : HACONFIG;
                     maxOutputFilter = 9; // overrule = 1
                     CHECK(1);
@@ -219,7 +220,7 @@
         case   15 : return 0;
         case   16 : return 0;
         case   17 : KEY4_PUB_CONFIG_CHECK_ENTITY("ATmega_Uptime");                                             HASECONDS;         maxOutputFilter = 2;                    VALUE_u32_LE;
-        case   18 : HACONFIG; KEY1_PUB_CONFIG_CHECK_ENTITY("V_Interface");                 HYST_U8(1);                            maxOutputFilter = 2;                    VALUE_u8div10;
+        case   18 : HACONFIG; HAVOLTAGE; KEY1_PUB_CONFIG_CHECK_ENTITY("V_Interface");      HYST_U8(1);                            maxOutputFilter = 2;                    VALUE_u8div10;
         case   19 : KEY1_PUB_CONFIG_CHECK_ENTITY("V_3V3_ATmega");                                                                 maxOutputFilter = 2;                    VALUE_u8div10;
         default   : return 0;
       }
