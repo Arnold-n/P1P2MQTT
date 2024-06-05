@@ -4,23 +4,27 @@ The P1P2MQTT bridge (previously P1P2-ESP-interface) has 2 CPUs:
  - ATmega328P running P1P2Monitor
  - ESP8266 running P1P2MQTT-bridge (previously P1P2-bridge-esp8266)
 
-A full upgrade involves flashing both CPUs. Any firmware before should be upgraded to fix a few known issues (and due to some changes, at the same time).
+A full upgrade involves flashing both CPUs.
 
 ## P1P2Monitor firmware for ATmega328
 
 These images are for the P1P2MQTT bridge (previously called P1P2-ESP-interface). These images do not work on the Arduino Uno.
 
+Minimal recommended upgrade is v0.9.46 for P1P2Monitor; older versions do not work with P1P2MQTT-bridge >=v0.9.46. 
+
+P1P2Monitor v0.9.53 adds buffered commands.
+
 P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and FDY/FDYQ/FXMQ F-series. Monitoring is also available for certain F-series models (using the generic F-series firmware).
 
-[P1P2Monitor v0.9.46 for Daikin E-series](P1P2Monitor-v0.9.46-Daikin-E.ino.hex)
+[P1P2Monitor v0.9.53 for Daikin E-series](P1P2Monitor-v0.9.53-Daikin-E.ino.hex)
 
-[P1P2Monitor v0.9.46 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.46-Daikin-F.ino.hex)
+[P1P2Monitor v0.9.53 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.53-Daikin-F.ino.hex)
 
-[P1P2Monitor v0.9.46 (experimental for Hitachi models)](P1P2Monitor-v0.9.46-Hitachi.ino.hex)
+[P1P2Monitor v0.9.53 (experimental for Hitachi models)](P1P2Monitor-v0.9.53-Hitachi.ino.hex)
 
-[P1P2Monitor v0.9.46 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.46-MHI.ino.hex)
+[P1P2Monitor v0.9.53 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.53-MHI.ino.hex)
 
-[P1P2Monitor v0.9.46 (experimental for Toshiba models)](P1P2Monitor-v0.9.46-Toshiba.ino.hex)
+[P1P2Monitor v0.9.53 (experimental for Toshiba models)](P1P2Monitor-v0.9.53-Toshiba.ino.hex)
 
 To flash this image OTA (Linux CLI):
 
@@ -41,13 +45,15 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 
 ## P1P2MQTT-bridge firmware for ESP8266
 
-[P1P2MQTT-bridge v0.9.52 for Daikin E-series](P1P2MQTT-bridge-v0.9.52-Daikin-E.ino.bin)
+Minimal recommended upgrade is v0.9.53 for P1P2MQTT-bridge.
 
-[P1P2MQTT-bridge v0.9.52 for Daikin F-series](P1P2MQTT-bridge-v0.9.52-Daikin-F.ino.bin)
+[P1P2MQTT-bridge v0.9.53 for Daikin E-series](P1P2MQTT-bridge-v0.9.53-Daikin-E.ino.bin)
 
-[P1P2MQTT-bridge v0.9.52 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.52-Hitachi.ino.bin)
+[P1P2MQTT-bridge v0.9.53 for Daikin F-series](P1P2MQTT-bridge-v0.9.53-Daikin-F.ino.bin)
 
-[P1P2MQTT-bridge v0.9.52 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.52-MHI.ino.bin)
+[P1P2MQTT-bridge v0.9.53 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.53-Hitachi.ino.bin)
+
+[P1P2MQTT-bridge v0.9.53 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.53-MHI.ino.bin)
 
 (for Toshiba, use Hitachi code for now).
 
