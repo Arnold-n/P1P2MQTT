@@ -4072,6 +4072,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           default   : UNKNOWN_BIT;
         }
         case  6 :             // year
+                              if (EE.minuteTimeStamp) return 0;
                               M.R.selectTimeString = 4;
                               // Prefer use of timeString2,
                               // unless we are not seeing these
@@ -4080,24 +4081,29 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                               return 0;
 
         case  7 :             // month
+                              if (EE.minuteTimeStamp) return 0;
                               timeString2[8] = '0' + (payloadByte / 10);
                               timeString2[9] = '0' + (payloadByte % 10);
                               return 0;
 
         case  8 :             // day
+                              if (EE.minuteTimeStamp) return 0;
                               timeString2[11] = '0' + (payloadByte / 10);
                               timeString2[12] = '0' + (payloadByte % 10);
                               return 0;
 
         case  9 :             // hours
+                              if (EE.minuteTimeStamp) return 0;
                               timeString2[14] = '0' + (payloadByte / 10);
                               timeString2[15] = '0' + (payloadByte % 10);
                               return 0;
         case 10 :             // minutes
+                              if (EE.minuteTimeStamp) return 0;
                               timeString2[17] = '0' + (payloadByte / 10);
                               timeString2[18] = '0' + (payloadByte % 10);
                               return 0;
         case 11 :             // seconds
+                              if (EE.minuteTimeStamp) return 0;
                               timeString2[20] = '0' + (payloadByte / 10);
                               timeString2[21] = '0' + (payloadByte % 10);
                               if (payloadByte != M.R.prevSec)

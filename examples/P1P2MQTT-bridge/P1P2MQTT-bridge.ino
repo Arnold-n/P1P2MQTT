@@ -183,6 +183,7 @@ typedef struct EEPROMSettings {
   byte D13;
   bool haSetup;
 #endif /* E_SERIES */
+  bool minuteTimeStamp;
 };
 
 EEPROMSettings EE;
@@ -292,6 +293,9 @@ const char paramName_46[] PROGMEM = "Energy produced <bridge "; // PARAM_EP
 
 // HA dashboard setup
 const char paramName_47[] PROGMEM = "HA dashboard setup      "; // PARAM_HA_SETUP
+
+// Date_Time_Daikin updated per second or per minute
+const char paramName_48[] PROGMEM = "Minute timestamp only   ";
 #endif /* E_SERIES */
 
 const char* const paramName[] PROGMEM = {
@@ -347,6 +351,7 @@ const char* const paramName[] PROGMEM = {
   paramName_45,
   paramName_46,
   paramName_47,
+  paramName_48,
 #endif /* E_SERIES */
 };
 
@@ -411,6 +416,7 @@ const paramTypes PROGMEM paramType[] = {
   P_UINT,
   P_UINT,
   P_BOOL,
+  P_BOOL,
 #endif /* E_SERIES */
 };
 
@@ -466,6 +472,7 @@ const int PROGMEM paramSize[] = {
   1,
   4,
   4,
+  1,
   1,
 #endif /* E_SERIES */
 };
@@ -523,6 +530,7 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   999999999, // E
   999999999, // E
   1,
+  1,
 #endif /* E_SERIES */
 };
 
@@ -579,6 +587,7 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.electricityConsumedCompressorHeating1,
   (char*) &EE.energyProducedCompressorHeating1,
   (char*) &EE.haSetup,
+  (char*) &EE.minuteTimeStamp,
 #endif /* E_SERIES */
 };
 
@@ -1973,6 +1982,14 @@ void loadEEPROM() {
     EE.energyProducedCompressorHeating1 = 0;
     EE.D13 = 0x03;
     EE.haSetup = 1;
+#endif /* E_SERIES */
+  }
+  if (EE.EE_version < 5) {
+    delayedPrintfTopicS("Upgrade EEPROM_version to 5");
+    EE.EE_version = 5;
+    EE.EE_size = sizeof(EE);
+#ifdef E_SERIES
+    EE.minuteTimeStamp = 0;
 #endif /* E_SERIES */
     saveEEPROM();
   }
