@@ -493,7 +493,7 @@ void stopControlAndCounters() {
 #define PARAM_TP_START      0x35
 #define PARAM_TP_END        0x3D
 #define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1)
-const uint32_t nr_params[PARAM_ARR_SZ] = { 0x014A, 0x002D, 0x0001, 0x001F, 0x00F0, 0x006C, 0x00AF, 0x0002, 0x0020 }; // number of parameters observed
+const uint32_t nr_params[PARAM_ARR_SZ] = { 0x017C, 0x002F, 0x0002, 0x001F, 0x00F0, 0x006C, 0x00AF, 0x0002, 0x0020 }; // number of parameters observed
 //byte packettype                      = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
 #endif /* E_SERIES */
 
