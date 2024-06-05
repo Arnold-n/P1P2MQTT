@@ -1321,14 +1321,17 @@ bool loadRTC(void) {
   if ((doubleResetData & 0xFF) <= 1) {
     // power-up, no RTC data
     printfTopicS("loadRTC fails (power-up detected)");
+    // no need to do anything; M.R was readback or initalized by loadMQTT
     return 0;
   }
+  // load only first 4 bytes (RTCversion and RTCdataLength are uint16_t)
   ESP.rtcUserMemoryRead(RTC_REGISTER, reinterpret_cast<uint32_t *>(&M.R), 4);
   if ((sizeof(M.R) != M.R.RTCdataLength) || (M.R.RTCversion != RTC_VERSION)) {
     printfTopicS("Refuse to loadRTC given wrong version/length %i %i / %i %i", sizeof(M.R), M.R.RTCdataLength, M.R.RTCversion, RTC_VERSION);
+    // restore length/version as already readback or initialized by loadMQTT
     M.R.RTCdataLength = sizeof(M.R);
     M.R.RTCversion    = RTC_VERSION;
-    // other data is readback or initalized by loadMQTT
+    // other data was readback or initalized by loadMQTT
     return 0;
   }
   ESP.rtcUserMemoryRead(RTC_REGISTER, reinterpret_cast<uint32_t *>(&M.R), sizeof(M.R));
@@ -1349,15 +1352,15 @@ void loadMQTT() {
         if (mqttSaveReceived) {
           mqttClient.unsubscribe(mqttTopic);
           if (mqttSaveTopicChar == MQTT_SAVE_TOPIC_CHAR) {
-            // first block received, check length/version
+            // first block received via MQTT, check length/version of M.R RTC data block
             if ((sizeof(M.R) != M.R.RTCdataLength) || (M.R.RTCversion != RTC_VERSION)) {
-              printfTopicS("M.R mismatch, full reset data/RTC");
+              printfTopicS("M.R.RTC length or version mismatch, full reset data/RTC");
               resetDataStructures();
               initDataRTC();
               return;
             }
             if ((sizeof(M) != M.MdataLength) || (M.Mversion != M_VERSION)) {
-              printfTopicS("M mismatch, full reset data/RTC");
+              printfTopicS("M length or version mismatch, full reset data/RTC");
               resetDataStructures();
               initDataRTC();
               return;
@@ -1394,7 +1397,6 @@ void loadMQTT() {
     }
   }
 }
-
 
 uint16_t mqttDeleted = 0;
 uint16_t mqttDeleteDetected = 0;

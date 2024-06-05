@@ -604,7 +604,7 @@ typedef struct mqttSaveStruct {
 byte bcnt = 0;
 
 mqttSaveStruct M;
-#define RTC_VERSION 5
+#define RTC_VERSION 6
 #define M_VERSION 7
 
 void checkSize() {
@@ -798,7 +798,7 @@ void initDataRTC() {
   M.R.prevSec = 0xFF;
   M.R.prevMin = 0xFF;
   M.R.compressor = 0;
-  M.R.useDHW = 2;  // 0x01=tank-installed 0x02=DHW-installed
+  M.R.useDHW = 3;  // assume 0x01=tank-installed 0x02=DHW-installed (until field setting detection)
   M.R.controlRTX10 = 0; // default (for me) RT, (Daikin default = 20)
   M.R.numberOfLWTzonesX10 = 0;
   M.R.climateMode = 0; // 0x40=WD 0x00=ABS 0x80/0xC0 = +prog
@@ -818,7 +818,7 @@ void initDataRTC() {
   M.R.roomTempCoolingMinX10 = 150;
   M.R.roomTempCoolingMaxX10 = 350;
   M.R.HCmode = 1; // assume heatingMode
-  M.R.heatingOnlyX10 = 1; // assume heatingOnly;
+  M.R.heatingOnlyX10 = 0; // assume cooling capacity (until field setting detection)
   M.R.defrostActive = 0;
 #define heatingMode (M.R.HCmode & 0x01)
 #define coolingMode (M.R.HCmode & 0x02)
