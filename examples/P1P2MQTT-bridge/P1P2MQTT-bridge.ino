@@ -948,7 +948,11 @@ uint32_t Mqtt_waitCounter = 0;
 
 uint32_t mqttPublished = 0;
 
+#ifdef DEBUG_OVER_SERIAL
+#define ignoreSerial 1
+#else
 #define ignoreSerial (EE.outputMode & 0x8000)
+#endif
 
 volatile bool Skipped = false;
 
@@ -2660,6 +2664,7 @@ void setup() {
   doubleResetDataDone = 0;
   doubleResetData = 0x01;
   ESP.rtcUserMemoryRead(doubleResetAddress, &doubleResetData, sizeof(doubleResetData));
+
   if ((doubleResetData & 0xFFFFFF00) == 0xAAAAAA00) {
     delayedPrintfTopicS("Double reset detected");
     doubleResetWiFi = 1;
@@ -2667,6 +2672,7 @@ void setup() {
     pinMode(BLUELED_PIN, OUTPUT);
     if ((doubleResetData & 0xFF) != 0xFF) doubleResetData += 1;
   } else if ((doubleResetData & 0xFFFFFF00) == 0x55555500) {
+    // regular reboot detected
     if ((doubleResetData & 0xFF) != 0xFF) doubleResetData += 1;
     doubleResetData ^= 0xFFFFFF00;
   } else {
@@ -2830,8 +2836,12 @@ void setup() {
 #endif /* WIFIPORTAL_TIMEOUT */
 
     if (doubleResetWiFi) {
-      doubleResetData ^= 0xFFFFFF00;
-      ESP.rtcUserMemoryWrite(doubleResetAddress, &doubleResetData, sizeof(doubleResetData));
+      // prevent double-reset AP upon next restart
+      if (!doubleResetDataDone) {
+        doubleResetDataDone = 1;
+        doubleResetData ^= 0xFFFFFF00;
+        ESP.rtcUserMemoryWrite(doubleResetAddress, &doubleResetData, sizeof(doubleResetData));
+      }
       if (!wifiManager.startConfigPortal(WIFIMAN_SSID2, WIFIMAN_PASSWORD)) {
         Serial.println("failed to connect and hit timeout");
         delay(3000);
@@ -2841,8 +2851,15 @@ void setup() {
         delay(5000);
       }
     }
+    // give user some time to perform double-reset
+    if (!doubleResetDataDone) {
+      delay(500);
+      doubleResetDataDone = 1;
+      doubleResetData ^= 0xFFFFFF00;
+      ESP.rtcUserMemoryWrite(doubleResetAddress, &doubleResetData, sizeof(doubleResetData));
+    }
     if (!wifiManager.autoConnect(EE.wifiManager_SSID, EE.wifiManager_password)) {
-      Serial_println(F("* [ESP] Failed to connect and hit timeout, resetting"));
+      Serial_println(F("* [ESP] Failed to connect and hit AP timeout, resetting"));
       // Reset and try again
       saveRebootReason(REBOOT_REASON_WIFIMAN2);
       ESP.reset();
@@ -3105,11 +3122,6 @@ void setup() {
   checkParam();
   loadData();
   printfTopicS("Setup ready");
-  if (!doubleResetDataDone) {
-    doubleResetDataDone = 1;
-    doubleResetData ^= 0xFFFFFF00;
-    ESP.rtcUserMemoryWrite(doubleResetAddress, &doubleResetData, sizeof(doubleResetData));
-  }
 }
 
 void process_for_mqtt(byte* rb, int n) {
