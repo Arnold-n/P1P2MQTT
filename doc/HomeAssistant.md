@@ -12,7 +12,7 @@ You can delete old MQTT topics and rebuild the new ones with the MQTT_Delete_Own
 
 The EEPROM data in the ESP includes MQTT server credentials and should survive a firmware update, but if that fails (especially for rc candidates shared by mail), you may encounter a bridge which connects to WiFi but not to MQTT. In that case you can either
 -telnet to the bridge, and use the commands `P7 IPv4-MQTT-server`, and if necessary also `P8 MQTT-port-nr`, `P9 MQTT-username` and `P10 MQTT-password`, or
--double-tap the reset-button until the blue LED lights up, connect to the AP  with SSID `P1P2` and password `P1P2P3P4`, and enter WiFi and MQTT server credentials.
+-double-tap the reset-button until the blue LED lights up, connect to the AP  with SSID `P1P2MQTT-2x` and password `P1P2P3P4`, and enter WiFi and MQTT server credentials.
 
 ##### Set up MQTT server
 
@@ -30,11 +30,12 @@ The P1P2MQTT bridge can be connected in parallel to your room thermostat, either
 
 ##### Power on Daikin system
 
-A WiFi Access Point with SSID `P1P2` should become available.
+A WiFi Access Point with SSID `P1P2MQTT` (or `P1P2MQTT-2x` after a double-reset) should become available.
+
 
 ##### Provide WiFi and MQTT server credentials
 
-Connect to the AP `P1P2` (default password `P1P2P3P4`) and enter WiFi credentials, and do not forget to also provide MQTT server credentials at the same time.
+Connect to the AP `P1P2MQTT` or `P1P2MQTT-2x`. Default password for `P1P2MQTT` is `P1P2P3P4` but you can change it later. Password for `P1P2MTT-2x` is `P1P2P3P4` but cannot be changed. After connecting, enter WiFi credentials, and do not forget to also provide MQTT server credentials at the same time.
 
 If you use the MQTT server from HA and do not know its IPv4 address, it can be found under `Settings`/`System`/`Network`/`Configure network interfaces`/`3-dots`/`IP-information`. Default port is 1883, MQTT user is `P1P2` and MQTT password is what you entered yourself.
 
@@ -111,9 +112,9 @@ To limit the number of write instructions to your Daikin, a `Write_Budget` is av
 
 If the red LED flashes in the P1P2MQTT bridge, this signals read errors or bus collission errors. You can telnet to the P1P2MQTT bridge to find out why.
 
-If the P1P2MQTT bridge fails to connect to WiFi, it will recreate the AP, with a SSID/password (default `P1P2`/`P1P2P3P4`, unless it was reconfigured by you), and you can re-enter all credentials.
+If the P1P2MQTT bridge fails to connect to WiFi, it will recreate the AP, with a SSID/password (default `P1P2MQTT`/`P1P2P3P4`, unless the password was reconfigured by you), and you can re-enter all credentials.
 
-If the P1P2MQTT bridge connects to WiFi but not to the MQTT server, you can double-reset the bridge to recreate the original AP (always with default SSID/password `P1P2`/`P1P2P3P4`) and you can re-enter WiFi and MQTT credentials.
+If the P1P2MQTT bridge connects to WiFi but not to the MQTT server, you can double-reset the bridge to recreate the original AP (always with default SSID/password `P1P2MQTT-2x`/`P1P2P3P4`) and you can re-enter WiFi and MQTT credentials.
 
 If the P1P2MQTT bridge cannot be put in `Control_Function` (if the switch bounces back), you can telnet to the P1P2MQTT bridge to find out if there are any informational or error messages.
 
@@ -250,6 +251,8 @@ On (some?) newer Altherma 3 R models, Quiet\_Level monitors the current quiet st
 | Production_Gasboiler                     | Gas boiler or backup heater heat production (flow * delta-T, with offset correction on temperature sensors)
 | Production_Heatpump                      | Heat pump (without backup heater) heat production (flow * delta-T, with offset correction on temperature sensors)
 
+Note: Consumption_Heatpump is based on P1P2/P/meter/U/9/Electricity_Power which is a MQTT topic to be provided by an external electricity meter for the outside unit's compressor (so without BUH). It is required for the calculation of COP_Realtime.
+
 ##### HC_COP
 
 | Function                                 | Description
@@ -258,6 +261,8 @@ On (some?) newer Altherma 3 R models, Quiet\_Level monitors the current quiet st
 | COP_Before_Bridge                        | Average COP over lifetime of Daikin until P1P2MQTT bridge locked consumtion/production counters (EEPROM_ESP_Set_Cons_Prod_Counters)
 | COP_Before_Bridge                        | Average COP over lifetime of Daikin afterP1P2MQTT bridge locked consumtion/production counters
 | COP_Realtime                             | Real-time COP based on Production_Heatpump/Consumption_Heatpump
+
+Note: COP_Realtime is only calculated if Consumption_Heatpump is (regularly) provided by an external electricity meter via MQTT.
 
 ##### HC_Meters
 
