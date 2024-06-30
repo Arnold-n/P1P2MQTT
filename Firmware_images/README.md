@@ -12,7 +12,7 @@ These images are for the P1P2MQTT bridge (previously called P1P2-ESP-interface).
 
 Minimal recommended upgrade is v0.9.46 for P1P2Monitor; older versions do not work with P1P2MQTT-bridge >=v0.9.46. 
 
-P1P2Monitor v0.9.53 adds buffered commands.
+P1P2Monitor v0.9.53 does not yet add buffered commands, but a future version will.
 
 P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and FDY/FDYQ/FXMQ F-series. Monitoring is also available for certain F-series models (using the generic F-series firmware).
 

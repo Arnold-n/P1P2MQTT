@@ -18,6 +18,8 @@ The E command format is `E <packet-type> <parameter-number> <new-value>`, all va
 
 Multiple commands can be given in one line with `E <packet-type1> <parameter-number1> <new-value1>  <packet-type2> <parameter-number2> <new-value2>`.
 
+Please pause for a few seconds between commands as commands are not yet buffered (buffering will be added in a future version).
+
 If you hate spaces, you may concatenate these using a 2-char packet-type and 4-byte parameter number: `E35 2F 0` becomes `E35002F0`
 
 Some example parameters and commands:

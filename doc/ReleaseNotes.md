@@ -1,7 +1,9 @@
 **Release notes**
 
-v0.9.53 P1P2Monitor
+(planned, not yet available) P1P2Monitor
 - Buffered writes
+
+v0.9.53 P1P2Monitor
 - 'KLICDA'-style counter request by cycle stealing supported, configurable via 'q' command
 
 v0.9.53 P1P2MQTT bridge
