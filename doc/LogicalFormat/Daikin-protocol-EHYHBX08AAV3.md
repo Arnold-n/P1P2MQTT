@@ -468,7 +468,7 @@ These 2 parameters frequently differ by 1 or by 4 positions in parameter number.
 |  0027         | 01                            | ?
 |  002D         | 00/01                         | heating/cooling off/on  (on some systems: setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on)
 |  002E         | 00/01                         | heating/cooling off/on
-|  002F         | 00/01                         | heating/cooling off/on  (on some systems: setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on)
+|  002F         | 00/01                         | heating/cooling off/on  (on some systems: setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on) LWT-MODE
 |  0030         | 00/01                         | heating/cooling off/on
 |  0031         | 00/01                         | heating/cooling off/on  (on some systems: setting this parameter in a 40Fx35 response to 0x00/0x01 switches heating/cooling off/on)
 |  0032         | 00/01                         | heating/cooling off/on
