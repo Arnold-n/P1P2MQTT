@@ -16,7 +16,7 @@ P1P2Monitor v0.9.53 does not yet add buffered commands, but a future version wil
 
 P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and FDY/FDYQ/FXMQ F-series. Monitoring is also available for certain F-series models (using the generic F-series firmware).
 
-[P1P2Monitor v0.9.53 for Daikin E-series](P1P2Monitor-v0.9.53-Daikin-E.ino.hex)
+[P1P2Monitor v0.9.54 for Daikin E-series](P1P2Monitor-v0.9.54-Daikin-E.ino.hex)
 
 [P1P2Monitor v0.9.53 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.53-Daikin-F.ino.hex)
 

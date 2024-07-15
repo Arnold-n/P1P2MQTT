@@ -74,7 +74,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "P1P2Monitor v0.9.54rc1"
+#define WELCOMESTRING "P1P2Monitor v0.9.54"
 #define SW_PATCH_VERSION 54
 #define SW_MINOR_VERSION 9
 #define SW_MAJOR_VERSION 0
@@ -166,9 +166,16 @@
 #define EEPROM_ADDRESS_WRITE_BUDGET_PERIOD  0x06 // 1 byte for write budget period
 #define EEPROM_ADDRESS_INITIAL_WRITE_BUDGET 0x07 // 1 byte for initial write budget
 #define EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY 0x08 // 1 byte for counter cycle stealing delay (0=off, 9 seems to work om some models, use with care!)
-
+// skip 0x09 for EEPROM_ADDRESS_VERSION
+#ifdef E_SERIES
+#define EEPROM_ADDRESS_ROOM_TEMPERATURE_LSB 0x0A // roomTemperature & 0xFF
+#define EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB 0x0B // (roomTemperature >> 8) & 0x7F | (insertRoomTemperature ? 0x80 : 0x00)
+#define INIT_ROOM_TEMPERATURE_LSB 200 // 20.0C
+#define INIT_ROOM_TEMPERATURE_MSB 0   // off
+#endif /* E_SERIES */
 #endif /* EF_SERIES */
-                                                // 0x08 and 0x0A-0x0F reserved
+
+
 #define EEPROM_ADDRESS_VERSION             0x09
 #define EEPROM_ADDRESS_SIGNATURE           0x10 // should be last, in view of unspecified strlen(EEPROM_SIGNATURE)
 

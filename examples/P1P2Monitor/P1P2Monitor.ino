@@ -189,10 +189,17 @@ void initEEPROM() {
 #endif /* EF_SERIES */
   }
   if (EEPROM.read(EEPROM_ADDRESS_VERSION) == 0) {
-    EEPROM.update(EEPROM_ADDRESS_VERSION, 1);
+    // EEPROM.update(EEPROM_ADDRESS_VERSION, 1);
 #ifdef EF_SERIES
     EEPROM.update(EEPROM_ADDRESS_INITIAL_WRITE_BUDGET, INIT_WRITE_BUDGET);
 #endif /* EF_SERIES */
+  }
+  if (EEPROM.read(EEPROM_ADDRESS_VERSION) < 2) {
+    EEPROM.update(EEPROM_ADDRESS_VERSION, 2);
+#ifdef E_SERIES
+    EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_LSB, INIT_ROOM_TEMPERATURE_LSB);
+    EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB, INIT_ROOM_TEMPERATURE_MSB);
+#endif /* E_SERIES */
   }
 }
 
@@ -341,6 +348,13 @@ void printWelcomeString(byte ign) {
   } else {
     Serial.println(F("* Counter cycle stealing inactive"));
   }
+  Serial.print(F("* Room Temperature insertion function "));
+  if (insertRoomTemperature) {
+    Serial.print(F("on: "));
+  } else {
+    Serial.print(F("off: "));
+  }
+  Serial.println(roomTemperature * 0.1);
 #endif /* E_SERIES */
 }
 
@@ -395,6 +409,8 @@ void setup() {
 #ifdef E_SERIES
   counterRepeatingRequest = EEPROM.read(EEPROM_ADDRESS_COUNTER_STATUS);
   counterCycleStealDelay = EEPROM.read(EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY);
+  roomTemperature = ((EEPROM.read(EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB) & 0x7F) << 8) | EEPROM.read(EEPROM_ADDRESS_ROOM_TEMPERATURE_LSB);
+  insertRoomTemperature = (EEPROM.read(EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB) & 0x80) >> 7;
 #endif /* E_SERIES */
 #ifdef MHI_SERIES
   mhiFormat  = EEPROM.read(EEPROM_ADDRESS_MHI_FORMAT);
@@ -934,22 +950,27 @@ byte wr_busy = 0;
                       }
                       break;
             case 'f':
-            case 'F': Serial.print(F("* Room Temperature insertion function "));
+            case 'F': Serial_print(F("* Room Temperature insertion function "));
                       {
                         int l;
                         int n;
                         if ((l = sscanf(RSp, "%hhd%n", &insertRoomTemperature, &n)) > 0) {
                           switch (insertRoomTemperature) {
+                            case 0  : Serial_println(F("switched off"));
+                                      EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB, (roomTemperature >> 8) & 0x7F);
+                                      break;
                             default : // fall-through
-                            case 0  : Serial_println(F("switched off")); break;
                             case 1  : Serial_print(F("switched on, temp "));
                                       if ((l = sscanf(RSp + n, "%d", &roomTemperature)) > 0) {
+                                        roomTemperature &= 0x7FFF; // ignore most-significant bit, should be 0
                                         Serial_print(F("set to "));
                                         Serial_println(roomTemperature * 0.1);
+                                        EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_LSB, roomTemperature & 0xFF);
                                       } else {
                                         Serial_print(F(" is "));
                                         Serial_println(roomTemperature * 0.1);
                                       }
+                                      EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB, (roomTemperature >> 8) /* & 0x7F not needed */ | 0x80);
                                       break;
                           }
                           break;
@@ -1980,8 +2001,8 @@ byte wr_busy = 0;
                         if (insertRoomTemperature) {
                           WB[w++] = 0x02; // param 0x0002
                           WB[w++] = 0x00;
-                          WB[w++] = (insertRoomTemperature >> 8 ) & 0xFF;
-                          WB[w++] =  insertRoomTemperature         & 0xFF;
+                          WB[w++] =  roomTemperature        & 0xFF;
+                          WB[w++] = (roomTemperature >> 8 ) & 0x7F;
                         }
                         for (byte i = 0; i < wr_n; i++) {
                           if ((wr_cnt[i])  && (wr_pt[i]  == RB[2]) && ((!insertRoomTemperature) || (wr_nr[i] != 0x0002))) {
@@ -1989,7 +2010,6 @@ byte wr_busy = 0;
                             WB[w++] = wr_nr[i] >> 8;
                             WB[w++] = wr_val[i] & 0xFF;
                             WB[w++] = (wr_val[i] >> 8) & 0xFF;
-Serial_print(F("* write 0x36 nr ")); Serial_println(i);
                           }
                           if (w >= n) {
                             if (i + 1 < wr_n) Serial_println(F("* >5 writes in 0x36 not possible, skipping some"));
