@@ -146,6 +146,8 @@ Header: 000011
 |     5   | 00                 | ?
 |     6   | 00                 | ?
 |     7   | 00                 | ?
+|     8   | 00                 | (only on some newer systems)
+|     9   | 00                 | (only on some newer systems)
 
 ### Packet type 11: response
 
