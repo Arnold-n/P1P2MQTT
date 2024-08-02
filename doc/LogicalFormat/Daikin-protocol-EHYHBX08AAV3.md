@@ -66,7 +66,7 @@ Header: 000010
 |     4    | 00                 | ?                        |
 |     5    | 00                 | ?                        |
 |     6    | 00                 | ?                        |
-|   7-8    | 13 05              | Target room temperature  | f8.8
+|   7-8    | 14 00              | Room heating setpoint    | f8/8
 | 9:7-6    | 00 - 11            | Quiet level (0-3)        | bits
 | 9:5      | 0/1                | Heating/Cooling automatic mode | bit
 | 9:others | 0                  | ?                        | bit
@@ -77,8 +77,7 @@ Header: 000010
 |12:others | 0                  | ?                        | bit
 |    13    | 00                 | ?                        |
 |    14    | 00                 | ?                        |
-|    15    | 0F                 | ?                        | flag8/bits?
-|    16    | 00                 | ?                        |
+| 15-16    | 16 00              | Room cooling setpoint    | f8/8
 |17:6      | 0/1                | operation (off/on)       | bit
 |17:1      | 0/1                | booster (off/on)         | bit
 |17:others | 0                  | ?                        | bit
@@ -108,9 +107,9 @@ Header: 400010
 | 3:0      | 0/1                | status 3-way valve (off/on)   | bit
 | 3:others | 0                  | ?                        | bit
 | 4-5      | 3C                 | DHW target temperature   | f8s8
-| 6        | 0F                 | ?                        | u8 / flag8?
+| 6        | 16                 | Room cooling setpoint    | f8/8
 | 7        | 00                 | ?
-| 8        | 14                 | Target room temperature  | u8 / f8.8?
+| 8        | 14                 | Room heating setpoint    | f8/8
 | 9        | 00                 | ?
 |10        | 1A                 | ?
 |11:2      | 0/1                | Quiet mode (off/on)      | bit

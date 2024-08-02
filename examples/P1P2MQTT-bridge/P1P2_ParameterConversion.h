@@ -3022,10 +3022,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     HATEMP1;
                     KEY2_PUB_CONFIG_CHECK_ENTITY("DHW_Setpoint_1");
                     VALUE_f8s8_LE;
-        case    6 : bcnt = 11; BITBASIS_UNKNOWN;
-        case    7 : UNKNOWN_BYTE;
+                    // bcnt = 11 no longer used here
+        case    6 : return 0;
+        case    7 : SUBDEVICE("_Room");                                        HATEMP1;                                     KEY2_PUB_CONFIG_CHECK_ENTITY("Room_Cooling_Setpoint_2");                   VALUE_f8s8_LE;
         case    8 : return 0;
-        case    9 : SUBDEVICE("_Room");                              HACONFIG; HATEMP1;                                     KEY2_PUB_CONFIG_CHECK_ENTITY("Room_Setpoint");                             VALUE_f8s8_LE;
+        case    9 : SUBDEVICE("_Room");                                        HATEMP1;                                     KEY2_PUB_CONFIG_CHECK_ENTITY("Room_Heating_Setpoint_2");                   VALUE_f8s8_LE;
         case   10 : switch (bitNr) {
           case    8 : bcnt = 12; BITBASIS;
           case    5 :                                                                                                       KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_HC_Auto");
