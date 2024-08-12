@@ -2277,6 +2277,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 WB[7] = 0x00;
                 WB[8] = 0x00;
                 WB[9] = 0x00;
+                WB[10] = 0x00;
                 // for now, don't support write: for (byte i = 0; i < wr_n; i++) { if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; wr_cnt[i]--; };
                 break;
               }
