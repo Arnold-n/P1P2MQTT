@@ -74,10 +74,15 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "P1P2Monitor v0.9.54"
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 #define SW_PATCH_VERSION 54
 #define SW_MINOR_VERSION 9
 #define SW_MAJOR_VERSION 0
+
+#define VERSIONSTRING TOSTRING(SW_MAJOR_VERSION) "." TOSTRING(SW_MINOR_VERSION) "." TOSTRING(SW_PATCH_VERSION) "rc1"
+#define WELCOMESTRING "P1P2Monitor v" VERSIONSTRING
 
 #ifdef MHI_SERIES
 #define INIT_MHI_FORMAT 1 // 1 (default) for conversion from/to 3-bit-per-byte format with check-sum, 0 for raw data

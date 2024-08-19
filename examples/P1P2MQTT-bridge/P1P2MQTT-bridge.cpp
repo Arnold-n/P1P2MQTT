@@ -52,7 +52,7 @@
  * Additionally, it can reset and program the ATmega328P if corresponding connections are available
  */
 
-#include "ESPTelnet.h"
+#include <ESPTelnet.h>
 #include "P1P2_Config.h"
 #include "P1P2_NetworkParams.h"
 #include "P1P2_HomeAssistant.h"
@@ -669,6 +669,17 @@ int16_t mqttBufferReadChar (void) {
   mqttBufferFree++;
   return c;
 }
+
+// forwad declarations
+void saveRebootReason(const byte x);
+byte rebootReason(void);
+void saveRTC(void);
+void process_for_mqtt(byte* rb, int n);
+void printWelcome(void);
+void reportState(void);
+void configTZ (void);
+void buildMqttTopic();
+
 
 uint16_t snprintfLength = 0;
 uint16_t snprintfLengthMax = 0;

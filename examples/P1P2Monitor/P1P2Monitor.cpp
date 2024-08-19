@@ -455,7 +455,7 @@ void setup() {
 
 // scanint and scanhex are used to save dynamic memory usage in main loop
 int scanint(char* s, uint16_t &b) {
-  return sscanf(s,"%d",&b);
+  return sscanf(s,"%hu",&b);
 }
 
 int scanhex(char* s, uint16_t &b) {
