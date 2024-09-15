@@ -4894,7 +4894,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     if (pubHa) {
                       HADEVICE_CLIMATE;
                       // temps, byte 6 in 40F038
-                      HADEVICE_CLIMATE_TEMPERATURE("S/2/Setpoint_Cooling", 14, 28, 1); // only visible in L1(/L5) mode, not in L0 mode // other values in cooling mode?
+                      HADEVICE_CLIMATE_TEMPERATURE("S/2/Setpoint_Cooling", EE.setpointCoolingMin, EE.setpointCoolingMax, 1); // only visible in L1(/L5) mode, not in L0 mode // other values in cooling mode?
                       HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/0/Temperature_Room");
                       HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'F3802%02X'|format(value|int)}}");
                       // modes byte 0 (off/on) and 1 (mode) in 40F038
@@ -4928,7 +4928,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     if (pubHa) {
                       HADEVICE_CLIMATE;
                       // temps, byte 6 in 40F038
-                      HADEVICE_CLIMATE_TEMPERATURE("S/2/Setpoint_Heating", 14, 28, 1); // only visible in L1(/L5) mode, not in L0 mode
+                      HADEVICE_CLIMATE_TEMPERATURE("S/2/Setpoint_Heating", EE.setpointHeatingMin, EE.setpointHeatingMax, 1); // only visible in L1(/L5) mode, not in L0 mode
                       HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/0/Temperature_Room");
                       HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'F3806%02X'|format(value|int)}}");
                       // modes byte 0 (off/on) and 1 (mode) in 40F038
@@ -5036,7 +5036,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     if (pubHa) {
                       HADEVICE_CLIMATE;
                       // temps, byte 6 in 40F038
-                      HADEVICE_CLIMATE_TEMPERATURE("S/2/Setpoint_Cooling", 14, 28, 1); // only visible in L1(/L5) mode, not in L0 mode // other values in cooling mode?
+                      HADEVICE_CLIMATE_TEMPERATURE("S/2/Setpoint_Cooling", EE.setpointCoolingMin, EE.setpointCoolingMax, 1); // only visible in L1(/L5) mode, not in L0 mode // other values in cooling mode?
                       HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/0/Temperature_Room");
                       HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'F3B02%02X'|format(value|int)}}");
                       // modes byte 0 (off/on) and 1 (mode) in 40F03B
@@ -5069,7 +5069,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                     if (pubHa) {
                       HADEVICE_CLIMATE;
                       // temps, byte 6 in 40F038
-                      HADEVICE_CLIMATE_TEMPERATURE("S/2/Setpoint_Heating", 14, 28, 1); // only visible in L1(/L5) mode, not in L0 mode
+                      HADEVICE_CLIMATE_TEMPERATURE("S/2/Setpoint_Heating", EE.setpointHeatingMin, EE.setpointHeatingMax, 1); // only visible in L1(/L5) mode, not in L0 mode
                       HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/0/Temperature_Room");
                       HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'F3B06%02X'|format(value|int)}}");
                       // modes byte 0 (off/on) and 1 (mode) in 40F03B

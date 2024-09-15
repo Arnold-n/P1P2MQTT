@@ -173,7 +173,9 @@ typedef struct EEPROMSettings {
 #endif /* E_SERIES */
 #define RESERVED_LEN 80
   char reservedText[ RESERVED_LEN ];
+#ifdef E_SERIES
   byte useR1T; // use R1T instead of R2T
+#endif /* E_SERIES */
   byte useTZ;
 #define TZ_STRING_LEN 50
   char userTZ[ TZ_STRING_LEN ];
@@ -184,6 +186,12 @@ typedef struct EEPROMSettings {
   bool haSetup;
 #endif /* E_SERIES */
   bool minuteTimeStamp;
+#ifdef F_SERIES
+  uint8_t setpointCoolingMin;
+  uint8_t setpointCoolingMax;
+  uint8_t setpointHeatingMin;
+  uint8_t setpointHeatingMax;
+#endif /* F_SERIES */
 };
 
 EEPROMSettings EE;
@@ -213,6 +221,12 @@ bool factoryReset = 0;
 #define xstr(s) str(s)
 #define str(s) #s
 #endif /* E_SERIES */
+#ifdef F_SERIES
+#define PARAM_SETPOINT_COOLING_MIN 35
+#define PARAM_SETPOINT_COOLING_MAX 36
+#define PARAM_SETPOINT_HEATING_MIN 37
+#define PARAM_SETPOINT_HEATING_MAX 38
+#endif /* F_SERIES */
 
 // wifiManager
 const char paramName_00[] PROGMEM = "wifiManager SSID        ";
@@ -298,6 +312,14 @@ const char paramName_47[] PROGMEM = "HA dashboard setup      "; // PARAM_HA_SETU
 const char paramName_48[] PROGMEM = "Minute timestamp only   ";
 #endif /* E_SERIES */
 
+#ifdef F_SERIES
+// Configurable min/max cooling/heating
+const char paramName_35[] PROGMEM = "Setpoint cooling minimum"; // PARAM_SETPOINT_COOLING_MIN
+const char paramName_36[] PROGMEM = "Setpoint cooling maximum"; // PARAM_SETPOINT_COOLING_MAX
+const char paramName_37[] PROGMEM = "Setpoint heating minimum"; // PARAM_SETPOINT_HEATING_MIN
+const char paramName_38[] PROGMEM = "Setpoint heating maximum"; // PARAM_SETPOINT_HEATING_MAX
+#endif /* F_SERIES */
+
 const char* const paramName[] PROGMEM = {
   paramName_00,
   paramName_01,
@@ -353,6 +375,12 @@ const char* const paramName[] PROGMEM = {
   paramName_47,
   paramName_48,
 #endif /* E_SERIES */
+#ifdef F_SERIES
+  paramName_35,
+  paramName_36,
+  paramName_37,
+  paramName_38,
+#endif /* F_SERIES */
 };
 
 typedef enum {
@@ -418,6 +446,12 @@ const paramTypes PROGMEM paramType[] = {
   P_BOOL,
   P_BOOL,
 #endif /* E_SERIES */
+#ifdef F_SERIES
+  P_UINT,
+  P_UINT,
+  P_UINT,
+  P_UINT,
+#endif /* F_SERIES */
 };
 
 const int PROGMEM paramSize[] = {
@@ -475,6 +509,12 @@ const int PROGMEM paramSize[] = {
   1,
   1,
 #endif /* E_SERIES */
+#ifdef F_SERIES
+  1,
+  1,
+  1,
+  1,
+#endif /* F_SERIES */
 };
 
 const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: max-length (length includes \0)
@@ -532,6 +572,12 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   1,
   1,
 #endif /* E_SERIES */
+#ifdef F_SERIES
+  40,
+  40,
+  40,
+  40,
+#endif /* F_SERIES */
 };
 
 char* const PROGMEM paramLocation[] = {
@@ -589,6 +635,12 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.haSetup,
   (char*) &EE.minuteTimeStamp,
 #endif /* E_SERIES */
+#ifdef F_SERIES
+  (char*) &EE.setpointCoolingMin,
+  (char*) &EE.setpointCoolingMax,
+  (char*) &EE.setpointHeatingMin,
+  (char*) &EE.setpointHeatingMax,
+#endif /* F_SERIES */
 };
 
 #define outputUnknown (EE.outputMode & 0x0008)
@@ -1812,6 +1864,17 @@ void printModifyParam(byte paramNr, bool modParam = false, int32_t newValue = 0,
   }
   if (modParam && (paramNr == PARAM_HA_SETUP)) unSeen();
 #endif /* E_SERIES */
+
+#ifdef F_SERIES
+  if (modParam && ((paramNr == PARAM_SETPOINT_COOLING_MIN) || (paramNr == PARAM_SETPOINT_COOLING_MAX))) {
+    registerUnseenByte(0x00, 0x38, 4);
+    registerUnseenByte(0x40, 0x3B, 4);
+  }
+  if (modParam && ((paramNr == PARAM_SETPOINT_HEATING_MIN) || (paramNr == PARAM_SETPOINT_HEATING_MAX))) {
+    registerUnseenByte(0x00, 0x38, 8);
+    registerUnseenByte(0x40, 0x3B, 8);
+  }
+#endif /* F_SERIES */
   if (modParam && ((paramNr == PARAM_USE_TZ) || (paramNr == PARAM_USER_TZ))) configTZ();
   delay(10);
 }
@@ -1855,6 +1918,25 @@ void reconnectMQTT() {
 
 WiFiManager wifiManager;
 IPAddress local_ip;
+
+#ifdef E_SERIES
+void configOffset(void) {
+  registerUnseenByte(0x00, 0x11, 1);
+  registerUnseenByte(0x40, 0x11, 13);
+  registerUnseenByte(0x40, 0x11, 9);
+  registerUnseenByte(0x40, 0x11, 1);
+  registerUnseenByte(0x40, 0x11, 7);
+}
+#endif /* E_SERIES */
+
+#ifdef F_SERIES
+void configMinMax(void) {
+  registerUnseenByte(0x00, 0x38, 4);
+  registerUnseenByte(0x40, 0x3B, 4);
+  registerUnseenByte(0x00, 0x38, 8);
+  registerUnseenByte(0x40, 0x3B, 8);
+}
+#endif /* F_SERIES */
 
 extern "C" uint32_t _EEPROM_start;
 #define EEPROM_sector (((uint32_t)&_EEPROM_start - 0x40200000) / SPI_FLASH_SEC_SIZE)
@@ -1915,8 +1997,8 @@ void loadEEPROM() {
     EE.static_nm[0] = '\0';
   }
   if (EE.EE_version < 1) {
-    delayedPrintfTopicS("Upgrade EEPROM_version to 1");
-    EE.EE_version = 1;
+    // delayedPrintfTopicS("Upgrade EEPROM_version to 1");
+    // EE.EE_version = 1;
     strlcpy(EE.wifiManager_SSID, WIFIMAN_SSID1, WIFIMAN_SSID_LEN);
     strlcpy(EE.wifiManager_password, WIFIMAN_PASSWORD, WIFIMAN_PASSWORD_LEN);
     strlcpy(EE.mdnsName, MDNS_NAME, MDNS_NAME_LEN);
@@ -1950,24 +2032,27 @@ void loadEEPROM() {
     EE.R4Toffset = INIT_R4T_OFFSET;
     EE.RToffset = INIT_RT_OFFSET;
     EE.useTotal = INIT_USE_TOTAL; // 0=use compressor-heating for COP-lifetime, 1=use total for COP-lifetime
+    configOffset();
 #endif /* E_SERIES */
 #define RESERVED_TEXT ""
     strlcpy(EE.reservedText, RESERVED_TEXT, RESERVED_LEN);
   }
   if (EE.EE_version < 2) {
-    delayedPrintfTopicS("Upgrade EEPROM_version to 2");
-    EE.EE_version = 2;
+    // delayedPrintfTopicS("Upgrade EEPROM_version to 2");
+    // EE.EE_version = 2;
+#ifdef E_SERIES
     EE.useR1T = 0;
+#endif /* E_SERIES */
   }
   if (EE.EE_version < 3) {
-    delayedPrintfTopicS("Upgrade EEPROM_version to 3");
-    EE.EE_version = 3;
+    // delayedPrintfTopicS("Upgrade EEPROM_version to 3");
+    // EE.EE_version = 3;
     EE.useTZ = 2;
     EE.userTZ[0] = '\0';
   }
   if (EE.EE_version < 4) {
-    delayedPrintfTopicS("Upgrade EEPROM_version to 4");
-    EE.EE_version = 4;
+    // delayedPrintfTopicS("Upgrade EEPROM_version to 4");
+    // EE.EE_version = 4;
 #ifdef E_SERIES
     EE.electricityConsumedCompressorHeating1 = 0;
     EE.energyProducedCompressorHeating1 = 0;
@@ -1976,25 +2061,31 @@ void loadEEPROM() {
 #endif /* E_SERIES */
   }
   if (EE.EE_version < 5) {
-    delayedPrintfTopicS("Upgrade EEPROM_version to 5");
-    EE.EE_version = 5;
+    // delayedPrintfTopicS("Upgrade EEPROM_version to 5");
+    // EE.EE_version = 5;
 #ifdef E_SERIES
     EE.minuteTimeStamp = 0;
 #endif /* E_SERIES */
+    // EE.EE_size = sizeof(EE); // EE_size never used - and not really needed, relying on EE_version and EE.signature
+  }
+  if (EE.EE_version < 6) {
+    // delayedPrintfTopicS("Upgrade EEPROM_version to 6");
+    // EE.EE_version = 6;
+#ifdef F_SERIES
+    EE.setpointCoolingMin = INIT_SETPOINT_COOLING_MIN;
+    EE.setpointCoolingMax = INIT_SETPOINT_COOLING_MAX;
+    EE.setpointHeatingMin = INIT_SETPOINT_HEATING_MIN;
+    EE.setpointHeatingMax = INIT_SETPOINT_HEATING_MAX;
+    configMinMax();
+#endif /* F_SERIES */
     EE.EE_size = sizeof(EE); // EE_size never used - and not really needed, relying on EE_version and EE.signature
+  }
+  if (EE.EE_version < 6) {
+    delayedPrintfTopicS("Upgrade EEPROM_version to 6");
+    EE.EE_version = 6;
     saveEEPROM();
   }
 }
-
-#ifdef E_SERIES
-void configOffset(void) {
-  registerUnseenByte(0x00, 0x11, 1);
-  registerUnseenByte(0x40, 0x11, 13);
-  registerUnseenByte(0x40, 0x11, 9);
-  registerUnseenByte(0x40, 0x11, 1);
-  registerUnseenByte(0x40, 0x11, 7);
-}
-#endif /* E_SERIES */
 
 void handleCommand(char* cmdString) {
 // handles a single command (not necessarily '\n'-terminated) received via telnet or MQTT (P1P2/W)
@@ -2093,6 +2184,9 @@ void handleCommand(char* cmdString) {
 #ifdef E_SERIES
                          configOffset();
 #endif /* E_SERIES */
+#ifdef F_SERIES
+                         configMinMax();
+#endif /* F_SERIES */
                          break;
                 case 7 : if (EE_dirty) {
                            printfTopicS("Changes pending, rejecting factory reset. To abandon changes and perform factory reset: D6, then retry D7");

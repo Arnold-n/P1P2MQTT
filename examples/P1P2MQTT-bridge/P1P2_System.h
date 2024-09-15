@@ -21,4 +21,13 @@
 
 #endif /* E_SERIES */
 
+#ifdef F_SERIES
+
+#define INIT_SETPOINT_COOLING_MIN 16
+#define INIT_SETPOINT_COOLING_MAX 32
+#define INIT_SETPOINT_HEATING_MIN 16
+#define INIT_SETPOINT_HEATING_MAX 32
+
+#endif /* F_SERIES */
+
 #endif /* P1P2_System */
