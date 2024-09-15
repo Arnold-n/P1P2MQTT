@@ -604,8 +604,8 @@ typedef struct mqttSaveStruct {
 byte bcnt = 0;
 
 mqttSaveStruct M;
-#define RTC_VERSION 6
-#define M_VERSION 7
+#define RTC_VERSION 7
+#define M_VERSION 8
 
 void checkSize() {
 #ifdef E_SERIES
@@ -1849,11 +1849,10 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
  * byte 1 max
  * byte 2 offset
  * byte 3 bit 7 exponent sign
- * byte 3 bit 6 mantissa? always 0
- * byte 3 bit 5-3 mantissa
+ * byte 3 bit 6-3 mantissa (can be 10!)
  * byte 3 bit 2 exponent ?, always 0
  * byte 3 bit 1 exponent
- * byte 3 bit 0 (always 0 from/to main unit; always 1 for comm to aux controller and perhaps also 1 from aux controller))
+ * byte 3 bit 0 (always 0 from/to main unit; often 1 for comm to aux controller and perhaps also 1 from aux controller))
  *
  * dummy: 00000001 OR FFFFFFFF
 */
@@ -1862,10 +1861,10 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
   int8_t fieldSettingMin          = (payload[payloadIndex - 1] & 0x80) ? -(int8_t) (payload[payloadIndex - 1] & 0x7F) : (int8_t) payload[payloadIndex - 1];
   // byte 3 step as FP
   byte fieldSettingStepExponentSign = (payload[payloadIndex] & 0x80) >> 7;  // bit 7
-  byte fieldSettingStepMantissa = (payload[payloadIndex] & 0x38) >> 3; // perhaps &0x78 // bits (6?), 5, 4, 3
-  byte fieldSettingStepExponent = (payload[payloadIndex] & 0x02) >> 1; // perhaps &0x06 // bits (2?), 1
+  byte fieldSettingStepMantissa = (payload[payloadIndex] & 0x78) >> 3; // bits 6 - 3
+  byte fieldSettingStepExponent = (payload[payloadIndex] & 0x02) >> 1; // perhaps 0x03 or 0x07
   // byte3 unknown
-  byte fieldSettingUnknownBitsStep = payload[payloadIndex] & 0x45; // bits 6,2,0  : '1': bit0=0, '2': bit0=1. bits 6,2 always zero.
+  byte fieldSettingUnknownBitsStep = payload[payloadIndex] & 0x05; // bit2,0; bit2 always 0?; bit0 0 or 1
   // byte 0 unknown
   byte fieldSettingUnknownBitsVal  = payload[payloadIndex - 3] & 0xC0; // bits 7,6   (src='0': 0x00,0x80,0xC0; src='2': 0x00, 0xC0)
   uint16_t fieldSettingMax     = fieldSettingMin + payload[payloadIndex - 2] * (fieldSettingStepMantissa * (fieldSettingStepExponent ? (fieldSettingStepExponentSign ? 0.100001 : 10) : 1)); // <0.1 >10 not yet observed / unsure how to implement
@@ -2132,6 +2131,11 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
   if (FSB) return 0;
 
   topicWrite;
+  // Catch Daikin's (new?) use of 10E-1 instead of 1E0 for stepsize
+  if (fieldSettingStepExponentSign && (fieldSettingStepMantissa == 10)) {
+    fieldSettingStepExponentSign = 0;
+    fieldSettingStepMantissa = 1;
+  }
   if (fieldSettingStepExponentSign) {
     snprintf(mqtt_value, MQTT_VALUE_LEN, "{\"val\":%1.1f, \"min\":%i, \"max\":%i, \"stepsize\":0.%i, \"bits\":\"%i%i\", \"bitsstep\":\"0x%02X\"}", fieldSettingVal, fieldSettingMin, fieldSettingMax, fieldSettingStepMantissa, fieldSettingUnknownBitsVal >> 7, (fieldSettingUnknownBitsVal >> 6) & 0x01, fieldSettingUnknownBitsStep);
   } else {
