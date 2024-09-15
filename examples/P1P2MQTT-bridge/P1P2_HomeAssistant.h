@@ -151,7 +151,7 @@ const char* haIconString[] = {
   "mdi:water",
   "mdi:currency-eur",
   "mdi:poll",
-  "mdi:volt", // TODO
+  "mdi:current-dc", // used for interface voltage
 };
 
 const char* haUomString[] = {
