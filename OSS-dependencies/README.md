@@ -1,6 +1,6 @@
 # Source code packages for dependencies
 
-To comply with the license conditions of the BSPs and library dependencies and to ensure that you can rebuild the firmware images using the same BSP and library versions, this folder contains the BSPs and the libraries used for buidling the provided firmware images.
+To comply with the license conditions of the BSPs and library dependencies and to ensure that you can rebuild the firmware images using the same BSP and library versions, this folder contains the BSPs and the libraries used for building the provided firmware images.
 
 ## BSPs
 
