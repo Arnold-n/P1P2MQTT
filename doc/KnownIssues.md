@@ -4,7 +4,7 @@
 
  - Home Assistant sometimes transmits an outdated setpoint, giving the impression the bridge is unresponsive. This seems an issue with HA, not with the bridge
  - Some controls and entities in Home Assistant appear with a delay; this seems partly an HA issue, partly because the P1P2MQTT bridge has to discover the Daikin system capabilities first; it is recommended not to build the dashboards immediately but first wait for all controls and entities to become discovered
- - the `C1` and `C2` commands violate P1/P2 bus protocol, check your status log `P1P2/S/#` and raw data logs `P1P2/R/#` for bus collisions and other problems when using this, or the counter value of Error\_Budget in HA under HC\_Bridge (should be and remain at least 9, should not decrease), use with care!
+ - the `C1`, `C2`, and `Q` commands intentionally violate the timing of the P1/P2 bus protocol, check your status log `P1P2/S/#` and raw data logs `P1P2/R/#` for bus collisions and other problems when using this, or the counter value of Error\_Budget in HA under HC\_Bridge (should be and remain at least 9, should not decrease), use with care! The bridge should detect any issues and switch these functions off in case of bus collissions
 
 ### Software related, fixed
 
