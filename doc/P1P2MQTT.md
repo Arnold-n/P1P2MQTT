@@ -123,7 +123,7 @@ P1P2/S/P1P2MQTT/bridge0 * [MON] 2024-05-06 21:07:35 Ready setup
 
 Topics providing information or commands to P1P2MQTT:
 - P1P2/W or P1P2/W/P1P2MQTT/bridge0 :          Channel to give commands to the P1P2MQTT and indirectly to P1P2Monitor
-- P1P2/P/meter/U/9/Electricity_Active_Power : Electricity consumption in Watt, provided by an external electricity meter or another program, enabling P1P2MQTT to calculate COP values
+- P1P2/P/meter/U/9/Electricity_Power : Current electricity consumption (active power) in Watt, provided by an external electricity meter or another program, enabling P1P2MQTT to calculate COP values
 
 #### P1P2MQTT commands for ESP8266
 
