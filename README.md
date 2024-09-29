@@ -1,6 +1,6 @@
 # Control your heat pump from Home Assistant with P1P2MQTT v0.9.46 (previously P1P2Serial)
 
-With release v0.9.46 climate control is automatically configured in Home Assistant. This version comes with a lot of improvements and changes, please see the [v0.9.46 release notes](doc/v0.9.46-releasenotes.md). 
+With release v0.9.46 climate control is automatically configured in Home Assistant. This version comes with a lot of improvements and changes, please see the [v0.9.46 release notes](doc/v0.9.46-ReleaseNotes.md). 
 
 This project primarily supports Daikin systems, but also other brands with HBS-based interfaces (see below).
 
