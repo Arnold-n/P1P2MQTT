@@ -2204,7 +2204,7 @@ void handleCommand(char* cmdString) {
                          factoryReset = 0;
                          pseudo0F = 9;
                          break;
-                case 9 : printfTopicS("Resetting wifiManager settings, ESP config, and restarting ESP/wifiManager AP");
+                case 9 : printfTopicS("Resetting wifiManager settings (WiFi/MQTT credentials), ESP config, and restarting ESP/wifiManager AP");
                          wifiManager.resetSettings();
                          WiFi.disconnect(true);
                          ESP.eraseConfig();
@@ -2270,9 +2270,9 @@ void handleCommand(char* cmdString) {
                          printfTopicS("D4: reconnect to MQTT");
                          printfTopicS("D5: save modifications to EEPROM");
                          printfTopicS("D6: reload settings from EEPROM (ignore changes from this session)");
-                         printfTopicS("D7: schedule factory reset on restart ESP (to undo: D8, to confirm: D0)");
+                         printfTopicS("D7: schedule factory reset (except WiFi/MQTT credentials) on restart ESP (to undo: D8, to confirm: D0)");
                          printfTopicS("D8: undo scheduling of factory reset");
-                         printfTopicS("D9: reset wifiManager settings and restart ESP");
+                         printfTopicS("D9: reset WiFi/MQTT credentials (WiFiManager) and restart ESP");
                          printfTopicS("D10: unSeen");
                          printfTopicS("D11: initDataRTC, resetData");
                          printfTopicS("D12: delete own and rebuild retained MQTT config/data (deletes old data from all bridges)");
