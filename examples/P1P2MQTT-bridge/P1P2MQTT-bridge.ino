@@ -855,7 +855,6 @@ bool initEthernet()
 
 AsyncMqttClient mqttClient;
 
-uint32_t maxLoopTime = 0;
 uint32_t espUptime = 0;
 bool shouldSaveConfig = false;
 //#ifdef MHI_SERIES
@@ -2152,9 +2151,6 @@ void handleCommand(char* cmdString) {
                          ESP.reset();
                          delay(100);
                          break;
-                case 2 : printfTopicS("Resetting maxLoopTime");
-                         maxLoopTime = 0;
-                         break;
                 case 4 : if (mqttDeleting) {
                            printfTopicS("Please wait until mqtt-delete action is finished");
                            break;
@@ -2265,7 +2261,6 @@ void handleCommand(char* cmdString) {
                 case 99: // no argument, fall-through to:
                 default: printfTopicS("D0: restart ESP (+initDataRTC/resetData in case of factoryreset)");
                          printfTopicS("D1: reset ESP");
-                         printfTopicS("D2: reset maxLoopTime");
                          printfTopicS("D3: reset-data-structures");
                          printfTopicS("D4: reconnect to MQTT");
                          printfTopicS("D5: save modifications to EEPROM");
@@ -2275,7 +2270,7 @@ void handleCommand(char* cmdString) {
                          printfTopicS("D9: reset WiFi/MQTT credentials (WiFiManager) and restart ESP");
                          printfTopicS("D10: unSeen");
                          printfTopicS("D11: initDataRTC, resetData");
-                         printfTopicS("D12: delete own and rebuild retained MQTT config/data (deletes old data from all bridges)");
+                         printfTopicS("D12: delete own and rebuild retained MQTT config/data (deletes old data from own bridge)");
 #ifdef E_SERIES
                          printfTopicS("D13: set consumption/production counters for COP before/after bridge installation");
 #endif /* E_SERIES */
@@ -3309,7 +3304,6 @@ void loop() {
   uint32_t currMillis = millis();
   uint16_t loopTime = currMillis - prevMillis;
   milliInc += loopTime;
-  if (loopTime > maxLoopTime) maxLoopTime = loopTime;
   prevMillis = currMillis;
   while (milliInc >= 1000) {
     milliInc -= 1000;
