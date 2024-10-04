@@ -2831,7 +2831,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       QOS_SWITCH;
                       if (pubHaBit) {
                         HADEVICE_SWITCH;
-                        HADEVICE_SWITCH_PAYLOADS("E35002F00 35003100", "E35002F01 35003101");
+                        HADEVICE_SWITCH_PAYLOADS("E35002F00 35003100 35002D00", "E35002F01 35003101 35002D01");
                         HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
                         PUB_CONFIG;
                       }
@@ -2858,7 +2858,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       KEY("Climate_Room_0"); // was Altherma_ON // was Climate_LWT
                       if (pubHaBit) {
                         HADEVICE_SWITCH;
-                        HADEVICE_SWITCH_PAYLOADS("E35003100", "E35003101");
+                        HADEVICE_SWITCH_PAYLOADS("E35002F00 35003100 35002D00", "E35002F01 35003101 35002D01");
                         HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
                         PUB_CONFIG;
                       }
@@ -2901,7 +2901,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       if (pubHa) {
                         HADEVICE_SELECT;
                         HADEVICE_SELECT_OPTIONS("\"Quiet Level 0\",\"Quiet Level 1\",\"Quiet Level 2\",\"Quiet Level 3\"", "'0':'Quiet Level 0','1':'Quiet Level 1','2':'Quiet Level 2','3':'Quiet Level 3'");
-                        HADEVICE_SELECT_COMMAND_TEMPLATE("{% set modesL={'Quiet Level 1':1,'Quiet Level 2':2,'Quiet Level 3':3}%} {{   ('E3A004D%02X 3A004C02'| format( ((modesL[value])|int)-1)) if value in modesL.keys() else 'E35000100'  }} ");
+                        HADEVICE_SELECT_COMMAND_TEMPLATE("{% set modesL={'Quiet Level 1':1,'Quiet Level 2':2,'Quiet Level 3':3}%} {{   ('E3A004D%02X 3A004C02'|format( ((modesL[value])|int)-1)) if value in modesL.keys() else 'E35000100'  }} ");
                         HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
                         PUB_CONFIG;
                       }
@@ -3735,11 +3735,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_Room")
                       if (heatingMode || EE.haSetup || !(M.R.first030 & 0x01)) {
                         HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"heat\"", "'0':'off','1':'heat'")
-                        HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E350031%02X 35002F%02X'|format(((modes[value]|int) if value in modes.keys() else 0), ((modes[value]|int) if value in modes.keys() else 0))}}");
+                        HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                         if (!heatingMode) espUptime030 = espUptime;
                       } else {
                         HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                        HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E350031%02X 35002F%02X'|format(((modes[value]|int) if value in modes.keys() else 0), ((modes[value]|int) if value in modes.keys() else 0))}}");
+                        HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                       }
                       HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'E360000%04X'|format((value*10)|int)}}");
                       HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3766,11 +3766,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                       HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_Room")
                       if (coolingMode || EE.haSetup || !(M.R.first030 & 0x02)) {
                         HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"cool\"", "'0':'off','1':'cool'")
-                        HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E350031%02X 35002F%02X'|format(((modes[value]|int) if value in modes.keys() else 0), ((modes[value]|int) if value in modes.keys() else 0))}}");
+                        HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                         if (!coolingMode) espUptime030 = espUptime;
                       } else {
                         HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                        HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E350031%02X 35002F%02X'|format(((modes[value]|int) if value in modes.keys() else 0), ((modes[value]|int) if value in modes.keys() else 0))}}");
+                        HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                       }
                       HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'E360001%04X'|format((value*10)|int)}}");
                       HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3803,11 +3803,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                         }
                         if (heatingMode || EE.haSetup || !(M.R.first030 & 0x04)) {
                           HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"heat\"", "'0':'off','1':'heat'")
-                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                           if (!heatingMode) espUptime030 = espUptime;
                         } else {
                           HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                         }
                         HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{%if(value<0)%}{{'E360008%04X'|format((65536+value*10)|int)}}{%else%}{{'E360008%04X'|format((value*10)|int)}}{%endif%}")
                         HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3823,11 +3823,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                         }
                         if (heatingMode || EE.haSetup || !(M.R.first030 & 0x04)) {
                           HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"heat\"", "'0':'off','1':'heat'")
-                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                           if (!heatingMode) espUptime030 = espUptime;
                         } else {
                           HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                         }
                         HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'E360006%04X'|format((value*10)|int)}}");
                         HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3857,11 +3857,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                         }
                         if (coolingMode || EE.haSetup || !(M.R.first030 & 0x08)) {
                           HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"cool\"", "'0':'off','1':'cool'")
-                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                           if (!coolingMode) espUptime030 = espUptime;
                         } else {
                           HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                         }
                         HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{%if(value<0)%}{{'E360009%04X'|format((65536+value*10)|int)}}{%else%}{{'E360009%04X'|format((value*10)|int)}}{%endif%}")
                         HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3878,11 +3878,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                         }
                         if (coolingMode || EE.haSetup || !(M.R.first030 & 0x08)) {
                           HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"cool\"", "'0':'off','1':'cool'")
-                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                           if (!coolingMode) espUptime030 = espUptime;
                         } else {
                           HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                          HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                         }
                         HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'E360007%04X'|format((value*10)|int)}}");
                         HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3912,11 +3912,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                           HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water")
                           if (heatingMode || EE.haSetup || !(M.R.first030 & 0x10)) {
                             HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"heat\"", "'0':'off','1':'heat'")
-                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                             if (!heatingMode) espUptime030 = espUptime;
                           } else {
                             HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                           }
                           HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{%if(value<0)%}{{'E36000D%04X'|format((65536+value*10)|int)}}{%else%}{{'E36000D%04X'|format((value*10)|int)}}{%endif%}")
                           HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3933,11 +3933,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                           }
                           if (heatingMode || EE.haSetup || !(M.R.first030 & 0x10)) {
                             HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"heat\"", "'0':'off','1':'heat'")
-                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                             if (!heatingMode) espUptime030 = espUptime;
                           } else {
                             HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                           }
                           HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'E36000B%04X'|format((value*10)|int)}}");
                           HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3973,11 +3973,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                           }
                           if (coolingMode || EE.haSetup || !(M.R.first030 & 0x20)) {
                             HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"cool\"", "'0':'off','1':'cool'")
-                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                             if (!coolingMode) espUptime030 = espUptime;
                           } else {
                             HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                           }
                           HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{%if(value<0)%}{{'E36000E%04X'|format((65536+value*10)|int)}}{%else%}{{'E36000E%04X'|format((value*10)|int)}}{%endif%}")
                           HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3995,11 +3995,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                           }
                           if (coolingMode || EE.haSetup || !(M.R.first030 & 0x20)) {
                             HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"cool\"", "'0':'off','1':'cool'")
-                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'cool':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                             if (!coolingMode) espUptime030 = espUptime;
                           } else {
                             HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\"", "'0':'off','1':'off'")
-                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X'| format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
+                            HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                           }
                           HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'E36000C%04X'|format((value*10)|int)}}");
                           HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
