@@ -900,7 +900,7 @@ Field setting information request by main controller.
 |  1            | XX                            | field value maximum (in steps)   | u8
 |  2            | XX                            | field value offset               | u8
 |  3:7-1        | b0bb b0b                      | field value step size            | sfp7
-|  3:0          | b                             | 0 for communication to heat pump | bit
+|  3:0          | b                             | 0 for communication from/to heat pump | bit
 |  4-7          | XX XX XX XX                   | 2nd field setting, see bytes 0-3 | u8,u8,u8,sfp7+bit
 |  8-11         | XX XX XX XX                   | 3rd field setting, see bytes 0-3 | u8,u8,u8,sfp7+bit
 | 12-15         | XX XX XX XX                   | 4th field setting, see bytes 0-3 | u8,u8,u8,sfp7+bit
