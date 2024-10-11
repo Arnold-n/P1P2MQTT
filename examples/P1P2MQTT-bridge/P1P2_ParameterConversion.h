@@ -355,14 +355,14 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
 #define PARAM_TP_START      0x35
 #define PARAM_TP_END        0x3D
 #define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1)   // 0       1       2       3       4       5       6       7       8
-const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x017C, 0x002F, 0x0002, 0x001F, 0x00F0, 0x006C, 0x00AF, 0x0002, 0x0020 }; // number of parameters observed
+const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x017D, 0x002F, 0x0002, 0x001F, 0x00F0, 0x006C, 0x00B0, 0x0002, 0x0020 }; // number of parameters observed
 //byte packettype                                    = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
 const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      1,      1,      2,      3,      4 }; // byte per parameter // was 8-bit
-const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x017C, 0x01DA, 0x01E0, 0x025C, 0x034C, 0x03B8, 0x0516, 0x051C /* , 0x059C */ }; // valstart = sum  (parnr_bytes * nr_params)
-const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017C, 0x01AB, 0x01AD, 0x01CC, 0x02BC, 0x0328, 0x03D7, 0x03D9 /* , 0x03F9 */ }; // seenstart = sum (parnr_bytes)
+const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01DB, 0x01E1, 0x025D, 0x034D, 0x03B9, 0x0519, 0x051F /* , 0x059F */ }; // valstart = sum  (parnr_bytes * nr_params)
+const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01AC, 0x01AE, 0x01CD, 0x02BD, 0x0329, 0x03D9, 0x03DB /* , 0x03FB */ }; // seenstart = sum (parnr_bytes)
 
-#define sizeParamVal  0x059C
-#define sizeParamSeen    128 // ceil(0x03F9/8) (1016/8) = 128
+#define sizeParamVal  0x059F
+#define sizeParamSeen    128 // ceil(0x03FB/8) = ceil(1019/8) = 128
 
 #define PCKTP_START  0x0B
 #define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 to 0x16 0x20 0x21 0x60-0x9F mapped to 0x17-0x58
@@ -1456,7 +1456,7 @@ uint16_t newCheckParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr,
     return 0;
   }
   if (paramNr >= nr_params[ppti]) {
-    printfTopicS("paramNr 0x%04X > expected nr_params %i for packetType 0x%02X", paramNr, nr_params[ppti], paramPacketType);
+    printfTopicS("paramNr 0x%04X >= expected nr_params %x%04X for packetType 0x%02X", paramNr, nr_params[ppti], paramPacketType);
     return 0;
   }
   if (paramPacketType < PARAM_TP_START) {
