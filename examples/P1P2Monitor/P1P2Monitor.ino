@@ -39,7 +39,7 @@
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
- * 20241012 v0.9.55 cleanup, fix insert message, fix L99 in L0 mode
+ * 20241012 v0.9.55 cleanup, fix insert message, fix L99 in L0 mode, buffer write commands, optional mask param for Dakin F series F command
  * 20240605 v0.9.53 replace KLICDA by configurable counterCycleStealDelay
  * 20240512 v0.9.46 remove unneeded 'G' 'H' and OLD_COMMANDS, adding MHI support, remove verbosity levels, F-series model-suggestions, multiple write-commands
  * 20230604 v0.9.38 H-link2 support added to main branch
@@ -227,18 +227,20 @@ uint16_t roomTemperature = 200;
 byte save_MCUSR;
 
 #ifdef EF_SERIES
-#define WR_MAX 6
+#define WR_MAX 10
 uint8_t wr_n = 0;
-uint8_t wr_cnt[WR_MAX] = { 0, 0, 0, 0, 0, 0 };
-uint8_t wr_pt[WR_MAX] = { 0, 0, 0, 0, 0, 0 };
+uint8_t wr_cnt[WR_MAX] = { 0 };
+uint8_t wr_written[WR_MAX] = { 0 };
+uint8_t wr_pt[WR_MAX] = { 0 };
 #endif /* EF_SERIES */
 #ifdef E_SERIES
-uint16_t wr_nr[WR_MAX] = { 0, 0, 0, 0, 0, 0 };
-uint32_t wr_val[WR_MAX] = { 0, 0, 0, 0, 0, 0 };
+uint16_t wr_nr[WR_MAX] = { 0 };
+uint32_t wr_val[WR_MAX] = { 0 };
 #endif /* E_SERIES */
 #ifdef F_SERIES
-uint8_t wr_nr[WR_MAX] = { 0, 0, 0, 0, 0, 0 };
-uint8_t wr_val[WR_MAX] = { 0, 0, 0, 0, 0, 0 };
+uint8_t wr_nr[WR_MAX] = { 0 };
+uint8_t wr_val[WR_MAX] = { 0 };
+uint8_t wr_mask[WR_MAX] = { 0 }; // determines which bits are copied from 00F03x to 40F03x message (1=copy, 0=overwrite with new value), default 0x00
 #endif /* F_SERIES */
 
 byte Tmin = 0;
@@ -509,7 +511,7 @@ void stopControlAndCounters(bool stopCycleStealing) {
     EEPROM.update(EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY, 0);
   }
 #endif /* E_SERIES */
-  for (byte i = 0; i < WR_MAX; i++) wr_cnt[i] = 0;
+  wr_n = 0;
 }
 #endif /* EF_SERIES */
 
@@ -542,13 +544,6 @@ byte compressor = 0;
 
 #ifdef E_SERIES
 bool writeParam(void) {
-/* already done via wr_busy
-  if (wr_cnt[wr_n]) {
-    // previous write still being processed
-    Serial_println(F("* Previous parameter write action still busy"));
-    return 0;
-  }
-*/
   if ((wr_pt[wr_n] < PARAM_TP_START) || (wr_pt[wr_n] > PARAM_TP_END)) {
     Serial_print(F("* wr_pt["));
     Serial_print(wr_n);
@@ -557,11 +552,13 @@ bool writeParam(void) {
     Serial_println(F(" not 0x35-0x3D"));
     return 0;
   }
-  if (wr_nr[wr_n] > nr_params[wr_pt[wr_n] - PARAM_TP_START]) {
+  if (wr_nr[wr_n] >= nr_params[wr_pt[wr_n] - PARAM_TP_START]) {
     Serial_print(F("* wr_nr["));
     Serial_print(wr_n);
-    Serial_print(F("] > expected: 0x"));
-    Serial_println(wr_nr[wr_n], HEX);
+    Serial_print(F("]: 0x"));
+    Serial_print(wr_nr[wr_n], HEX);
+    Serial_print(F(" >= nr_params : 0x"));
+    Serial_println(nr_params[wr_pt[wr_n] - PARAM_TP_START], HEX);
     return 0;
   }
   uint8_t wr_nrb;
@@ -586,13 +583,13 @@ bool writeParam(void) {
   if (writeBudget) {
     if (writeBudget != 255) writeBudget--;
     wr_cnt[wr_n] = WR_CNT;
-    Serial_print(F("* Initiating parameter write for packet-type 0x"));
+    Serial_print(F("* Adding write for packet-type 0x"));
     Serial_print(wr_pt[wr_n], HEX);
     Serial_print(F(" parameter nr 0x"));
     Serial_print(wr_nr[wr_n], HEX);
     Serial_print(F(" to value 0x"));
     Serial_print(wr_val[wr_n], HEX);
-    Serial_println();
+    Serial_println(" to buffer");
     return 1;
   } else {
     Serial_println(F("* Currently no write budget left"));
@@ -604,6 +601,7 @@ bool writeParam(void) {
 
 #ifdef F_SERIES
 bool writeParam(void) {
+  // check wr_pt
   if ((model == 10) || (model == 11)) {
     if (wr_pt[wr_n] != 0x38) {
       Serial_print(F("* wr_pt["));
@@ -628,48 +626,72 @@ bool writeParam(void) {
     return 0;
   }
   // check wr_nr[wr_n]
+  // writable payload fields
+  // Model 10 BCL FDY  38 0 1 2 4 6 8
+  // Model 11 LPA FXMQ 38 0 1 2 4 6 8
+  // Model 12 M   FDYQ 3B 0 1 2 4 6 8 16 17
   if ((wr_nr[wr_n] > 17) || (wr_nr[wr_n] == 3) || (wr_nr[wr_n] == 5) || (wr_nr[wr_n] == 7) || ((wr_nr[wr_n] >= 9) && (wr_nr[wr_n] <= 15)) || ((wr_nr[wr_n] == 16) && (wr_pt[wr_n] == 0x38)) || ((wr_nr[wr_n] == 17) && (wr_pt[wr_n] == 0x38))) {
     Serial_print(F("* wr_nr[wr_n] invalid, should be 0, 1, 2, 4, 6, 8 (or for packet type 0x3B: 16 or 17): "));
     Serial_println(wr_nr[wr_n]);
     return 0;
   }
   if ((wr_nr[wr_n] == 0) && (wr_val[wr_n] > 1)) {
-    Serial_print(F("wr_val["));
-    Serial_print(wr_n);
-    Serial_println(F("] for payload byte 0 (status) must be 0 or 1"));
+    Serial_print(F("wr_val for payload byte 0 (status) is 0x"));
+    Serial_print(wr_val[wr_n], HEX);
+    Serial_println(F(", must be 0 or 1"));
     return 0;
   }
   if ((wr_nr[wr_n] == 1) && ((wr_val[wr_n] < 0x60) || (wr_val[wr_n] > 0x67))) {
-    Serial_print(F("wr_val["));
-    Serial_print(wr_n);
-    Serial_println(F("] for payload byte 1 (operating-mode) must be in range 0x60-0x67"));
+    Serial_print(F("wr_val for payload byte 1 (operating-mode) is 0x"));
+    Serial_print(wr_val[wr_n], HEX);
+    Serial_println(F(", must be in range 0x60-0x67"));
     return 0;
   }
   if (((wr_nr[wr_n] == 2) || (wr_nr[wr_n] == 6)) && ((wr_val[wr_n] < 0x0A) || (wr_val[wr_n] > 0x1E))) {
-    Serial_print(F("wr_val["));
-    Serial_print(wr_n);
-    Serial_println(F("] for payload byte 2/6 (target-temp cooling/heating) must be in range 0x10-0x20"));
+    Serial_print(F("wr_val for payload byte 2/6 (target-temp cooling/heating) is 0x"));
+    Serial_print(wr_val[wr_n], HEX);
+    Serial_println(F(", must be in range 0x10-0x20"));
     return 0;
   }
   if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && (wr_val[wr_n] < 0x03)) {
-    wr_val[wr_n] = 0x11 + (wr_val[wr_n] << 5); // 0x00 -> 0x11; 0x01 -> 0x31; 0x02 -> 0x51
+    wr_val[wr_n] = 0x11 + (wr_val[wr_n] << 5); // map 0x00 -> 0x11; 0x01 -> 0x31; 0x02 -> 0x51
     return 1;
   } else if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && ((wr_val[wr_n] < 0x11) || (wr_val[wr_n] > 0x51))) {
-    Serial_print(F("wr_val["));
-    Serial_print(wr_n);
-    Serial_println(F("] for payload byte 4/8 (fan-speed cooling/heating) must be in range 0x11-0x51 or 0x00-0x02"));
+    Serial_print(F("wr_val for payload byte 4/8 (fan-speed cooling/heating) is 0x"));
+    Serial_print(wr_val[wr_n], HEX);
+    Serial_println(F(", must be in range 0x11-0x51 or 0x00-0x02"));
     return 0;
   }
-  // no limitations for wr_nr[wr_n] == 16
+  if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && (((wr_val[wr_n] & 0x70) == 0x70) || (!(wr_val[wr_n] & 0x10)))) {
+    Serial_print(F("wr_val for payload byte 4/8 (fan-speed part) is 0x"));
+    Serial_print(wr_val[wr_n], HEX);
+    Serial_println(F(", must be 0x10, 0x30, or 0x50"));
+    return 0;
+  }
+  if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && ((wr_val[wr_n] & 0x0F) != 0x00) && ((wr_val[wr_n] & 0x0F) != 0x05)) {
+    Serial_print(F("wr_val for payload byte 4/8 (swing-mode part) is 0x"));
+    Serial_print(wr_val[wr_n], HEX);
+    Serial_println(F(", must be 0x00 or 0x05"));
+    return 0;
+  }
+  // no limitations for payload byte 16
   if ((wr_nr[wr_n] == 17) && (wr_val[wr_n] > 0x03)) {
-    Serial_print(F("wr_val["));
-    Serial_print(wr_n);
-    Serial_println(F("] for payload byte 17 (fan-mode) must be in range 0x00-0x03"));
+    Serial_print(F("wr_val for payload byte 17 (fan-mode) is 0x"));
+    Serial_print(wr_val[wr_n], HEX);
+    Serial_println(F(", must be in range 0x00-0x03"));
+    return 0;
+  }
+  if (wr_val[wr_n] & wr_mask[wr_n]) {
+    Serial_print(F("(wr_val 0x["));
+    Serial_print(wr_val[wr_n], HEX);
+    Serial_print(F(" & wr_mask 0x"));
+    Serial_print(wr_mask[wr_n], HEX);
+    Serial_println(F(") should be zero"));
     return 0;
   }
   if (writeBudget) {
     if (writeBudget != 255) writeBudget--;
-    wr_cnt[wr_n] = WR_CNT; // write repetitions, must be 1 for S-series
+    wr_cnt[wr_n] = WR_CNT;
     Serial_print(F("* Initiating write (part) "));
     Serial_print(wr_n);
     Serial_print(F(" for packet-type 0x"));
@@ -678,6 +700,8 @@ bool writeParam(void) {
     Serial_print(wr_nr[wr_n]);
     Serial_print(F(" to value 0x"));
     Serial_print(wr_val[wr_n], HEX);
+    Serial_print(F(" mask 0x"));
+    Serial_print(wr_mask[wr_n], HEX);
     Serial_println();
   } else {
     Serial_println(F("* Currently no write budget left"));
@@ -693,9 +717,6 @@ const int8_t expectedLength[3][16] ={{ 20, -1, -1, -1, -1, -1, -1, -1, 16, 11, -
 // -1: packet not expected
 // -2: packet length unknown, or unsure if packet is expected
 #endif /* F_SERIES */
-
-
-
 
 #ifdef EF_SERIES
 
@@ -748,6 +769,34 @@ bool checkPacketDuplicate(const byte n) {
 
 void restartData() {
   for (byte i = 0; i < 12; i++) packetSeen[i] = 0;
+}
+
+void shiftCountWrites(void) {
+  uint8_t countBusy = 0;
+  for (byte i = 0; i < wr_n; i++) {
+    if (wr_cnt[i]) {
+      if (countBusy < i) {
+        wr_cnt[countBusy] = wr_cnt[i];
+        wr_cnt[i] = 0;
+        wr_pt[countBusy] = wr_pt[i];
+        wr_nr[countBusy] = wr_nr[i];
+        wr_val[countBusy] = wr_val[i];
+#ifdef F_SERIES
+        wr_mask[countBusy] = wr_mask[i];
+#endif /* F_SERIES */
+      }
+      countBusy++;
+    }
+  }
+/*
+  if (countBusy < wr_n) {
+    Serial.print(F("* Shifted writes - from "));
+    Serial.print(wr_n);
+    Serial.print(F(" to "));
+    Serial.println(countBusy);
+  }
+*/
+  wr_n = countBusy;
 }
 
 #else
@@ -849,12 +898,6 @@ void loop() {
       } else {
         if (!reportedTooLong) {
           Serial_println(F("* Line too long, terminated"));
-/*
-          Serial_print(F("* Line too long, terminated, ignored: ->"));
-          Serial_print(RS);
-          Serial_print(lst);
-          Serial_println(F("<-"));
-*/
           reportedTooLong = 1;
         }
         ignoreremainder = 0;
@@ -868,17 +911,6 @@ void loop() {
         *(--RSp) = '\0';
       }
       if (ignoreremainder == 2) {
-/*
-        Serial_print(F("* First line received via serial is ignored: ->"));
-        if (rs < 10) {
-          Serial_print(RS);
-        } else {
-          RS[9] = '\0';
-          Serial_print(RS);
-          Serial_print("...");
-        }
-        Serial_println("<-");
-*/
         ignoreremainder = 0;
       } else if (ignoreremainder == 1) {
         if (!reportedTooLong) {
@@ -896,9 +928,11 @@ void loop() {
         {
 #endif
 byte scannedLength = 0;
+byte scannedLength2 = 0;
 int8_t scannedParams = 0;
-byte wr_busy = 0;
-          switch (*(RSp - 1)) { // in use by ESP: adhjps (v), in use by ATmega: cefgiklmnoqtuvwx, available: bryz
+byte wr_n_prev = 0;
+byte writeBudget_prev = 0;
+          switch (*(RSp - 1)) { // in use by ESP: adhjps(v), in use by ATmega: cefgiklmnoqtuvwx, available: bryz
             case '\0': // Serial_println(F("* Empty line received"));
                       break;
             case '*': // Serial_print(F("* Received: "));
@@ -910,25 +944,31 @@ byte wr_busy = 0;
                         Serial_println(F("* Requires L1"));
                         break;
                       }
-                      for (byte i = 0; i < WR_MAX; i++) wr_busy += wr_cnt[i];
-                      if (wr_busy) {
-                        // previous write still being processed
-                        Serial_println(F("* Previous parameter write action(s) still busy"));
+                      shiftCountWrites(); // shift writes in buffer, may change wr_n
+                      if (wr_n == WR_MAX) {
+                        // previous writes still being processed, buffer full
+                        Serial_println(F("* Write buffer full"));
                         break;
+                      } else if (wr_n) {
+                        // previous write(s) still being processed
+                        Serial_print(F("* Write buffer not-empty ("));
+                        Serial_print(wr_n);
+                        Serial_println(F("), trying to add write(s)"));
                       }
-                      wr_n = 0;
+                      wr_n_prev = wr_n;
+                      writeBudget_prev = writeBudget;
                       while ((wr_n < WR_MAX) && ((scannedParams = sscanf(RSp, (const char*) "%2hhx%4x%8lx%hhn", &wr_pt[wr_n], &wr_nr[wr_n], &wr_val[wr_n], &scannedLength)) > 0)) {
                         RSp += scannedLength;
-                        if (scannedParams == 3) {
+                        if (scannedParams >= 3) {
                           if (!writeParam()) {
-                            // cancel scheduled writes (full or error)
-                            wr_n = 0;
-                            for (byte i = 0; i < WR_MAX; i++) wr_cnt[i]= 0;
+                            // writeParam indicates error or lack of write budget -> cancel newly scheduled writes, error already reported in writeParam
+                            wr_n = wr_n_prev;
+                            writeBudget = writeBudget_prev;
                             break;
                           }
                           wr_n++;
                         } else {
-                          Serial_print(F("* Ignoring (all) instruction(s), expected 3 arguments, received: "));
+                          Serial_print(F("* Ignoring (all) new instruction(s), received <3 arg: "));
                           Serial_print(scannedParams);
                           if (scannedParams > 0) {
                             Serial_print(F(" pt: 0x"));
@@ -943,10 +983,16 @@ byte wr_busy = 0;
                             Serial_print(wr_nr[wr_n], HEX);
                           }
                           Serial_println();
-                          wr_n = 0;
-                          for (byte i = 0; i < WR_MAX; i++) wr_cnt[i] = 0;
+                          wr_n = wr_n_prev;
+                          writeBudget = writeBudget_prev;
                           break;
                         }
+                      }
+                      if ((wr_n == WR_MAX) && ((scannedParams = sscanf(RSp, (const char*) "%2hhx", &wbtemp)) > 0)) {
+                        Serial_println(F("* Too many arguments or too many writes to add, cancelling all new writes"));
+                        wr_n = wr_n_prev;
+                        writeBudget = writeBudget_prev;
+                        break;
                       }
                       break;
             case 'f':
@@ -1038,23 +1084,36 @@ byte wr_busy = 0;
                         Serial_println(F("* Command requires operation as auxiliary controller (L1)"));
                         break;
                       }
-                      for (byte i = 0; i < WR_MAX; i++) wr_busy += wr_cnt[i];
-                      if (wr_busy) {
-                        // previous write still being processed
-                        Serial_println(F("* Previous parameter write action(s) still busy"));
+                      shiftCountWrites(); // shift writes in buffer, may change wr_n
+                      if (wr_n == WR_MAX) {
+                        // previous writes still being processed, buffer full
+                        Serial_println(F("* Parameter write buffer full, command ignored"));
                         break;
+                      } else if (wr_n) {
+                        // previous write(s) still being processed
+                        Serial_print(F("* Parameter write buffer not-empty ("));
+                        Serial_print(wr_n);
+                        Serial_println(F("), but will attempt to add write(s)"));
                       }
-                      wr_n = 0;
-                      while ((wr_n < WR_MAX) && ((scannedParams = sscanf(RSp, (const char*) "%2hhx%2hhx%2hhx%hhn", &wr_pt[wr_n], &wr_nr[wr_n], &wr_val[wr_n], &scannedLength)) > 0)) {
-                        RSp += scannedLength;
-                        // Valid write parameters
-                        // Model 10 BCL FDY  38 0 1 2 4 6 8
-                        // Model 11 LPA FXMQ 38 0 1 2 4 6 8
-                        // Model 12 M   FDYQ 3B 0 1 2 4 6 8 16 17
-                        //
-                        // check wr_pt
-                        if (scannedParams != 3) {
-                          Serial_print(F("* Ignoring (all) instruction(s), expected 3 arguments, received: "));
+                      wr_n_prev = wr_n;
+                      writeBudget_prev = writeBudget;
+                      while ((wr_n < WR_MAX) && ((scannedParams = sscanf(RSp, (const char*) "%2hhx%2hhx%2hhx%hhnM%2hhx%hhn", &wr_pt[wr_n], &wr_nr[wr_n], &wr_val[wr_n], &scannedLength, &wr_mask[wr_n], &scannedLength2)) > 0)) {
+                        if (scannedParams >= 3) {
+                          if (!writeParam()) {
+                            // writeParam indicates error or lack of write budget -> cancel newly scheduled writes, error already reported in writeParam
+                            wr_n = wr_n_prev;
+                            writeBudget = writeBudget_prev;
+                            break;
+                          }
+                          if (scannedParams == 3) {
+                            RSp += scannedLength;
+                            wr_mask[wr_n] = 0x00;
+                          } else {
+                            RSp += scannedLength2;
+                          }
+                          wr_n++;
+                        } else {
+                          Serial_print(F("* Ignoring (all) new instruction(s), expected 3 arguments, received: "));
                           Serial_print(scannedParams);
                           if (scannedParams > 0) {
                             Serial_print(F(" pt: 0x"));
@@ -1065,17 +1124,16 @@ byte wr_busy = 0;
                             Serial_print(wr_nr[wr_n], HEX);
                           }
                           Serial_println();
-                          wr_n = 0;
+                          wr_n = wr_n_prev;
+                          writeBudget = writeBudget_prev;
                           break;
-                        } else {
-                          if (!writeParam()) {
-                            // cancel scheduled writes (full or error)
-                            wr_n = 0;
-                            for (byte i = 0; i < WR_MAX; i++) wr_cnt[i]= 0;
-                            break;
-                          }
-                          wr_n++;
                         }
+                      }
+                      if ((wr_n == WR_MAX) && ((scannedParams = sscanf(RSp, (const char*) "%2hhx", &wbtemp)) > 0)) {
+                        Serial_println(F("* Too many arguments or too many writes to add, cancelling all new writes"));
+                        wr_n = wr_n_prev;
+                        writeBudget = writeBudget_prev;
+                        break;
                       }
                       break;
 #endif /* F_SERIES */
@@ -1294,10 +1352,10 @@ byte wr_busy = 0;
                                       break;
                            }
                         } else {
-                          Serial_println(F("* Model can (only) be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M11 or M12 to do so)"));
+                          Serial_println(F("* Model can (only) be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M111 or M12 to do so)"));
                         }
                       } else {
-                        Serial_println(F("* Model can be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M11 or M12 to do so)"));
+                        Serial_println(F("* Model can be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M111 or M12 to do so)"));
                       }
                       Serial_print(F("* Brand is "));
                       Serial_print(brand);
@@ -1437,7 +1495,7 @@ byte wr_busy = 0;
                                         break;
                                       } else {
                                         CONTROL_ID = 0x00;
-                                        for (byte i = 0; i < WR_MAX; i++) wr_cnt[i] = 0;
+                                        wr_n = 0;
                                       }
                                       if (temp == 0) EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
                                     }
@@ -1874,7 +1932,6 @@ byte wr_busy = 0;
       } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0xF0) == 0x30) && !F030forcounter)  {
         // non-empty 00Fx3x (F0/F1, but not FF, FF is not yet supported) request message received, and we did not use this slot to request counters
         // check if there is no other auxiliary controller
-        // TODO should we detect and report empty payload messages?
         if ((RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x03] < F0THRESHOLD)) {
           FxAbsentCnt[RB[1] & 0x03]++;
           if (FxAbsentCnt[RB[1] & 0x03] == F0THRESHOLD) {
@@ -1947,14 +2004,16 @@ byte wr_busy = 0;
         // insert message (or restart Daikin) if reply slot is safe and if scheduled
         // precondition here: ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0xF0) == 0x30) && !F030forcounter)
         // non-empty 00Fx3x (F0/F1, but not FF, FF is not yet supported) request message received, and we did not use this slot to request counters
-        byte writeAction = 0;
+        byte writeAction = 0; // 0 no write, 1 auxiliary controller, 2 insert message, 3 auxiliary controller F-series to be repeated
         byte nwrite = nread; // nread is uint16_t but should fit in uint8_t
         byte d = 0;
+/*
         if (nread > 24) {
           Serial_print(F("* Surprise: received 00Fx3x packet of size "));
           Serial_println(nread);
           nwrite = 24;
         }
+*/
         if (CRC_GEN) nwrite--; // omit CRC from received-byte-counter
         // insert user-specified message or restart Daikin message
         if ((FxAbsentCnt[RB[1] & 0x01] == F0THRESHOLD) && (insertMessageCnt
@@ -1971,7 +2030,7 @@ byte wr_busy = 0;
 #endif /* E_SERIES */
           d = F030DELAY_INSERT;
           nwrite = insertMessageLength;
-          writeAction = 2;
+          writeAction = 2; // insert message
         }
         // auxiliary controller
         if (!writeAction && (FxAbsentCnt[RB[1] & 0x01] == F0THRESHOLD) && CONTROL_ID && (RB[1] == CONTROL_ID)) {
@@ -1986,11 +2045,11 @@ byte wr_busy = 0;
             case 0x30 :
                         // in: 17 byte; out: 17 byte; answer WB[7] should contain a 01 if we want to communicate a new setting in packet type 35
                         for (byte w = 3; w < nwrite; w++) WB[w] = 0x00;
-                        // set byte WB[<wr_pt - 0x2E>] to 0x01 to request a F03x message to set wr_nr to wr_val
+                        // set byte WB[<wr_pt - 0x2E>] to 0x01 to request a F03x message to set parameter wr_nr to wr_val
                         for (byte i = 0; i < wr_n; i++) if (wr_cnt[i]) WB[wr_pt[i] - 0x2E] = 0x01;
                         if (insertRoomTemperature) WB[0x36 - 0x2E] = 0x01;
                         d = F030DELAY;
-                        writeAction = 1;
+                        writeAction = 1; // auxiliary controller write
                         break;
             case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function partly date/time, partly unknown
                         // RB[7] RB[8] seem to identify the auxiliary controller type;
@@ -2003,13 +2062,13 @@ byte wr_busy = 0;
 #ifdef CTRL_ID_2
                         WB[8] = CTRL_ID_2;
 #endif
-                        writeAction = 1;
+                        writeAction = 1; // auxiliary controller write
                         break;
             case 0x32 : // in: 19 byte: out 19 byte, out is copy in
                         for (w = 3; w < nwrite; w++) WB[w] = RB[w];
                         // on one system, response is all-zero, so consider to change to all-zero response:
                         // for (w = 3; w < nwrite; w++) WB[w] = 0x00;
-                        writeAction = 1;
+                        writeAction = 1; // auxiliary controller write
                         break;
             case 0x33 : // not seen, no response
                         break;
@@ -2025,19 +2084,19 @@ byte wr_busy = 0;
                         w = 3;
                         for (byte i = 0; i < wr_n; i++) {
                           if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
-                             WB[w++] = wr_nr[i] & 0xFF;
-                             WB[w++] = wr_nr[i] >> 8;
-                             WB[w++] = (wr_val[i] & 0xFF);
+                            WB[w++] = wr_nr[i] & 0xFF;
+                            WB[w++] = wr_nr[i] >> 8;
+                            WB[w++] = (wr_val[i] & 0xFF);
+                            wr_cnt[i] |= 0x80;
                           }
-                          if (w >= nwrite) break; // max 6 writes in 0x35/0x3A
+                          if (w >= nwrite) break; // max 6 writes in 0x35/0x3A, remaining ones will be handled later
                         }
-                        writeAction = 1;
+                        writeAction = 1; // auxiliary controller write
                         break;
             case 0x36 : // in: 23 byte; out 23 byte; 2-byte parameters; reply with FF
                         // A parameter consists of 4 bytes: 2 bytes for param nr, and 2 bytes for value
                         for (w = 3; w < nwrite; w++) WB[w] = 0xFF;
                         w = 3;
-
                         if (insertRoomTemperature) {
                           WB[w++] = 0x02; // param 0x0002
                           WB[w++] = 0x00;
@@ -2050,13 +2109,11 @@ byte wr_busy = 0;
                             WB[w++] = wr_nr[i] >> 8;
                             WB[w++] = wr_val[i] & 0xFF;
                             WB[w++] = (wr_val[i] >> 8) & 0xFF;
+                            wr_cnt[i] |= 0x80;
                           }
-                          if (w >= nwrite) {
-                            if (i + 1 < wr_n) Serial_println(F("* >5 writes in 0x36 not possible, skipping some"));
-                            break; // max 5 writes in 0x36/0x3B
-                          }
+                          if (w >= nwrite) break; // max 5 writes in 0x36/0x3B, remaining ones will be handled later
                         }
-                        writeAction = 1;
+                        writeAction = 1; // auxiliary controller write
                         break;
             case 0x3B : // in: 23 byte; out 23 byte; 2-byte parameters; reply with FF
                         // A parameter consists of 4 bytes: 2 bytes for param nr, and 2 bytes for value
@@ -2065,13 +2122,14 @@ byte wr_busy = 0;
                         for (byte i = 0; i < wr_n; i++) {
                           if ((wr_cnt[i])  && (wr_pt[i]  == RB[2])) {
                             WB[w++] = wr_nr[i] & 0xFF;
-                             WB[w++] = wr_nr[i] >> 8;
-                             WB[w++] = wr_val[i] & 0xFF;
-                             WB[w++] = (wr_val[i] >> 8) & 0xFF;
+                            WB[w++] = wr_nr[i] >> 8;
+                            WB[w++] = wr_val[i] & 0xFF;
+                            WB[w++] = (wr_val[i] >> 8) & 0xFF;
+                            wr_cnt[i] |= 0x80;
                           }
-                          if (w >= nwrite) break; // max 5 writes in 0x36/0x3B
+                          if (w >= nwrite) break; // max 5 writes in 0x36/0x3B, remaining ones will be handled later
                         }
-                        writeAction = 1;
+                        writeAction = 1; // auxiliary controller write
                         break;
             case 0x37 : // fall-through
             case 0x3C : // in: 23 byte; out 23 byte; 3-byte parameters; reply with FF
@@ -2081,14 +2139,15 @@ byte wr_busy = 0;
                         for (byte i = 0; i < wr_n; i++) {
                           if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
                             WB[w++] = wr_nr[i] & 0xFF;
-                             WB[w++] = wr_nr[i] >> 8;
-                             WB[w++] = wr_val[i] & 0xFF;
-                             WB[w++] = (wr_val[i] >> 8) & 0xFF;
-                             WB[w++] = (wr_val[i] >> 16) & 0xFF;
+                            WB[w++] = wr_nr[i] >> 8;
+                            WB[w++] = wr_val[i] & 0xFF;
+                            WB[w++] = (wr_val[i] >> 8) & 0xFF;
+                            WB[w++] = (wr_val[i] >> 16) & 0xFF;
+                            wr_cnt[i] |= 0x80;
                           }
-                          if (w >= nwrite) break; // max 4 writes in 0x37/0x3C
+                          if (w >= nwrite) break; // max 4 writes in 0x37/0x3C, remaining ones will be handled later
                         }
-                        writeAction = 1;
+                        writeAction = 1; // auxiliary controller write
                         break;
             case 0x38 : // fall-through
             case 0x39 : // fall-through
@@ -2107,18 +2166,21 @@ byte wr_busy = 0;
                             WB[w++] = (wr_val[i] >> 8) & 0xFF;
                             WB[w++] = (wr_val[i] >> 16) & 0xFF;
                             WB[w++] = (wr_val[i] >> 24) & 0xFF;
+                            wr_cnt[i] |= 0x80;
                           }
-                          if (w >= nwrite) break; // max 3 writes in 0x38/0x39/0x3D
+                          if (w >= nwrite) break; // max 3 writes in 0x38/0x39/0x3D, remaining ones will be handled later
                         }
-                        writeAction = 1;
+                        writeAction = 1; // auxiliary controller write
                         break;
             case 0x3E : // schedule related packet
                         // 0x3E01, 0x3E02, ... in: 23 byte; out: 23 byte; out 40F13E01(even for higher) + 19xFF
                         WB[3] = RB[3];
                         for (w = 4; w < nwrite; w++) WB[w] = 0xFF;
-                        writeAction = 1;
+                        writeAction = 1; // auxiliary controller write
                         break;
-            default   : // 0x31/0x33/0x34/0x3F not seen, no response
+            case 0x3F : // not seen, no response
+                        break;
+            default   : // other message types not seen, no response
                         break;
           }
 #endif /* E_SERIES */
@@ -2176,38 +2238,38 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
           switch (RB[2]) {
             case 0x30 : // all models: polling auxiliary controller, reply with empty payload
               d = F030DELAY;
-              writeAction = 1;
+              writeAction = 1; // auxiliary controller write
               nwrite = 3;
               break;
             case 0x32 : // incoming message,  occurs only once, 8 bytes, first byte is 0xC0, others 0x00; reply is one byte value 0x01? polling auxiliary controller?, reply with empty payload
               // if (model != 11)  break;
               // FXMQ / version LPA
-              writeAction = controlLevel;
+              writeAction = controlLevel; // auxiliary controller write unless L5
               nwrite = 4;
               WB[3]  = 0x01; // W target status
               break;
             case 0x35 : // FXMQ outside unit name, reply with empty payload
               // if (model != 11)  break;
               // FXMQ / version LPA
-              writeAction = controlLevel;
+              writeAction = controlLevel; // auxiliary controller write unless L5
               nwrite = 3;
               break;
             case 0x36 : // FXMQ indoor unit name, reply with empty payload
               // if (model != 11)  break;
               // FXMQ / version LPA
-              writeAction = controlLevel;
+              writeAction = controlLevel; // auxiliary controller write unless L5
               nwrite = 3;
               break;
             case 0x37 : // FDYQ / version M  zone name packet, reply with empty payload
               // if (model != 12)  break;
               // FDYQ / version M
-              writeAction = controlLevel;
+              writeAction = controlLevel; // auxiliary controller write unless L5
               nwrite = 3;
               break;
             case 0x38 :
               if (model == 10) {
                 // FDY / version BCL control message, copy bytes back and change if 'F' command is given
-                writeAction = controlLevel;
+                writeAction = controlLevel; // auxiliary controller write unless L5
                 nwrite = 18;
                 for (w = 13; w <= 15; w++) WB[w] = 0x00;
                 WB[3]  = RB[3] & 0x01;           // W target status
@@ -2223,13 +2285,16 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 WB[16] = RB[18];                 //   target fan mode ?? & 0x03 ?
                 WB[17] = 0x00;                   //   ? (change flag, & 0x7F ?)
                 for (byte i = 0; i < wr_n; i++) {
-                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; /* wr_cnt[i]--; */ };
+                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
+                    WB[wr_nr[i] + 3] = wr_val[i] | (wr_mask[i] & WB[wr_nr[i] + 3]);
+                    wr_cnt[i] |= 0x80;
+                  }
                 }
                 break;
               }
               if (model == 11) {
                 // FXMQ / version PCL control message, copy a few bytes back, change bytes if 'F' command is given
-                writeAction = controlLevel;
+                writeAction = controlLevel; // auxiliary controller write unless L5
                 nwrite = 20;
                 WB[3]  = RB[3] & 0x01;           // W target status
                 WB[4]  = RB[5];                  // W target operating mode
@@ -2251,8 +2316,8 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 for (byte i = 0; i < wr_n; i++) {
                   if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
                     if ((wr_nr[i] == 0) && (WB[wr_nr[i] + 3] == 0x00) && (wr_val[i])) WB[16] |= 0x20; // change payload byte 13 from C0 to E0, only if payload byte 0 is set to 1 here
-                    WB[wr_nr[i] + 3] = wr_val[i];
-/*                    wr_cnt[i]--; */
+                    WB[wr_nr[i] + 3] = wr_val[i] | (wr_mask[i] & WB[wr_nr[i] + 3]);
+                    wr_cnt[i] |= 0x80;
                   }
                 }
                 break;
@@ -2261,7 +2326,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
             case 0x39 :
               if (model == 10)  {
                 // guess that this is filter warning for FDY / version BCL, reply with 4-byte payload
-                writeAction = controlLevel;
+                writeAction = controlLevel; // auxiliary controller write unless L5
                 nwrite = 7;
                 WB[3] = 0x00;
                 WB[4] = 0x00;
@@ -2272,7 +2337,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
               }
               if (model == 11) {
                 // FXMQ / LPA reply with 5-byte all-zero payload
-                writeAction = controlLevel;
+                writeAction = controlLevel; // auxiliary controller write unless L5
                 nwrite = 8;
                 WB[3] = 0x00;
                 WB[4] = 0x00;
@@ -2286,7 +2351,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
             case 0x3A : // ??, reply with 8-byte all-zero payload
               if (model == 11)  {
                 // FXMQ / version LPA
-                writeAction = controlLevel;
+                writeAction = controlLevel; // auxiliary controller write unless L5
                 nwrite = 11;
                 WB[3] = 0x00;
                 WB[4] = 0x00;
@@ -2303,7 +2368,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
             case 0x3B : // FDYQ /version M control message, copy bytes back and change if 'F' command is given
               if (model == 12)  {
                 // FDYQ / version M
-                writeAction = controlLevel;
+                writeAction = controlLevel; // auxiliary controller write unless L5
                 nwrite = 22;
                 for (w = 13; w <= 18; w++) WB[w] = 0x00;
                 WB[3]  = RB[3] & 0x01;           // W target status
@@ -2320,7 +2385,10 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 WB[20] = RB[21] & 0x03;          // W target fan mode
                 WB[21] = 0x00;                   //   ? (change flag, & 0x7F ?)
                 for (byte i = 0; i < wr_n; i++) {
-                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; /* wr_cnt[i]--; */ };
+                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
+                    WB[wr_nr[i] + 3] = wr_val[i] | (wr_mask[i] & WB[wr_nr[i] + 3]);
+                    wr_cnt[i] |= 0x80;
+                  }
                 }
                 break;
               }
@@ -2328,7 +2396,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
             case 0x3C : // FDYQ filter message, reply with 2-byte zero payload
               if (model == 12)  {
                 // FDYQ / version M
-                writeAction = controlLevel;
+                writeAction = controlLevel; // auxiliary controller write unless L5
                 nwrite = 5;
                 WB[3] = 0x00;
                 WB[4] = 0x00;
@@ -2336,7 +2404,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 break;
               }
               break;
-            default   : // 0x31/0x33/0x34/0x3E/0x3F not seen, no response
+            default   : // 0x31/0x33/0x34/0x3D/0x3E/0x3F or non-0x3x messages not seen, no response
               break;
           }
 #endif /* F_SERIES */
@@ -2348,14 +2416,16 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
 #ifdef E_SERIES
             if (writeAction == 1) {
               for (byte i = 0; i < wr_n; i++) {
-                if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
+                // only for those really scheduled  (& 0x80)
+                if (wr_cnt[i] & 0x80) {
                   wr_cnt[i]--;
+                  wr_cnt[i] &= 0x7F;
                   parameterWritesDone ++;
-                  Serial_print(F("* Executing E command for packet 0x"));
+                  Serial_print(F("* Packet 0x"));
                   Serial_print(wr_pt[i], HEX);
-                  Serial_print(" setting param 0x");
+                  Serial_print(" param 0x");
                   Serial_print(wr_nr[i], HEX);
-                  Serial_print(" to 0x");
+                  Serial_print(" set to 0x");
                   if (wr_val[i] <= 0x0F) Serial_print('0');
                   Serial_println(wr_val[i], HEX);
                 }
@@ -2373,22 +2443,30 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
             }
 #endif /* E_SERIES */
 #ifdef F_SERIES
-            if ((writeAction == 1) && ((RB[2] == 0x3B) || (RB[2] == 0x38 ))) {
+            if (((writeAction & 0x01) == 1) && ((RB[2] == 0x3B) || (RB[2] == 0x38 ))) {
               for (byte i = 0; i < wr_n; i++) {
-                if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
-                  wr_cnt[i]--;
-                  Serial_print(F("* Executing F command for packet 0x"));
+                if (wr_cnt[i] & 0x80) {
+                  Serial_print(F("* Packet 0x"));
                   Serial_print(wr_pt[i], HEX);
-                  Serial_print(" setting payload byte ");
+                  Serial_print(" payload byte ");
                   Serial_print(wr_nr[i]);
-                  Serial_print(" to 0x");
-                  Serial_println(wr_val[i], HEX);
+                  Serial_print(" set to 0x");
+                  Serial_print(wr_val[i], HEX);
+                  if (writeAction == 3) {
+                    Serial_println(", to be repeated");
+                  } else {
+                    // writeAction == 1
+                    Serial_println();
+                    wr_cnt[i]--;
+                  }
+                  wr_cnt[i] &= 0x7F;
                 }
               }
             }
 #endif /* F_SERIES */
           } else {
             Serial_println(F("* Refusing to write packet while previous packet write wasn't finished"));
+            for (byte i = 0; i < wr_n; i++) { wr_cnt[i] &= 0x7F; }
             if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
           }
         }
@@ -2429,7 +2507,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
       Serial_print('0');
     } else {
       Serial_print(delta / 1000); delta %= 1000;
-    };
+    }
     Serial_print(F("."));
     if (delta < 100) Serial_print('0');
     if (delta < 10) Serial_print('0');
