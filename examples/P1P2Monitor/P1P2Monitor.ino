@@ -2128,6 +2128,7 @@ byte wr_busy = 0;
 // BCL FDY          0x30 20/0                                                                                         0x38 16/15 / 0x39 11/4
 // LPA FXMQ         0x30 20/0   0x32 8/1              0x35 19/0   0x36 19/0                                           0x38 20/17   0x39 14/5   0x3A 18/8
 // M   FDYQ         0x30 20/0                                                 0x3700-0x3706 14/0 0x3707-0x3713 16/0                                       0x3B 20/19 / 0x3C 12/2
+// D=LPA?
 
 // Compatible systems:
 // ?   EKHBRD*ADV: ?

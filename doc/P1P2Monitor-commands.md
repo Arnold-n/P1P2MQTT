@@ -47,7 +47,7 @@ The most useful commands:
  - `C0` (Daikin E only) to stop requesting counters every minute
  - `E` (Daikin E only) or `F` for parameter writing, more information in [Commands-Eseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Eseries.md) or [Commands-Fseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Fseries.md)
  - `F` (Daikin F only) for parameter writing, more information in [Commands-Eseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Eseries.md) or [Commands-Fseries.md](https://github.com/Arnold-n/P1P2MQTT/blob/main/doc/Commands-Fseries.md)
- - 'F' (Daikin E only) to set fake room temperature sensor (`F1 205` sets reported room temperature to 20.5C)
+ - `F` (Daikin E only) to set fake room temperature sensor (`F1 205` sets reported room temperature to 20.5C, `F1` switches fake sensor on, `F0` switches fake sensor off)
 
 ### Monitor commands:
 
@@ -72,8 +72,8 @@ The most useful commands:
 - `C2` like C1, but keeps repeating every new minute,
 - `C0` stop requesting counters, and
 - `C`  show counter-repeating-request status.
-- 'Q9' (Daikin E only) to cycle-steal the pause after 400012 message for doing a counter-request; this works on certain systems but could give bus collissions on others, use with care. Upon bus collission detection Q9 and auxiliary control mode will be switched off
-- 'Q0' (Daikin E only) to stop cycle-stealing
+- `Q9` (Daikin E only) to cycle-steal the pause after 400012 message for doing a counter-request; this works on certain systems but could give bus collissions on others, use with care. Upon bus collission detection Q9 and auxiliary control mode will be switched off
+- `Q0` (Daikin E only) to stop cycle-stealing
 
 ## Raw data commands:
 
