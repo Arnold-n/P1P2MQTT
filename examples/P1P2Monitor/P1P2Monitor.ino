@@ -39,6 +39,7 @@
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
  * Version history
+ * 20241012 v0.9.55 cleanup, fix insert message, fix L99 in L0 mode
  * 20240605 v0.9.53 replace KLICDA by configurable counterCycleStealDelay
  * 20240512 v0.9.46 remove unneeded 'G' 'H' and OLD_COMMANDS, adding MHI support, remove verbosity levels, F-series model-suggestions, multiple write-commands
  * 20230604 v0.9.38 H-link2 support added to main branch
@@ -115,16 +116,16 @@ static byte readErrorLast = 0;
 static byte writeRefusedBusy = 0;
 static byte writeRefusedBudget = 0;
 #ifdef EF_SERIES
-static byte controlLevel = 1; // for F-series L5 mode
-#ifdef ENABLE_INSERT_MESSAGE
-static byte restartDaikinCnt = 0;
-static byte restartDaikinReady = 0;
 static byte insertMessageCnt = 0;
 static byte insertMessage[RB_SIZE];
 static byte insertMessageLength = 0;
-#endif /* ENABLE_INSERT_MESSAGE */
 #endif /* EF_SERIES */
+#ifdef E_SERIES
+static byte restartDaikinCnt = 0;
+static byte restartDaikinReady = 0;
+#endif /* E_SERIES */
 #ifdef F_SERIES
+static byte controlLevel = 1; // 1 for L1 mode, 0 for F-series L5 mode
 static byte modelSuggestion = 0;
 #endif /* F_SERIES */
 
@@ -633,37 +634,37 @@ bool writeParam(void) {
     return 0;
   }
   if ((wr_nr[wr_n] == 0) && (wr_val[wr_n] > 1)) {
-    Serial_println(F("wr_val["));
+    Serial_print(F("wr_val["));
     Serial_print(wr_n);
-    Serial_print(F("] for payload byte 0 (status) must be 0 or 1"));
+    Serial_println(F("] for payload byte 0 (status) must be 0 or 1"));
     return 0;
   }
   if ((wr_nr[wr_n] == 1) && ((wr_val[wr_n] < 0x60) || (wr_val[wr_n] > 0x67))) {
-    Serial_println(F("wr_val["));
+    Serial_print(F("wr_val["));
     Serial_print(wr_n);
-    Serial_print(F("] for payload byte 1 (operating-mode) must be in range 0x60-0x67"));
+    Serial_println(F("] for payload byte 1 (operating-mode) must be in range 0x60-0x67"));
     return 0;
   }
   if (((wr_nr[wr_n] == 2) || (wr_nr[wr_n] == 6)) && ((wr_val[wr_n] < 0x0A) || (wr_val[wr_n] > 0x1E))) {
-    Serial_println(F("wr_val["));
+    Serial_print(F("wr_val["));
     Serial_print(wr_n);
-    Serial_print(F("] for payload byte 2/6 (target-temp cooling/heating) must be in range 0x10-0x20"));
+    Serial_println(F("] for payload byte 2/6 (target-temp cooling/heating) must be in range 0x10-0x20"));
     return 0;
   }
   if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && (wr_val[wr_n] < 0x03)) {
     wr_val[wr_n] = 0x11 + (wr_val[wr_n] << 5); // 0x00 -> 0x11; 0x01 -> 0x31; 0x02 -> 0x51
     return 1;
   } else if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && ((wr_val[wr_n] < 0x11) || (wr_val[wr_n] > 0x51))) {
-    Serial_println(F("wr_val["));
+    Serial_print(F("wr_val["));
     Serial_print(wr_n);
-    Serial_print(F("] for payload byte 4/8 (fan-speed cooling/heating) must be in range 0x11-0x51 or 0x00-0x02"));
+    Serial_println(F("] for payload byte 4/8 (fan-speed cooling/heating) must be in range 0x11-0x51 or 0x00-0x02"));
     return 0;
   }
   // no limitations for wr_nr[wr_n] == 16
   if ((wr_nr[wr_n] == 17) && (wr_val[wr_n] > 0x03)) {
-    Serial_println(F("wr_val["));
+    Serial_print(F("wr_val["));
     Serial_print(wr_n);
-    Serial_print(F("] for payload byte 17 (fan-mode) must be in range 0x00-0x03"));
+    Serial_println(F("] for payload byte 17 (fan-mode) must be in range 0x00-0x03"));
     return 0;
   }
   if (writeBudget) {
@@ -764,8 +765,7 @@ void loop() {
   uint16_t temp;
   uint16_t temphex;
   int wb = 0;
-  int n;
-  int wbtemp;
+  byte wbtemp;
   int c;
   static byte ignoreremainder = 2; // ignore first line from serial input to avoid misreading a partial message just after reboot
   static bool reportedTooLong = 0;
@@ -842,10 +842,6 @@ void loop() {
           Serial_println(F("* Line too long, ignored"));
 /*
           Serial_print(F("* Line too long, ignored, ignoring remainder: ->"));
-          Serial_print(RS);
-          Serial_print(lst);
-          Serial_print(c);
-          Serial_println(F("<-"));
           // show full line, so not yet setting reportedTooLong = 1 here;
 */
         }
@@ -899,8 +895,8 @@ void loop() {
         RSp = RS + 1;
         {
 #endif
-byte scanned = 0;
-byte scannedTotal = 0;
+byte scannedLength = 0;
+int8_t scannedParams = 0;
 byte wr_busy = 0;
           switch (*(RSp - 1)) { // in use by ESP: adhjps (v), in use by ATmega: cefgiklmnoqtuvwx, available: bryz
             case '\0': // Serial_println(F("* Empty line received"));
@@ -921,8 +917,9 @@ byte wr_busy = 0;
                         break;
                       }
                       wr_n = 0;
-                      while ((wr_n < WR_MAX) && ((n = sscanf(RSp + scannedTotal, (const char*) "%2hhx%4x%8lx%n", &wr_pt[wr_n], &wr_nr[wr_n], &wr_val[wr_n], &scanned)) > 0)) {
-                        if (n == 3) {
+                      while ((wr_n < WR_MAX) && ((scannedParams = sscanf(RSp, (const char*) "%2hhx%4x%8lx%hhn", &wr_pt[wr_n], &wr_nr[wr_n], &wr_val[wr_n], &scannedLength)) > 0)) {
+                        RSp += scannedLength;
+                        if (scannedParams == 3) {
                           if (!writeParam()) {
                             // cancel scheduled writes (full or error)
                             wr_n = 0;
@@ -930,16 +927,19 @@ byte wr_busy = 0;
                             break;
                           }
                           wr_n++;
-                          scannedTotal += scanned;
                         } else {
                           Serial_print(F("* Ignoring (all) instruction(s), expected 3 arguments, received: "));
-                          Serial_print(n);
-                          if (n > 0) {
+                          Serial_print(scannedParams);
+                          if (scannedParams > 0) {
                             Serial_print(F(" pt: 0x"));
+                            if (wr_pt[wr_n] <= 0x0F) Serial_print('0');
                             Serial_print(wr_pt[wr_n], HEX);
                           }
-                          if (n > 1) {
+                          if (scannedParams > 1) {
                             Serial_print(F(" nr: 0x"));
+                            if (wr_nr[wr_n] <= 0xFFF) Serial_print('0');
+                            if (wr_nr[wr_n] <= 0xFF) Serial_print('0');
+                            if (wr_nr[wr_n] <= 0x0F) Serial_print('0');
                             Serial_print(wr_nr[wr_n], HEX);
                           }
                           Serial_println();
@@ -952,22 +952,21 @@ byte wr_busy = 0;
             case 'f':
             case 'F': Serial_print(F("* Room Temperature insertion function "));
                       {
-                        int l;
-                        int n;
-                        if ((l = sscanf(RSp, "%hhd%n", &insertRoomTemperature, &n)) > 0) {
+                        if (sscanf(RSp, "%hhd%hhn", &insertRoomTemperature, &scannedLength) > 0) {
+                          RSp += scannedLength;
                           switch (insertRoomTemperature) {
                             case 0  : Serial_println(F("switched off"));
                                       EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB, (roomTemperature >> 8) & 0x7F);
                                       break;
                             default : // fall-through
                             case 1  : Serial_print(F("switched on, temp "));
-                                      if ((l = sscanf(RSp + n, "%d", &roomTemperature)) > 0) {
+                                      if (sscanf(RSp, "%d", &roomTemperature) > 0) {
                                         roomTemperature &= 0x7FFF; // ignore most-significant bit, should be 0
                                         Serial_print(F("set to "));
                                         Serial_println(roomTemperature * 0.1);
                                         EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_LSB, roomTemperature & 0xFF);
                                       } else {
-                                        Serial_print(F(" is "));
+                                        Serial_print(F("is "));
                                         Serial_println(roomTemperature * 0.1);
                                       }
                                       EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB, (roomTemperature >> 8) /* & 0x7F not needed */ | 0x80);
@@ -984,43 +983,39 @@ byte wr_busy = 0;
                       }
                       break;
             case 'q':
-            case 'Q': if (CONTROL_ID) {
-                        Serial_println(F("* Counter cycle stealing should not be necessary in L1 mode, refusing command, use C2 instead"));
+            case 'Q': if ((sscanf(RSp, "%hhd", &counterCycleStealDelay)) > 0) {
+                        if (counterCycleStealDelay) {
+                          if (CONTROL_ID) {
+                            Serial_println(F("* Counter cycle stealing should not be necessary in L1 mode, refusing command, use C2 instead, or use L0/Q9/L1 sequence"));
+                            break;
+                          }
+                          if (counterRepeatingRequest) {
+                            Serial_println(F("* Repetitive requesting of counter values already active, will not enable counter cycle stealing"));
+                            break;
+                          }
+                          if (counterRequest) {
+                            Serial_println(F("* Previous single counter request not finished yet"));
+                            break;
+                          }
+                          Serial_print(F("* Counter cycle stealing will be active with delay set to (recommended: 9) "));
+                          Serial_println(counterCycleStealDelay);
+                          Serial_println(F("* Setting max errors permitted to minimum for safety"));
+                          errorsPermitted = MIN_ERRORS_PERMITTED;
+                          counterRequest = 1;
+                        } else {
+                          Serial_println(F("* Counter cycle stealing is or will be switched off"));
+                          Serial_println(F("* Setting max errors permitted back to initial value"));
+                          errorsPermitted = INIT_ERRORS_PERMITTED;
+                          counterRequest = 0;
+                        }
+                        EEPROM.update(EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY, counterCycleStealDelay);
                         break;
                       }
-                      {
-                        int l;
-                        int n;
-                        if ((l = sscanf(RSp, "%hhd%n", &counterCycleStealDelay, &n)) > 0) {
-                          if (counterCycleStealDelay) {
-                            if (counterRepeatingRequest) {
-                              Serial_println(F("* Repetitive requesting of counter values already active, will not enable counter cycle stealing"));
-                              break;
-                            }
-                            if (counterRequest && !counterCycleStealDelay) {
-                              Serial_println(F("* Previous single counter request not finished yet"));
-                              break;
-                            }
-                            Serial_print(F("* Counter cycle stealing will be active with delay set to (recommended: 9) "));
-                            Serial_println(counterCycleStealDelay);
-                            Serial_println(F("* Setting errorsPermitted to 2 for safety"));
-                            errorsPermitted = 2;
-                            counterRequest = 1;
-                          } else {
-                            Serial_println(F("* Counter cycle stealing will be switched off"));
-                            Serial_println(F("* Setting errorsPermitted back to initial value"));
-                            errorsPermitted = INIT_ERRORS_PERMITTED;
-                            counterRequest = 0;
-                          }
-                          EEPROM.update(EEPROM_ADDRESS_COUNTER_CYCLE_STEAL_DELAY, counterCycleStealDelay);
-                          break;
-                        }
-                        if (counterCycleStealDelay) {
-                          Serial_print(F("* Counter cycle stealing is active with delay "));
-                          Serial_println(counterCycleStealDelay);
-                        } else {
-                          Serial_println(F("* Counter cycle stealing is switched off"));
-                        }
+                      if (counterCycleStealDelay) {
+                        Serial_print(F("* Counter cycle stealing is active with delay "));
+                        Serial_println(counterCycleStealDelay);
+                      } else {
+                        Serial_println(F("* Counter cycle stealing is switched off"));
                       }
                       break;
 #else
@@ -1050,21 +1045,22 @@ byte wr_busy = 0;
                         break;
                       }
                       wr_n = 0;
-                      while ((wr_n < WR_MAX) && ((n = sscanf(RSp + scannedTotal, (const char*) "%2hhx%2hhx%2hhx%n", &wr_pt[wr_n], &wr_nr[wr_n], &wr_val[wr_n], &scanned)) > 0)) {
+                      while ((wr_n < WR_MAX) && ((scannedParams = sscanf(RSp, (const char*) "%2hhx%2hhx%2hhx%hhn", &wr_pt[wr_n], &wr_nr[wr_n], &wr_val[wr_n], &scannedLength)) > 0)) {
+                        RSp += scannedLength;
                         // Valid write parameters
                         // Model 10 BCL FDY  38 0 1 2 4 6 8
                         // Model 11 LPA FXMQ 38 0 1 2 4 6 8
                         // Model 12 M   FDYQ 3B 0 1 2 4 6 8 16 17
                         //
                         // check wr_pt
-                        if (n != 3) {
+                        if (scannedParams != 3) {
                           Serial_print(F("* Ignoring (all) instruction(s), expected 3 arguments, received: "));
-                          Serial_print(n);
-                          if (n > 0) {
+                          Serial_print(scannedParams);
+                          if (scannedParams > 0) {
                             Serial_print(F(" pt: 0x"));
                             Serial_print(wr_pt[wr_n], HEX);
                           }
-                          if (n > 1) {
+                          if (scannedParams > 1) {
                             Serial_print(F(" nr: 0x"));
                             Serial_print(wr_nr[wr_n], HEX);
                           }
@@ -1079,29 +1075,28 @@ byte wr_busy = 0;
                             break;
                           }
                           wr_n++;
-                          scannedTotal += scanned;
                         }
                       }
                       break;
 #endif /* F_SERIES */
 #ifdef MHI_SERIES
             case 'g':
-            case 'G': Serial.print(F("* Checksum generation on/off "));
+            case 'G': Serial_print(F("* Checksum generation on/off "));
                       if (scanint(RSp, temp) == 1) {
                         cs_gen = temp ? 1 : 0;
                         Serial_print(F("set to "));
                       }
-                      Serial.println(cs_gen);
+                      Serial_println(cs_gen);
                       break;
             case 'm':
-            case 'M': Serial.print(F("* MHI format translation 3-to-1 on/off "));
+            case 'M': Serial_print(F("* MHI format translation 3-to-1 on/off "));
                       if (scanint(RSp, temp) == 1) {
                         mhiFormat = temp ? 1 : 0;
                         P1P2MQTT.setMHI(mhiFormat);
                         EEPROM.update(EEPROM_ADDRESS_MHI_FORMAT, mhiFormat);
-                        Serial.print(F("set to "));
+                        Serial_print(F("set to "));
                       }
-                      Serial.println(mhiFormat);
+                      Serial_println(mhiFormat);
                       break;
 #endif /* MHI_SERIES */
             case 'v':
@@ -1170,22 +1165,26 @@ byte wr_busy = 0;
             case 'W':
 #ifdef EF_SERIES
                       if (CONTROL_ID) {
-                        // in L1/L5 mode, insert message in time allocated for 40F030 slot
+                        // in L1/L5 mode, insert message in time allocated for (E-Series:) 40F030 or (F-Series:) 40F03X time slot
                         if (insertMessageCnt) {
                           Serial_println(F("* insertMessage already scheduled"));
                           break;
                         }
+#ifdef E_SERIES
                         if (restartDaikinCnt) {
                           Serial_println(F("* restartDaikin already scheduled"));
                           break;
                         }
                         Serial_print(F("* Writing next 40Fx30 slot: "));
+                        restartDaikinReady = 0; // to indicate insertMessage is overwritten and restart cannot be done until new restart packet is received
+#else /* E_SERIES */
+                        Serial_print(F("* Writing next 40Fx3x slot: "));
+#endif /* E_SERIES */
                         insertMessageLength = 0;
-                        restartDaikinReady = 0; // to indicate insertMessage is overwritten and restart cannot be done until new packet received/loaded
-                        while ((wb < RB_SIZE) && (wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
+                        while ((wb < RB_SIZE) && (wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2hhx%hhn", &wbtemp, &scannedLength) == 1)) {
+                          RSp += scannedLength;
                           insertMessage[insertMessageLength++] = wbtemp;
                           insertMessageCnt = 1;
-                          RSp += n;
                           {
                             if (wbtemp <= 0x0F) Serial_print("0");
                             Serial_print(wbtemp, HEX);
@@ -1200,31 +1199,31 @@ byte wr_busy = 0;
                       }
 #endif /* EF_SERIES */
                       // for non-Daikin systems, and for Daikin systems in L0 mode, just schedule a packet write, use with care
-                      Serial_print(F("* Scheduling write: "));
+                      if (!P1P2MQTT.writeready()) {
+                        Serial_println(F("* Refusing to write packet while previous packet wasn't finished"));
+                        if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
+                        break;
+                      }
                       wb = 0;
-                      while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2x%n", &wbtemp, &n) == 1)) {
+                      while ((wb < WB_SIZE) && (sscanf(RSp, (const char*) "%2hhx%hhn", &wbtemp, &scannedLength) == 1)) {
+                        RSp += scannedLength;
+                        if (!wb) Serial_print(F("* Scheduling write: "));
                         WB[wb++] = wbtemp;
-                        RSp += n;
                         {
                           if (wbtemp <= 0x0F) Serial_print("0");
                           Serial_print(wbtemp, HEX);
                         }
                       }
-                      Serial_println();
-                      if (P1P2MQTT.writeready()) {
-                        if (wb) {
-#ifdef MHI_SERIES
-                          P1P2MQTT.writepacket(WB, wb, sd, cs_gen);
-#else /* MHI_SERIES */
-                          P1P2MQTT.writepacket(WB, wb, sd, CRC_GEN, CRC_CS_FEED);
-#endif /* MHI_SERIES */
-                        } else {
-                          Serial_println(F("* Refusing to write empty packet"));
-                        }
-                      } else {
-                        Serial_println(F("* Refusing to write packet while previous packet wasn't finished"));
-                        if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
+                      if (!wb) {
+                        Serial_println(F("* Refusing to write empty packet"));
+                        break;
                       }
+                      Serial_println();
+#ifdef MHI_SERIES
+                      P1P2MQTT.writepacket(WB, wb, sd, cs_gen);
+#else /* MHI_SERIES */
+                      P1P2MQTT.writepacket(WB, wb, sd, CRC_GEN, CRC_CS_FEED);
+#endif /* MHI_SERIES */
                       break;
             case 'k': // soft-reset ESP
             case 'K': Serial_println(F("* Resetting ATmega ...."));
@@ -1343,7 +1342,7 @@ byte wr_busy = 0;
                           case 98 : Serial_println(F("* restart data"));
                                     restartData();
                                     break;
-#ifdef ENABLE_INSERT_MESSAGE
+#ifdef E_SERIES
                           case 99 : if (compressor) {
                                       Serial_println(F("* restart refused, because compressor is on"));
                                       break;
@@ -1363,62 +1362,97 @@ byte wr_busy = 0;
                                     restartDaikinCnt = RESTART_NR_MESSAGES;
                                     Serial_println(F("* Scheduling attempt to restart Daikin"));
                                     break;
-#endif /* ENABLE_INSERT_MESSAGE */
+#endif /* E_SERIES */
                           case  0 :
                           case  1 :
                           case  2 :
                           case  3 :
-                          case  5 : if (temp & 0x01) {
+#ifdef F_SERIES
+                          case  5 : 
+#endif /* F_SERIES */
+                                    if (temp & 0x01) {
                                       if (errorsPermitted < MIN_ERRORS_PERMITTED) {
                                         Serial_println(F("* Errorspermitted (error budget) too low; control not enabled"));
                                         break;
                                       }
                                       if (CONTROL_ID) {
-                                        Serial_print(F("* CONTROL_ID is 0x"));
+                                        Serial_print(F("* Control_id is 0x"));
                                         Serial_print(CONTROL_ID, HEX);
-                                        Serial_print(F(", changing control mode to L"));
-                                        Serial_println(temp);
-                                        if (temp < 2) EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+#ifdef F_SERIES
+                                        if (temp == 5) {
+                                          Serial_print(F(", changing to partial control mode L5"));
+                                        }
+#endif /* F_SERIES */
+                                        if (temp == 1) {
+                                          Serial_print(F(", saving L1 to EEPROM"));
+                                          EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                                        }
+                                        Serial_println();
+#ifdef F_SERIES
                                         controlLevel = (temp == 5) ? 0 : 1; // F-series: special mode L5 answers only to F030
+#endif /* F_SERIES */
                                         break;
                                       }
                                       if (FxAbsentCnt[0] == F0THRESHOLD) {
-                                        Serial_println(F("* Control_id 0xF0 supported and free, starting auxiliary controller"));
+                                        Serial_print(F("* Control_id 0xF0 supported and free, starting "));
+#ifdef F_SERIES
+                                        if (temp == 5) Serial_print(F("(partial mode) "));
+#endif /* F_SERIES */
+                                        Serial_print(F("auxiliary controller"));
                                         CONTROL_ID = 0xF0;
+#ifdef F_SERIES
                                         controlLevel = (temp == 5) ? 0 : 1; // F-series: special mode L5 answers only to F030
-                                        if (temp < 2) EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID); // L2/L3/L5 for short experiments, doesn't survive ATmega reboot !
+#endif /* F_SERIES */
+                                        if (temp == 1) {
+                                          EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID); // L2/L3/L5 for short experiments, doesn't survive ATmega reboot !
+                                          Serial_print(F(", saving L1 to EEPROM"));
+                                        }
+                                        Serial_println();
 #ifdef E_SERIES
                                       } else if (FxAbsentCnt[1] == F0THRESHOLD) {
-                                        Serial_println(F("* Control_id 0xF1 supported, no auxiliary controller found for 0xF1, switching control functionality on 0xF1 on"));
+                                        Serial_print(F("* Control_id 0xF1 supported and free, starting auxiliary controller"));
                                         CONTROL_ID = 0xF1;
-                                        if (temp < 2) EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                                        if (temp == 1) {
+                                          EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID); // L2/L3/L5 for short experiments, doesn't survive ATmega reboot !
+                                          Serial_print(F(", saving L1 to EEPROM"));
+                                        }
+                                        Serial_println();
                                       } else if (FxAbsentCnt[3] == F0THRESHOLD) {
                                         Serial_println(F("* Control_id 0xFF supported, no auxiliary controller found for 0xFF, but control on 0xFF not supported (yet?)"));
+                                        break;
 #endif /* E_SERIES */
                                       } else {
                                         Serial_println(F("* No free address for controller found (yet). Control functionality not enabled"));
                                         Serial_println(F("* You may wish to re-try in a few seconds (and perhaps switch other auxiliary controllers off)"));
+                                        break;
                                       }
                                     } else {
                                       if (!CONTROL_ID) {
-                                        Serial_println(F("* CONTROL_ID is already 0x00"));
-                                        if (temp < 2) EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                                        Serial_print(F("* Control_id is already 0x00"));
+                                        if (temp == 0) {
+                                          Serial_println(F(", saving L0 to EEPROM"));
+                                          EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                                        }
+                                        Serial_println();
                                         break;
                                       } else {
                                         CONTROL_ID = 0x00;
                                         for (byte i = 0; i < WR_MAX; i++) wr_cnt[i] = 0;
                                       }
-                                      if (temp < 2) EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
+                                      if (temp == 0) EEPROM.update(EEPROM_ADDRESS_CONTROL_ID, CONTROL_ID);
                                     }
                                     Serial_print(F("* Control_id set to 0x"));
                                     if (CONTROL_ID <= 0x0F) Serial_print("0");
                                     Serial_println(CONTROL_ID, HEX);
                                     break;
-                          default : Serial_println(F("* Valid arguments: 0 (control mode off, store state in EEPROM), 1 (control mode on, store state in EEPROM),"));
-                                    Serial_println(F("*   2 (control mode off, do not store state in EEPROM), 3 (control mode on, do not store state in EEPROM),"));
+                          default : Serial_println(F("* Valid arguments:"));
+                                    Serial_println(F("*  0 (control mode off, store state in EEPROM)"));
+                                    Serial_println(F("*  1 (control mode on, store state in EEPROM)"));
+                                    Serial_println(F("*  2 (control mode off, do not store state in EEPROM)"));
+                                    Serial_println(F("*  3 (control mode on, do not store state in EEPROM)"));
 #ifdef F_SERIES
-                                    Serial_println(F("*   5 (partial control mode on, do not store state in EEPROM)"));
-                                    Serial_println(F("*   Control mode is limited for model 1 (F generic)"));
+                                    Serial_println(F("*  5 (partial control mode on, do not store state in EEPROM)"));
+                                    Serial_println(F("* Control mode is limited for model 1 (F generic)"));
 #endif /* F_SERIES */
                                     break;
                         }
@@ -1427,23 +1461,30 @@ byte wr_busy = 0;
                         if (CONTROL_ID <= 0x0F) Serial_print("0");
                         Serial_println(CONTROL_ID, HEX);
                         if (CONTROL_ID) {
+#ifdef F_SERIES
                           if (controlLevel) {
                             if (model > 1) {
-                              Serial_println(F("* Control mode is on (L1) "));
+#endif /* F_SERIES */
+                              Serial_println(F("* Control mode is on"));
+#ifdef F_SERIES
                             } else {
-                              Serial_println(F("* Control mode is on (L1) but limited because model=1, use M command to set Daikin model"));
+                              Serial_println(F("* Control mode is on but limited because model=1, use M command to set Daikin model"));
                             }
                           } else {
                             Serial_println(F("* Control mode is limited (L5 mode), replying only to 00F030*"));
                           }
+#endif /* F_SERIES */
                         } else {
                           Serial_println(F("* Control mode is off"));
                         }
-                        Serial_println(F("* Valid arguments: 0 (control mode off, store state in EEPROM), 1 (control mode on, store state in EEPROM),"));
-                        Serial_println(F("*   2 (control mode off, do not store state in EEPROM), 3 (control mode on, do not store state in EEPROM),"));
+                        Serial_println(F("* Valid arguments:"));
+                        Serial_println(F("*  0 (control mode off, store state in EEPROM)"));
+                        Serial_println(F("*  1 (control mode on, store state in EEPROM)"));
+                        Serial_println(F("*  2 (control mode off, do not store state in EEPROM)"));
+                        Serial_println(F("*  3 (control mode on, do not store state in EEPROM)"));
 #ifdef F_SERIES
-                        Serial_println(F("*   5 (partial control mode on, do not store state in EEPROM)"));
-                        Serial_println(F("*   Control mode is limited for model 1 (F generic)"));
+                        Serial_println(F("*  5 (partial control mode on, do not store state in EEPROM)"));
+                        Serial_println(F("* Control mode is limited for model 1 (F generic)"));
 #endif /* F_SERIES */
                       }
                       break;
@@ -1555,7 +1596,7 @@ byte wr_busy = 0;
     uint16_t delta;
     errorbuf_t readError = 0;
 #ifdef MHI_SERIES
-    int nread = P1P2MQTT.readpacket(RB, delta, EB, RB_SIZE, cs_gen);
+    uint16_t nread = P1P2MQTT.readpacket(RB, delta, EB, RB_SIZE, cs_gen);
 #else /* MHI_SERIES */
     int nread = P1P2MQTT.readpacket(RB, delta, EB, RB_SIZE, CRC_GEN, CRC_CS_FEED);
 #endif /* MHI_SERIES */
@@ -1815,8 +1856,9 @@ byte wr_busy = 0;
         }
       }
 #endif /* E_SERIES */
-      if ((nread > 4) && (RB[0] == 0x40) && (((RB[1] & 0xFE) == 0xF0) || (RB[1] == 0xFF)) && ((RB[2] & 0x30) == 0x30)) {
-        // non-empty 40Fx3x auxiliary controller reply received - note this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < F03XDELAY/F030DELAY (- margin)
+      if ((nread > 4) && (RB[0] == 0x40) && (((RB[1] & 0xFE) == 0xF0) || (RB[1] == 0xFF)) && ((RB[2] & 0xF0) == 0x30)) {
+        // non-empty 40Fx3x auxiliary controller reply received from F0, F1, or FF
+        // this could be our own (slow, delta=F030DELAY or F03XDELAY) reply so only reset count if delta < F03XDELAY/F030DELAY (- margin)
         // Note for developers using >1 P1P2Monitor-interfaces (=to self): this detection mechanism fails if there are 2 P1P2Monitor programs (and adapters) with same delay settings on the same bus.
         // check if there is any other auxiliary controller on 0x3x:
         if (((RB[2] == 0x30) && (delta < F030DELAY - 2)) || ((RB[2] != 0x30) && (delta < F03XDELAY - 2))) {
@@ -1829,7 +1871,7 @@ byte wr_busy = 0;
             stopControlAndCounters(0);
           }
         }
-      } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0x30) == 0x30) && !F030forcounter)  {
+      } else if ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0xF0) == 0x30) && !F030forcounter)  {
         // non-empty 00Fx3x (F0/F1, but not FF, FF is not yet supported) request message received, and we did not use this slot to request counters
         // check if there is no other auxiliary controller
         // TODO should we detect and report empty payload messages?
@@ -1841,7 +1883,9 @@ byte wr_busy = 0;
             if (CONTROL_ID == RB[1]) {
               Serial_println(F(" detected, control functionality will restart"));
               insertMessageCnt = 0;  // avoid delayed insertMessage/restartDaikin
+#ifdef E_SERIES
               restartDaikinCnt = 0;
+#endif /* E_SERIES */
             } else {
 #ifdef E_SERIES
               Serial_println(F(" detected, switching control functionality can be switched on (using L command, L1 for full control)"));
@@ -1900,76 +1944,72 @@ byte wr_busy = 0;
           }
         }
 #endif /* F_SERIES */
-        // act as auxiliary controller:
-        if ((CONTROL_ID && (FxAbsentCnt[CONTROL_ID & 0x03] == F0THRESHOLD) && (RB[1] == CONTROL_ID))
-#ifdef ENABLE_INSERT_MESSAGE
-            || ((insertMessageCnt || restartDaikinCnt) && (FxAbsentCnt[CONTROL_ID & 0x03] == F0THRESHOLD) && (RB[0] == 0x00) && (RB[1] == CONTROL_ID)
-#ifndef ENABLE_INSERT_MESSAGE_3x
-                                                                                             && (RB[2] == 0x30)
-#endif /* ENABLE_INSERT_MESSAGE_3x */
-                                                                                                               )
-#endif /* ENABLE_INSERT_MESSAGE */
-                                                                                                     ) {
+        // insert message (or restart Daikin) if reply slot is safe and if scheduled
+        // precondition here: ((nread > 4) && (RB[0] == 0x00) && ((RB[1] & 0xFE) == 0xF0) && ((RB[2] & 0xF0) == 0x30) && !F030forcounter)
+        // non-empty 00Fx3x (F0/F1, but not FF, FF is not yet supported) request message received, and we did not use this slot to request counters
+        byte writeAction = 0;
+        byte nwrite = nread; // nread is uint16_t but should fit in uint8_t
+        byte d = 0;
+        if (nread > 24) {
+          Serial_print(F("* Surprise: received 00Fx3x packet of size "));
+          Serial_println(nread);
+          nwrite = 24;
+        }
+        if (CRC_GEN) nwrite--; // omit CRC from received-byte-counter
+        // insert user-specified message or restart Daikin message
+        if ((FxAbsentCnt[RB[1] & 0x01] == F0THRESHOLD) && (insertMessageCnt
+#ifdef E_SERIES
+                                                                            || restartDaikinCnt) && (RB[2] == 0x30
+#endif /* E_SERIES */
+                                                                                                                  )) {
+          // prepare insertMessage/restart
+          for (int i = 0; i < insertMessageLength; i++) WB[i] = insertMessage[i];
+#ifdef E_SERIES
+          if (restartDaikinCnt) {
+            WB[RESTART_PACKET_PAYLOAD_BYTE + 3] |= RESTART_PACKET_BYTE;
+          }
+#endif /* E_SERIES */
+          d = F030DELAY_INSERT;
+          nwrite = insertMessageLength;
+          writeAction = 2;
+        }
+        // auxiliary controller
+        if (!writeAction && (FxAbsentCnt[RB[1] & 0x01] == F0THRESHOLD) && CONTROL_ID && (RB[1] == CONTROL_ID)) {
+          // or if no message to insert, prepare to act as auxiliary controller if reply slot is safe and if CONTROL_ID matches RB[1]:
           WB[0] = 0x40;
           WB[1] = RB[1];
           WB[2] = RB[2];
-          int n = nread;
-          int d = F03XDELAY;
-          bool wr = 0;
-          byte w;
-          if (CRC_GEN) n--; // omit CRC from received-byte-counter
-          if (n > WB_SIZE) {
-            n = WB_SIZE;
-            Serial_print(F("* Surprise: received 00Fx3x packet of size "));
-            Serial_println(nread);
-          }
+          d = F03XDELAY;
+          byte w = 0;
 #ifdef E_SERIES
           switch (RB[2]) {
             case 0x30 :
-#ifdef ENABLE_INSERT_MESSAGE
-                        if (insertMessageCnt || restartDaikinCnt) {
-                          for (int i = 0; i < insertMessageLength; i++) WB[i] = insertMessage[i];
-                          if (insertMessageCnt) {
-                            Serial_println(F("* Insert user-specified message"));
-                            insertMessageCnt--;
-                          }
-                          if (restartDaikinCnt) {
-                            Serial_println(F("* Attempt to restart Daikin"));
-                            WB[RESTART_PACKET_PAYLOAD_BYTE + 3] |= RESTART_PACKET_BYTE;
-                            restartDaikinCnt--;
-                          }
-                          d = F030DELAY_INSERT;
-                          n = insertMessageLength;
-                          wr = 1;
-                          break;
-                        }
-#endif
                         // in: 17 byte; out: 17 byte; answer WB[7] should contain a 01 if we want to communicate a new setting in packet type 35
-                        for (w = 3; w < n; w++) WB[w] = 0x00;
+                        for (byte w = 3; w < nwrite; w++) WB[w] = 0x00;
                         // set byte WB[<wr_pt - 0x2E>] to 0x01 to request a F03x message to set wr_nr to wr_val
                         for (byte i = 0; i < wr_n; i++) if (wr_cnt[i]) WB[wr_pt[i] - 0x2E] = 0x01;
                         if (insertRoomTemperature) WB[0x36 - 0x2E] = 0x01;
                         d = F030DELAY;
-                        wr = 1;
+                        writeAction = 1;
                         break;
             case 0x31 : // in: 15 byte; out: 15 byte; out pattern is copy of in pattern except for 2 bytes RB[7] RB[8]; function partly date/time, partly unknown
                         // RB[7] RB[8] seem to identify the auxiliary controller type;
                         // Do pretend to be a LAN adapter (even though this may trigger "data not in sync" upon restart?)
                         // If we don't set address, installer mode in main thermostat may become inaccessible
-                        for (w = 3; w < n; w++) WB[w] = RB[w];
+                        for (w = 3; w < nwrite; w++) WB[w] = RB[w];
 #ifdef CTRL_ID_1
                         WB[7] = CTRL_ID_1;
 #endif
 #ifdef CTRL_ID_2
                         WB[8] = CTRL_ID_2;
 #endif
-                        wr = 1;
+                        writeAction = 1;
                         break;
             case 0x32 : // in: 19 byte: out 19 byte, out is copy in
-                        for (w = 3; w < n; w++) WB[w] = RB[w];
+                        for (w = 3; w < nwrite; w++) WB[w] = RB[w];
                         // on one system, response is all-zero, so consider to change to all-zero response:
-                        // for (w = 3; w < n; w++) WB[w] = 0x00;
-                        wr = 1;
+                        // for (w = 3; w < nwrite; w++) WB[w] = 0x00;
+                        writeAction = 1;
                         break;
             case 0x33 : // not seen, no response
                         break;
@@ -1981,7 +2021,7 @@ byte wr_busy = 0;
                         // A parameter consists of 3 bytes: 2 bytes for param nr, and 1 byte for value
                         // parameters in the 00F035 message may indicate status changes in the heat pump (parameters 0144- or 0162- ASCII name of device)
                         // parameters in the 00F03A message may indicate system status (silent, schedule, unit, DST, holiday)
-                        for (w = 3; w < n; w++) WB[w] = 0xFF;
+                        for (w = 3; w < nwrite; w++) WB[w] = 0xFF;
                         w = 3;
                         for (byte i = 0; i < wr_n; i++) {
                           if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
@@ -1989,13 +2029,13 @@ byte wr_busy = 0;
                              WB[w++] = wr_nr[i] >> 8;
                              WB[w++] = (wr_val[i] & 0xFF);
                           }
-                          if (w >= n) break; // max 6 writes in 0x35/0x3A
+                          if (w >= nwrite) break; // max 6 writes in 0x35/0x3A
                         }
-                        wr = 1;
+                        writeAction = 1;
                         break;
             case 0x36 : // in: 23 byte; out 23 byte; 2-byte parameters; reply with FF
                         // A parameter consists of 4 bytes: 2 bytes for param nr, and 2 bytes for value
-                        for (w = 3; w < n; w++) WB[w] = 0xFF;
+                        for (w = 3; w < nwrite; w++) WB[w] = 0xFF;
                         w = 3;
 
                         if (insertRoomTemperature) {
@@ -2011,16 +2051,16 @@ byte wr_busy = 0;
                             WB[w++] = wr_val[i] & 0xFF;
                             WB[w++] = (wr_val[i] >> 8) & 0xFF;
                           }
-                          if (w >= n) {
+                          if (w >= nwrite) {
                             if (i + 1 < wr_n) Serial_println(F("* >5 writes in 0x36 not possible, skipping some"));
                             break; // max 5 writes in 0x36/0x3B
                           }
                         }
-                        wr = 1;
+                        writeAction = 1;
                         break;
             case 0x3B : // in: 23 byte; out 23 byte; 2-byte parameters; reply with FF
                         // A parameter consists of 4 bytes: 2 bytes for param nr, and 2 bytes for value
-                        for (w = 3; w < n; w++) WB[w] = 0xFF;
+                        for (w = 3; w < nwrite; w++) WB[w] = 0xFF;
                         w = 3;
                         for (byte i = 0; i < wr_n; i++) {
                           if ((wr_cnt[i])  && (wr_pt[i]  == RB[2])) {
@@ -2029,14 +2069,14 @@ byte wr_busy = 0;
                              WB[w++] = wr_val[i] & 0xFF;
                              WB[w++] = (wr_val[i] >> 8) & 0xFF;
                           }
-                          if (w >= n) break; // max 5 writes in 0x36/0x3B
+                          if (w >= nwrite) break; // max 5 writes in 0x36/0x3B
                         }
-                        wr = 1;
+                        writeAction = 1;
                         break;
             case 0x37 : // fall-through
             case 0x3C : // in: 23 byte; out 23 byte; 3-byte parameters; reply with FF
                         // A parameter consists of 4 bytes: 2 bytes for param nr, and 3 bytes for value
-                        for (w = 3; w < n; w++) WB[w] = 0xFF;
+                        for (w = 3; w < nwrite; w++) WB[w] = 0xFF;
                         w = 3;
                         for (byte i = 0; i < wr_n; i++) {
                           if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
@@ -2046,9 +2086,9 @@ byte wr_busy = 0;
                              WB[w++] = (wr_val[i] >> 8) & 0xFF;
                              WB[w++] = (wr_val[i] >> 16) & 0xFF;
                           }
-                          if (w >= n) break; // max 4 writes in 0x37/0x3C
+                          if (w >= nwrite) break; // max 4 writes in 0x37/0x3C
                         }
-                        wr = 1;
+                        writeAction = 1;
                         break;
             case 0x38 : // fall-through
             case 0x39 : // fall-through
@@ -2057,7 +2097,7 @@ byte wr_busy = 0;
                         // parameters in the 00F039 range are field settings
                         // parameters in the 00F03D range are ?
                         // A parameter consists of 6 bytes: 2 bytes for param nr, and 4 bytes for value
-                        for (w = 3; w < n; w++) WB[w] = 0xFF;
+                        for (w = 3; w < nwrite; w++) WB[w] = 0xFF;
                         w = 3;
                         for (byte i = 0; i < wr_n; i++) {
                           if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
@@ -2068,38 +2108,18 @@ byte wr_busy = 0;
                             WB[w++] = (wr_val[i] >> 16) & 0xFF;
                             WB[w++] = (wr_val[i] >> 24) & 0xFF;
                           }
-                          if (w >= n) break; // max 3 writes in 0x38/0x39/0x3D
+                          if (w >= nwrite) break; // max 3 writes in 0x38/0x39/0x3D
                         }
-                        wr = 1;
+                        writeAction = 1;
                         break;
             case 0x3E : // schedule related packet
                         // 0x3E01, 0x3E02, ... in: 23 byte; out: 23 byte; out 40F13E01(even for higher) + 19xFF
                         WB[3] = RB[3];
-                        for (w = 4; w < n; w++) WB[w] = 0xFF;
-                        wr = 1;
+                        for (w = 4; w < nwrite; w++) WB[w] = 0xFF;
+                        writeAction = 1;
                         break;
             default   : // 0x31/0x33/0x34/0x3F not seen, no response
                         break;
-          }
-          if (wr) {
-            if (P1P2MQTT.writeready()) {
-              P1P2MQTT.writepacket(WB, n, d, CRC_GEN, CRC_CS_FEED);
-              for (byte i = 0; i < wr_n; i++) {
-                if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
-                  wr_cnt[i]--;
-                  parameterWritesDone ++;
-                  Serial_print(F("* Executing E command for packet 0x"));
-                  Serial_print(wr_pt[i], HEX);
-                  Serial_print(" setting param 0x");
-                  Serial_print(wr_nr[i], HEX);
-                  Serial_print(" to 0x");
-                  Serial_println(wr_val[i], HEX);
-                }
-              }
-            } else {
-              Serial_println(F("* Refusing to write packet while previous packet wasn't finished"));
-              if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
-            }
           }
 #endif /* E_SERIES */
 #ifdef F_SERIES
@@ -2152,43 +2172,42 @@ etc
 
 For FDYQ-like systems, try using the same commands with packet type 38 replaced by 3B.
 */
-
           switch (RB[2]) {
             case 0x30 : // all models: polling auxiliary controller, reply with empty payload
               d = F030DELAY;
-              wr = 1;
-              n = 3;
+              writeAction = 1;
+              nwrite = 3;
               break;
             case 0x32 : // incoming message,  occurs only once, 8 bytes, first byte is 0xC0, others 0x00; reply is one byte value 0x01? polling auxiliary controller?, reply with empty payload
               // if (model != 11)  break;
               // FXMQ / version LPA
-              wr = controlLevel;
-              n = 4;
+              writeAction = controlLevel;
+              nwrite = 4;
               WB[3]  = 0x01; // W target status
               break;
             case 0x35 : // FXMQ outside unit name, reply with empty payload
               // if (model != 11)  break;
               // FXMQ / version LPA
-              wr = controlLevel;
-              n = 3;
+              writeAction = controlLevel;
+              nwrite = 3;
               break;
             case 0x36 : // FXMQ indoor unit name, reply with empty payload
               // if (model != 11)  break;
               // FXMQ / version LPA
-              wr = controlLevel;
-              n = 3;
+              writeAction = controlLevel;
+              nwrite = 3;
               break;
             case 0x37 : // FDYQ / version M  zone name packet, reply with empty payload
               // if (model != 12)  break;
               // FDYQ / version M
-              wr = controlLevel;
-              n = 3;
+              writeAction = controlLevel;
+              nwrite = 3;
               break;
             case 0x38 :
               if (model == 10) {
                 // FDY / version BCL control message, copy bytes back and change if 'F' command is given
-                wr = controlLevel;
-                n = 18;
+                writeAction = controlLevel;
+                nwrite = 18;
                 for (w = 13; w <= 15; w++) WB[w] = 0x00;
                 WB[3]  = RB[3] & 0x01;           // W target status
                 WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
@@ -2203,14 +2222,14 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 WB[16] = RB[18];                 //   target fan mode ?? & 0x03 ?
                 WB[17] = 0x00;                   //   ? (change flag, & 0x7F ?)
                 for (byte i = 0; i < wr_n; i++) {
-                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; wr_cnt[i]--; };
+                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; /* wr_cnt[i]--; */ };
                 }
                 break;
               }
               if (model == 11) {
                 // FXMQ / version PCL control message, copy a few bytes back, change bytes if 'F' command is given
-                wr = controlLevel;
-                n = 20;
+                writeAction = controlLevel;
+                nwrite = 20;
                 WB[3]  = RB[3] & 0x01;           // W target status
                 WB[4]  = RB[5];                  // W target operating mode
                 WB[5]  = RB[7];                  // W target temperature cooling (can be changed by reply with different value)
@@ -2232,7 +2251,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                   if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
                     if ((wr_nr[i] == 0) && (WB[wr_nr[i] + 3] == 0x00) && (wr_val[i])) WB[16] |= 0x20; // change payload byte 13 from C0 to E0, only if payload byte 0 is set to 1 here
                     WB[wr_nr[i] + 3] = wr_val[i];
-                    wr_cnt[i]--;
+/*                    wr_cnt[i]--; */
                   }
                 }
                 break;
@@ -2241,35 +2260,33 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
             case 0x39 :
               if (model == 10)  {
                 // guess that this is filter warning for FDY / version BCL, reply with 4-byte payload
-                wr = controlLevel;
-                n = 7;
+                writeAction = controlLevel;
+                nwrite = 7;
                 WB[3] = 0x00;
                 WB[4] = 0x00;
                 WB[5] = RB[11];
                 WB[6] = RB[12];
-                for (byte i = 0; i < wr_n; i++) {
-                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; wr_cnt[i]--; };
-                }
+                // for now, don't support write
                 break;
               }
               if (model == 11) {
                 // FXMQ / LPA reply with 5-byte all-zero payload
-                wr = controlLevel;
-                n = 8;
+                writeAction = controlLevel;
+                nwrite = 8;
                 WB[3] = 0x00;
                 WB[4] = 0x00;
                 WB[5] = 0x00;
                 WB[6] = 0x00;
                 WB[7] = 0x00;
-                // for now, don't support write: for (byte i = 0; i < wr_n; i++) { if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; wr_cnt[i]--; };
+                // for now, don't support write
                 break;
               }
               break;
             case 0x3A : // ??, reply with 8-byte all-zero payload
               if (model == 11)  {
                 // FXMQ / version LPA
-                wr = controlLevel;
-                n = 11;
+                writeAction = controlLevel;
+                nwrite = 11;
                 WB[3] = 0x00;
                 WB[4] = 0x00;
                 WB[5] = 0x00;
@@ -2278,15 +2295,15 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 WB[8] = 0x00;
                 WB[9] = 0x00;
                 WB[10] = 0x00;
-                // for now, don't support write: for (byte i = 0; i < wr_n; i++) { if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; wr_cnt[i]--; };
+                // for now, don't support write
                 break;
               }
               break;
             case 0x3B : // FDYQ /version M control message, copy bytes back and change if 'F' command is given
               if (model == 12)  {
                 // FDYQ / version M
-                wr = controlLevel;
-                n = 22;
+                writeAction = controlLevel;
+                nwrite = 22;
                 for (w = 13; w <= 18; w++) WB[w] = 0x00;
                 WB[3]  = RB[3] & 0x01;           // W target status
                 WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
@@ -2302,7 +2319,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 WB[20] = RB[21] & 0x03;          // W target fan mode
                 WB[21] = 0x00;                   //   ? (change flag, & 0x7F ?)
                 for (byte i = 0; i < wr_n; i++) {
-                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; wr_cnt[i]--; };
+                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; /* wr_cnt[i]--; */ };
                 }
                 break;
               }
@@ -2310,40 +2327,81 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
             case 0x3C : // FDYQ filter message, reply with 2-byte zero payload
               if (model == 12)  {
                 // FDYQ / version M
-                wr = controlLevel;
-                n = 5;
+                writeAction = controlLevel;
+                nwrite = 5;
                 WB[3] = 0x00;
                 WB[4] = 0x00;
-                for (byte i = 0; i < wr_n; i++) {
-                  if (wr_cnt[i] && (wr_pt[i] == RB[2])) { WB[wr_nr[i] + 3] = wr_val[i]; wr_cnt[i]--; };
-                }
+                // for now, don't support write
                 break;
               }
               break;
             default   : // 0x31/0x33/0x34/0x3E/0x3F not seen, no response
               break;
           }
-          if (wr) {
-            if (P1P2MQTT.writeready()) {
-              P1P2MQTT.writepacket(WB, n, d, CRC_GEN, CRC_CS_FEED);
-            } else {
-              Serial_println(F("* Refusing to write packet while previous packet wasn't finished, flushing write action"));
-              if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
-            }
-          }
 #endif /* F_SERIES */
+        }
+        if (writeAction) {
+          if (P1P2MQTT.writeready()) {
+            P1P2MQTT.writepacket(WB, nwrite, d, CRC_GEN, CRC_CS_FEED);
+            // report action
+#ifdef E_SERIES
+            if (writeAction == 1) {
+              for (byte i = 0; i < wr_n; i++) {
+                if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
+                  wr_cnt[i]--;
+                  parameterWritesDone ++;
+                  Serial_print(F("* Executing E command for packet 0x"));
+                  Serial_print(wr_pt[i], HEX);
+                  Serial_print(" setting param 0x");
+                  Serial_print(wr_nr[i], HEX);
+                  Serial_print(" to 0x");
+                  if (wr_val[i] <= 0x0F) Serial_print('0');
+                  Serial_println(wr_val[i], HEX);
+                }
+              }
+            }
+            if (writeAction == 2) {
+              if (insertMessageCnt) {
+                Serial_println(F("* Insert user-specified message"));
+                insertMessageCnt--;
+              }
+              if (restartDaikinCnt) {
+                Serial_println(F("* Attempt to restart Daikin"));
+                restartDaikinCnt--;
+              }
+            }
+#endif /* E_SERIES */
+#ifdef F_SERIES
+            if ((writeAction == 1) && ((RB[2] == 0x3B) || (RB[2] == 0x38 ))) {
+              for (byte i = 0; i < wr_n; i++) {
+                if (wr_cnt[i] && (wr_pt[i] == RB[2])) {
+                  wr_cnt[i]--;
+                  Serial_print(F("* Executing F command for packet 0x"));
+                  Serial_print(wr_pt[i], HEX);
+                  Serial_print(" setting payload byte ");
+                  Serial_print(wr_nr[i]);
+                  Serial_print(" to 0x");
+                  Serial_println(wr_val[i], HEX);
+                }
+              }
+            }
+#endif /* F_SERIES */
+          } else {
+            Serial_println(F("* Refusing to write packet while previous packet write wasn't finished"));
+            if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
+          }
         }
       }
     }
 #endif /* MONITORCONTROL */
 
-#ifdef ENABLE_INSERT_MESSAGE
+#ifdef E_SERIES
     if ((insertMessageCnt == 0) && (RB[0] == 0x00) && (RB[1] == 0x00) && (RB[2] == RESTART_PACKET_TYPE)) {
       for (int i = 0; i < nread - 1; i++) insertMessage[i] = RB[i];
       insertMessageLength = nread - 1;
       restartDaikinReady = 1;
     }
-#endif
+#endif /* E_SERIES */
 
 #ifdef PSEUDO_PACKETS
 #ifdef EF_SERIES
@@ -2435,7 +2493,7 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
       if (EB[i] & ERROR_CRC_CS) {
         // CS or CRC error detected in readpacket
 #ifdef MHI_SERIES
-        Serial.print(F(" CS error"));
+        Serial_print(F(" CS error"));
 #else /* MHI_SERIES */
         Serial_print(F(" CRC error"));
 #endif /* MHI_SERIES */
@@ -2489,9 +2547,17 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
     WB[9]  = errorsPermitted;
     WB[10] = (parameterWritesDone >> 8) & 0xFF;
     WB[11] = parameterWritesDone & 0xFF;
+#ifdef F_SERIES
     WB[12] = controlLevel;
+#else /* F_SERIES */
+    WB[12] = 0;
+#endif /* F_SERIES */
     WB[13] = CONTROL_ID;
+#ifdef F_SERIES
     WB[14] = CONTROL_ID ? controlLevel : 0; // auxiliary control mode fully on; is 1 for full control modes L1 and L3, 0 for L5
+#else /* F_SERIES */
+    WB[14] = CONTROL_ID ? 1 : 0;
+#endif /* F_SERIES */
 #endif /* EF_SERIES */
 #ifdef E_SERIES
     WB[15] = counterRepeatingRequest;

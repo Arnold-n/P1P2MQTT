@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20241012 v0.9.55 cleanup, fix insert message, fix L99 in L0 mode
  * 20240605 v0.9.53 replace KLICDA by configurable counterCycleStealDelay
  * 20240512 v0.9.46 simultaneous writes, (fake) room temperature sensor, MHI increased buffer size, check-sum, and MHI-protocol data conversion, removed OLD_COMMAND support
  * 20230702 v0.9.40 increase buffer size for Hitachi
@@ -266,8 +267,8 @@
 #define F03XDELAY  30   // Time delay for in ms auxiliary controller simulation, should preferably be a bit larger than any regular response from auxiliary controllers (which is typically 25 ms)
 #define F0THRESHOLD 5   // Number of 00Fx30 messages to remain unanswered before we feel safe to act as auxiliary controller
 
-#define ENABLE_INSERT_MESSAGE // enables L99 to restart Daikin system and enables W command to insert messages in 40F030 (3x if ENABLE_INSERT_ME$SAGE_3x also defined) slot during L1 operation, use with care!
-#define ENABLE_INSERT_MESSAGE_3x // enables L99 to restart Daikin system and enables W command to insert messages in 40F03x slot during L1 operation, use with even more care!
+// L99 command inserts messages to restart Daikin system
+// Wxxxxxx command inserts user-specified message in 40Fx3x time slot
 #define F030DELAY_INSERT 25    // Time delay for inserted message; 25 seems OK, but if bus collisions occur, try 5
 #define RESTART_NR_MESSAGES 2 // nr of restart messages to be sent (1 is sometimes not enough, 2 OK?)
 #define RESTART_PACKET_TYPE 0x12
