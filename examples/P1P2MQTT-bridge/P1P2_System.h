@@ -30,4 +30,8 @@
 
 #endif /* F_SERIES */
 
+#ifdef H_SERIES
+#define INIT_HITACHI_MODEL 1
+#endif /* H_SERIES */
+
 #endif /* P1P2_System */

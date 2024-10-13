@@ -443,17 +443,18 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,  16,  32,  48,  64  /
 // 0 .. 7 for pseudo packets 000008 - 00000F
 // 8 .. F for pseudo packets 400008 - 40000F
 //
-// Hitachi type 1
+// Hitachi model 1, source 1
 // 10: 21 00 0B
 // 11: 21 00 12
 // 12: 89 00 27
-// 13: 89 00 2D
+// 13: 89 00 2D xx xx xx xx XX (XX = 0xE1 .. 0xE5, currently decode only 0xE2)
 // 14: 41 00 18
 //   : 89 06 (acknowledgement only)
 //   : 21 06 (acknowledgement only)
 //   : 41 06 (acknowledgement only)
 //
-// Hitachi type 2
+// Hitachi, source 2
+//
 // 15: 21 00 29 xx xx xx xx F1
 // 16: 21 00 29 xx xx xx xx F2
 // 17: 21 00 29 xx xx xx xx F3
@@ -465,7 +466,7 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,  16,  32,  48,  64  /
 // 1D: 89 00 29 xx xx xx xx E4
 // 1E: 89 00 29 xx xx xx xx E5
 //
-// Hitachi type 3
+// Hitachi, source 3
 //
 // 15: 21 00 29 xx xx xx xx F1
 // 16: 21 00 29 xx xx xx xx F2
@@ -481,27 +482,35 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,  16,  32,  48,  64  /
 // 20: 8A 00 29 xx xx xx xx F1
 // .. and more, reserved?
 //
-// Hitachi type 4
+// Hitachi, source 4
 //
 // ..
 // 21:
 // ..
 // 29:
 //
-// Hitachi type 5
+// Hitachi model 2
 //
-// 13: 89 00 2D but different entities from Hitachi type 1 nr 13
+// 13: 89 00 2D xx xx xx xx XX (for 0xE2 different entities from Hitachi model 1 nr 13, currently decode only 0xE2)
 // 2A: 21 00 1C
+//
+// Hitachi HiBox AHP-SMB-01 and ATW-ATAG-02
+//
+// 2B: 79 00 2E
+// 2C: FF 00 23
+//
+// nr_bytes = value 3rd byte - 4; or - 3 to cover CS_GEN byte
 
 #define sizePayloadBitsSeen 12 // for Hitachi, but not for Toshiba
 
-#define PCKTP_ARR_SZ 0x2B
-//byte pti                                      =   0..F  (0..7 for 000008..00000F, 8..F for 400008..40000F)                           10-14                           15-1E                                             1F-20                                               2A
-//byte pti                                      =    0    1    2    3    4    5    6    7    8    9   0A   0B   0C   0D   0E   0F      10   11   12   13   14          15   16   17   18   19   1A   1B   1C   1D   1E   1F   20   21  22  23  24  25  26  27  28  29        2A // 25->24 when CS_GEN implemented
-const PROGMEM uint32_t nr_bytes[PCKTP_ARR_SZ]  = {  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,      7,  14,  20,  35,  41,         37,  37,  37,  37,  37,  19,  37,  37,  37,  37,  37,  37,  50, 50, 50, 50, 50, 50, 50, 50, 50,       25     };
-const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ] = {   0,  20,  40,  60,  80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300,    320, 327, 341, 361, 396,/*rst*/ 320, 357, 394, 431, 468, 505, 524, 561, 598, 635, 672, 709, 746,796,846,896,946,996,1046,1096,1146,    1196        /* , 746 -> 1221 */ };
-#define sizePayloadByteVal 1221
-#define sizePayloadByteSeen 153 // ceil(1221/8)
+#define PCKTP_ARR_SZ 0x2D
+//byte pti                                      =   0..F  (0..7 for 000008..00000F, 8..F for 400008..40000F)                           10-14                           15-1E                                             1F-20                                               2A       2B     2C
+//byte pti                                      =    0    1    2    3    4    5    6    7    8    9   0A   0B   0C   0D   0E   0F      10   11   12   13   14          15   16   17   18   19   1A   1B   1C   1D   1E   1F   20   21  22  23  24  25  26  27  28  29        2A       2B     2C  // length 25->24 when CS_GEN implemented
+//3rd byte                                      =                                                                                      0B   12   27   2D   18          29   29   29   29   29   17   29   29   29   29   29   29    ?   ?   ?   ?   ?   ?   ?   ?   ?        1C       2E     23
+const PROGMEM uint32_t nr_bytes[PCKTP_ARR_SZ]  = {  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,      7,  14,  20,  35,  41,         37,  37,  37,  37,  37,  19,  37,  37,  37,  37,  37,  37,  50, 50, 50, 50, 50, 50, 50, 50, 50,       25     , 43,    32 };
+const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ] = {   0,  20,  40,  60,  80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300,    320, 327, 341, 361, 396,/*rst*/ 320, 357, 394, 431, 468, 505, 524, 561, 598, 635, 672, 709, 746,796,846,896,946,996,1046,1096,1146,    1196   , 1221,1264     /* , 746 -> 1296 */ };
+#define sizePayloadByteVal 1296
+#define sizePayloadByteSeen 162 // ceil(1296/8)
 
 #elif defined W_SERIES
 
@@ -1150,6 +1159,9 @@ byte calculatePti(const byte packetSrc, const byte packetType)
     case 0x4930 : pti = 0x29; break;
     // new in v0.9.47
     case 0x211C : pti = 0x2A; break;
+    // new in v0.9.55rc1
+    case 0x792E : pti = 0x2B; break;
+    case 0xFF23 : pti = 0x2C; break;
     default     : break;
   }
 
@@ -1610,7 +1622,7 @@ uint8_t value_bits_nopub(byte packetSrc, byte packetType, byte payloadIndex, byt
 
 uint8_t unknownByte(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value) {
   snprintf(mqttTopic + mqttTopicPrefixLength, MQTT_TOPIC_LEN, "PacketSrc_0x%02X_Type_0x%02X_Byte_%i", packetSrc, packetType, payloadIndex);
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "0x%02X", payload[payloadIndex]);
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "0x%02X %i", payload[payloadIndex], payload[payloadIndex]);
   return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
 }
 
@@ -5187,6 +5199,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     case 0x41 : src = 4; break; // sender is Hitachi remote control or Airzone
     case 0x00 : src = 0; break; // pseudopacket, ATmega
     case 0x40 : src = 1; break; // pseudopacket, ESP
+    case 0x79 : src = 5; break; // HiBox AHP-SMB-01 or ATW-TAG-02 ?
+    case 0xFF : src = 6; break; // HiBox AHP-SMB-01 or ATW-TAG-02 ?
     default   : src = 9; break;
   }
   SRC(src); // set char in mqtt_key prefix
@@ -5206,24 +5220,43 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     //        including data from the outdoor unit
     case 0x89: switch (packetType) {
       case 0x29: switch (payload[4])  { // payload[4] can be 0xE1..0xE5, currently decode only 0xE2
-        case 0xE2: switch (payloadIndex) {
-          case  6:                               CAT_MEASUREMENT;              HAPERCENT;                                   KEY1_PUB_CONFIG_CHECK_ENTITY("OUExpansionValve");                          VALUE_u8;
-          case  7:                               CAT_MEASUREMENT;              HAPERCENT;                                   KEY1_PUB_CONFIG_CHECK_ENTITY("IUExpansionValve");                          VALUE_u8;
-          case  8:                               CAT_MEASUREMENT;              HAFREQ;                                      KEY1_PUB_CONFIG_CHECK_ENTITY("TargetCompressorFrequency");                 VALUE_u8;
-          case  9:                               CAT_MEASUREMENT;                                                           KEY1_PUB_CONFIG_CHECK_ENTITY("ControlCircuitRunStop");                     VALUE_u8;
-          case 10:                               CAT_MEASUREMENT;                                                           KEY1_PUB_CONFIG_CHECK_ENTITY("HeatpumpIntensity");                         VALUE_u8;
-          case 14:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("IUAirInletTemperature");                     VALUE_s8;
-          case 15:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("IUAirOutletTemperature");                    VALUE_s8;
-          case 20:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("OUHeatExchangerTemperatureOutput");          VALUE_s8;
-          case 21:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("IUGasPipeTemperature");                      VALUE_s8;
-          case 22:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("IULiquidPipeTemperature");                   VALUE_s8;
-          case 23:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("OutdoorAirTemperature");                     VALUE_s8;
-          case 24:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("TempQ");                                     VALUE_s8;
-          case 25:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("CompressorTemperature");                     VALUE_s8;
-          case 26:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("TemperatureEvaporator");                     VALUE_s8;
-          case 29:                               CAT_SETTING;                  HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("TemperatureSetting");                        VALUE_s8;
-          case 37: return 0; // do not report checksum
-          default  : UNKNOWN_BYTE;
+        case 0xE2: switch (EE.hitachiModel) {
+          case 1 : switch (payloadIndex) {
+            case  6:                               CAT_MEASUREMENT;              HAPERCENT;                                   KEY1_PUB_CONFIG_CHECK_ENTITY("OUExpansionValve");                          VALUE_u8;
+            case  7:                               CAT_MEASUREMENT;              HAPERCENT;                                   KEY1_PUB_CONFIG_CHECK_ENTITY("IUExpansionValve");                          VALUE_u8;
+            case  8:                               CAT_MEASUREMENT;              HAFREQ;                                      KEY1_PUB_CONFIG_CHECK_ENTITY("TargetCompressorFrequency");                 VALUE_u8;
+            case  9:                               CAT_MEASUREMENT;                                                           KEY1_PUB_CONFIG_CHECK_ENTITY("ControlCircuitRunStop");                     VALUE_u8;
+            case 10:                               CAT_MEASUREMENT;                                                           KEY1_PUB_CONFIG_CHECK_ENTITY("HeatpumpIntensity");                         VALUE_u8;
+            case 14:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("IUAirInletTemperature");                     VALUE_s8;
+            case 15:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("IUAirOutletTemperature");                    VALUE_s8;
+            case 20:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("OUHeatExchangerTemperatureOutput");          VALUE_s8;
+            case 21:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("IUGasPipeTemperature");                      VALUE_s8;
+            case 22:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("IULiquidPipeTemperature");                   VALUE_s8;
+            case 23:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("OutdoorAirTemperature");                     VALUE_s8;
+            case 24:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("TempQ");                                     VALUE_s8;
+            case 25:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("CompressorTemperature");                     VALUE_s8;
+            case 26:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("TemperatureEvaporator");                     VALUE_s8;
+            case 29:                               CAT_SETTING;                  HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("TemperatureSetting");                        VALUE_s8;
+            case 37: return 0; // do not report checksum
+            default  : UNKNOWN_BYTE;
+          }
+          case 2 : switch (payloadIndex) {
+            case  7:                               CAT_MEASUREMENT;              HAPERCENT;                                   KEY1_PUB_CONFIG_CHECK_ENTITY("InsideRegulatorOpening");         VALUE_u8;
+            case  8:                               CAT_MEASUREMENT;              HAPERCENT;                                   KEY1_PUB_CONFIG_CHECK_ENTITY("OutsideRegulatorOpening");        VALUE_u8;
+            case  9:                               CAT_MEASUREMENT;              HAFREQ;                                      KEY1_PUB_CONFIG_CHECK_ENTITY("CompressorFrequency");            VALUE_u8;
+            case 11:                               CAT_MEASUREMENT;              HACURRENT;                                   KEY1_PUB_CONFIG_CHECK_ENTITY("HeatpumpIntensity");              VALUE_u8;
+            case 15:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("WaterINTemperature");             VALUE_s8;
+            case 16:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("WaterOUTTemperature");            VALUE_s8;
+            case 21:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("ExchangerOutputTemperature");     VALUE_s8;
+            case 22:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("GasTemperature");                 VALUE_s8;
+            case 23:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("LiquidTemperature");              VALUE_s8;
+            case 24:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("ExternalSensorTemperature");      VALUE_s8;
+            case 26:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("CompressorDischargeTemperature"); VALUE_s8;
+            case 27:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("EvaporatorTemperature");          VALUE_s8;
+            case 37: return 0; // do not report checksum
+            default  : UNKNOWN_BYTE;
+          }
+          default  : UNKNOWN_BYTE; // unknown hitachiModel
         }
         default: switch (payloadIndex) {
           case 37: return 0; // do not report checksum
@@ -5385,11 +5418,12 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           default: UNKNOWN_BIT;
         }
         case    9 : HACONFIG;                                                                                                 KEY1_PUB_CONFIG_CHECK_ENTITY("Temperature");   VALUE_u8;
+        // perhaps case 0x18 : return 0; // do not report checksum
         default   : UNKNOWN_BYTE;
       }
       case 0x29: switch (payload[4])  { // payload[4] can be 0xF1..0xF5, currently do not decode
         default: switch (payloadIndex) {
-          case 37: return 0; // do not report checksum
+          case 0x25: return 0; // do not report checksum
           default  : UNKNOWN_BYTE;
         }
       }
@@ -5504,23 +5538,57 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     case 0x8A: switch (packetType) {
       case 0x29: switch (payload[4])  { // payload[4] can be 0xF1..0xF5, seen F1 only, currently decode only 0xE2
         case 0xF1: switch (payloadIndex) {
-          case 0x25: return 0; // do not report checksum
+          // perhaps case 0x25: return 0; // do not report checksum
           default : UNKNOWN_BYTE;
         }
         default  : return 0;
       }
       default: UNKNOWN_BYTE; // unknown packet type
     }
-    // new in v0.9.45
+    // 0x79 : sender is ?
+    // new in v0.9.55
+    case 0x79: switch (packetType) {
+      case 0x2E: switch (payloadIndex) {
+        // perhaps case 0x2A: return 0; // do not report checksum
+        default : UNKNOWN_BYTE;
+      }
+      default  : return 0;
+    }
+    // 0xFF : sender is ?
+    // new in v0.9.55
+    case 0xFF: switch (packetType) {
+      case 0x23: switch (payloadIndex) {
+        // perhaps case 0x1F: return 0; // do not report checksum
+        default : UNKNOWN_BYTE;
+      }
+      default  : return 0;
+    }
+    // new in v0.9.45 / v0.9.55
     case 0x19: switch (packetType) {
-      case 0x09: UNKNOWN_BYTE;
-      case 0x0A: UNKNOWN_BYTE;
+      case 0x09: switch (payloadIndex) {
+        // perhaps case 0x05: return 0; // do not report checksum
+        default : UNKNOWN_BYTE;
+      }
+      case 0x0A: switch (payloadIndex) {
+        case  5  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Temperature_Gas");              VALUE_u8; // TGas
+        case  6  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Temperature_liquid");           VALUE_u8; // TLiq  // so this is not a checksum ?
+        cefault  : UNKNOWN_BYTE;
+      }
       case 0x10: UNKNOWN_BYTE;
       default: return 0;
     }
     case 0x23: switch (packetType) {
       case 0x0A: UNKNOWN_BYTE;
-      case 0x1C: UNKNOWN_BYTE;
+      case 0x1C: switch (payloadIndex) {
+        case 14  : HACONFIG; CAT_MEASUREMENT; HAFREQ;    KEY1_PUB_CONFIG_CHECK_ENTITY("Inverter_Operation_Frequency"); VALUE_u8; // Freq
+        case  6  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Ambient_Temperature");          VALUE_s8; // Ta
+        case  8  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Evaporator_Gas_Temperature");   VALUE_s8; // Te
+        case 10  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Discharge_Gas_Temperature");    VALUE_s8; // Td
+        case 12  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Discharge Pressure");           VALUE_u8; // Pd in MPa (divide by 10 to get actual value) = in bar, no division needed ?
+        case 15  : HACONFIG; CAT_MEASUREMENT; HACURRENT; KEY1_PUB_CONFIG_CHECK_ENTITY("Compressor_Current");           VALUE_u8; // Curr A
+        case 16  : HACONFIG; CAT_MEASUREMENT; HAPERCENT; KEY1_PUB_CONFIG_CHECK_ENTITY("Output_Expansion_Valve_Open");  VALUE_u8; // Evo %
+        default  : UNKNOWN_BYTE;
+      }
       default: return 0;
     }
     case 0x29: switch (packetType) {
@@ -5529,8 +5597,19 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     }
     case 0x49: switch (packetType) {
       case 0x09: UNKNOWN_BYTE;
-      case 0x23: UNKNOWN_BYTE;
-      case 0x30: UNKNOWN_BYTE;
+      case 0x23: switch (payloadIndex) {
+        case  8  : HACONFIG; CAT_SETTING;     HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Temperature_Target");                 VALUE_u8; // Tset
+        default  : UNKNOWN_BYTE;
+      }
+      case 0x30: switch (payloadIndex) {
+        case  7 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Water_Inlet_Temperature");            VALUE_s8; // Twi
+        case  8 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Water_Outlet_Temperature");           VALUE_s8; // Two
+        case 11 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Water_Outlet_Heat_Pump_Temperature"); VALUE_s8; // TwoHP
+        case 16 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Ambient_Average_Temperature");        VALUE_s8; // TaAv
+        case 20 : HACONFIG; CAT_MEASUREMENT; HAPERCENT;  KEY1_PUB_CONFIG_CHECK_ENTITY("Indoor_Expansion_Valve_Open");        VALUE_u8; // Evi
+        case 30 : HACONFIG; CAT_MEASUREMENT; HAPERCENT;  KEY1_PUB_CONFIG_CHECK_ENTITY("Heat_Pump_Water_Pump_Speed");         VALUE_u8; // HPWP
+        default : UNKNOWN_BYTE;
+      }
       default: return 0;
     }
     default: break; // do nothing

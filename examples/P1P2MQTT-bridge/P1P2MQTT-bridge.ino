@@ -192,6 +192,9 @@ typedef struct EEPROMSettings {
   uint8_t setpointHeatingMin;
   uint8_t setpointHeatingMax;
 #endif /* F_SERIES */
+#ifdef H_SERIES
+  uint8_t hitachiModel;
+#endif /* H_SERIES */
 };
 
 EEPROMSettings EE;
@@ -320,6 +323,10 @@ const char paramName_37[] PROGMEM = "Setpoint heating minimum"; // PARAM_SETPOIN
 const char paramName_38[] PROGMEM = "Setpoint heating maximum"; // PARAM_SETPOINT_HEATING_MAX
 #endif /* F_SERIES */
 
+#ifdef H_SERIES
+const char paramName_35[] PROGMEM = "Hitachi Model Type      ";
+#endif /* H_SERIES */
+
 const char* const paramName[] PROGMEM = {
   paramName_00,
   paramName_01,
@@ -381,6 +388,9 @@ const char* const paramName[] PROGMEM = {
   paramName_37,
   paramName_38,
 #endif /* F_SERIES */
+#ifdef H_SERIES
+  paramName_35,
+#endif /* H_SERIES */
 };
 
 typedef enum {
@@ -452,6 +462,9 @@ const paramTypes PROGMEM paramType[] = {
   P_UINT,
   P_UINT,
 #endif /* F_SERIES */
+#ifdef H_SERIES
+  P_UINT,
+#endif /* H_SERIES */
 };
 
 const int PROGMEM paramSize[] = {
@@ -515,6 +528,9 @@ const int PROGMEM paramSize[] = {
   1,
   1,
 #endif /* F_SERIES */
+#ifdef H_SERIES
+  1,
+#endif /* H_SERIES */
 };
 
 const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: max-length (length includes \0)
@@ -578,6 +594,9 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   40,
   40,
 #endif /* F_SERIES */
+#ifdef H_SERIES
+   2,
+#endif /* H_SERIES */
 };
 
 char* const PROGMEM paramLocation[] = {
@@ -641,6 +660,9 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.setpointHeatingMin,
   (char*) &EE.setpointHeatingMax,
 #endif /* F_SERIES */
+#ifdef H_SERIES
+  (char*) &EE.hitachiModel,
+#endif /* H_SERIES */
 };
 
 #define outputUnknown (EE.outputMode & 0x0008)
@@ -2079,11 +2101,23 @@ void loadEEPROM() {
 #endif /* F_SERIES */
     EE.EE_size = sizeof(EE); // EE_size never used - and not really needed, relying on EE_version and EE.signature
   }
+#ifdef H_SERIES
+  if (EE.EE_version < 7) {
+    EE.hitachiModel = INIT_HITACHI_MODEL;
+  }
+  if (EE.EE_version < 7) {
+    delayedPrintfTopicS("Upgrade EEPROM_version to 7");
+    EE.EE_version = 7;
+    saveEEPROM();
+  }
+#else
   if (EE.EE_version < 6) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 6");
     EE.EE_version = 6;
     saveEEPROM();
   }
+#endif /* H_SERIES */
+  delayedPrintfTopicS("Loaded EEPROM_version %i", EE.EE_version);
 }
 
 void handleCommand(char* cmdString) {
@@ -2353,6 +2387,12 @@ void handleCommand(char* cmdString) {
                                 printfTopicS("%i: %s", i, PREDEFINED_TZ[i]);
                               }
                               break;
+#ifdef H_SERIES
+                    case 35 : printfTopicS("Options for Hitachi model parameter P%2d", temp);
+                              printfTopicS("1: (default) Yutaki S");
+                              printfTopicS("2: TBD");
+                              break;
+#endif /* H_SERIES */
                     default : break;
                   }
                 }
