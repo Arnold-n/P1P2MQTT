@@ -2923,9 +2923,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         }
         case   10 : switch (bitNr) {
           case    8 : bcnt = 4; BITBASIS;
-          case    2 : // implied by Quiet_Mode based on 0x3A/0x0D info, so no HACONFIG, but re-enable for J0010 outputmode;
+          case    2 : // implied by Quiet_Mode based on 0x3A/0x0D info, but on some models 0x3A/0x0D does not output Quiet_Mode, so output it here (off/on only) too
+                      HACONFIG;
                       CHECKBIT;
-                      KEY("Quiet_Mode");
+                      SUBDEVICE("_Quiet");
+                      KEY("Quiet_Mode_Active");
                       PUB_CONFIG;
                       CHECK_ENTITY;
                       VALUE_flag8;
