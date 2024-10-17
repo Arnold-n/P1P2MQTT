@@ -1250,8 +1250,7 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
   // status_topic
   topicCharSpecificSlash('P'); // slash to add entityname
   switch (haDevice) {
-    case HA_BINSENSOR  : // pl_of pl_on
-                         HACONFIGMESSAGE_ADD(",\"pl_off\":0,\"pl_on\":1");
+    case HA_BINSENSOR  : HACONFIGMESSAGE_ADD(",\"pl_off\":0,\"pl_on\":1");
                          // fall-through
     case HA_SELECT     : // fall-through
     case HA_TEXT       : // fall-through
@@ -1331,6 +1330,9 @@ bool bTotalAvailable = false;   // indicates if bTotal is available
 
 // include file for parameter conversion
 // include here such that printfTopicS() is available in header file code
+
+static byte throttle = 1;
+static byte throttleValue = THROTTLE_VALUE;
 
 #include "P1P2_ParameterConversion.h"
 
@@ -1448,6 +1450,9 @@ void loadMQTT() {
             if ((sizeof(M) != M.MdataLength) || (M.Mversion != M_VERSION)) {
               printfTopicS("M length or version mismatch, full reset data/RTC");
               resetDataStructures();
+#ifdef E_SERIES
+              resetFieldSettings();
+#endif /* E_SERIES */
               initDataRTC();
               return;
             }
@@ -1550,9 +1555,6 @@ void loadData() {
   loadMQTT(); // loads from MQTT, inits if necessary
   loadRTC();  // overwrites data from RTC, but only if doubleResetData signature matches and version/length match
 }
-
-static byte throttle = 1;
-static byte throttleValue = THROTTLE_VALUE;
 
 void mqttSubscribe() {
   saveTopic();
@@ -2156,14 +2158,20 @@ void handleCommand(char* cmdString) {
     case 'd': // Various options: reset ESP, data structures, factory reset
     case 'D': n = (sscanf((const char*) (cmdString + 1), "%d", &temp) == 1);
               switch ((n > 0) ? temp : 99) {
-                case 11: printfTopicS("Init Data, reset Data, no restart");
+                case 11: printfTopicS("Init Data, reset Data, reset field settings, no restart");
                          initDataRTC();
                          resetDataStructures();
+#ifdef E_SERIES
+                         resetFieldSettings();
+#endif /* E_SERIES */
                          break;
                 case 0 : if (factoryReset) {
-                           printfTopicS("Init Data, reset Data...");
+                           printfTopicS("Init Data, reset Data, reset field settings, ...");
                            initDataRTC();
                            resetDataStructures();
+#ifdef E_SERIES
+                           resetFieldSettings();
+#endif /* E_SERIES */
                          }
                          // fall-through
                          printfTopicS("Restarting ESP...");
@@ -2196,13 +2204,18 @@ void handleCommand(char* cmdString) {
                            printfTopicS("Please wait until mqtt-delete action is finished");
                            break;
                          }
-                         printfTopicS("Resetting data structures, throttle");
+                         printfTopicS("Resetting data structures (except field settings), throttle");
                          throttleStepTime = espUptime + THROTTLE_STEP_S;
                          throttleValue = THROTTLE_VALUE;
                          pseudo0F = 9;
                          clientPublishMqttChar('L', MQTT_QOS_WILL, MQTT_RETAIN_WILL, "online");
                          resetDataStructures();
                          break;
+#ifdef E_SERIES
+                case 2 : printfTopicS("Resetting field settings history");
+                         resetFieldSettings();
+                         break;
+#endif /* E_SERIES */
                 case 5 : saveEEPROM();
                          printfTopicS("Saving modifications to EEPROM");
                          break;
@@ -2222,7 +2235,7 @@ void handleCommand(char* cmdString) {
                            printfTopicS("Changes pending, rejecting factory reset. To abandon changes and perform factory reset: D6, then retry D7");
                            break;
                          }
-                         printfTopicS("Schedule factory reset (except MQTT credentials) on restart (undo: D8 / confirm,clean-RTC/MQTT-data,restart ESP: D0)");
+                         printfTopicS("Schedule factory reset (all settings except WiFi/MQTT credentials) on restart (undo: D8 / confirm,clean-RTC/MQTT-data,restart ESP: D0)");
                          strlcpy(EE.signature, EEPROM_SIGNATURE_COMMON, sizeof(EE.signature)); // maintain only MQTT server credentials
                          saveEEPROM();
                          factoryReset = 1;
@@ -2292,10 +2305,16 @@ void handleCommand(char* cmdString) {
                            mqttUnsubscribeTime = espUptime + DELETE_STEP;
                          }
                          break;
+#ifdef E_SERIES
+                case 15: fieldSettingPublishNr = 0;
+                         printfTopicS("Start output field settings");
+#endif /* E_SERIES */
+                         break;
                 case 99: // no argument, fall-through to:
-                default: printfTopicS("D0: restart ESP (+initDataRTC/resetData in case of factoryreset)");
+                default: printfTopicS("D0: restart ESP (+initDataRTC/resetData/resetFS in case of factoryreset)");
                          printfTopicS("D1: reset ESP");
-                         printfTopicS("D3: reset-data-structures");
+                         printfTopicS("D2: reset field settings");
+                         printfTopicS("D3: reset-data-structures (except field settings)");
                          printfTopicS("D4: reconnect to MQTT");
                          printfTopicS("D5: save modifications to EEPROM");
                          printfTopicS("D6: reload settings from EEPROM (ignore changes from this session)");
@@ -2303,12 +2322,13 @@ void handleCommand(char* cmdString) {
                          printfTopicS("D8: undo scheduling of factory reset");
                          printfTopicS("D9: reset WiFi/MQTT credentials (WiFiManager) and restart ESP");
                          printfTopicS("D10: unSeen");
-                         printfTopicS("D11: initDataRTC, resetData");
+                         printfTopicS("D11: initDataRTC, resetData, reset field settings");
                          printfTopicS("D12: delete own and rebuild retained MQTT config/data (deletes old data from own bridge)");
 #ifdef E_SERIES
                          printfTopicS("D13: set consumption/production counters for COP before/after bridge installation");
 #endif /* E_SERIES */
                          printfTopicS("D14: delete all and rebuild retained MQTT config/data (deletes old data from all bridges)");
+                         printfTopicS("D15: start MQTT output of field settings");
                          reportState();
                          break;
               }
@@ -3275,6 +3295,7 @@ void process_for_mqtt(byte* rb, int n) {
                                       || ((rb[0] == 0x00) && ((rb[2] == 0x31) || (rb[2] == 0x12)))               // time packets should be handled in right order
                                       || ((rb[0] == 0x40) && (rb[2] == 0xB8) && ((rb[3] & 0xFE) == 0x00))        // 0000B800/0000B801 should not be throttled
                                       || ((rb[0] == 0x40) && (rb[2] == 0x0F)                            )        // 40000F  should not be throttled
+                                      || ((rb[0] == 0x40) && (rb[2] >= 0x60) && (rb[2] <= 0x8F)         )        // 400060-40008F should not be throttled
 #endif /* E_SERIES */
                                                                                                  ) {
 #ifdef MHI_SERIES
@@ -3395,8 +3416,11 @@ void loop() {
         if (throttleValue) {
           printfTopicS("Throttling at %i", throttleValue);
         } else {
-          printfTopicS("Ready throttling");
+          printfTopicS("Ready throttling, start output field settings");
           pseudo0F = 9;
+#ifdef E_SERIES
+          fieldSettingPublishNr = 0;
+#endif /* E_SERIES */
         }
       }
 
@@ -3606,8 +3630,7 @@ void loop() {
             clientPublishMqttChar('Z', MQTT_QOS_CONFIG, MQTT_RETAIN_CONFIG, mqtt_value);
             printfTopicS("Resetting data structures, throttle");
             throttleStepTime = espUptime + THROTTLE_STEP_S;
-            throttleValue = THROTTLE_VALUE;
-            pseudo0F = 9;
+            throttleValue = THROTTLE_VALUE; pseudo0F = 9;
             clientPublishMqttChar('L', MQTT_QOS_WILL, MQTT_RETAIN_WILL, "online");
             resetDataStructures();
             digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);

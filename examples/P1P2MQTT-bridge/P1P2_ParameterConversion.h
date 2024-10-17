@@ -85,7 +85,7 @@
 // macro usage
 //
 // regular entity reporting done by calling KEYx_PUB_CONFIG_CHECK_ENTITY which calls
-//            CHECK(x), determines only new/changed, and returns pubHa/pubEntity masks
+//            CHECK(x), determines only new/changed, and generates pubHaEntity mask
 //            PUB_CONFIG(K)   -> if needed, publishes config (if pubHa && haConfig && ...???), returns 0 if publishHA fails
 //            CHECK_ENTITY(K) -> returns 0 if nothing to be published, otherwise (if pubHa||pubEntity / hysteresis): prepares to publish topic (in VALUE*)
 // after which the code is supposed to call
@@ -147,7 +147,7 @@ byte FSB = 0;
 
 #define PARAM_KEY(K) { CHECKPARAM(paramValLength); KEY(K); PUB_CONFIG; CHECK_ENTITY; }
 
-#define FIELDKEY(K) { /* if (FSB) break; */  \
+#define FIELDKEY(K) { if (FSB) break;  \
                       CAT_FIELDSETTING; \
                       KEY(K); \
                       switch (packetType) {\
@@ -155,7 +155,8 @@ byte FSB = 0;
                         case 0x60 ... 0x8F : CHECK(4); break;\
                         default : printfTopicS("FIELDKEY unexpected packetType %i", packetType); break;\
                       }\
-                      PUB_CONFIG; CHECK_ENTITY; break;}
+                      PUB_CONFIG; \
+                      CHECK_ENTITY; break;}
 
 #define KEYHEADER(K)    { pubHaEntity = 1; if (haConfig || (EE.outputMode & 0x0100)) { KEY(K); VALUE_header; }; return 0; } // for packet with empty payload
 
@@ -357,11 +358,11 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
 #define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1)   // 0       1       2       3       4       5       6       7       8
 const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x017D, 0x002F, 0x0002, 0x001F, 0x00F0, 0x006C, 0x00B0, 0x0002, 0x0020 }; // number of parameters observed
 //byte packettype                                    = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
-const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      1,      1,      2,      3,      4 }; // byte per parameter // was 8-bit
-const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01DB, 0x01E1, 0x025D, 0x034D, 0x03B9, 0x0519, 0x051F /* , 0x059F */ }; // valstart = sum  (parnr_bytes * nr_params)
+const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      4,      1,      2,      3,      4 }; // byte per parameter // was 8-bit
+const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01DB, 0x01E1, 0x025D, 0x061D, 0x0689, 0x07E9, 0x07EF /* , 0x086F */ }; // valstart = sum  (parnr_bytes * nr_params)
 const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01AC, 0x01AE, 0x01CD, 0x02BD, 0x0329, 0x03D9, 0x03DB /* , 0x03FB */ }; // seenstart = sum (parnr_bytes)
 
-#define sizeParamVal  0x059F
+#define sizeParamVal  0x086F
 #define sizeParamSeen    128 // ceil(0x03FB/8) = ceil(1019/8) = 128
 
 #define PCKTP_START  0x0B
@@ -619,7 +620,8 @@ mqttSaveStruct M;
 void checkSize() {
 #ifdef E_SERIES
   for (byte i = 1; i < PARAM_ARR_SZ; i++) {
-    if (seenstart[i] != seenstart[i - 1] + nr_params[i - 1]) printfTopicS("seenstart error i %i seenstart[i] 0x%04X seenstart[i-1] 0x%04X nr_params[i-1] 0x%04X", i, seenstart[i], seenstart[i-1], nr_params[i-1]);
+// correct for byte-aligning seenstart[0x39]
+    if (seenstart[i] != seenstart[i - 1] + nr_params[i - 1] + (  (PARAM_TP_START + i == 0x39) ? 0 : 0)) printfTopicS("seenstart error i %i seenstart[i] 0x%04X seenstart[i-1] 0x%04X nr_params[i-1] 0x%04X", i, seenstart[i], seenstart[i-1], nr_params[i-1]);
     if (valstart[i] != valstart[i - 1] + nr_params[i - 1] * parnr_bytes[i - 1]) printfTopicS("valstart error i 0x%04X valstart[i] 0x%04X valstart[i-1] 0x%04X nr_params[i-1] 0x%04X", i, valstart[i], valstart[i-1], nr_params[i-1]);
   }
 #endif /* E_SERIES */
@@ -765,8 +767,8 @@ void resetDataStructures(void) {
   }
 #ifdef E_SERIES
   for (byte i = 0; i < 2; i++) {
-    for (uint16_t j = 0; j < sizeParamVal; j++) M.paramVal[i][j] = 0;
-    for (uint16_t j = 0; j < sizeParamSeen; j++) M.paramSeen[i][j] = 0;
+    for (uint16_t j = 0; j < sizeParamVal; j++)  if ((j < valstart[0x39 - PARAM_TP_START])  || (j >= valstart[0x3A - PARAM_TP_START])  || (i == 1)) M.paramVal[i][j] = 0;
+    for (uint16_t j = 0; j < sizeParamSeen; j++) if ((j < seenstart[0x39 - PARAM_TP_START]) || (j >= seenstart[0x3A - PARAM_TP_START]) || (i == 1)) M.paramSeen[i][j >> 3] &= (0xFF ^  (1 << (j & 0x07)));
   }
   for (byte j = 0; j < 36; j++) M.cntByte[j] = 0xFF;
 #endif /* E_SERIES */
@@ -782,6 +784,13 @@ void resetDataStructures(void) {
   }
 #endif /* SAVESCHEDULE */
 }
+
+#ifdef E_SERIES
+void resetFieldSettings(void) {
+  for (uint16_t j = valstart[0x39 - PARAM_TP_START]; j < valstart[0x3A - PARAM_TP_START]; j++) M.paramVal[0][j] = 0;
+  for (uint16_t j = seenstart[0x39 - PARAM_TP_START]; j < seenstart[0x3A - PARAM_TP_START]; j++) M.paramSeen[0][j >> 3] &= (0xFF ^  (1 << (j & 0x07)));
+}
+#endif /* E_SERIES */
 
 void initDataRTC() {
   // 4 bytes to test the waters
@@ -1498,7 +1507,7 @@ uint16_t newCheckParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr,
       default :                      skipHysteresis = false;
                                      break;
     }
-    for (byte i = payloadIndex + 1 - paramValLength; i <= payloadIndex - ((paramPacketType == 0x39) ? 3 : 0); i++) {        // 0x39 is field settings so only first byte changes
+    for (byte i = payloadIndex + 1 - paramValLength; i <= payloadIndex - ((paramPacketType == 0x39) ? /* 3 */ 0 : 0); i++) {        // 0x39 is field settings so only first byte changes, but (new fs strategy:) check all
       if (M.paramVal[ppts][ptbv++] != payload[i]) pubParam = (EE.outputFilter <= maxOutputFilter) && !skipHysteresis;
     }
   } else {
@@ -1519,7 +1528,7 @@ void registerSeenParam() {
 uint8_t publishEntityParam(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, const char* mqtt_value, byte paramValLength) {
   uint16_t ptbv = valstart[ppti] + paramNr * parnr_bytes[ppti];
   if (clientPublish(mqtt_value, haQos)) {
-    for (byte i = payloadIndex + 1 - paramValLength; i <= payloadIndex - ((paramPacketType == 0x39) ? 3 : 0); i++) M.paramVal[ppts][ptbv++] = payload[i];
+    for (byte i = payloadIndex + 1 - paramValLength; i <= payloadIndex /* - ((paramPacketType == 0x39) ? 3 : 0) */; i++) M.paramVal[ppts][ptbv++] = payload[i];
     M.paramSeen[ppts][ptbs >> 3] |= (1 << (ptbs & 0x07));
   } // else retry later
   return 0;
@@ -1886,6 +1895,7 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
   byte paramPacketType = packetType; // for dual-function FIELDKEY
   switch (paramNr) {
     // field settings [0_XX] (don't use '-' character in FIELDKEY/topic)
+    // FIELDKEY should be called after FIELDSTORE as FIELDKEY will break when FSB == 1
     case 0x00 : FIELDKEY("0_00_A3123_LWT_Heating_Add_WD_Curve_High_Amb_LWT");
     case 0x01 : FIELDKEY("0_01_A3123_LWT_Heating_Add_WD_Curve_Low_Amb_LWT");
     case 0x02 : FIELDKEY("0_02_A3123_LWT_Heating_Add_WD_Curve_High_Amb");
@@ -2140,6 +2150,7 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
                 printfTopicS("Fieldsetting unknown 0x%02X 0x%02X    0x%02X 0x%02X 0x%02X 0x%02X", packetSrc, paramNr, payload[payloadIndex - 3], payload[payloadIndex - 2], payload[payloadIndex - 1], payload[payloadIndex]);
                 FIELDKEY("Fieldsetting_Unknown");
   }
+
   if (FSB) return 0;
 
   topicWrite;
@@ -2160,15 +2171,43 @@ uint8_t field_setting(byte packetSrc, byte packetType, byte payloadIndex, byte* 
   byte FieldNr1 = (packetType + 0x04) & 0x0F;
   byte FieldNr2 = (8 - ((packetType & 0xF0) >> 4)) * 5 + (payloadIndex >> 2);
   uint16_t paramNr = FieldNr1 * 0x0F + FieldNr2;
+  // if FSB == 1: common_field_setting returns 0, does not save history, only called for FIELDSTORE functionality, as FIELDKEY breaks and common_field_setting returns 0
   if (common_field_setting(packetSrc, packetType, payloadIndex, payload, paramNr, mqtt_value)) {
+    byte ppti = 0x39 - PARAM_TP_START;
+    uint16_t ptbv = valstart[ppti] + paramNr * parnr_bytes[ppti];
     return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 4);
+  }
+  // store field setting data from 4000[678][0-F] data for later publishing, store value in param-data for 00F039 history
+  if (packetSrc == 0x40) {
+    byte ppti = 0x39 - PARAM_TP_START;
+    uint16_t ptbs = seenstart[ppti] + paramNr;
+    uint16_t ptbv = valstart[ppti] + paramNr * parnr_bytes[ppti];
+    for (byte i = 0; i < 4; i++) M.paramVal[0][ptbv + i] = payload[payloadIndex - 3 + i] & 0x3F;
+    M.paramSeen[0][ptbs >> 3] |= (1 << (ptbs & 0x07));
   }
   return 0;
 }
 
 uint8_t param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value) {
   if (common_field_setting(paramSrc, paramPacketType, payloadIndex, payload, paramNr, mqtt_value)) {
+    byte ppti = 0x39 - PARAM_TP_START;
     return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, 4);
+  }
+  return 0;
+}
+
+uint8_t  publishFieldSetting(byte paramNr) {
+  byte  ppti = 0x39 - PARAM_TP_START;
+  uint16_t ptbs = seenstart[ppti] + paramNr;
+  uint16_t ptbv = valstart[ppti] + paramNr * parnr_bytes[ppti];
+  if (M.paramSeen[0][ptbs >> 3] & (1 << (ptbs & 0x07))) {
+    // force this field setting unseen before calling common_field_setting/publishEntityParam to ensure MQTT output of config+data
+    M.paramSeen[0][ptbs >> 3]  &= (0xFF ^  (1 << (ptbs & 0x07)));
+    // publish HA + entity
+    if (common_field_setting(0x00, 0x39, 3, &M.paramVal[0][ptbv], paramNr, mqtt_value)) {
+      return publishEntityParam(0x00, 0x39, paramNr, 3, &M.paramVal[0][ptbv], mqtt_value, 4);
+    }
+    return 0;
   }
   return 0;
 }
@@ -2706,9 +2745,8 @@ const char weekDay[7][3] = { "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"};
 
 uint16_t parameterWritesDone = 0; // # writes done by ATmega; perhaps useful for ESP-side queueing
 
-
+byte fieldSettingPublishNr = 0xF1; // 0xF1 = ready
 #endif /* E_SERIES */
-
 
 byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, byte bitNr) {
 // A payloadIndex value EMPTY_PAYLOAD indicates an empty payload (used during restart)
@@ -2777,7 +2815,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     }
     case 0x00 :
                 switch (payloadIndex) {
-      case  EMPTY_PAYLOAD : KEYHEADER("RestartPhase0");
+      case  EMPTY_PAYLOAD : printfTopicS("Restart phase 0");
+                            KEYHEADER("RestartPhase0");
       default   : UNKNOWN_BYTE; // not observed
     }
     case 0x01 :
@@ -3481,16 +3520,18 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     case 0x60 ... 0x8F : switch (packetSrc) {                   // field setting
       case 0x00 : return 0; // UI or bridge writing new field settings, ignore
       case 0x40 : switch (payloadIndex) {
+        case 19        : if (packetType == 0x8F) { // last packet of field setting information
+                           if (!throttleValue) { // if not throttling, start output field settings
+                             printfTopicS("Not throttling, received field settings, so start output field settings");
+                             fieldSettingPublishNr = 0;
+                           }
+                         }
+                         // fallthrough
         case  3        : // fallthrough
         case  7        : // fallthrough
         case 11        : // fallthrough
-        case 15        : // fallthrough
-        case 19        : FSB = 1;
-                         SRC(2); // cheating to align with 00F039 field setting info
-                         SUBDEVICE("_FieldSettings");
-                         HACONFIG;
-                         HADEVICE_SENSOR_VALUE_TEMPLATE("{{value_json.val}}");
-                         FIELD_SETTING;
+        case 15        : FSB = 1;
+                         FIELD_SETTING; // only to store history data, not to output any data over mqtt yet
         case  0 ...  2 : // fallthrough
         case  4 ...  6 : // fallthrough
         case  8 ... 10 : // fallthrough
@@ -4030,7 +4071,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                   }
                   VALUE_u0; // ensure Seen is set
                   return 0;
-        case  6 :
+        case  6 : // internal calculations
                   { byte fch = (M.R.first030 ^ M.R.first030a);
                     if (fch && (espUptime > espUptime030 + 15)) {
                       if (fch & 0x01) {
@@ -4064,6 +4105,18 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                         //printfTopicS("030-20 ready");
                       }
                     }
+                  }
+                  // field setting publication
+                  if (fieldSettingPublishNr < 0xF0) {
+                    HACONFIG;
+                    FSB = 0;
+                    SUBDEVICE("_FieldSettings");
+                    HACONFIG;
+                    HADEVICE_SENSOR_VALUE_TEMPLATE("{{value_json.val}}");
+                    return publishFieldSetting(fieldSettingPublishNr++);
+                  } else if (fieldSettingPublishNr == 0xF0) {
+                    fieldSettingPublishNr++;
+                    printfTopicS("Field setting output ready");
                   }
                   return 0;
         default : return 0;
