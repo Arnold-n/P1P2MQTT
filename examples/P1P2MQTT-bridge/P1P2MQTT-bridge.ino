@@ -66,7 +66,7 @@
 uint16_t electricityMeterActivePower =  0;   // in W, max 65kW
 uint32_t electricityMeterTotal =  0; // in Wh, max  4GWh (= 20y * 200 000 kWh)
 byte electricityMeterDataValid =  0;
-StaticJsonDocument<1024> electricityMeterJsonDocument;
+StaticJsonDocument<2048> electricityMeterJsonDocument;
 #endif /* W_SERIES */
 
 #include <EEPROM.h>
