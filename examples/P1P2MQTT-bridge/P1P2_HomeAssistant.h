@@ -147,7 +147,7 @@ const char* haIconString[] = {
   "mdi:counter",
   "mdi:heat-pump",
   "mdi:heat-pump",
-  "mdi:valve",
+  "mdi:valve",      // % only used for valve
   "mdi:water",
   "mdi:currency-eur",
   "mdi:poll",
@@ -225,7 +225,7 @@ const char* haDeviceClassString[] = {
   "",          // packets/events
   "current",
   "frequency",
-  "enum",
+  "",          // should be numeric for %
   "pressure",
   "",          // Euro/kWh cost
   "",
