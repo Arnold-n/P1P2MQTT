@@ -453,7 +453,7 @@ void setup() {
 #endif
   P1P2MQTT.setDelayTimeout(sdto);
   P1P2MQTT.ledError(0);
-  Serial.println(F("* Ready setup"));
+  Serial.println(F("* Rdy setup"));
 }
 
 // scanint and scanhex are used to save dynamic memory usage in main loop
@@ -574,7 +574,7 @@ bool writeParam(void) {
     case 0x3D : wr_nrb = 4; break;
   }
   if (wr_val[wr_n] >> (wr_nrb << 3)) {
-    Serial_print(F("* Parameter value too large for packet type; #bytes is "));
+    Serial_print(F("* Param value too large for packet type; #bytes is "));
     Serial_print(wr_nrb);
     Serial_print(F(" value is "));
     Serial_println(wr_val[wr_n], HEX);
@@ -583,16 +583,17 @@ bool writeParam(void) {
   if (writeBudget) {
     if (writeBudget != 255) writeBudget--;
     wr_cnt[wr_n] = WR_CNT;
-    Serial_print(F("* Adding write for packet-type 0x"));
+/*
+    Serial_print(F("* +b 0x"));
     Serial_print(wr_pt[wr_n], HEX);
-    Serial_print(F(" parameter nr 0x"));
+    Serial_print(F(" nr 0x"));
     Serial_print(wr_nr[wr_n], HEX);
-    Serial_print(F(" to value 0x"));
-    Serial_print(wr_val[wr_n], HEX);
-    Serial_println(" to buffer");
+    Serial_print(F(" to 0x"));
+    Serial_println(wr_val[wr_n], HEX);
+*/
     return 1;
   } else {
-    Serial_println(F("* Currently no write budget left"));
+    Serial_println(F("* No write budget left"));
     if (writeRefusedBudget < 0xFF) writeRefusedBudget++;
     return 0;
   }
@@ -631,26 +632,26 @@ bool writeParam(void) {
   // Model 11 LPA FXMQ 38 0 1 2 4 6 8
   // Model 12 M   FDYQ 3B 0 1 2 4 6 8 16 17
   if ((wr_nr[wr_n] > 17) || (wr_nr[wr_n] == 3) || (wr_nr[wr_n] == 5) || (wr_nr[wr_n] == 7) || ((wr_nr[wr_n] >= 9) && (wr_nr[wr_n] <= 15)) || ((wr_nr[wr_n] == 16) && (wr_pt[wr_n] == 0x38)) || ((wr_nr[wr_n] == 17) && (wr_pt[wr_n] == 0x38))) {
-    Serial_print(F("* wr_nr[wr_n] invalid, should be 0, 1, 2, 4, 6, 8 (or for packet type 0x3B: 16 or 17): "));
+    Serial_print(F("* wr_nr[wr_n] should be 0,1,2,4,6,8 (or 0x3B ,16,17): "));
     Serial_println(wr_nr[wr_n]);
     return 0;
   }
   if ((wr_nr[wr_n] == 0) && (wr_val[wr_n] > 1)) {
-    Serial_print(F("wr_val for payload byte 0 (status) is 0x"));
+    Serial_print(F("wr_val byte 0 (status) is 0x"));
     Serial_print(wr_val[wr_n], HEX);
-    Serial_println(F(", must be 0 or 1"));
+    Serial_println(F(", not 0 or 1"));
     return 0;
   }
   if ((wr_nr[wr_n] == 1) && ((wr_val[wr_n] < 0x60) || (wr_val[wr_n] > 0x67))) {
-    Serial_print(F("wr_val for payload byte 1 (operating-mode) is 0x"));
+    Serial_print(F("wr_val byte 1 (op-mode) is 0x"));
     Serial_print(wr_val[wr_n], HEX);
-    Serial_println(F(", must be in range 0x60-0x67"));
+    Serial_println(F(", not in range 0x60-0x67"));
     return 0;
   }
   if (((wr_nr[wr_n] == 2) || (wr_nr[wr_n] == 6)) && ((wr_val[wr_n] < 0x0A) || (wr_val[wr_n] > 0x1E))) {
-    Serial_print(F("wr_val for payload byte 2/6 (target-temp cooling/heating) is 0x"));
+    Serial_print(F("wr_val byte 2/6 (target-temp) is 0x"));
     Serial_print(wr_val[wr_n], HEX);
-    Serial_println(F(", must be in range 0x10-0x20"));
+    Serial_println(F(", not in range 0x10-0x20"));
     return 0;
   }
   if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && (wr_val[wr_n] < 0x03)) {
@@ -659,26 +660,26 @@ bool writeParam(void) {
   } else if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && ((wr_val[wr_n] < 0x11) || (wr_val[wr_n] > 0x51))) {
     Serial_print(F("wr_val for payload byte 4/8 (fan-speed cooling/heating) is 0x"));
     Serial_print(wr_val[wr_n], HEX);
-    Serial_println(F(", must be in range 0x11-0x51 or 0x00-0x02"));
+    Serial_println(F(", not in range 0x11-0x51 or 0x00-0x02"));
     return 0;
   }
   if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && (((wr_val[wr_n] & 0x70) == 0x70) || (!(wr_val[wr_n] & 0x10)))) {
-    Serial_print(F("wr_val for payload byte 4/8 (fan-speed part) is 0x"));
+    Serial_print(F("wr_val byte 4/8 (fan-speed part) is 0x"));
     Serial_print(wr_val[wr_n], HEX);
-    Serial_println(F(", must be 0x10, 0x30, or 0x50"));
+    Serial_println(F(", not 0x10,0x30,0x50"));
     return 0;
   }
   if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && ((wr_val[wr_n] & 0x0F) != 0x00) && ((wr_val[wr_n] & 0x0F) != 0x05)) {
-    Serial_print(F("wr_val for payload byte 4/8 (swing-mode part) is 0x"));
+    Serial_print(F("wr_val byte 4/8 (swing-mode part) is 0x"));
     Serial_print(wr_val[wr_n], HEX);
-    Serial_println(F(", must be 0x00 or 0x05"));
+    Serial_println(F(", not 0x00,0x05"));
     return 0;
   }
   // no limitations for payload byte 16
   if ((wr_nr[wr_n] == 17) && (wr_val[wr_n] > 0x03)) {
-    Serial_print(F("wr_val for payload byte 17 (fan-mode) is 0x"));
+    Serial_print(F("wr_val byte 17 (fan-mode) is 0x"));
     Serial_print(wr_val[wr_n], HEX);
-    Serial_println(F(", must be in range 0x00-0x03"));
+    Serial_println(F(", not in range 0x00-0x03"));
     return 0;
   }
   if (wr_val[wr_n] & wr_mask[wr_n]) {
@@ -686,25 +687,25 @@ bool writeParam(void) {
     Serial_print(wr_val[wr_n], HEX);
     Serial_print(F(" & wr_mask 0x"));
     Serial_print(wr_mask[wr_n], HEX);
-    Serial_println(F(") should be zero"));
+    Serial_println(F(") must be zero"));
     return 0;
   }
   if (writeBudget) {
     if (writeBudget != 255) writeBudget--;
     wr_cnt[wr_n] = WR_CNT;
-    Serial_print(F("* Initiating write (part) "));
+    Serial_print(F("* Initiating write "));
     Serial_print(wr_n);
-    Serial_print(F(" for packet-type 0x"));
+    Serial_print(F(" packet-type 0x"));
     Serial_print(wr_pt[wr_n], HEX);
-    Serial_print(F(" payload byte "));
+    Serial_print(F(" byte "));
     Serial_print(wr_nr[wr_n]);
-    Serial_print(F(" to value 0x"));
+    Serial_print(F(" to 0x"));
     Serial_print(wr_val[wr_n], HEX);
     Serial_print(F(" mask 0x"));
     Serial_print(wr_mask[wr_n], HEX);
     Serial_println();
   } else {
-    Serial_println(F("* Currently no write budget left"));
+    Serial_println(F("* No write budget left"));
     if (writeRefusedBudget < 0xFF) writeRefusedBudget++;
     return 0;
   }
@@ -947,11 +948,11 @@ byte writeBudget_prev = 0;
                       shiftCountWrites(); // shift writes in buffer, may change wr_n
                       if (wr_n == WR_MAX) {
                         // previous writes still being processed, buffer full
-                        Serial_println(F("* Write buffer full"));
+                        Serial_println(F("* Buffer full"));
                         break;
                       } else if (wr_n) {
                         // previous write(s) still being processed
-                        Serial_print(F("* Write buffer not-empty ("));
+                        Serial_print(F("* Buffer not-empty ("));
                         Serial_print(wr_n);
                         Serial_println(F("), trying to add write(s)"));
                       }
@@ -969,7 +970,8 @@ byte writeBudget_prev = 0;
                           wr_n++;
                         } else {
                           Serial_print(F("* Ignoring (all) new instruction(s), received <3 arg: "));
-                          Serial_print(scannedParams);
+                          Serial_println(scannedParams);
+/*
                           if (scannedParams > 0) {
                             Serial_print(F(" pt: 0x"));
                             if (wr_pt[wr_n] <= 0x0F) Serial_print('0');
@@ -983,6 +985,7 @@ byte writeBudget_prev = 0;
                             Serial_print(wr_nr[wr_n], HEX);
                           }
                           Serial_println();
+*/
                           wr_n = wr_n_prev;
                           writeBudget = writeBudget_prev;
                           break;
@@ -996,23 +999,22 @@ byte writeBudget_prev = 0;
                       }
                       break;
             case 'f':
-            case 'F': Serial_print(F("* Room Temperature insertion function "));
+            case 'F': Serial_print(F("* Room Temp insertion "));
                       {
                         if (sscanf(RSp, "%hhd%hhn", &insertRoomTemperature, &scannedLength) > 0) {
                           RSp += scannedLength;
                           switch (insertRoomTemperature) {
-                            case 0  : Serial_println(F("switched off"));
+                            case 0  : Serial_println(F("off"));
                                       EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB, (roomTemperature >> 8) & 0x7F);
                                       break;
                             default : // fall-through
-                            case 1  : Serial_print(F("switched on, temp "));
+                            case 1  : Serial_print(F("on, temp "));
                                       if (sscanf(RSp, "%d", &roomTemperature) > 0) {
                                         roomTemperature &= 0x7FFF; // ignore most-significant bit, should be 0
                                         Serial_print(F("set to "));
                                         Serial_println(roomTemperature * 0.1);
                                         EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_LSB, roomTemperature & 0xFF);
                                       } else {
-                                        Serial_print(F("is "));
                                         Serial_println(roomTemperature * 0.1);
                                       }
                                       EEPROM.update(EEPROM_ADDRESS_ROOM_TEMPERATURE_MSB, (roomTemperature >> 8) /* & 0x7F not needed */ | 0x80);
@@ -2421,11 +2423,11 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                   wr_cnt[i]--;
                   wr_cnt[i] &= 0x7F;
                   parameterWritesDone ++;
-                  Serial_print(F("* Packet 0x"));
+                  Serial_print(F("* wr 0x"));
                   Serial_print(wr_pt[i], HEX);
-                  Serial_print(" param 0x");
+                  Serial_print(" 0x");
                   Serial_print(wr_nr[i], HEX);
-                  Serial_print(" set to 0x");
+                  Serial_print(" to 0x");
                   if (wr_val[i] <= 0x0F) Serial_print('0');
                   Serial_println(wr_val[i], HEX);
                 }
