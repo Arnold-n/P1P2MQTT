@@ -538,6 +538,8 @@ int8_t F_prev = -1;
 byte F_prevDet = 0;
 byte F_max = 0;
 byte div4 = 0;
+bool lcdMode = 0; // default Aux_LCD off
+byte userMode = 1; // default advanced user mode
 #endif /* E_SERIES */
 
 byte compressor = 0;
@@ -1403,6 +1405,21 @@ byte writeBudget_prev = 0;
                                     restartData();
                                     break;
 #ifdef E_SERIES
+                          case 80 : Serial_println(F("* LCD off"));
+                                    lcdMode = 0;
+                                    break;
+                          case 81 : Serial_println(F("* LCD on"));
+                                    lcdMode = 1;
+                                    break;
+                          case 90 : Serial_println(F("* Normal user mode"));
+                                    userMode = 0;
+                                    break;
+                          case 91 : Serial_println(F("* Advanced user mode"));
+                                    userMode = 1;
+                                    break;
+                          case 92 : Serial_println(F("* Installer mode"));
+                                    userMode = 2;
+                                    break;
                           case 99 : if (compressor) {
                                       Serial_println(F("* restart refused, because compressor is on"));
                                       break;
@@ -2058,11 +2075,29 @@ byte writeBudget_prev = 0;
                         // Do pretend to be a LAN adapter (even though this may trigger "data not in sync" upon restart?)
                         // If we don't set address, installer mode in main thermostat may become inaccessible
                         for (w = 3; w < nwrite; w++) WB[w] = RB[w];
-#ifdef CTRL_ID_1
-                        WB[7] = CTRL_ID_1;
-#endif
+                        // LCD handling
+                        WB[6] = (RB[6] & 0xAE); // 0x80 = Main_LCD_light; 0x20 = Aux_LCD_Ack; 0x0E contains 3 always0 bits; 0x01 is not copied back
+                        if (lcdMode) {
+                          // check if main LCD is off
+                          if (!(RB[6] & 0x80)) {
+                            // set request
+                            WB[6] |= 0x10;
+                            // if acknowledged, switch LCD on
+                            if (RB[6] & 0x20) WB[6] |= 0x40;
+                          }
+                        }
+                        // UI advanced/installer mode handling
+                        WB[7] = (RB[7] & 0xE2) | 0x10;
+                        // add advanced mode indicator
+                        if (userMode != 1) WB[7] |= 0x04; // normal mode or installer mode -> no advanced mode
+                        if (userMode == 2) {
+                          // if installer mode is newly granted, or if already in instlaler mode, confirm installer mode (request no longer needed)
+                          if (RB[7] & 0x0A) WB[7] ^= 0x18;
+                          // if installer mode not yet active (0x08) or not yet granted (0x02), and if main installer mode is not acitve (0x40), make installer mode request
+                          if (!(RB[7] & 0x4A)) WB[7] |= 0x01;
+                        } // else nothing to do; automatically drops out of installer mode
 #ifdef CTRL_ID_2
-                        WB[8] = CTRL_ID_2;
+                        WB[8] = CTRL_ID_2; // 0x10 0x24 0x25 ??
 #endif
                         writeAction = 1; // auxiliary controller write
                         break;

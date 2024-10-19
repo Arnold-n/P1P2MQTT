@@ -418,12 +418,11 @@ Header: 00F031 or 40F031
 | Byte nr | Hex value observed | Description               | Data type
 |:--------|:-------------------|:--------------------------|:-
 |     0-2 | 00                 | ?                         | u8
-|     3:0 | 1                  | operation related?        | u8
-|     3:7 | 0/1                | operation related?        | u8
-| 3:other | 0                  | operation related?        | u8
-|     4   | 74, B4             | auxiliary controller ID?  | u8
-|     4:5 | 0/1                | operation related?        | u8
-|     5   | 11,15,51,55        | auxiliary controller ID?  | u8
+|     3   |                    | LCD backlight status exchange | u8
+|     4   |                    | User/Installer mode exchange  | u8
+|     5:6 |                    | hourly pulse              | bit
+|     5:2 |                    | missing F0 reply detected | bit
+|     5:other |                | ?                         |
 |     6   | 13 (example)       | date - year (0x13 = 2019) | u8
 |     7   | 01-0C              | date - month              | u8
 |     8   | 01-1F              | date - day of month       | u8

@@ -141,6 +141,7 @@ byte FSB = 0;
 #define KEY4_DEL_CONFIG_CHECK_ENTITY(K)    { CHECK(4); KEY(K); DEL_CONFIG; CHECK_ENTITY; }
 
 #define KEYBIT_PUB_CONFIG_PUB_ENTITY(K)          { if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR; CHECKBIT;        KEY(K); PUB_CONFIG; CHECK_ENTITY; VALUE_flag8; }
+#define KEYBIT_PUB_CONFIG_PUB_ENTITY_INV(K)      { if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR; CHECKBIT;        KEY(K); PUB_CONFIG; CHECK_ENTITY; VALUE_flag8_inv; }
 #define KEYBIT_PUB_CONFIG_CHECK_ENTITY(K)        { if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR; CHECKBIT;        KEY(K); PUB_CONFIG; CHECK_ENTITY;  }
 #define KEYBITS_PUB_CONFIG_PUB_ENTITY(x, y, K)   {                                                CHECKBITS(x, y); KEY(K); PUB_CONFIG; CHECK_ENTITY; VALUE_bits(x, y);}
 #define KEYBITS_PUB_CONFIG_CHECK_ENTITY(x, y, K) {                                                CHECKBITS(x, y); KEY(K); PUB_CONFIG; CHECK_ENTITY; }
@@ -356,14 +357,14 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
 #define PARAM_TP_START      0x35
 #define PARAM_TP_END        0x3D
 #define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1)   // 0       1       2       3       4       5       6       7       8
-const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x017D, 0x002F, 0x0002, 0x001F, 0x00F0, 0x006C, 0x00B0, 0x0002, 0x0020 }; // number of parameters observed
+const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x017D, 0x0030, 0x0002, 0x001F, 0x00F0, 0x006C, 0x00B0, 0x0002, 0x0020 }; // number of parameters observed
 //byte packettype                                    = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
 const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      4,      1,      2,      3,      4 }; // byte per parameter // was 8-bit
-const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01DB, 0x01E1, 0x025D, 0x061D, 0x0689, 0x07E9, 0x07EF /* , 0x086F */ }; // valstart = sum  (parnr_bytes * nr_params)
-const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01AC, 0x01AE, 0x01CD, 0x02BD, 0x0329, 0x03D9, 0x03DB /* , 0x03FB */ }; // seenstart = sum (parnr_bytes)
+const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01DD, 0x01E3, 0x025F, 0x061F, 0x068B, 0x07EB, 0x07F1 /* , 0x0871 */ }; // valstart = sum  (parnr_bytes * nr_params)
+const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01AD, 0x01AF, 0x01CE, 0x02BE, 0x032A, 0x03DA, 0x03DC /* , 0x03FC */ }; // seenstart = sum (parnr_bytes)
 
-#define sizeParamVal  0x086F
-#define sizeParamSeen    128 // ceil(0x03FB/8) = ceil(1019/8) = 128
+#define sizeParamVal  0x0871
+#define sizeParamSeen    128 // ceil(0x03FC/8) = ceil(1020/8) = 128
 
 #define PCKTP_START  0x0B
 #define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 to 0x16 0x20 0x21 0x60-0x9F mapped to 0x17-0x58
@@ -381,18 +382,18 @@ const PROGMEM uint32_t nr_bytes[PCKTP_ARR_SZ]     =
 //0000xx
   0,    0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  14,   6,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
 //4000xx
- 20,    20,  20,  20,  20,  20,  20,  20,  20,  20,  20,   0,   0,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
+ 20,   20,  20,  20,  20,  20,  20,  20,  20,  20,  20,   0,   6,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
 //800010, 800018
   17, 6,
  };
 
 const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     =
 {  0,   0,   0,   0,  20,  40,  60,  80, 100, 120, 140, 160, 174, 180, 200,                                                                                                                                                                                                                                                         220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460, 480, 500, 520,
- 540, 560, 580, 600, 620, 640, 660, 680, 700, 720, 740, 760, 760, 760, 780,                                                                                                                                                                                                                                                         800, 820, 840, 860, 880, 900, 920, 940, 960, 980,1000,1020,1040,1060,1080,1100,
- 1120,1137, /* sizePayloadByteVal=1143 */ };
-#define sizePayloadByteVal 1143
-#define sizePayloadByteSeen 143 // ceil(1143/8)
-#define sizePayloadBitsSeen 29
+ 540, 560, 580, 600, 620, 640, 660, 680, 700, 720, 740, 760, 760, 766, 786,                                                                                                                                                                                                                                                         806, 826, 846, 866, 886, 906, 926, 946, 966, 986,1006,1026,1046,1066,1086,1106,
+ 1126,1143, /* sizePayloadByteVal=1149 */ };
+#define sizePayloadByteVal 1149
+#define sizePayloadByteSeen 144 // ceil(1149/8)
+#define sizePayloadBitsSeen 33
 
 #ifdef SAVESCHEDULE
 #define SCHEDULE_MEM_START 0x0250
@@ -626,7 +627,7 @@ void checkSize() {
   }
 #endif /* E_SERIES */
   for (uint16_t i = 1; i < PCKTP_ARR_SZ; i++) {
-    if (bytestart[i] != bytestart[i - 1] + nr_bytes[i - 1]) printfTopicS("bytestart error i %i bytestart[i] %i bytestart[i-1] %i nr_bytes[i-1]", i, bytestart[i], bytestart[i-1], nr_bytes[i-1]);
+    if (bytestart[i] != bytestart[i - 1] + nr_bytes[i - 1]) printfTopicS("bytestart error i %i bytestart[i] 0x%04X bytestart[i-1] 0x%04X nr_bytes[i-1]", i, bytestart[i], bytestart[i-1], nr_bytes[i-1]);
   }
 }
 
@@ -750,6 +751,56 @@ byte  createButtonsSwitches(void) {
   HADEVICE_BUTTON_COMMAND("E35003601");
   HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
   if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+
+  HARESET;
+  KEY("LCD_On");
+  SUBDEVICE("_UI");
+  HADEVICE_BUTTON;
+  //  HADEVICE_BUTTON_CLASS("*");
+  HADEVICE_BUTTON_COMMAND("L81");
+  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+  HADEVICE_AVAILABILITY("S\/2\/Main_LCD_Light", 0, 1); // Only available if main LCD is off
+  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+
+  HARESET;
+  KEY("LCD_Off");
+  SUBDEVICE("_UI");
+  HADEVICE_BUTTON;
+  //  HADEVICE_BUTTON_CLASS("*");
+  HADEVICE_BUTTON_COMMAND("L80");
+  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+
+
+  HARESET;
+  KEY("Mode_0_Normal_User");
+  SUBDEVICE("_UI");
+  HADEVICE_BUTTON;
+  //  HADEVICE_BUTTON_CLASS("*");
+  HADEVICE_BUTTON_COMMAND("L90");
+  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+
+
+  HARESET;
+  KEY("Mode_1_Advanced_User");
+  SUBDEVICE("_UI");
+  HADEVICE_BUTTON;
+  //  HADEVICE_BUTTON_CLASS("*");
+  HADEVICE_BUTTON_COMMAND("L91");
+  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+
+  HARESET;
+  KEY("Mode_2_Installer");
+  SUBDEVICE("_UI");
+  HADEVICE_BUTTON;
+  //  HADEVICE_BUTTON_CLASS("*");
+  HADEVICE_BUTTON_COMMAND("L92");
+  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+  HADEVICE_AVAILABILITY("S\/2\/Main_Installer", 0, 1); // Only available if main not in installer mode
+  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+
 #endif /* E_SERIES */
 
   registerSeenByte(); // do not publish entity, as only configs are needed
@@ -1477,7 +1528,7 @@ uint16_t newCheckParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr,
     return 0;
   }
   if (paramNr >= nr_params[ppti]) {
-    printfTopicS("paramNr 0x%04X >= expected nr_params %x%04X for packetType 0x%02X", paramNr, nr_params[ppti], paramPacketType);
+    printfTopicS("paramNr 0x%04X >= expected nr_params 0x%04X for packetType 0x%02X", paramNr, nr_params[ppti], paramPacketType);
     return 0;
   }
   if (paramPacketType < PARAM_TP_START) {
@@ -1599,8 +1650,8 @@ uint8_t value_s16_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* p
 
 bool FN_flag8(uint8_t b, uint8_t n)  { return (b >> n) & 0x01; }
 
-uint8_t value_flag8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, byte bitNr) {
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", FN_flag8(payload[payloadIndex], bitNr));
+uint8_t value_flag8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, byte bitNr, bool invertValue=false) {
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", invertValue ^ FN_flag8(payload[payloadIndex], bitNr));
   return publishEntityBits(packetSrc, packetType, payloadIndex, payload, mqtt_value);
 }
 
@@ -2262,6 +2313,7 @@ uint8_t  publishFieldSetting(byte paramNr) {
 #define VALUE_bits(n1, n2)       { value_bits(packetSrc, packetType, payloadIndex, payload, mqtt_value, n1, n2);                         return 0; }
 #define VALUE_bits_nopub(n1, n2)       { value_bits_nopub(packetSrc, packetType, payloadIndex, payload, mqtt_value, n1, n2);                         return 0; }
 #define VALUE_flag8              { if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR; value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr); return 0; }
+#define VALUE_flag8_inv          { if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR; value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr, 1); return 0; }
 #define UNKNOWN_BIT              { CAT_UNKNOWN; CHECKBIT; if (pubEntity && (haConfig || (EE.outputMode & 0x0100))) unknownBit(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr); return 0; }
 #define VALUE_u8_add2k           { value_u8_add2k(packetSrc, packetType, payloadIndex, payload, mqtt_value);                             return 0; }
 #define VALUE_s4abs1c            { value_s4abs1c(packetSrc, packetType, payloadIndex, payload, mqtt_value);                              return 0; }
@@ -4132,8 +4184,38 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case  0 :             bcnt = 23; BITBASIS_UNKNOWN;
         case  1 :                                CAT_UNKNOWN;                                                               KEYBIT_PUB_CONFIG_PUB_ENTITY("F031_1");
         case  2 :                                CAT_UNKNOWN;                                                               KEYBIT_PUB_CONFIG_PUB_ENTITY("F031_2");
-        case  3 :                                CAT_UNKNOWN;                                                               KEYBIT_PUB_CONFIG_PUB_ENTITY("UI_Status_LCD");  // 01=LCD off, 81=LCD on ??; 0x80/0x00 also seen during reboot (UI off/on) (LCD off/on) ?
-        case  4 :                                CAT_UNKNOWN;                                                               KEYBIT_PUB_CONFIG_PUB_ENTITY("UI_Installer_Mode"); // B4=installer, 74=user mode 60=during reboot?
+        case 3: switch (bitNr) {
+          case 8: bcnt = 29; BITBASIS;
+/*
+          case 0:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_0031_3_0_Q_Always1");
+          case 1:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_0031_3_1_Q_Always0");
+          case 2:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_0031_3_2_Q_Always0");
+          case 3:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_0031_3_3_Q_Always0");
+          case 4:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_LCD_Req_2");
+          case 5:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_LCD_Ack");
+          case 6:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_LCD_Light_2");
+*/
+          case 7: HACONFIG; SUBDEVICE("_UI"); CAT_SETTING;                                                                  KEYBIT_PUB_CONFIG_PUB_ENTITY("Main_LCD_Light");
+          default: return 0;
+        }
+        case 4:
+                switch (bitNr) {
+          case 8: bcnt = 30; BITBASIS;
+/*
+          case 0:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer_Req_2");
+          case 1:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer_Ack");
+          case 2:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY_INV("Aux_Advanced_2");
+          case 3:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer_2");
+          case 4:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY_INV("Aux_Installer2_2");
+*/
+          case 5: HACONFIG; SUBDEVICE("_UI"); CAT_SETTING;                                                                  KEYBIT_PUB_CONFIG_PUB_ENTITY_INV("Main_Advanced");
+          case 6: HACONFIG; SUBDEVICE("_UI"); CAT_SETTING;                                                                  KEYBIT_PUB_CONFIG_PUB_ENTITY("Main_Installer");
+/*
+          case 7:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY_INV("Main_Installer2");
+*/
+          default: return 0;
+        }
+/*
         case  5 : switch (bitNr) {
           case    8 : bcnt = 24; BITBASIS;
           case    6 : return 0; // suppress hourly pulse reporting
@@ -4143,6 +4225,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           case    0 :                            CAT_UNKNOWN;                                                               KEYBIT_PUB_CONFIG_PUB_ENTITY("Reboot_Related_Q31-00-5-0");
           default   : UNKNOWN_BIT;
         }
+*/
         case  6 :             // year
                               if (EE.minuteTimeStamp) return 0;
                               M.R.selectTimeString = 4;
@@ -4195,6 +4278,39 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         default:              return 0;
       }
       case 0x40 : switch (payloadIndex) {
+        case 3: switch (bitNr) {
+          case 8: bcnt = 31; BITBASIS;
+/*
+          case 0:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_4031_3_0_Q_Always0");
+          case 1:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_4031_3_1_Q_Always0");
+          case 2:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_4031_3_2_Q_Always0");
+          case 3:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_4031_3_3_Q_Always0");
+          case 4:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_LCD_Req");
+          case 5:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_LCD_Ack_2");
+*/
+          case 6: HACONFIG; SUBDEVICE("_UI"); CAT_SETTING;                                                                  KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_LCD_Light");
+/*
+          case 7:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Main_LCD_Light_2");
+*/
+          default: return 0;
+        }
+        case 4: switch (bitNr) {
+          case 8: bcnt = 32; BITBASIS;
+/*
+          case 0:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer_Req");
+          case 1:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer_Ack_2");
+*/
+          case 2: HACONFIG; SUBDEVICE("_UI"); CAT_SETTING;                                                                  KEYBIT_PUB_CONFIG_PUB_ENTITY_INV("Aux_Advanced");
+          case 3: HACONFIG; SUBDEVICE("_UI"); CAT_SETTING;                                                                  KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer");
+/*
+          case 4:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY_INV("Aux_Installer2");
+          case 5:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY_INV("Main_Advanced_2");
+          case 6:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Main_Installer_2");
+          case 7:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY_INV("Main_Installer2_2");
+*/
+          default: return 0;
+        }
+        //case 5 :  SUBDEVICE("_31"); HACONFIG; KEY1_PUB_CONFIG_CHECK_ENTITY("4031-5"); VALUE_u8hex; // always 0x05 ??
         default:              return 0;
       }
     }

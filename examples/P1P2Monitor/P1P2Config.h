@@ -99,8 +99,7 @@
                                   //   (in case of bus collision or read errors, the bridge will switch off cycle stealing mode and will switch off control mode)
 
 // set CTRL adapter ID; if not used, installer mode becomes unavailable on main controller
-#define CTRL_ID_1 0xB4 // LAN adapter ID in 0x31 payload byte 7
-#define CTRL_ID_2 0x10 // LAN adapter ID in 0x31 payload byte 8
+#define CTRL_ID_2 0x10 // Value for packet 0x31 payload byte 5
 
 // Controller ID values
 #define CONTROL_ID_NONE 0x00     // do not act as auxiliary controller

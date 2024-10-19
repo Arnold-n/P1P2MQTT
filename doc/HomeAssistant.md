@@ -305,6 +305,17 @@ Note: COP_Realtime is only calculated if Consumption_Heatpump is (regularly) pro
 | DHW_Related_Q                            | ?
 | DHW_Setpoint                             | Hot water setpoint
 
+##### HC_UI
+
+Simulates functions of the auxiliary controller
+
+| Function                                 | Description
+|:-----------------------------------------|:----------------------------------------------------------|
+| LCD_Off                                  | Switches (simulated) LCD backlight of bridge off
+| LCD_On                                   | Switches (simulated) LCD backlight of bridge on (LCD backlights of main and auxiliary controller cannot be both on)
+| Mode_0_Normal_User                       | Puts P1P2MQTT bridge into normal user mode
+| Mode_1_Advanced_User                     | Puts P1P2MQTT bridge into advanced user mode
+| Mode_2_Installer                         | Puts P1P2MQTT bridge into installer mode (if/when main controller is not in installer mode)
 
 #### Control and entity overview (Daikin AC / F-series)
 

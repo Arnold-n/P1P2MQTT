@@ -63,6 +63,11 @@ The most useful commands:
 - `L0` sets auxiliary controller mode off (remains effective after restart),
 - `L2` (and L3) switch auxiliary controller mode off (and on) but do not save this change to EEPROM,
 - `L5` (F-series only) switches auxiliary controller mode partially on: only 00F030 messages are responded to. This enable monitoring which 00F03x packets will be requested. Not saved to EEPROM,
+- `L80` (E-series only) reports (simulated) LCD backlight of bridge to be off
+- `L81` (E-series only) reports (simulated) LCD backlight of bridge to be on (if/when main controller backlight is off; this will block LCD light on main controller)
+- `L90` (E-series only) puts bridge in normal user mode
+- `L91` (E-series only) puts bridge in advanced user mode
+- `L92` (E-series only) puts bridge in installer mode (if/when main controller is not in installer mode)
 - `L99` (E-series only) restarts Daikin system, use with care!
 - `L`  displays current controller\_id (0x00 = off; 0xF0/0xF1 is first/secondary auxiliary controller),
 
