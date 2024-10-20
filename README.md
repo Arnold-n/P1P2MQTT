@@ -1,12 +1,12 @@
-# Control your heat pump from Home Assistant with P1P2MQTT v0.9.46 (previously P1P2Serial)
+# Control your heat pump from Home Assistant with P1P2MQTT
 
-With release v0.9.46 climate control is automatically configured in Home Assistant. This version comes with a lot of improvements and changes, please see the [v0.9.46 release notes](doc/v0.9.46-ReleaseNotes.md). 
+Since release v0.9.46 climate controls are automatically configured in Home Assistant. v0.9.46 (or later) comes with a lot of improvements and changes, please see the [v0.9.46 release notes](doc/v0.9.46-ReleaseNotes.md). 
 
-This project primarily supports Daikin systems, but also other brands with HBS-based interfaces (see below).
+This project primarily supports control of Daikin systems, but also monitoring of other brands with HBS-based interfaces (see below).
 
 # Monitor and control your Daikin system from Home Assistant
 
-With the P1P2MQTT project you can monitor and control your heat pump or A/C system - locally - from Home Assistant or via MQTT. Various Daikin systems, especially Altherma full electric and hybrid, Sky Air, and VRV systems, can be monitored and controlled via the P1/P2 2-wire room thermostat interface without any need for a cloud API. Daikin (hybrid) heat pump systems are usually controlled by a room thermostat over a 2-wire HBS interface, called P1/P2, which combines data and power. This project enables to monitor (and, for some systems, control) your Daikin system by connecting to the P1/P2 interface.
+With the P1P2MQTT project (previously P1P1Serial) you can monitor and control your heat pump or A/C system - locally - from Home Assistant or via MQTT. Various Daikin systems, especially Altherma full electric and hybrid, Sky Air, and VRV systems, can be monitored and controlled via the P1/P2 2-wire room thermostat interface without any need for a cloud API. Daikin (hybrid) heat pump systems are usually controlled by a room thermostat over a 2-wire HBS interface, called P1/P2, which combines data and power. This project enables to monitor (and, for some systems, control) your Daikin system by connecting to the P1/P2 interface.
 
 Understanding your heat pump system operation is crucial to optimizing comfort, lifetime and reducing your energy bill. We reduced our energy bill by more than 100 Euro per year by monitoring, understanding and then improving our Daikin system settings.
 

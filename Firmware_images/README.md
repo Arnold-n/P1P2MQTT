@@ -6,6 +6,10 @@ The P1P2MQTT bridge (previously P1P2-ESP-interface) has 2 CPUs:
 
 A full upgrade involves flashing both CPUs.
 
+Stable version is currently v0.9.53/v0.9.54.
+
+v0.9.55rc3 adds buffered writes (Daikin E/F), improved field setting handling (Daikin E), and bridge installer mode (Daikin E). These should work, but please report any issues, especially for other models than the Daikin E-series.
+
 ## P1P2Monitor firmware for ATmega328
 
 These images are for the P1P2MQTT bridge (previously called P1P2-ESP-interface). These images do not work on the Arduino Uno.

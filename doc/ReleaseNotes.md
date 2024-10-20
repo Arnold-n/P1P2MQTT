@@ -1,12 +1,22 @@
 **Release notes**
 
-(planned, not yet available) P1P2Monitor
+v0.9.55rc3
+
 - Buffered writes
+- Daikin E: add Quiet_Mode_Active output
+- Daikin E: switch bridge between user mode, advanced user mode, and installer mode
+- Daikin E: simulate LCD backlight on bridge
+- Daikin E: improve field setting handling
+- Daikin F: preparing for masked writes
+- Hitachi: more decoding, diversification
+- HomeWizard: fix for 3-phase energy meter
 
 v0.9.53 P1P2Monitor
+
 - 'KLICDA'-style counter request by cycle stealing supported, configurable via 'q' command
 
 v0.9.53 P1P2MQTT bridge
+
 - tank-installed and cooling-capacity assumed by default until field setting is observed
 - P48 option to update timestamps once/minute only
 - V_Interface is now voltage
