@@ -1359,8 +1359,8 @@ uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIn
                                        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue + applyHysteresis >= oldValue));
                                      }
                                      break;
-      case HYSTERESIS_TYPE_S8:       { int8_t oldValue = u_payloadValue_LE(M.payloadByteVal + pi2, 1);
-                                       int8_t newValue = u_payloadValue_LE(payload + payloadIndex, 1);
+      case HYSTERESIS_TYPE_S8:       { int8_t oldValue = (uint8_t) u_payloadValue_LE(M.payloadByteVal + pi2, 1);
+                                       int8_t newValue = (uint8_t) u_payloadValue_LE(payload + payloadIndex, 1);
                                        skipHysteresis = ((newValue <= oldValue + applyHysteresis) && (newValue + applyHysteresis >= oldValue));
                                      }
                                      break;
@@ -1609,9 +1609,21 @@ uint8_t value_u_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* pay
   return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, length);
 }
 
+// signed integers, LE
+
 uint8_t value_s_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, byte length) {
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", s_payloadValue_LE(payload + payloadIndex, length));
   return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, length);
+}
+
+uint8_t value_s8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value) {
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int8_t) payload[payloadIndex]);
+  return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
+}
+
+uint8_t value_s16_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value) {
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int16_t) (uint16_t) u_payloadValue_LE(payload + payloadIndex , 2));
+  return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 2);
 }
 
 uint8_t value_sdiv100_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, byte length) {
@@ -1632,18 +1644,6 @@ uint8_t value_udiv10(byte packetSrc, byte packetType, byte payloadIndex, byte* p
 uint8_t value_udiv1000_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, byte length) {
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", u_payloadValue_LE(payload + payloadIndex, length) * 0.001);
   return  publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, length);
-}
-
-// signed integers, LE
-
-uint8_t value_s8(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value) {
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int8_t) payload[payloadIndex]);
-  return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
-}
-
-uint8_t value_s16_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value) {
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", (int16_t) (uint16_t) u_payloadValue_LE(payload + payloadIndex , 2));
-  return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 2);
 }
 
 // single bit
@@ -2296,20 +2296,19 @@ uint8_t  publishFieldSetting(byte paramNr) {
 #define VALUE_u16hex_LE          { value_u_hex_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 2);                          return 0; }
 #define VALUE_u24hex_LE          { value_u_hex_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 3);                          return 0; }
 #define VALUE_u32hex_LE          { value_u_hex_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 4);                          return 0; }
-#define VALUE_u0                 { value_u0(packetSrc, packetType, payloadIndex, payload, mqtt_value);                                   return 0; }
-#define VALUE_u8                 { value_u_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);                              return 0; }
+#define VALUE_s8                 { value_s8(packetSrc, packetType, payloadIndex, payload, mqtt_value);                                   return 0; }
+#define VALUE_s8div10            { value_sdiv10_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);                         return 0; }
+#define VALUE_s8div100           { value_sdiv100_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);                        return 0; }
 #define VALUE_s16_LE             { value_s_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 2);                              return 0; }
 #define VALUE_s16div10_LE        { value_sdiv10_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 2);                         return 0; }
 #define VALUE_s16div100_LE       { value_sdiv100_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 2);                        return 0; }
-#define VALUE_s8div100           { value_sdiv100_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);                        return 0; }
-#define VALUE_s8div10            { value_sdiv10_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);                         return 0; }
+#define VALUE_u0                 { value_u0(packetSrc, packetType, payloadIndex, payload, mqtt_value);                                   return 0; }
+#define VALUE_u8                 { value_u_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);                              return 0; }
 #define VALUE_u16_LE             { value_u_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 2);                              return 0; }
 #define VALUE_u16div1000_LE      { value_udiv1000_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 2);                       return 0; }
 #define VALUE_u24_LE             { value_u_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 3);                              return 0; }
 #define VALUE_u32_LE             { value_u_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 4);                              return 0; }
 #define VALUE_u32div1000_LE      { value_udiv1000_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 4);                       return 0; }
-#define VALUE_s8                 { value_s8(packetSrc, packetType, payloadIndex, payload, mqtt_value);                                   return 0; }
-#define VALUE_s8                 { value_s_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);                              return 0; }
 #define VALUE_bits(n1, n2)       { value_bits(packetSrc, packetType, payloadIndex, payload, mqtt_value, n1, n2);                         return 0; }
 #define VALUE_bits_nopub(n1, n2)       { value_bits_nopub(packetSrc, packetType, payloadIndex, payload, mqtt_value, n1, n2);                         return 0; }
 #define VALUE_flag8              { if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR; value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr); return 0; }
