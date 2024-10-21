@@ -5757,8 +5757,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         default : UNKNOWN_BYTE;
       }
       case 0x0A: switch (payloadIndex) {
-        case  5  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Temperature_Gas");              VALUE_u8; // TGas
-        case  6  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Temperature_liquid");           VALUE_u8; // TLiq  // so this is not a checksum ?
+        case  5  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Tgas");                         VALUE_u8; // Temperature_Gas
+        case  6  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Tliq");                         VALUE_u8; // Temperature_liquid // so this is not a checksum
         cefault  : UNKNOWN_BYTE;
       }
       case 0x10: UNKNOWN_BYTE;
@@ -5767,13 +5767,13 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     case 0x23: switch (packetType) {
       case 0x0A: UNKNOWN_BYTE;
       case 0x1C: switch (payloadIndex) {
-        case 14  : HACONFIG; CAT_MEASUREMENT; HAFREQ;    KEY1_PUB_CONFIG_CHECK_ENTITY("Inverter_Operation_Frequency"); VALUE_u8; // Freq
-        case  6  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Ambient_Temperature");          VALUE_s8; // Ta
-        case  8  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Evaporator_Gas_Temperature");   VALUE_s8; // Te
-        case 10  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Discharge_Gas_Temperature");    VALUE_s8; // Td
-        case 12  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Discharge Pressure");           VALUE_u8; // Pd in MPa (divide by 10 to get actual value) = in bar, no division needed ?
-        case 15  : HACONFIG; CAT_MEASUREMENT; HACURRENT; KEY1_PUB_CONFIG_CHECK_ENTITY("Compressor_Current");           VALUE_u8; // Curr A
-        case 16  : HACONFIG; CAT_MEASUREMENT; HAPERCENT; KEY1_PUB_CONFIG_CHECK_ENTITY("Output_Expansion_Valve_Open");  VALUE_u8; // Evo %
+        case 14  : HACONFIG; CAT_MEASUREMENT; HAFREQ;    KEY1_PUB_CONFIG_CHECK_ENTITY("Freq");                         VALUE_u8; // Inverter_Operation_Frequency
+        case  6  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Ta");                           VALUE_s8; // Ambient_Temperature
+        case  8  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Te");                           VALUE_s8; // Evaporator_Gas_Temperature
+        case 10  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Td");                           VALUE_s8; // Discharge_Gas_Temperature
+        case 12  : HACONFIG; CAT_MEASUREMENT; HAPRESSURE;KEY1_PUB_CONFIG_CHECK_ENTITY("Pd");                           VALUE_u8div10; // Discharge Pressure in MPa (div by 10)
+        case 15  : HACONFIG; CAT_MEASUREMENT; HACURRENT; KEY1_PUB_CONFIG_CHECK_ENTITY("Curr");                         VALUE_u8; // Compressor_Current
+        case 16  : HACONFIG; CAT_MEASUREMENT; HAPERCENT; KEY1_PUB_CONFIG_CHECK_ENTITY("Evo");                          VALUE_u8; // Output_Expansion_Valve_Open
         default  : UNKNOWN_BYTE;
       }
       default: return 0;
@@ -5785,16 +5785,16 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
     case 0x49: switch (packetType) {
       case 0x09: UNKNOWN_BYTE;
       case 0x23: switch (payloadIndex) {
-        case  8  : HACONFIG; CAT_SETTING;     HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Temperature_Target");                 VALUE_u8; // Tset
+        case  8  : HACONFIG; CAT_SETTING;     HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Tset");                         VALUE_u8; // Temperature_Target
         default  : UNKNOWN_BYTE;
       }
       case 0x30: switch (payloadIndex) {
-        case  7 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Water_Inlet_Temperature");            VALUE_s8; // Twi
-        case  8 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Water_Outlet_Temperature");           VALUE_s8; // Two
-        case 11 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Water_Outlet_Heat_Pump_Temperature"); VALUE_s8; // TwoHP
-        case 16 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Ambient_Average_Temperature");        VALUE_s8; // TaAv
-        case 20 : HACONFIG; CAT_MEASUREMENT; HAPERCENT;  KEY1_PUB_CONFIG_CHECK_ENTITY("Indoor_Expansion_Valve_Open");        VALUE_u8; // Evi
-        case 30 : HACONFIG; CAT_MEASUREMENT; HAPERCENT;  KEY1_PUB_CONFIG_CHECK_ENTITY("Heat_Pump_Water_Pump_Speed");         VALUE_u8; // HPWP
+        case  7 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Twi");                          VALUE_s8; // Water_Inlet_Temperature
+        case  8 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("Two");                          VALUE_s8; // Water_Outlet_Temperature
+        case 11 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("TwoHP");                        VALUE_s8; // Water_Outlet_Heat_Pump_Temperature
+        case 16 : HACONFIG; CAT_TEMP;        HATEMP0;    KEY1_PUB_CONFIG_CHECK_ENTITY("TaAv");                         VALUE_s8; // Ambient_Average_Temperature
+        case 20 : HACONFIG; CAT_MEASUREMENT; HAPERCENT;  KEY1_PUB_CONFIG_CHECK_ENTITY("Evi");                          VALUE_u8; // Indoor_Expansion_Valve_Open
+        case 30 : HACONFIG; CAT_MEASUREMENT; HAPERCENT;  KEY1_PUB_CONFIG_CHECK_ENTITY("HPWP");                         VALUE_u8; // Heat_Pump_Water_Pump_Speed
         default : UNKNOWN_BYTE;
       }
       default: return 0;

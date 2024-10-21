@@ -169,7 +169,11 @@ const char* haUomString[] = {
   "A",
   "Hz",
   "%",
+#ifdef H_SERIES
+  "MPa",
+#else
   "bar",
+#endif
   "€/kWh",
   " ",  // graph for unit-less COP
   "V",
