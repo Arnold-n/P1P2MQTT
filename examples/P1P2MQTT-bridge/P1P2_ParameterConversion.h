@@ -93,9 +93,9 @@
 //
 // Calling order is: (set vars) CHECK PUB_CONFIG CHECK_ENTITY VALUE
 
-#define CHECK(length)      { pubHaEntity = newCheckPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, length, 1); }
+#define CHECK(length)      { pubHaEntity = newCheckPayloadBytesVal(packetSrc, packetDst, packetType, payloadIndex, payload, length, 1); }
 #define CHECKPARAM(length) { pubHaEntity = newCheckParamVal       (paramSrc, paramPacketType, paramNr, payloadIndex, payload, length); }
-#define BITBASIS           { pubHaEntityBits = newCheckPayloadBytesVal(packetSrc, packetType, payloadIndex, payload, 1, 0); return (pubHaEntityBits & 0xFF); }
+#define BITBASIS           { pubHaEntityBits = newCheckPayloadBytesVal(packetSrc, packetDst, packetType, payloadIndex, payload, 1, 0); return (pubHaEntityBits & 0xFF); }
 #define BITBASIS_UNKNOWN   { switch (bitNr) { case 8 : BITBASIS; default : UNKNOWN_BIT; } }
 
 uint16_t pubHaEntity = 0;
@@ -369,8 +369,8 @@ const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01AD,
 #define sizeParamSeen    128 // ceil(0x03FC/8) = ceil(1020/8) = 128
 
 #define PCKTP_START  0x0B
-#define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 to 0x16 0x20 0x21 0x60-0x9F mapped to 0x17-0x58
-#define PCKTP_ARR_BLOCK (PCKTP_END - PCKTP_START + 3 + 18 /* for 60-8F: + 48 */)
+#define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 to 0x16 0x20 0x21 0x60-0x9F mapped to 0x17-0x58 ; 0x31 3x separately for 0xF0 0xF1 0xFF
+#define PCKTP_ARR_BLOCK (PCKTP_END - PCKTP_START + 3 + 18 + 2 /* for 60-8F: + 48 */)
 #define PCKTP_ARR_SZ    ((2 * PCKTP_ARR_BLOCK) + 2)
 
 // 00F030 : used for setting up HA, at least 11 needed, for now 14 reserved
@@ -378,24 +378,24 @@ const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01AD,
 // 00F031 : 12 bytes, storage is needed only for first 6
 // 40F031 : not used, no storage needed
 
-//0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  30,  31,  20,  21,   /* 60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  6A,  6B,  6C,  6D,  6E,  6F,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  7A,  7B,  7C,  7D,  7E,  7F,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  8A,  8B,  8C,  8D,  8E,  8F, */  90,  91,  92,  93,  94,  95,  96,  97,  98,  99,  9A,  9B,  9C,  9D,  9E,  9F
+//0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  30,  31,  31,  31,  20,  21,   /* 60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  6A,  6B,  6C,  6D,  6E,  6F,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  7A,  7B,  7C,  7D,  7E,  7F,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  8A,  8B,  8C,  8D,  8E,  8F, */  90,  91,  92,  93,  94,  95,  96,  97,  98,  99,  9A,  9B,  9C,  9D,  9E,  9F
 const PROGMEM uint32_t nr_bytes[PCKTP_ARR_SZ]     =
 {
 //0000xx
-  0,    0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  14,   6,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
+  0,    0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  14,   6,   6,   6,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
 //4000xx
- 20,   20,  20,  20,  20,  20,  20,  20,  20,  20,  20,   0,   6,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
+ 20,   20,  20,  20,  20,  20,  20,  20,  20,  20,  20,   0,   6,   6,   6,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
 //800010, 800018
   17, 6,
  };
 
 const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     =
-{  0,   0,   0,   0,  20,  40,  60,  80, 100, 120, 140, 160, 174, 180, 200,                                                                                                                                                                                                                                                         220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460, 480, 500, 520,
- 540, 560, 580, 600, 620, 640, 660, 680, 700, 720, 740, 760, 760, 766, 786,                                                                                                                                                                                                                                                         806, 826, 846, 866, 886, 906, 926, 946, 966, 986,1006,1026,1046,1066,1086,1106,
- 1126,1143, /* sizePayloadByteVal=1149 */ };
-#define sizePayloadByteVal 1149
-#define sizePayloadByteSeen 144 // ceil(1149/8)
-#define sizePayloadBitsSeen 33
+{  0,   0,   0,   0,  20,  40,  60,  80, 100, 120, 140, 160, 174, 180, 186, 192, 212,                                                                                                                                                                                                                                                         232, 252, 272, 292, 312, 332, 352, 372, 392, 412, 432, 452, 472, 492, 512, 532,
+ 552, 572, 592, 612, 632, 652, 672, 692, 712, 732, 752, 772, 772, 778, 784, 790, 810,                                                                                                                                                                                                                                                         830, 850, 870, 890, 910, 930, 950, 970, 990,1010,1030,1050,1070,1090,1110,1130,
+ 1150,1167, /* sizePayloadByteVal=1173 */ };
+#define sizePayloadByteVal 1173
+#define sizePayloadByteSeen 147 // ceil(1173/8)
+#define sizePayloadBitsSeen 41
 
 #ifdef SAVESCHEDULE
 #define SCHEDULE_MEM_START 0x0250
@@ -648,165 +648,228 @@ void registerSeenByte() {
   return;
 }
 
-byte  createButtonsSwitches(void) {
-  HARESET;
-  KEY("Restart_P1P2Monitor_ATmega");
-  SUBDEVICE("_Bridge");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("restart");
-  HADEVICE_BUTTON_COMMAND("A");
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+byte newButtons1 = 0; // 15 / 9 static buttons
+#ifdef E_SERIES
+#define NR_BUTTONS_1 15
+byte newButtons2 = 0; // 2 dynamic buttons depending on controlId
+#define NR_BUTTONS_2 2
+#else
+#define NR_BUTTONS_1 9
+#endif
 
-  HARESET;
-  KEY("Restart_P1P2MQTT_ESP");
-  SUBDEVICE("_Bridge");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("restart");
-  HADEVICE_BUTTON_COMMAND("D0");
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
 
-  HARESET;
-  KEY("MQTT_Rebuild");
-  SUBDEVICE("_Bridge");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("restart");
-  HADEVICE_BUTTON_COMMAND("D3");
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("MQTT_Delete_Own_Rebuild");
-  SUBDEVICE("_Setup");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("update");
-  HADEVICE_BUTTON_COMMAND("D12");
-  HADEVICE_AVAILABILITY("S\/9\/ESP_Throttling", 0, 1);
-  HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("MQTT_Delete_All_Rebuild");
-  SUBDEVICE("_Setup");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("update");
-  HADEVICE_BUTTON_COMMAND("D14");
-  HADEVICE_AVAILABILITY("S\/9\/ESP_Throttling", 0, 1);
-  HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("EEPROM_ESP_Save_Changes");
-  SUBDEVICE("_Bridge");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("update");
-  HADEVICE_BUTTON_COMMAND("D5");
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("EEPROM_ESP_Undo_Changes");
-  SUBDEVICE("_Bridge");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("restart");
-  HADEVICE_BUTTON_COMMAND("D6");
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("Factory_Reset_ESP_After_Restart");
-  SUBDEVICE("_Setup");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("update");
-  HADEVICE_BUTTON_COMMAND("D7");
-  HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("Factory_Reset_ESP_Cancel");
-  SUBDEVICE("_Setup");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("restart");
-  HADEVICE_BUTTON_COMMAND("D8");
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+byte  createButtonsSwitches1(void) {
+  byte nrButtonsLeft = NR_BUTTONS_1;
+#ifdef E_SERIES
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("EEPROM_ESP_Set_Cons_Prod_Counters");
+    SUBDEVICE("_Bridge");
+    HADEVICE_BUTTON;
+    //  HADEVICE_BUTTON_CLASS("*");
+    HADEVICE_BUTTON_COMMAND("D13");
+    HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("Daikin_Restart_Careful");
+    SUBDEVICE("_FieldSettings");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("restart");
+    HADEVICE_BUTTON_COMMAND("L99");
+    HADEVICE_AVAILABILITY("S\/0\/Altherma_On", 0, 1);
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("Daikin_Defrost_Request");
+    SUBDEVICE("_Mode");
+    HADEVICE_BUTTON;
+    //  HADEVICE_BUTTON_CLASS("*");
+    HADEVICE_BUTTON_COMMAND("E35003601");
+    HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("LCD_Off");
+    SUBDEVICE("_UI");
+    HADEVICE_BUTTON;
+    //  HADEVICE_BUTTON_CLASS("*");
+    HADEVICE_BUTTON_COMMAND("L80");
+    HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("Mode_0_Normal_User");
+    SUBDEVICE("_UI");
+    HADEVICE_BUTTON;
+    //  HADEVICE_BUTTON_CLASS("*");
+    HADEVICE_BUTTON_COMMAND("L90");
+    HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("Mode_1_Advanced_User");
+    SUBDEVICE("_UI");
+    HADEVICE_BUTTON;
+    //  HADEVICE_BUTTON_CLASS("*");
+    HADEVICE_BUTTON_COMMAND("L91");
+    HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+#endif /* E_SERIES */
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("Restart_P1P2Monitor_ATmega");
+    SUBDEVICE("_Bridge");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("restart");
+    HADEVICE_BUTTON_COMMAND("A");
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("Restart_P1P2MQTT_ESP");
+    SUBDEVICE("_Bridge");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("restart");
+    HADEVICE_BUTTON_COMMAND("D0");
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("MQTT_Rebuild");
+    SUBDEVICE("_Bridge");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("restart");
+    HADEVICE_BUTTON_COMMAND("D3");
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("MQTT_Delete_Own_Rebuild");
+    SUBDEVICE("_Setup");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("update");
+    HADEVICE_BUTTON_COMMAND("D12");
+    HADEVICE_AVAILABILITY("S\/9\/ESP_Throttling", 0, 1);
+    HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("MQTT_Delete_All_Rebuild");
+    SUBDEVICE("_Setup");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("update");
+    HADEVICE_BUTTON_COMMAND("D14");
+    HADEVICE_AVAILABILITY("S\/9\/ESP_Throttling", 0, 1);
+    HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("EEPROM_ESP_Save_Changes");
+    SUBDEVICE("_Bridge");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("update");
+    HADEVICE_BUTTON_COMMAND("D5");
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("EEPROM_ESP_Undo_Changes");
+    SUBDEVICE("_Bridge");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("restart");
+    HADEVICE_BUTTON_COMMAND("D6");
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("Factory_Reset_ESP_After_Restart");
+    SUBDEVICE("_Setup");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("update");
+    HADEVICE_BUTTON_COMMAND("D7");
+    HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  if (newButtons1 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("Factory_Reset_ESP_Cancel");
+    SUBDEVICE("_Setup");
+    HADEVICE_BUTTON;
+    HADEVICE_BUTTON_CLASS("restart");
+    HADEVICE_BUTTON_COMMAND("D8");
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons1 = nrButtonsLeft;
+  }
+  return 1;
+}
 
 #ifdef E_SERIES
-  HARESET;
-  KEY("EEPROM_ESP_Set_Cons_Prod_Counters");
-  SUBDEVICE("_Bridge");
-  HADEVICE_BUTTON;
-  //  HADEVICE_BUTTON_CLASS("*");
-  HADEVICE_BUTTON_COMMAND("D13");
-  HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("Daikin_Restart_Careful");
-  SUBDEVICE("_FieldSettings");
-  HADEVICE_BUTTON;
-  HADEVICE_BUTTON_CLASS("restart");
-  HADEVICE_BUTTON_COMMAND("L99");
-  HADEVICE_AVAILABILITY("S\/0\/Altherma_On", 0, 1);
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("Daikin_Defrost_Request");
-  SUBDEVICE("_Mode");
-  HADEVICE_BUTTON;
-  //  HADEVICE_BUTTON_CLASS("*");
-  HADEVICE_BUTTON_COMMAND("E35003601");
-  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("LCD_On");
-  SUBDEVICE("_UI");
-  HADEVICE_BUTTON;
-  //  HADEVICE_BUTTON_CLASS("*");
-  HADEVICE_BUTTON_COMMAND("L81");
-  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
-  HADEVICE_AVAILABILITY("S\/2\/Main_LCD_Light", 0, 1); // Only available if main LCD is off
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("LCD_Off");
-  SUBDEVICE("_UI");
-  HADEVICE_BUTTON;
-  //  HADEVICE_BUTTON_CLASS("*");
-  HADEVICE_BUTTON_COMMAND("L80");
-  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-
-  HARESET;
-  KEY("Mode_0_Normal_User");
-  SUBDEVICE("_UI");
-  HADEVICE_BUTTON;
-  //  HADEVICE_BUTTON_CLASS("*");
-  HADEVICE_BUTTON_COMMAND("L90");
-  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-
-  HARESET;
-  KEY("Mode_1_Advanced_User");
-  SUBDEVICE("_UI");
-  HADEVICE_BUTTON;
-  //  HADEVICE_BUTTON_CLASS("*");
-  HADEVICE_BUTTON_COMMAND("L91");
-  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-  HARESET;
-  KEY("Mode_2_Installer");
-  SUBDEVICE("_UI");
-  HADEVICE_BUTTON;
-  //  HADEVICE_BUTTON_CLASS("*");
-  HADEVICE_BUTTON_COMMAND("L92");
-  HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
-  HADEVICE_AVAILABILITY("S\/2\/Main_Installer", 0, 1); // Only available if main not in installer mode
-  if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
-
-#endif /* E_SERIES */
-
-  registerSeenByte(); // do not publish entity, as only configs are needed
+byte  createButtonsSwitches2(void) {
+  byte nrButtonsLeft = NR_BUTTONS_2;
+  if (newButtons2 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("LCD_On");
+    SUBDEVICE("_UI");
+    HADEVICE_BUTTON;
+    //  HADEVICE_BUTTON_CLASS("*");
+    HADEVICE_BUTTON_COMMAND("L81");
+    HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+    switch (controlId) {
+      case 0xF0 : HADEVICE_AVAILABILITY("S\/2\/Main_LCD_Light", 0, 1); // Only available if main LCD is off
+                  break; 
+      case 0xF1 : HADEVICE_AVAILABILITY("S\/4\/Main_LCD_Light", 0, 1); // Only available if main LCD is off
+                  break; 
+      case 0xFF : HADEVICE_AVAILABILITY("S\/6\/Main_LCD_Light", 0, 1); // Only available if main LCD is off
+                  break; 
+    }
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons2 = nrButtonsLeft;
+  }
+  if (newButtons2 >= nrButtonsLeft--) {
+    HARESET;
+    KEY("Mode_2_Installer");
+    SUBDEVICE("_UI");
+    HADEVICE_BUTTON;
+    //  HADEVICE_BUTTON_CLASS("*");
+    HADEVICE_BUTTON_COMMAND("L92");
+    HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+    switch (controlId) {
+      case 0xF0 : HADEVICE_AVAILABILITY("S\/2\/Main_Installer", 0, 1); // Only available if main not in installer mode
+                  break; 
+      case 0xF1 : HADEVICE_AVAILABILITY("S\/4\/Main_Installer", 0, 1); // Only available if main not in installer mode
+                  break; 
+      case 0xFF : HADEVICE_AVAILABILITY("S\/6\/Main_Installer", 0, 1); // Only available if main not in installer mode
+                  break; 
+    }
+    if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
+    newButtons2 = nrButtonsLeft;
+  }
+  return 1;
 }
+#endif /* E_SERIES */
 
 void resetDataStructures(void) {
   checkSize();
@@ -1094,7 +1157,7 @@ byte applyHysteresisType = 0;
 #ifdef H_SERIES
 byte calculatePti(const byte packetSrc, const byte packetType, byte* payload)
 #else /* H_SERIES */
-byte calculatePti(const byte packetSrc, const byte packetType)
+byte calculatePti(const byte packetSrc, const byte packetDst, const byte packetType)
 #endif /* H_SERIES */
 {
   byte pti;
@@ -1110,11 +1173,20 @@ byte calculatePti(const byte packetSrc, const byte packetType)
                 break;
     case 0x30 : pti = (PCKTP_END - PCKTP_START) + 1;
                 break;
+
+
     case 0x31 : pti = (PCKTP_END - PCKTP_START) + 2;
+                switch (packetDst) {
+                  case 0xF0 : break;
+                  case 0xFF : pti++;
+                              // fall-through
+                  case 0xF1 : pti++; break;
+                  default   : pti = 0xFF;
+                }
                 break;
     case 0x60 ... 0x8F : pti = 0xFE; // no history, handle as new
                 break;
-    case 0x90 ... 0x9F : pti = (PCKTP_END - PCKTP_START) + 5 + (packetType - 0x90);
+    case 0x90 ... 0x9F : pti = (PCKTP_END - PCKTP_START) + 7 + (packetType - 0x90);
                 break;
     default   : pti = 0xFF; break;
   }
@@ -1243,7 +1315,7 @@ byte calculatePti(const byte packetSrc, const byte packetType)
   return pti;
 }
 
-uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, byte length, bool byteBasis) {
+uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetDst, byte packetType, byte payloadIndex, byte* payload, byte length, bool byteBasis) {
 // returns (8-bit pubHa, 8-bit pubEntity)
 // returns (as pubHa) if homeassistant config msg should be published
 // returns (as pubEntity) which bits are new or, if (EE.outputFilter <= maxOutFilter), have been changed subject to an optional hysteresis check
@@ -1258,7 +1330,7 @@ uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIn
 #ifdef H_SERIES
   byte pti = calculatePti(packetSrc, packetType, payload); // pti index for nr_bytes/bytestart arrays
 #else /* H_SERIES */
-  byte pti = calculatePti(packetSrc, packetType); // pti index for nr_bytes/bytestart arrays
+  byte pti = calculatePti(packetSrc, packetDst, packetType); // pti index for nr_bytes/bytestart arrays
 #endif /* H_SERIES */
 
   if ((pti < 0xFE) && (pti >= PCKTP_ARR_SZ)) {
@@ -1422,10 +1494,10 @@ uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetType, byte payloadIn
 }
 
 #ifndef H_SERIES
-void registerUnseenByte(byte packetSrc, byte packetType, byte payloadIndex)
+void registerUnseenByte(byte packetSrc, byte packetDst, byte packetType, byte payloadIndex)
 {
 
-  byte pti = calculatePti(packetSrc, packetType);
+  byte pti = calculatePti(packetSrc, packetDst, packetType);
   if (pti == 0xFF) return;
   uint16_t pi2 = bytestart[pti] + payloadIndex;
 
@@ -1894,19 +1966,19 @@ byte param_value_hex_BE(byte paramSrc, byte paramPacketType, uint16_t paramNr, b
   return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
 }
 
-#define UNSEEN_BYTE_00_10_19_CLIMATE_DHW registerUnseenByte(0x00, 0x10, 19);
-#define UNSEEN_BYTE_00_30_0_CLIMATE_ROOM_HEATING registerUnseenByte(0x00, 0x30,  0);
-#define UNSEEN_BYTE_00_30_1_CLIMATE_ROOM_COOLING registerUnseenByte(0x00, 0x30,  1);
-#define UNSEEN_BYTE_00_30_2_CLIMATE_LWT_HEATING registerUnseenByte(0x00, 0x30,  2);
-#define UNSEEN_BYTE_00_30_3_CLIMATE_LWT_COOLING registerUnseenByte(0x00, 0x30,  3);
-#define UNSEEN_BYTE_00_30_4_CLIMATE_LWT_HEATING_ADD registerUnseenByte(0x00, 0x30,  4);
-#define UNSEEN_BYTE_00_30_5_CLIMATE_LWT_COOLING_ADD registerUnseenByte(0x00, 0x30,  5);
-#define UNSEEN_BYTE_00_14_05_CLIMATE_LWT_ABS_HEATING registerUnseenByte(0x00, 0x14, 5);
-#define UNSEEN_BYTE_00_14_07_CLIMATE_LWT_ABS_COOLING registerUnseenByte(0x00, 0x14, 7);
-#define UNSEEN_BYTE_00_14_10_CLIMATE_LWT_DEV_HEATING registerUnseenByte(0x00, 0x14, 10);
-#define UNSEEN_BYTE_00_14_11_CLIMATE_LWT_DEV_COOLING registerUnseenByte(0x00, 0x14, 11);
-#define UNSEEN_BYTE_40_14_18_CLIMATE_LWT_ADD registerUnseenByte(0x40, 0x14, 18);
-#define UNSEEN_BYTE_40_0F_10_HEATING_ONLY registerUnseenByte(0x40, 0x0F, 10);
+#define UNSEEN_BYTE_00_10_19_CLIMATE_DHW registerUnseenByte(0x00, 0x00, 0x10, 19);
+#define UNSEEN_BYTE_00_30_0_CLIMATE_ROOM_HEATING registerUnseenByte(0x00, 0x00, 0x30,  0);
+#define UNSEEN_BYTE_00_30_1_CLIMATE_ROOM_COOLING registerUnseenByte(0x00, 0x00, 0x30,  1);
+#define UNSEEN_BYTE_00_30_2_CLIMATE_LWT_HEATING registerUnseenByte(0x00, 0x00, 0x30,  2);
+#define UNSEEN_BYTE_00_30_3_CLIMATE_LWT_COOLING registerUnseenByte(0x00, 0x00, 0x30,  3);
+#define UNSEEN_BYTE_00_30_4_CLIMATE_LWT_HEATING_ADD registerUnseenByte(0x00, 0x00, 0x30,  4);
+#define UNSEEN_BYTE_00_30_5_CLIMATE_LWT_COOLING_ADD registerUnseenByte(0x00, 0x00, 0x30,  5);
+#define UNSEEN_BYTE_00_14_05_CLIMATE_LWT_ABS_HEATING registerUnseenByte(0x00, 0x00, 0x14, 5);
+#define UNSEEN_BYTE_00_14_07_CLIMATE_LWT_ABS_COOLING registerUnseenByte(0x00, 0x00, 0x14, 7);
+#define UNSEEN_BYTE_00_14_10_CLIMATE_LWT_DEV_HEATING registerUnseenByte(0x00, 0x00, 0x14, 10);
+#define UNSEEN_BYTE_00_14_11_CLIMATE_LWT_DEV_COOLING registerUnseenByte(0x00, 0x00, 0x14, 11);
+#define UNSEEN_BYTE_40_14_18_CLIMATE_LWT_ADD registerUnseenByte(0x40, 0x00, 0x14, 18);
+#define UNSEEN_BYTE_40_0F_10_HEATING_ONLY registerUnseenByte(0x40, 0x00, 0x0F, 10);
 
 #define FIELDSTORE(x, registerUnseen) { \
   if (x != fieldSettingValdiv10) {\
@@ -1952,6 +2024,7 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
   int16_t fieldSettingValdiv10 = fieldSettingMin * 10 + (payload[payloadIndex - 3] & 0x3F)  * (fieldSettingStepMantissa * (fieldSettingStepExponent ? (fieldSettingStepExponentSign ? 1 : 100) : 10)); // <0.1 >10 not yet observed / unsure how to implement
   byte paramSrc = packetSrc;
   byte paramPacketType = packetType; // for dual-function FIELDKEY
+  byte packetDst = 0; // dummy for FIELDKEY
   switch (paramNr) {
     // field settings [0_XX] (don't use '-' character in FIELDKEY/topic)
     // FIELDKEY should be called after FIELDSTORE as FIELDKEY will break when FSB == 1
@@ -2815,7 +2888,7 @@ uint16_t parameterWritesDone = 0; // # writes done by ATmega; perhaps useful for
 byte fieldSettingPublishNr = 0xF1; // 0xF1 = ready
 #endif /* E_SERIES */
 
-byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, byte bitNr) {
+byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte payloadIndex, byte* payload, byte bitNr) {
 // A payloadIndex value EMPTY_PAYLOAD indicates an empty payload (used during restart)
 // payloadIndex count payload bytes starting at 0 (following Budulinek's suggestion)
 
@@ -2868,7 +2941,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
   if ((packetType & 0xF0) == 0x30) {
     src += 2;  // 2-7 from/to auxiliary controller, 2-3 for F0
     if (payload[-2] == 0xF1) src += 2; // 4-5 for F1
-    if (payload[-2] == 0xFF) src += 4; // 6-7 for F2
+    if (payload[-2] == 0xFF) src += 4; // 6-7 for FF
   }
   if ((packetType & 0xF8) == 0x08) src += 8;          // 8-9 pseudo-packets ESP / ATmega
   if ((packetType & 0xF8) == 0x00) src = ('B' - '0'); // B boot messages 0x00-0x07
@@ -4201,7 +4274,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         case  1 :                                CAT_UNKNOWN;                                                               KEYBIT_PUB_CONFIG_PUB_ENTITY("F031_1");
         case  2 :                                CAT_UNKNOWN;                                                               KEYBIT_PUB_CONFIG_PUB_ENTITY("F031_2");
         case 3: switch (bitNr) {
-          case 8: bcnt = 29; BITBASIS;
+          case 8: bcnt = 29 + (packetDst & 0x03) - (packetDst == 0xFF ? 1 : 0); BITBASIS;
 /*
           case 0:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_0031_3_0_Q_Always1");
           case 1:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_0031_3_1_Q_Always0");
@@ -4216,7 +4289,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
         }
         case 4:
                 switch (bitNr) {
-          case 8: bcnt = 30; BITBASIS;
+          case 8: bcnt = 32 + (packetDst & 0x03) - (packetDst == 0xFF ? 1 : 0); BITBASIS;
 /*
           case 0:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer_Req_2");
           case 1:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer_Ack");
@@ -4295,7 +4368,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
       }
       case 0x40 : switch (payloadIndex) {
         case 3: switch (bitNr) {
-          case 8: bcnt = 31; BITBASIS;
+          case 8: bcnt = 35 + (packetDst & 0x03) - (packetDst == 0xFF ? 1 : 0); BITBASIS;
 /*
           case 0:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_4031_3_0_Q_Always0");
           case 1:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Z_4031_3_1_Q_Always0");
@@ -4311,7 +4384,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
           default: return 0;
         }
         case 4: switch (bitNr) {
-          case 8: bcnt = 32; BITBASIS;
+          case 8: bcnt = 38 + (packetDst & 0x03) - (packetDst == 0xFF ? 1 : 0); BITBASIS;
 /*
           case 0:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer_Req");
           case 1:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Aux_Installer_Ack_2");
@@ -4568,7 +4641,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
                             default : KEY("Memory_Unknown"); break;
                           }
                           CAT_SCHEDULE;
-                          return newSched[PS];
+                          return newSched[PS]; // outdated code
                         }
                       } else {
                         // Receiving more (padding) bytes than fragment length
@@ -4824,8 +4897,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte
   }
   if ((packetType & 0xF0) == 0x30) {
     src += 2;  // 2-7 from/to auxiliary controller, 2-3 for F0
-    if (payload[-2] == 0xF1) src += 2; // 4-5 for F1
-    if (payload[-2] == 0xFF) src += 4; // 6-7 for F2
+    if (packetDst == 0xF1) src += 2; // 4-5 for F1
+    if (packetDst == 0xFF) src += 4; // 6-7 for F2
   }
   if ((packetType & 0xF8) == 0x08) src += 8;          // 8-9 pseudo-packets ESP / ATmega
   if ((packetType & 0xF8) == 0x00) src = ('B' - '0'); // B boot messages 0x00-0x07
@@ -5901,13 +5974,13 @@ void unSeen() {
 #endif /* E_SERIES */
 }
 
-byte bits2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, byte j) {
-  byte b = bytesbits2keyvalue(packetSrc, packetType, payloadIndex, payload, j) ;
+byte bits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte payloadIndex, byte* payload, byte j) {
+  byte b = bytesbits2keyvalue(packetSrc, packetDst, packetType, payloadIndex, payload, j) ;
   return b;
 }
 
-byte bytes2keyvalue(byte packetSrc, byte packetType, byte payloadIndex, byte* payload) {
-  return bits2keyvalue(packetSrc, packetType, payloadIndex, payload, 8) ;
+byte bytes2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte payloadIndex, byte* payload) {
+  return bits2keyvalue(packetSrc, packetDst, packetType, payloadIndex, payload, 8) ;
 }
 
 #endif /* P1P2_ParameterConversion */

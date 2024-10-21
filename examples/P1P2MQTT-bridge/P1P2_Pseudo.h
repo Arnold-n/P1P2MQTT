@@ -69,12 +69,11 @@
                     KEY1_PUB_CONFIG_CHECK_ENTITY("Output_Filter");                                                                                                        VALUE_u8;
         case   10 : HAENTITYCATEGORY_DIAGNOSTIC;
                     KEY1_PUB_CONFIG_CHECK_ENTITY("P1P2_ESP_Interface_hwID_ESP");                                                                                          VALUE_u8hex;
-        case   11 : // implied in createButtonSwitches() HACONFIG;
+        case   11 : HACONFIG;
                     CHECK(1); // PUB_CONFIG
-                    if (pubHa) {
-                      createButtonsSwitches();
-                      registerSeenByte(); // do not publish entity, as only config is needed
-                    }
+                    if (pubHa && !newButtons1) newButtons1 = NR_BUTTONS_1;
+                    if (newButtons1 && createButtonsSwitches1()) registerSeenByte();
+                    return 0;
 #ifdef E_SERIES
         case   12 : return 0;
         case   13 : HACONFIG;
@@ -188,7 +187,22 @@
         case    7 : return 0;
         case    8 :           KEY2_PUB_CONFIG_CHECK_ENTITY("P1P2_Monitor_Counter_Parameter_Writes");                                                                      VALUE_u16_LE;
         case    9 :           KEY1_PUB_CONFIG_CHECK_ENTITY("Control_Level_If_Active");                                                                                    VALUE_u8;
-        case   10 :           KEY1_PUB_CONFIG_CHECK_ENTITY("Control_ID");                                                                                                 VALUE_u8hex;
+        case   10 :           HACONFIG;
+                              KEY1_PUB_CONFIG_CHECK_ENTITY("Control_ID");
+#ifdef E_SERIES
+                              if (pubEntity && !newButtons2) newButtons2 = NR_BUTTONS_2;
+                              if (newButtons2 && createButtonsSwitches2()) {
+                                HARESET;
+                                HACONFIG;
+                                CAT_SETTING;
+                                SUBDEVICE("_Bridge");
+                                KEY("Control_ID");
+                                VALUE_u8hex;
+                              }
+                    return 0;
+#else /* E_SERIES */
+                    VALUE_u8hex;
+#endif /* E_SERIES */
         case   11 : HACONFIG;
                     maxOutputFilter = 9; // overrule = 1
                     CHECK(1);

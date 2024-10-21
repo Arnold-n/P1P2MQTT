@@ -1333,6 +1333,9 @@ bool bTotalAvailable = false;   // indicates if bTotal is available
 
 static byte throttle = 1;
 static byte throttleValue = THROTTLE_VALUE;
+#ifdef E_SERIES
+byte controlId = 0;
+#endif /* E_SERIES */
 
 #include "P1P2_ParameterConversion.h"
 
@@ -1868,17 +1871,17 @@ void printModifyParam(byte paramNr, bool modParam = false, int32_t newValue = 0,
 
 #ifdef E_SERIES
   if (modParam && (paramNr == PARAM_RT_OFFSET)) {
-    registerUnseenByte(0x00, 0x11, 1);
-    registerUnseenByte(0x40, 0x11, 13);
+    registerUnseenByte(0x00, 0x00, 0x11, 1);
+    registerUnseenByte(0x40, 0x00, 0x11, 13);
   }
   if (modParam && (paramNr == PARAM_R1T_OFFSET)) {
-    registerUnseenByte(0x40, 0x11, 9);
+    registerUnseenByte(0x40, 0x00, 0x11, 9);
   }
   if (modParam && (paramNr == PARAM_R2T_OFFSET)) {
-    registerUnseenByte(0x40, 0x11, 1);
+    registerUnseenByte(0x40, 0x00, 0x11, 1);
   }
   if (modParam && (paramNr == PARAM_R4T_OFFSET)) {
-    registerUnseenByte(0x40, 0x11, 7);
+    registerUnseenByte(0x40, 0x00, 0x11, 7);
   }
   if ((modParam && (paramNr == PARAM_EP)) || (modParam && (paramNr == PARAM_EC))) {
     pseudo0B = 9;
@@ -1890,12 +1893,12 @@ void printModifyParam(byte paramNr, bool modParam = false, int32_t newValue = 0,
 
 #ifdef F_SERIES
   if (modParam && ((paramNr == PARAM_SETPOINT_COOLING_MIN) || (paramNr == PARAM_SETPOINT_COOLING_MAX))) {
-    registerUnseenByte(0x00, 0x38, 4);
-    registerUnseenByte(0x40, 0x3B, 4);
+    registerUnseenByte(0x00, 0x00, 0x38, 4);
+    registerUnseenByte(0x40, 0x00, 0x3B, 4);
   }
   if (modParam && ((paramNr == PARAM_SETPOINT_HEATING_MIN) || (paramNr == PARAM_SETPOINT_HEATING_MAX))) {
-    registerUnseenByte(0x00, 0x38, 8);
-    registerUnseenByte(0x40, 0x3B, 8);
+    registerUnseenByte(0x00, 0x00, 0x38, 8);
+    registerUnseenByte(0x40, 0x00, 0x3B, 8);
   }
 #endif /* F_SERIES */
   if (modParam && ((paramNr == PARAM_USE_TZ) || (paramNr == PARAM_USER_TZ))) configTZ();
@@ -1944,20 +1947,20 @@ IPAddress local_ip;
 
 #ifdef E_SERIES
 void configOffset(void) {
-  registerUnseenByte(0x00, 0x11, 1);
-  registerUnseenByte(0x40, 0x11, 13);
-  registerUnseenByte(0x40, 0x11, 9);
-  registerUnseenByte(0x40, 0x11, 1);
-  registerUnseenByte(0x40, 0x11, 7);
+  registerUnseenByte(0x00, 0x00, 0x11, 1);
+  registerUnseenByte(0x40, 0x00, 0x11, 13);
+  registerUnseenByte(0x40, 0x00, 0x11, 9);
+  registerUnseenByte(0x40, 0x00, 0x11, 1);
+  registerUnseenByte(0x40, 0x00, 0x11, 7);
 }
 #endif /* E_SERIES */
 
 #ifdef F_SERIES
 void configMinMax(void) {
-  registerUnseenByte(0x00, 0x38, 4);
-  registerUnseenByte(0x40, 0x3B, 4);
-  registerUnseenByte(0x00, 0x38, 8);
-  registerUnseenByte(0x40, 0x3B, 8);
+  registerUnseenByte(0x00, 0x00, 0x38, 4);
+  registerUnseenByte(0x40, 0x00, 0x3B, 4);
+  registerUnseenByte(0x00, 0x00, 0x38, 8);
+  registerUnseenByte(0x40, 0x00, 0x3B, 8);
 }
 #endif /* F_SERIES */
 
@@ -3281,7 +3284,7 @@ void process_for_mqtt(byte* rb, int n) {
   if (!mqttConnected) Mqtt_disconnectSkippedPackets++;
   if (mqttConnected || MQTT_DISCONNECT_CONTINUE) {
 #ifdef EF_SERIES
-    if (n == 3) bytes2keyvalue(rb[0], rb[2], EMPTY_PAYLOAD, rb + 3);
+    if (n == 3) bytes2keyvalue(rb[0], rb[1], rb[2], EMPTY_PAYLOAD, rb + 3);
 #endif /* EF_SERIES */
 #ifdef MHI_SERIES
     for (byte i = 1; i < n; i++)
@@ -3299,15 +3302,15 @@ void process_for_mqtt(byte* rb, int n) {
 #endif /* E_SERIES */
                                                                                                  ) {
 #ifdef MHI_SERIES
-        byte doBits = bytes2keyvalue(rb[0],     0, i - 1, rb + 1);
+        byte doBits = bytes2keyvalue(rb[0],     0,     0, i - 1, rb + 1);
 #else /* MHI_SERIES */
-        byte doBits = bytes2keyvalue(rb[0], rb[2], i - 3, rb + 3);
+        byte doBits = bytes2keyvalue(rb[0], rb[1], rb[2], i - 3, rb + 3);
 #endif /* MHI_SERIES */
         // returns which bits should be handled
 #ifdef MHI_SERIES
-        for (byte j = 0; j < 8; j++) if (doBits & (1 << j)) bits2keyvalue(rb[0],    0 , i - 1, rb + 1, j);
+        for (byte j = 0; j < 8; j++) if (doBits & (1 << j)) bits2keyvalue(rb[0],     0,    0 , i - 1, rb + 1, j);
 #else /* MHI_SERIES */
-        for (byte j = 0; j < 8; j++) if (doBits & (1 << j)) bits2keyvalue(rb[0], rb[2], i - 3, rb + 3, j);
+        for (byte j = 0; j < 8; j++) if (doBits & (1 << j)) bits2keyvalue(rb[0], rb[1], rb[2], i - 3, rb + 3, j);
 #endif /* MHI_SERIES */
       }
     }
@@ -3721,7 +3724,12 @@ void loop() {
                 if ((EE.outputMode & 0x0022) && !mqttDeleting) process_for_mqtt(readHex, rh);
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0E)) pseudo0B = pseudo0C = 9; // Insert pseudo packet 40000B/0C in output serial after 00000E
 #ifndef W_SERIES
-                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) pseudo0D = pseudo0F = 9; // Insert pseudo packet 40000D/0F in output serial after 00000F
+                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) {
+                  pseudo0D = pseudo0F = 9; // Insert pseudo packet 40000D/0F in output serial after 00000F
+#ifdef E_SERIES
+                  controlId = readHex[13];
+#endif /* E_SERIES */
+                }
 #endif /* W_SERIES */
                 if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) {
 #ifndef W_SERIES
