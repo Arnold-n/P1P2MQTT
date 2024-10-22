@@ -6,10 +6,6 @@ The P1P2MQTT bridge (previously P1P2-ESP-interface) has 2 CPUs:
 
 A full upgrade involves flashing both CPUs.
 
-Stable version is currently v0.9.53/v0.9.54.
-
-v0.9.55rc3 adds buffered writes (Daikin E/F), improved field setting handling (Daikin E), and bridge installer mode (Daikin E). These should work, but please report any issues, especially for other models than the Daikin E-series.
-
 ## P1P2Monitor firmware for ATmega328
 
 These images are for the P1P2MQTT bridge (previously called P1P2-ESP-interface). These images do not work on the Arduino Uno.
@@ -29,6 +25,10 @@ P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and 
 [P1P2Monitor v0.9.53 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.53-MHI.ino.hex)
 
 [P1P2Monitor v0.9.53 (experimental for Toshiba models)](P1P2Monitor-v0.9.53-Toshiba.ino.hex)
+
+Experimental versions:
+- [P1P2Monitor v0.9.55rc3 for Daikin-F series](P1P2Monitor-v0.9.55rc3-Daikin-F.ino.bin) adds buffered writes and write mask  support
+- [P1P2Monitor v0.9.55rc3 for Daikin-E series](P1P2Monitor-v0.9.55rc3-Daikin-E.ino.bin) adds buffered writes and bridge LCD and installer mode
 
 To flash this image OTA (Linux CLI):
 
@@ -60,6 +60,15 @@ Minimal recommended upgrade is v0.9.53 for P1P2MQTT-bridge.
 [P1P2MQTT-bridge v0.9.53 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.53-MHI.ino.bin)
 
 (for Toshiba, use Hitachi code for now).
+
+Stable version is currently v0.9.53/v0.9.54.
+
+Experimental versions:
+- [P1P2MQTT-bridge v0.9.55rc3 for Daikin-F series](P1P2MQTT-bridge-v0.9.55rc3-Daikin-F.ino.bin) adds buffered writes
+- [P1P2MQTT-bridge v0.9.55rc4 for Daikin-E series](P1P2MQTT-bridge-v0.9.55rc4-Daikin-E.ino.bin) adds bridge LCD and installer mode, and improved field setting handling
+- [P1P2MQTT-bridge v0.9.55rc4 for Hitachi](P1P2MQTT-bridge-v0.9.55rc4-Hitachi.ino.bin) adds a few entities
+
+Please report any issues you might find with the experimental versions.
 
 Note to users of the original v1.0 version: please do not erase the flash memory of the ESP8266 when flashing these images; if you do, you will need to reset the hardware identifier back to 0 using the 'P31 0' command (or you will not be able to flash the ATmega328P).
 
