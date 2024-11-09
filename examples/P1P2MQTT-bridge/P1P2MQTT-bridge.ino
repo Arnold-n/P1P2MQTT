@@ -1054,9 +1054,9 @@ bool clientPublishMqtt(const char* key, uint8_t qos, bool retain, const char* va
   }
 }
 
-void clientPublishMqttChar(const char key, uint8_t qos, bool retain, const char* value = nullptr) {
+bool clientPublishMqttChar(const char key, uint8_t qos, bool retain, const char* value = nullptr) {
   topicCharSpecific(key);
-  clientPublishMqtt(mqttTopic, qos, retain, value);
+  return clientPublishMqtt(mqttTopic, qos, retain, value);
 }
 
 void clientPublishTelnet(bool includeTopic, const char* value, bool addDate = true) {
@@ -1086,9 +1086,7 @@ void clientPublishTelnetChar(const char key, const char* value) {
   }
 }
 
-#define MAXRH 23
-#define PWB (23 * 2 + 36) // max pseudopacket 23 bytes (excl CRC byte), 33 bytes for timestamp-prefix, 1 byte for terminating null, 2 for CRC byte
-
+IPAddress local_ip;
 static byte pseudo0B = 0;
 static byte pseudo0C = 0;
 static byte pseudo0D = 0;
@@ -1096,6 +1094,10 @@ static byte pseudo0E = 0;
 static byte pseudo0F = 9;
 byte mqttDeleting = 0;
 uint32_t mqttUnsubscribeTime = 0;
+
+
+#define MAXRH 23
+#define PWB (23 * 2 + 36) // max pseudopacket 23 bytes (excl CRC byte), 33 bytes for timestamp-prefix, 1 byte for terminating null, 2 for CRC byte
 
 void writePseudoPacket(byte* WB, byte rh)
 // rh is pseudo packet size (without CRC or CS byte)
@@ -1333,11 +1335,34 @@ bool bTotalAvailable = false;   // indicates if bTotal is available
 
 static byte throttle = 1;
 static byte throttleValue = THROTTLE_VALUE;
+static uint32_t throttleStepTime = 0;
 #ifdef E_SERIES
 byte controlId = 0;
 #endif /* E_SERIES */
 
 #include "P1P2_ParameterConversion.h"
+
+void reportOnlineRestartData(void) {
+  //                      SUB? Reset?
+  // mqttConnected == 1 :              this function should not be called
+  // mqttConnected == 2 :  1     *     reconnected after MQTT disconnect (reset if (outputMode & 0x0800))
+  // mqttConnected == 3 :  0     1     after D3 or after delete finished or after homeassistant/online detectec
+  // mqttConnected == 4 :  0     0     OTA failed
+  snprintf_P(mqtt_value, 16, PSTR("%d.%d.%d.%d"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+  if (clientPublishMqttChar('Z', MQTT_QOS_CONFIG, MQTT_RETAIN_CONFIG, mqtt_value) && clientPublishMqttChar('L', MQTT_QOS_WILL, MQTT_RETAIN_WILL, "online")) {
+    if (mqttDeleting) {
+      delayedPrintfTopicS("Mqtt reconnect - continue mqtt delete");
+    } else if ((EE.outputMode & 0x0800) || (mqttConnected == 3)) {
+      delayedPrintfTopicS("Reset and restart data communication after D3 or Mqtt (re)connect");
+      resetDataStructures();
+      throttleStepTime = espUptime + THROTTLE_STEP_S;
+      throttleValue = THROTTLE_VALUE;
+      pseudo0F = 9;
+    }
+    if (mqttConnected == 2) mqttSubscribe();
+    mqttConnected = 1;
+  }
+}
 
 #define MQTT_SAVE_TOPIC_CHAR 'A'
 
@@ -1631,7 +1656,6 @@ void WiFiManagerSaveConfigCallback () {
 uint32_t milliInc = 0;
 uint32_t prevMillis = 0; //millis();
 static uint32_t reconnectTime = 0;
-static uint32_t throttleStepTime = 0;
 
 void ATmega_dummy_for_serial() {
   // printfTopicS("Two dummy lines to ATmega.");
@@ -1924,26 +1948,19 @@ void reconnectMQTT() {
   }
   delayedPrintfTopicS("MQTT Client is disconnected");
   // re-enable ATmega serial output on v1.2
+  ignoreRemainder = 2;
   digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
   mqttClient.setServer(EE.mqttServer, EE.mqttPort);
   mqttClient.setCredentials((EE.mqttUser[0] == '\0') ? 0 : EE.mqttUser, (EE.mqttPassword[0] == '\0') ? 0 : EE.mqttPassword);
   mqttClient.setClientId(EE.mqttClientName);
-  printfTopicS("Trying to connect to MQTT server (first attempt may fail)"); // library issue?
+  printfTopicS("Trying to connect to MQTT server (first attempt may fail)");
   Mqtt_reconnectDelay = 0;
   Mqtt_disconnectTime = 0;
   fallback = 0;
-  if (EE.outputMode & 0x800) { // only if 0x0800
-    throttleStepTime = espUptime + THROTTLE_STEP_S;
-    throttleValue = THROTTLE_VALUE;
-    pseudo0F = 9;
-    resetDataStructures();
-  }
-  delay(500);
   reconnectTime = espUptime;
 }
 
 WiFiManager wifiManager;
-IPAddress local_ip;
 
 #ifdef E_SERIES
 void configOffset(void) {
@@ -2207,12 +2224,8 @@ void handleCommand(char* cmdString) {
                            printfTopicS("Please wait until mqtt-delete action is finished");
                            break;
                          }
-                         printfTopicS("Resetting data structures (except field settings), throttle");
-                         throttleStepTime = espUptime + THROTTLE_STEP_S;
-                         throttleValue = THROTTLE_VALUE;
-                         pseudo0F = 9;
-                         clientPublishMqttChar('L', MQTT_QOS_WILL, MQTT_RETAIN_WILL, "online");
-                         resetDataStructures();
+                         // printfTopicS("Resetting data structures (except field settings), throttle");
+                         mqttConnected = 3;
                          break;
 #ifdef E_SERIES
                 case 2 : printfTopicS("Resetting field settings history");
@@ -2588,11 +2601,7 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
       if (mqttDeleting) {
       delayedPrintfTopicS("Detected homeassistant/status online - ignored due to ongoing mqtt delete action");
       } else {
-        delayedPrintfTopicS("Detected homeassistant/status online");
-        throttleStepTime = espUptime + THROTTLE_STEP_S;
-        throttleValue = THROTTLE_VALUE;
-        pseudo0F = 9;
-        resetDataStructures();
+        mqttConnected = 3; // to report online status and to call resetDataStructures
       }
     } else if (!strcmp(MQTT_payload, "offline")) {
       delayedPrintfTopicS("Detected homeassistant/status offline");
@@ -3066,9 +3075,6 @@ void setup() {
 #endif
   }
 
-  // setup uses mqtt_value to store string version op IPv4 address
-  snprintf_P(mqtt_value, 16, PSTR("%d.%d.%d.%d"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
-
   buildMqttTopic();
 
 // MQTT client setup
@@ -3161,10 +3167,9 @@ void setup() {
     }
   }
 
-  if (mqttClient.connected()) {
-    clientPublishMqttChar('L', MQTT_QOS_WILL, MQTT_RETAIN_WILL, "online");
-    printWelcome();
-  }
+  mqttConnected = 2;
+  reportOnlineRestartData();
+
   delay(200);
 #ifdef ARDUINO_OTA
 // OTA
@@ -3207,7 +3212,7 @@ void setup() {
     }
   });
   ArduinoOTA.onError([](ota_error_t error) {
-    clientPublishMqttChar('L', MQTT_QOS_WILL, MQTT_RETAIN_WILL, "online");
+    mqttConnected = 4; // report online status
     switch (error) {
       case OTA_AUTH_ERROR    : printfTopicS("OTA Auth Failed");
                                break;
@@ -3243,6 +3248,10 @@ void setup() {
   // set RESET_PIN back to INPUT mode
   pinMode(RESET_PIN, INPUT);
   MDNS.addService("avrisp", "tcp", avrisp_port);
+
+
+
+  // mqtt_value was initialized in reportOnlineRestartData()
   printfTopicS("AVRISP: ATmega programming: avrdude -c avrisp -p atmega328p -P net:%s:%i -t # or -U ...", mqtt_value, avrisp_port);
   // listen for avrdudes
   avrprog->begin();
@@ -3272,7 +3281,6 @@ void setup() {
 
   configTZ();
 
-  clientPublishMqttChar('Z', MQTT_QOS_CONFIG, MQTT_RETAIN_CONFIG, mqtt_value);
   printfTopicS("IPv4 address: %s", mqtt_value);
 
   checkParam();
@@ -3448,8 +3456,8 @@ void loop() {
         if (mqttDeleting) {
           printfTopicS("Stop mqtt delete action");
           mqttUnsubscribeToDelete();
-          digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
           ignoreRemainder = 2; // in view of change of ignoreSerial caused by mqttDeleting change
+          digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
           mqttDeleting = 0;
         }
         // disconnect
@@ -3459,11 +3467,6 @@ void loop() {
         mqttClient.setServer(MQTT2_SERVER, MQTT2_PORT);
         mqttClient.setCredentials(MQTT2_USER, MQTT2_PASSWORD);
         printfTopicS("Trying to connect to fallback MQTT server (first attempt will fail)");
-        throttleStepTime = espUptime + THROTTLE_STEP_S;
-        throttleValue = THROTTLE_VALUE;
-        pseudo0F = 9;
-        resetDataStructures();
-        delay(500);
         Mqtt_reconnectDelay = 0;
         reconnectTime = espUptime; // 1st attempt always fails (library issue?)
         fallback = 1;
@@ -3503,8 +3506,7 @@ void loop() {
 
                                  while ((c = Serial.read()) >= 0); // flush serial input
 
-
-
+                                 ignoreRemainder = 2; // in view of change of ignoreSerial caused by mqttDeleting change
                                  pinMode(ATMEGA_SERIAL_ENABLE, OUTPUT); // not really needed
                                  digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
                                  delay(100);
@@ -3561,22 +3563,9 @@ void loop() {
   }
   wasConnected = WiFi.isConnected() || ethernetConnected;
 
-  if (mqttConnected == 2) {
-    // mqtt (re)connected
-    clientPublishMqttChar('L', MQTT_QOS_WILL, MQTT_RETAIN_WILL, "online");
-    if (EE.outputMode & 0x0800) { // only if 0x0800
-      if (mqttDeleting) {
-        delayedPrintfTopicS("Mqtt reconnect - continue mqtt delete");
-      } else {
-        delayedPrintfTopicS("Restart data communication after Mqtt reconnect");
-        resetDataStructures();
-        throttleStepTime = espUptime + THROTTLE_STEP_S;
-        throttleValue = THROTTLE_VALUE;
-        pseudo0F = 9;
-      }
-    }
-    mqttSubscribe();
-    mqttConnected = 1;
+  if (mqttConnected > 1) {
+    // mqtt (re)connected, OTA failed, D3 to be handled, or homeassistant online detected
+    reportOnlineRestartData();
   }
 
   if (!OTAbusy)  {
@@ -3627,15 +3616,10 @@ void loop() {
              mqttUnsubscribeTime = espUptime + DELETE_STEP;
           } else {
             // already done: mqttDeleting = 0;
+            // recreate deleted messages
+            mqttConnected = 3; // same as D3
+            reportOnlineRestartData();
             ignoreRemainder = 2; // in view of change of ignoreSerial caused by mqttDeleting change
-            // create deleted messages
-            snprintf_P(mqtt_value, 16, PSTR("%d.%d.%d.%d"), local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
-            clientPublishMqttChar('Z', MQTT_QOS_CONFIG, MQTT_RETAIN_CONFIG, mqtt_value);
-            printfTopicS("Resetting data structures, throttle");
-            throttleStepTime = espUptime + THROTTLE_STEP_S;
-            throttleValue = THROTTLE_VALUE; pseudo0F = 9;
-            clientPublishMqttChar('L', MQTT_QOS_WILL, MQTT_RETAIN_WILL, "online");
-            resetDataStructures();
             digitalWrite(ATMEGA_SERIAL_ENABLE, HIGH);
           }
         }
