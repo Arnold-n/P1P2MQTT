@@ -1374,7 +1374,7 @@ uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetDst, byte packetType
 #endif /* E_SERIES */
 #ifndef MHI_SERIES
   if (pti == 0xFF) {
-    printfTopicS("Unknown packetSrc 0x%02X packetType 0x%02X index %i", packetSrc, packetType, payloadIndex);
+    printfTopicS("Unknown packetSrc 0x%02X packetDst 0x%02X packetType 0x%02X index %i", packetSrc, packetDst, packetType, payloadIndex);
     return 0;
   }
   if (length && (payloadIndex >= nr_bytes[pti])) {
