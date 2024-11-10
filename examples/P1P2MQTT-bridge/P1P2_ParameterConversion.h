@@ -369,8 +369,8 @@ const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01AD,
 #define sizeParamSeen    128 // ceil(0x03FC/8) = ceil(1020/8) = 128
 
 #define PCKTP_START  0x0B
-#define PCKTP_END    0x15 // 0x0D-0x15 and 0x31 to 0x16 0x20 0x21 0x60-0x9F mapped to 0x17-0x58 ; 0x31 3x separately for 0xF0 0xF1 0xFF
-#define PCKTP_ARR_BLOCK (PCKTP_END - PCKTP_START + 3 + 18 + 2 /* for 60-8F: + 48 */)
+#define PCKTP_END    0x15 // 0x0B-0x15 / 0x31 0x20 0x21 0x60-0x9F mapped to 0x16-.. ; 0x31/0x32 4x separately for 0xF0 0xF1 0xF2 0xFF
+#define PCKTP_ARR_BLOCK (PCKTP_END - PCKTP_START + 3 + 18 + 2 + 1 + 4 /* for 60-8F: + 48 */)
 #define PCKTP_ARR_SZ    ((2 * PCKTP_ARR_BLOCK) + 2)
 
 // 00F030 : used for setting up HA, at least 11 needed, for now 14 reserved
@@ -378,23 +378,28 @@ const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01AD,
 // 00F031 : 12 bytes, storage is needed only for first 6
 // 40F031 : not used, no storage needed
 
-//0B,  0C,  0D,  0E,  0F,  10,  11,  12,  13,  14,  15,  30,  31,  31,  31,  20,  21,   /* 60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  6A,  6B,  6C,  6D,  6E,  6F,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  7A,  7B,  7C,  7D,  7E,  7F,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  8A,  8B,  8C,  8D,  8E,  8F, */  90,  91,  92,  93,  94,  95,  96,  97,  98,  99,  9A,  9B,  9C,  9D,  9E,  9F
+const PROGMEM uint32_t ptiCheck[PCKTP_ARR_SZ] =
+{
+0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14,0x15,0x30,0x31,0x31,0x31,0x31,0x32,0x32,0x32,0x32,0x20,0x21,   /* 60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  6A,  6B,  6C,  6D,  6E,  6F,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  7A,  7B,  7C,  7D,  7E,  7F,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  8A,  8B,  8C,  8D,  8E,  8F, */0x90,0x91,0x92,0x93,0x94,0x95,0x96,0x97,0x98,0x99,0x9A,0x9B,0x9C,0x9D,0x9E,0x9F,
+0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14,0x15,0x30,0x31,0x31,0x31,0x31,0x32,0x32,0x32,0x32,0x20,0x21,   /* 60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  6A,  6B,  6C,  6D,  6E,  6F,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  7A,  7B,  7C,  7D,  7E,  7F,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  8A,  8B,  8C,  8D,  8E,  8F, */0x90,0x91,0x92,0x93,0x94,0x95,0x96,0x97,0x98,0x99,0x9A,0x9B,0x9C,0x9D,0x9E,0x9F,
+0x10,0x18
+ };
 const PROGMEM uint32_t nr_bytes[PCKTP_ARR_SZ]     =
 {
 //0000xx
-  0,    0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  14,   6,   6,   6,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
+  0,    0,   0,  20,  20,  20,  20,  20,  20,  20,  20,  14,  12,  12,  12,  12,  16,  16,  16,  16,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
 //4000xx
- 20,   20,  20,  20,  20,  20,  20,  20,  20,  20,  20,   0,   6,   6,   6,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
+ 20,   20,  20,  20,  20,  20,  20,  20,  20,  20,  20,   0,  12,  12,  12,  12,  16,  16,  16,  16,  20,  20,   /* 20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, */  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
 //800010, 800018
   17, 6,
  };
 
 const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     =
-{  0,   0,   0,   0,  20,  40,  60,  80, 100, 120, 140, 160, 174, 180, 186, 192, 212,                                                                                                                                                                                                                                                         232, 252, 272, 292, 312, 332, 352, 372, 392, 412, 432, 452, 472, 492, 512, 532,
- 552, 572, 592, 612, 632, 652, 672, 692, 712, 732, 752, 772, 772, 778, 784, 790, 810,                                                                                                                                                                                                                                                         830, 850, 870, 890, 910, 930, 950, 970, 990,1010,1030,1050,1070,1090,1110,1130,
- 1150,1167, /* sizePayloadByteVal=1173 */ };
-#define sizePayloadByteVal 1173
-#define sizePayloadByteSeen 147 // ceil(1173/8)
+{  0,   0,   0,   0,  20,  40,  60,  80, 100, 120, 140, 160, 174, 186, 198, 210, 222, 238, 254, 270, 286, 306,                                                                                                                                                                                                                                                         326, 346, 366, 386, 406, 426, 446, 466, 486, 506, 526, 546, 566, 586, 606, 626,
+ 646, 666, 686, 706, 726, 746, 766, 786, 806, 826, 846, 866, 866, 878, 890, 902, 914, 930, 946, 962, 978, 998,                                                                                                                                                                                                                                                        1018,1038,1058,1078,1098,1118,1138,1158,1178,1198,1218,1238,1258,1278,1298,1318,
+ 1338,1355, /* sizePayloadByteVal=1361 */ };
+#define sizePayloadByteVal 1361
+#define sizePayloadByteSeen 171 // ceil(1361/8)
 #define sizePayloadBitsSeen 41
 
 #ifdef SAVESCHEDULE
@@ -619,19 +624,6 @@ byte bcnt = 0;
 mqttSaveStruct M;
 #define RTC_VERSION 7
 #define M_VERSION 8
-
-void checkSize() {
-#ifdef E_SERIES
-  for (byte i = 1; i < PARAM_ARR_SZ; i++) {
-// correct for byte-aligning seenstart[0x39]
-    if (seenstart[i] != seenstart[i - 1] + nr_params[i - 1] + (  (PARAM_TP_START + i == 0x39) ? 0 : 0)) printfTopicS("seenstart error i %i seenstart[i] 0x%04X seenstart[i-1] 0x%04X nr_params[i-1] 0x%04X", i, seenstart[i], seenstart[i-1], nr_params[i-1]);
-    if (valstart[i] != valstart[i - 1] + nr_params[i - 1] * parnr_bytes[i - 1]) printfTopicS("valstart error i 0x%04X valstart[i] 0x%04X valstart[i-1] 0x%04X nr_params[i-1] 0x%04X", i, valstart[i], valstart[i-1], nr_params[i-1]);
-  }
-#endif /* E_SERIES */
-  for (uint16_t i = 1; i < PCKTP_ARR_SZ; i++) {
-    if (bytestart[i] != bytestart[i - 1] + nr_bytes[i - 1]) printfTopicS("bytestart error i %i bytestart[i] 0x%04X bytestart[i-1] 0x%04X nr_bytes[i-1]", i, bytestart[i], bytestart[i-1], nr_bytes[i-1]);
-  }
-}
 
 // local
 byte maxOutputFilter = 0;
@@ -870,36 +862,6 @@ byte  createButtonsSwitches2(void) {
   return 1;
 }
 #endif /* E_SERIES */
-
-void resetDataStructures(void) {
-  checkSize();
-  M.Mversion = M_VERSION;
-  M.MdataLength = sizeof(M);
-  for (uint16_t j = 0; j < sizePayloadByteVal; j++) {
-    M.payloadByteVal[j]  = 0;
-  }
-  for (uint16_t j = 0; j < sizePayloadByteSeen; j++) {
-    M.payloadByteSeen[j] = 0;
-  }
-#ifdef E_SERIES
-  for (byte i = 0; i < 2; i++) {
-    for (uint16_t j = 0; j < sizeParamVal; j++)  if ((j < valstart[0x39 - PARAM_TP_START])  || (j >= valstart[0x3A - PARAM_TP_START])  || (i == 1)) M.paramVal[i][j] = 0;
-    for (uint16_t j = 0; j < sizeParamSeen; j++) if ((j < seenstart[0x39 - PARAM_TP_START]) || (j >= seenstart[0x3A - PARAM_TP_START]) || (i == 1)) M.paramSeen[i][j >> 3] &= (0xFF ^  (1 << (j & 0x07)));
-  }
-  for (byte j = 0; j < 36; j++) M.cntByte[j] = 0xFF;
-#endif /* E_SERIES */
-  for (byte j = 0; j < sizePayloadBitsSeen; j++) {
-    M.payloadBitsSeen[j] = 0;
-  }
-#ifdef SAVESCHEDULE
-  byte i;
-  uint16 j;
-  for (i = 0; i < 2; i++) {
-    for (j = 0; j < SCHEDULE_MEM_SIZE; j++) scheduleMem[i][j] = 0;
-    for (j = 0; j < SCHEDULE_MEM_SIZE; j++) scheduleMemSeen[i][j] = false;
-  }
-#endif /* SAVESCHEDULE */
-}
 
 #ifdef E_SERIES
 void resetFieldSettings(void) {
@@ -1161,32 +1123,41 @@ byte calculatePti(const byte packetSrc, const byte packetDst, const byte packetT
 #endif /* H_SERIES */
 {
   byte pti;
-
 #ifdef E_SERIES
-
   switch (packetType) {
     case PCKTP_START ... 0x15 : pti = packetType - PCKTP_START;
                 break;
-    case 0x20 : pti = (PCKTP_END - PCKTP_START) + 3;
-                break;
-    case 0x21 : pti = (PCKTP_END - PCKTP_START) + 4;
-                break;
     case 0x30 : pti = (PCKTP_END - PCKTP_START) + 1;
                 break;
-
-
     case 0x31 : pti = (PCKTP_END - PCKTP_START) + 2;
                 switch (packetDst) {
                   case 0xF0 : break;
                   case 0xFF : pti++;
                               // fall-through
+                  case 0xF2 : pti++;
+                              // fall-through
                   case 0xF1 : pti++; break;
                   default   : pti = 0xFF;
                 }
                 break;
+    case 0x32 : pti = (PCKTP_END - PCKTP_START) + 6;
+                switch (packetDst) {
+                  case 0xF0 : break;
+                  case 0xFF : pti++;
+                              // fall-through
+                  case 0xF2 : pti++;
+                              // fall-through
+                  case 0xF1 : pti++; break;
+                  default   : pti = 0xFF;
+                }
+                break;
+    case 0x20 : pti = (PCKTP_END - PCKTP_START) + 10;
+                break;
+    case 0x21 : pti = (PCKTP_END - PCKTP_START) + 11;
+                break;
     case 0x60 ... 0x8F : pti = 0xFE; // no history, handle as new
                 break;
-    case 0x90 ... 0x9F : pti = (PCKTP_END - PCKTP_START) + 7 + (packetType - 0x90);
+    case 0x90 ... 0x9F : pti = (PCKTP_END - PCKTP_START) + 12 + (packetType - 0x90);
                 break;
     default   : pti = 0xFF; break;
   }
@@ -1205,8 +1176,14 @@ byte calculatePti(const byte packetSrc, const byte packetDst, const byte packetT
                                break;
                  }
                  break;
-    default    : // do nothing
+    default    : pti = 0xFF;
                  break;
+  }
+
+
+  if ((pti < 0xFE) && (pti >= PCKTP_ARR_SZ)) {
+    printfTopicS("pti error pti 0x%02X packetSrc 0x%02X packetDst 0x%02X packetType 0x%02X\n", pti, packetSrc, packetDst, packetType);
+    pti = 0xFF;
   }
 
 #elif defined W_SERIES /* *_SERIES */
@@ -1313,6 +1290,64 @@ byte calculatePti(const byte packetSrc, const byte packetDst, const byte packetT
 
 #endif /* *_SERIES */
   return pti;
+}
+
+void checkSize() {
+#ifdef E_SERIES
+  for (byte i = 1; i < PARAM_ARR_SZ; i++) {
+// correct for byte-aligning seenstart[0x39]
+    if (seenstart[i] != seenstart[i - 1] + nr_params[i - 1] + (  (PARAM_TP_START + i == 0x39) ? 0 : 0)) printfTopicS("seenstart error i %i seenstart[i] 0x%04X seenstart[i-1] 0x%04X nr_params[i-1] 0x%04X", i, seenstart[i], seenstart[i-1], nr_params[i-1]);
+    if (valstart[i] != valstart[i - 1] + nr_params[i - 1] * parnr_bytes[i - 1]) printfTopicS("valstart error i 0x%04X valstart[i] 0x%04X valstart[i-1] 0x%04X nr_params[i-1] 0x%04X", i, valstart[i], valstart[i-1], nr_params[i-1]);
+  }
+  for (byte packetSrc = 0x00; packetSrc <= 0x40; packetSrc += 0x80) {
+    for (byte packetDst = 0xF0; packetDst != 0x01; packetDst += 0x01) {
+      for (byte packetType = 0x00; packetType != 0xFF; packetType += 0x01) {
+        byte pti = calculatePti(packetSrc, packetDst, packetType);
+//        printfTopicS("pti check pti 0x%02X ptiCheck [pti] 0x%02X packetSrc 0x%02X packetDst 0x%02X packetType 0x%02X", pti, ptiCheck [ pti], packetSrc, packetDst, packetType);
+        if (pti < 0xFE) {
+          if (ptiCheck[ pti ] != packetType) {
+            printfTopicS("pti error pti 0x%02X ptiCheck [pti] 0x%02X packetSrc 0x%02X packetDst 0x%02X packetType 0x%02X", pti, ptiCheck [ pti], packetSrc, packetDst, packetType);
+          } else {
+//            printfTopicS("pti OK    pti 0x%02X ptiCheck [pti] 0x%02X packetSrc 0x%02X packetDst 0x%02X packetType 0x%02X", pti, ptiCheck [ pti], packetSrc, packetDst, packetType);
+          }
+        }
+      }
+    }
+  }
+#endif /* E_SERIES */
+  for (uint16_t i = 1; i < PCKTP_ARR_SZ; i++) {
+    if (bytestart[i] != bytestart[i - 1] + nr_bytes[i - 1]) printfTopicS("bytestart error i %i bytestart[i] 0x%04X bytestart[i-1] 0x%04X nr_bytes[i-1]", i, bytestart[i], bytestart[i-1], nr_bytes[i-1]);
+  }
+}
+
+void resetDataStructures(void) {
+  checkSize();
+  M.Mversion = M_VERSION;
+  M.MdataLength = sizeof(M);
+  for (uint16_t j = 0; j < sizePayloadByteVal; j++) {
+    M.payloadByteVal[j]  = 0;
+  }
+  for (uint16_t j = 0; j < sizePayloadByteSeen; j++) {
+    M.payloadByteSeen[j] = 0;
+  }
+#ifdef E_SERIES
+  for (byte i = 0; i < 2; i++) {
+    for (uint16_t j = 0; j < sizeParamVal; j++)  if ((j < valstart[0x39 - PARAM_TP_START])  || (j >= valstart[0x3A - PARAM_TP_START])  || (i == 1)) M.paramVal[i][j] = 0;
+    for (uint16_t j = 0; j < sizeParamSeen; j++) if ((j < seenstart[0x39 - PARAM_TP_START]) || (j >= seenstart[0x3A - PARAM_TP_START]) || (i == 1)) M.paramSeen[i][j >> 3] &= (0xFF ^  (1 << (j & 0x07)));
+  }
+  for (byte j = 0; j < 36; j++) M.cntByte[j] = 0xFF;
+#endif /* E_SERIES */
+  for (byte j = 0; j < sizePayloadBitsSeen; j++) {
+    M.payloadBitsSeen[j] = 0;
+  }
+#ifdef SAVESCHEDULE
+  byte i;
+  uint16 j;
+  for (i = 0; i < 2; i++) {
+    for (j = 0; j < SCHEDULE_MEM_SIZE; j++) scheduleMem[i][j] = 0;
+    for (j = 0; j < SCHEDULE_MEM_SIZE; j++) scheduleMemSeen[i][j] = false;
+  }
+#endif /* SAVESCHEDULE */
 }
 
 uint16_t newCheckPayloadBytesVal(byte packetSrc, byte packetDst, byte packetType, byte payloadIndex, byte* payload, byte length, bool byteBasis) {
@@ -2939,9 +2974,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                 break;
   }
   if ((packetType & 0xF0) == 0x30) {
-    src += 2;  // 2-7 from/to auxiliary controller, 2-3 for F0
-    if (payload[-2] == 0xF1) src += 2; // 4-5 for F1
-    if (payload[-2] == 0xFF) src += 4; // 6-7 for FF
+    src += 2;  // 2-7 from/to auxiliary controller, 2-3 for 0xF0
+    if (payload[-2] == 0xF1) src += 2; // 4-5 for 0xF1
+    if (payload[-2] == 0xFF) src += 4; // 6-7 for 0xFF
+    if (payload[-2] == 0xF2) src += 'D' - 2 - '0'; // D-E for 0xF2 (EKRHH)
   }
   if ((packetType & 0xF8) == 0x08) src += 8;          // 8-9 pseudo-packets ESP / ATmega
   if ((packetType & 0xF8) == 0x00) src = ('B' - '0'); // B boot messages 0x00-0x07
@@ -3868,7 +3904,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
       }
       default :               UNKNOWN_BYTE;
     }
-    // Packet types 0x3x from main controller (0x00) and from auxiliary controller(s) (0xF0 / 0xF1 / 0xFF)
+    // Packet types 0x3x from main controller (0x00) and from auxiliary controller(s) (0xF0 / 0xF1 / 0xF2 / 0xFF)
     case 0x30 : switch (packetSrc) {
       case 0x00 : switch (payloadIndex) {
         case  0 : // bytes in 0x30 message do not seem to contain useful information but packet is present each cycle (in E, not in F)
@@ -4403,8 +4439,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         default:              return 0;
       }
     }
-    // PacketTypes 32,33,34,3F not observed
-    case 0x32 : // fallthrough
+    case 0x32 : UNKNOWN_BYTE; // unknown source
+    // PacketTypes 33,34,3F not observed
     case 0x33 : // fallthrough
     case 0x34 : // fallthrough
     case 0x3F : return 0;
@@ -4896,9 +4932,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                 break;
   }
   if ((packetType & 0xF0) == 0x30) {
-    src += 2;  // 2-7 from/to auxiliary controller, 2-3 for F0
-    if (packetDst == 0xF1) src += 2; // 4-5 for F1
-    if (packetDst == 0xFF) src += 4; // 6-7 for F2
+    src += 2;  // 2-7 from/to auxiliary controller, 2-3 for 0xF0
+    if (packetDst == 0xF1) src += 2; // 4-5 for 0xF1
+    if (packetDst == 0xFF) src += 4; // 6-7 for 0xFF
   }
   if ((packetType & 0xF8) == 0x08) src += 8;          // 8-9 pseudo-packets ESP / ATmega
   if ((packetType & 0xF8) == 0x00) src = ('B' - '0'); // B boot messages 0x00-0x07
