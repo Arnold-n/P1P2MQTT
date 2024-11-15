@@ -277,7 +277,8 @@ static byte ATmegaHwID = 0;
 // ATmegaHwID = 0 for V1.0 or Arduino: no ADC
 //              1 for V1.1: ADC on pins 6,7
 //              2 for V1.2: ADC on pins 0,1, and PB5 used as serial-output-enabler
-// ATMegaHwID is self-generated based on ADC7 value, whether PD3/PD4 is connected (previously: initial PB5 value, no longer valid as test)
+//              3 for V1.3: ADC on pins 6,7, and PB5 used as serial-output-enabler
+// ATMegaHwID is self-generated based on ADC7 value, whether PD3/PD4(/PD2) is connected (previously: initial PB5 value, no longer valid as test)
 
 uint16_t testADC = 0;
 
@@ -367,8 +368,9 @@ void printWelcomeString(byte ign) {
 void setup() {
   save_MCUSR = MCUSR;
   MCUSR = 0;
-// test if hardware is v1.2?
+// test if hardware is v1.2 or v1.3?
 #define V12_TESTPIN_IN  PD4
+#define V13_TESTPIN_IN  PD2
 #define V12_TESTPIN_OUT PD3
   pinMode(V12_TESTPIN_IN, INPUT_PULLUP);
   pinMode(V12_TESTPIN_OUT, OUTPUT);
@@ -377,10 +379,19 @@ void setup() {
   digitalWrite(V12_TESTPIN_OUT, HIGH);
   bool readBackHigh = digitalRead(V12_TESTPIN_IN);
   pinMode(V12_TESTPIN_IN, INPUT);
-  pinMode(V12_TESTPIN_OUT, INPUT);
   if ((readBackLow == false) && (readBackHigh == true))  ATmegaHwID = 2;
-  if ((readBackLow == false) && (readBackHigh == false))  ATmegaHwID = 0xFF; // should never happen
-
+  // if ((readBackLow == false) && (readBackHigh == false))  ATmegaHwID = 0xFF; // should never happen
+  if (ATmegaHwID == 2) {
+    pinMode(V13_TESTPIN_IN, INPUT_PULLUP);
+    digitalWrite(V12_TESTPIN_OUT, LOW);
+    readBackLow = digitalRead(V13_TESTPIN_IN);
+    digitalWrite(V12_TESTPIN_OUT, HIGH);
+    readBackHigh = digitalRead(V13_TESTPIN_IN);
+    pinMode(V13_TESTPIN_IN, INPUT);
+    if ((readBackLow == false) && (readBackHigh == true))  ATmegaHwID = 3;
+  }
+  pinMode(V12_TESTPIN_OUT, INPUT);
+  // if not >=v1.2, test if hardware is v1.1?
   if (!ATmegaHwID) {
     // check if we have ADC support
     DIDR0 = 0x03;
@@ -439,7 +450,8 @@ void setup() {
   // 0 v1.0 no ADC
   // 1 v1.1 use ADC6 and ADC7
   // 2 v1.2 use ADC0 and ADC1, reverse R,W LEDs
-  P1P2MQTT.begin(9600, ATmegaHwID ? true : false, (ATmegaHwID == 1) ? 6 : 0, (ATmegaHwID == 1) ? 7 : 1,  (ATmegaHwID == 2));
+  // 3 v1.3 use ADC6 and ADC7, reverse R,W LEDs
+  P1P2MQTT.begin(9600, ATmegaHwID ? true : false, ((ATmegaHwID & 0x01) == 0x01) ? 6 : 0, ((ATmegaHwID & 0x01) == 0x01) ? 7 : 1,  (ATmegaHwID >= 2));
   P1P2MQTT.setEcho(echo);
 #ifdef MHI_SERIES
   P1P2MQTT.setMHI(mhiFormat);
@@ -831,7 +843,7 @@ void loop() {
 // CLK  GPIO15 pin 16 // PB5 // pull-down // W=Write // blue                                                        V14/V15
 // RST         pin 1  // PC4 // pull-up   // E=Error // red   // reset-switch
 
-  if (ATmegaHwID == 2) switch (suppressSerial) {
+  if (ATmegaHwID >= 2) switch (suppressSerial) {
     case 0 : if ((PINB & 0x10) == 0) { // if GPIO0 == 0, disable serial, switch off power LED, and wait for GPIO15=0
                suppressSerial = 1;
                P1P2MQTT.ledPower(1);

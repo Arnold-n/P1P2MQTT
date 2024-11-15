@@ -169,9 +169,9 @@
 #if F_CPU <= 8000000L
 // Assume we are on P1P2-ESP-interface with LED_ERROR on PD3, overrule earlier defines
 #define LED_ERROR PD3
-#define DIGITAL_SET_LED_ERROR           (PORTD |= 0x08)
-#define DIGITAL_RESET_LED_ERROR         (PORTD &= 0xF7)
-#define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTD |= 0x08) : (PORTD &= 0xF7))
+#define DIGITAL_SET_LED_ERROR           (PORTD |= 0x1C)
+#define DIGITAL_RESET_LED_ERROR         (PORTD &= 0xE3)
+#define DIGITAL_WRITE_LED_ERROR(val)    ((val) ? (PORTD |= 0x1C) : (PORTD &= 0xE3))
 #endif /* F_CPU */
 
 // 4 leds:        on   P1P2-ESP-interface   /   Arduino ATmega250     / Arduino Uno

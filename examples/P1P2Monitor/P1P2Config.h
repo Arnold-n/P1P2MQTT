@@ -2,6 +2,7 @@
  *
  * Copyright (c) 2019-2024 Arnold Niessen, arnold.niessen-at-gmail-dot-com - licensed under CC BY-NC-ND 4.0 with exceptions (see LICENSE.md)
  *
+ * 20241113 v0.9.56 support for V1.3
  * 20241012 v0.9.55 cleanup, fix insert message, fix L99 in L0 mode
  * 20240605 v0.9.53 replace KLICDA by configurable counterCycleStealDelay
  * 20240512 v0.9.46 simultaneous writes, (fake) room temperature sensor, MHI increased buffer size, check-sum, and MHI-protocol data conversion, removed OLD_COMMAND support
@@ -75,8 +76,8 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "P1P2Monitor v0.9.55"
-#define SW_PATCH_VERSION 55
+#define WELCOMESTRING "P1P2Monitor v0.9.56"
+#define SW_PATCH_VERSION 56
 #define SW_MINOR_VERSION 9
 #define SW_MAJOR_VERSION 0
 
