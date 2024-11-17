@@ -15,6 +15,7 @@
  * ArduinoJson 6.11.3 by Benoit Blanchon
  *
  * Version history
+ * 20241117 v0.9.56 P14/other changes initiate direct MQTT reconnect
  * 20240519 v0.9.51 onMqtt improved (D12 fixes + lower mem)
  * 20240519 v0.9.49 fix haConfigMsg max length
  * 20240515 v0.9.46 HA/MQTT discovery climate controls, remove BINDATA, improve TZ, remove json output format, add W_SERIES for HomeWizard electricity meter bridge
@@ -1885,8 +1886,10 @@ void printModifyParam(byte paramNr, bool modParam = false, int32_t newValue = 0,
                                             // fall-through
       case PARAM_USE_BRIDGE_NAME_IN_TOPIC :
       case PARAM_USE_DEVICE_NAME_IN_TOPIC :
-      case PARAM_MQTT_PREFIX              : printfTopicS("Save (D5) and reset (D0) required to make changes effective");
-                                            buildMqttTopic(); // lazy coding, is only needed for mqttPrefix, useDeviceNameInTopic, deviceName, useBridgeNameInTopic, bridgeName
+      case PARAM_MQTT_PREFIX              : buildMqttTopic(); // lazy coding, is only needed for mqttPrefix, useDeviceNameInTopic, deviceName, useBridgeNameInTopic, bridgeName
+                                            printfTopicS("ESP will reconnect with new MQTT parameters; push reset button to fall back to previous MQTT settings if this fails");
+                                            delay(200);
+                                            reconnectMQTT();
                                             break;
       default                             : break;
     }
@@ -2352,6 +2355,14 @@ void handleCommand(char* cmdString) {
     case 'p': // Set parameter
     case 'P':
               if ((n = sscanf((const char*) (cmdString + 1), "%d%n", &temp, &temp2)) > 0) {
+
+                if (temp == 9999) {
+                  printfTopicS("P14 action");
+                  snprintf(tempstring, 8, "br-%i", local_ip[3]);
+                  printModifyParam(PARAM_BRIDGE_NAME, 1, temp2, tempstring);
+                  break;
+                }
+
                 if ((temp < 0) || (temp >= PARAM_NR)) {
                   printfTopicS("Parameter %i not supported, range 0-%d", temp, PARAM_NR - 1);
                   break;
@@ -2413,7 +2424,6 @@ void handleCommand(char* cmdString) {
 
                 if (modifyParam) {
                   printfTopicS("To make parameter change permanent, use command D5");
-                  printfTopicS("Some parameter changes also require a MQTT reconnect (D4) or an ESP restart (D0)");
                 } else {
                   switch (temp) {
                     case 33 : printfTopicS("Options for TZ parameter P%2d", temp);
