@@ -3443,9 +3443,10 @@ void loop() {
         if (throttleValue) {
           printfTopicS("Throttling at %i", throttleValue);
         } else {
-          printfTopicS("Ready throttling, start output field settings");
+          printfTopicS("Ready throttling");
           pseudo0F = 9;
 #ifdef E_SERIES
+          printfTopicS("Start output field settings");
           fieldSettingPublishNr = 0;
 #endif /* E_SERIES */
         }
