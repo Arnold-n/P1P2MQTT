@@ -308,6 +308,9 @@ void printWelcomeString(byte ign) {
 #ifdef F_SERIES
   Serial.print(F(" F-series"));
 #endif /* F_SERIES */
+#ifdef F1F2_SERIES
+  Serial.print(F(" F1F2-series"));
+#endif /* F1F2_SERIES */
 #ifdef H_SERIES
   Serial.print(F(" H-series"));
 #endif /* H_SERIES */
@@ -1272,7 +1275,7 @@ byte writeBudget_prev = 0;
                         break;
                       }
 #endif /* EF_SERIES */
-                      // for non-Daikin systems, and for Daikin systems in L0 mode, just schedule a packet write, use with care
+                      // for non-Daikin systems, and for Daikin systems in L0 mode (or F1/F2), just schedule a packet write, use with care
                       if (!P1P2MQTT.writeready()) {
                         Serial_println(F("* Refusing to write packet while previous packet wasn't finished"));
                         if (writeRefusedBusy < 0xFF) writeRefusedBusy++;

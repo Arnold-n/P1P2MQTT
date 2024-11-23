@@ -132,12 +132,16 @@
 //         12=F-series, major version M
 //         20-29 reserved for EKH*/Altherma 2/ perhaps EWYQ,EWAQ
 //         30-39 reserved for Altherma 3 models
+//         40=F1/F2 generic
+//         41-49 reserved for F1/F2 specific
 //
 // to reset EEPROM to settings in P1P2Config.h, either erase EEPROM, or change EEPROM_SIGNATURE in P1P2Config.h
 #ifdef E_SERIES
 #define EEPROM_SIGNATURE "P1P2SIG01"
 #elif defined F_SERIES
 #define EEPROM_SIGNATURE "P1P2-F"
+#elif defined F1F2_SERIES
+#define EEPROM_SIGNATURE "P1P2-F1"
 #elif defined H_SERIES
 #define EEPROM_SIGNATURE "P1P2-H"
 #elif defined M_SERIES
@@ -188,6 +192,10 @@
 #define INIT_BRAND 1
 #define INIT_MODEL 1
 #endif
+#ifdef F1F2_SERIES
+#define INIT_BRAND 1
+#define INIT_MODEL 40
+#endif
 #ifdef H_SERIES
 #define INIT_BRAND 2
 #define INIT_MODEL 0
@@ -223,6 +231,15 @@
 // P1/P2 read buffer size to store raw data and error codes read from P1P2bus; 1 extra for reading back CRC byte; 24 might be enough
 #define RB_SIZE 33
 #endif /* EF_SERIES */
+
+#ifdef F1F2_SERIES
+// for now: 80 bytes
+#define RS_SIZE 170
+// MHI: should be >22, tbd
+#define WB_SIZE 81
+// MHI: should be >22, tbd
+#define RB_SIZE 81
+#endif /* F1F2_SERIES */
 
 #ifdef MHI_SERIES
 // serial read buffer size for reading from serial port, max line length on serial input is 150 (2 characters per byte, plus some)

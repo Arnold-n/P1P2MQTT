@@ -427,6 +427,21 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,   0,  20,  40,  60,  
 
 #define sizePayloadBitsSeen 1
 
+#elif defined F1F2_SERIES
+
+#define PCKTP_START  0x08 // 0x08..0x12, others mapped, // 0x37 zone name/0xC1 service mode subtype would require special coding, not supported yet
+#define PCKTP_ARR_BLOCK 8
+#define PCKTP_ARR_SZ ((2 * PCKTP_ARR_BLOCK) + 0)
+//byte packetsrc                                   = { 00                                    , 40 }
+//byte packettype                                  = { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  08,  09,  0A,  0B,  0C,  0D,  0E,  0F }
+const PROGMEM uint32_t nr_bytes [PCKTP_ARR_SZ]     = {  0,  20,  20,  20,   0,  20,  20,  20,   0,  20,  20,  20,   0,  20,  20,  20 };
+const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,   0,  20,  40,  60,  60,  80, 100, 120, 120, 140, 160, 180, 180, 200, 220  /*, sizePayloadByteVal = 240 */ };
+
+#define sizePayloadByteVal  240
+#define sizePayloadByteSeen  30 // ceil(240/8)
+
+#define sizePayloadBitsSeen 1
+
 #elif defined MHI_SERIES
 
 #define sizePayloadBitsSeen 0x14
@@ -1231,6 +1246,21 @@ byte calculatePti(const byte packetSrc, const byte packetDst, const byte packetT
                    default :   pti = 0xFF;
                                break;
                  }
+                 break;
+    default    : // do nothing
+                 break;
+  }
+
+#elif defined F1F2_SERIES /* *_SERIES */
+
+   switch (packetType) {
+    case 0x08 ... 0x0F : pti = packetType - PCKTP_START; break;
+    default            : pti = 0xFF; break;                            // no history
+  }
+  if (pti != 0xFF) switch (packetSrc) {
+    case 0x00  : // do nothing
+                 break;
+    case 0x40  : pti += PCKTP_ARR_BLOCK;
                  break;
     default    : // do nothing
                  break;
@@ -5915,6 +5945,38 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
 #include "P1P2_Pseudo.h"
     default: UNKNOWN_BYTE; // break; // do nothing
   }
+
+#elif defined F1F2_SERIES
+
+// no decoding yet
+
+  byte src;
+
+  switch (packetSrc) {
+    case 0x00 : src = 0;
+                break;
+    case 0x40 : src = 1;
+                break;
+    case 0x80 : src = 'A' - '0';
+                break;
+    default   : src = 'H' - '0';
+                break;
+  }
+  if ((packetType & 0xF0) == 0x30) {
+    src += 2;  // 2-7 from/to auxiliary controller, 2-3 for 0xF0
+    if (packetDst == 0xF1) src += 2; // 4-5 for 0xF1
+    if (packetDst == 0xFF) src += 4; // 6-7 for 0xFF
+  }
+  if ((packetType & 0xF8) == 0x08) src += 8;          // 8-9 pseudo-packets ESP / ATmega
+  if ((packetType & 0xF8) == 0x00) src = ('B' - '0'); // B boot messages 0x00-0x07
+  SRC(src); // set SRC char in mqttTopic
+
+  switch (packetType) {
+#include "P1P2_Pseudo.h"
+    default : return 0; // UNKNOWN_BYTE // unknown PacketByte
+  }
+
+  return 0;
 
 #elif defined MHI_SERIES
 

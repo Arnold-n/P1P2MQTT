@@ -103,6 +103,9 @@
 #elif defined MHI_SERIES
 #define TX_BUFFER_SIZE 121 // write buffer size (1 more than max size needed)
 #define RX_BUFFER_SIZE 121 // read buffer (1 more than max size needed), should be <=254
+#elif defined F1F2_SERIES
+#define TX_BUFFER_SIZE 81  // write buffer size (1 more than max size needed)
+#define RX_BUFFER_SIZE 81  // read buffer (1 more than max size needed), should be <=254
 #else /* H_SERIES */
 #define TX_BUFFER_SIZE 25  // write buffer size (1 more than max size needed)
 #define RX_BUFFER_SIZE 25  // read buffer (1 more than max size needed), should be <=254

@@ -145,6 +145,10 @@
 #define THROTTLE_STEP_S 1  // in seconds (higher=slower)
 #define THROTTLE_STEP_P 10  // in percentage (higher=faster)
 #define THROTTLE_VALUE 100 // start with 100% skipping, linearly decreasing 1% each THROTTLE_STEP seconds down to 0% skipping, must be multiple of THROTTLE_STEP_P
+#elif defined F1F2_SERIES
+#define THROTTLE_STEP_S 1  // in seconds (higher=slower)
+#define THROTTLE_STEP_P 50  // in percentage (higher=faster)
+#define THROTTLE_VALUE 100 // start with 100% skipping, linearly decreasing 1% each THROTTLE_STEP seconds down to 0% skipping, must be multiple of THROTTLE_STEP_P
 #elif defined F_SERIES
 #define THROTTLE_STEP_S 1  // in seconds (higher=slower)
 #define THROTTLE_STEP_P 1  // in percentage (higher=faster)
@@ -201,6 +205,9 @@
 #if defined EF_SERIES
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
 #endif /* EF_SERIES || W_SERIES */
+#ifdef F1F2_SERIES
+#define CRC_GEN 0
+#endif /* F1F2_SERIES */
 #ifdef MHI_SERIES
 #define CS_GEN 1  // Summation checksum on/off
 #endif /* MHI_SERIES */
@@ -209,7 +216,9 @@
 #define MQTT_KEY_LEN 100
 #define MQTT_VALUE_LEN 1000
 #define RB 1000     // max size of readBuffer (serial input from Arduino) (was 400, changed for long-scope-mode to 1000)
-#if not (defined TH_SERIES || defined MHI_SERIES)
+#ifdef F1F2_SERIES
+#define HB 80
+#elif not (defined TH_SERIES || defined MHI_SERIES)
 #define HB 24      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
 #else /* MHI_SERIES || TH_SERIES */
 #define HB 65      // max size of hexbuf, same as P1P2Monitor (model-dependent? 24 might be sufficient)
@@ -238,6 +247,8 @@
 #define EEPROM_SIGNATURE_OLD4 "P1P2sij"
 #ifdef E_SERIES
 #define EEPROM_SIGNATURE_NEW  "P1P2sEz" // new signature for EEPROM initialization (user/password length 80/80, rebootReason, outputMode, outputFilter, mqttInputByte4, hwId, EEPROM_version, reserved-data)
+#elif defined F1F2_SERIES
+#define EEPROM_SIGNATURE_NEW  "P1P2sF2"
 #elif defined F_SERIES
 #define EEPROM_SIGNATURE_NEW  "P1P2sFz"
 #elif defined M_SERIES

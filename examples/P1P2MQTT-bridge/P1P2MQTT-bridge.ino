@@ -963,6 +963,9 @@ void onTelnetConnect(String ip) {
 #ifdef F_SERIES
   telnet.println(" for Daikin F-Series");
 #endif /* F_SERIES */
+#ifdef F1F2_SERIES
+  telnet.println(" for Daikin F1/F2");
+#endif /* F1F2_SERIES */
 #ifdef H_SERIES
   telnet.println(" for Hitachi");
 #endif /* H_SERIES */
@@ -2808,6 +2811,9 @@ void printWelcome(void) {
 #ifdef F_SERIES
   printfTopicS("Compiled %s %s for Daikin F-Series", __DATE__, __TIME__);
 #endif /* F_SERIES */
+#ifdef F1F2_SERIES
+  printfTopicS("Compiled %s %s for Daikin F1/F2", __DATE__, __TIME__);
+#endif /* F1F2_SERIES */
 #ifdef H_SERIES
   printfTopicS("Compiled %s %s for Hitachi", __DATE__, __TIME__);
 #endif /* H_SERIES */
