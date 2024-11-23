@@ -358,15 +358,18 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
 
 #define PARAM_TP_START      0x35
 #define PARAM_TP_END        0x3D
-#define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1)   // 0       1       2       3       4       5       6       7       8
-const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x017D, 0x0030, 0x0002, 0x001F, 0x00F0, 0x006C, 0x00B0, 0x0002, 0x0020 }; // number of parameters observed
-//byte packettype                                    = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D };
-const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      4,      1,      2,      3,      4 }; // byte per parameter // was 8-bit
-const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01DD, 0x01E3, 0x025F, 0x061F, 0x068B, 0x07EB, 0x07F1 /* , 0x0871 */ }; // valstart = sum  (parnr_bytes * nr_params)
-const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x017D, 0x01AD, 0x01AF, 0x01CE, 0x02BE, 0x032A, 0x03DA, 0x03DC /* , 0x03FC */ }; // seenstart = sum (parnr_bytes)
+#define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1 + 1)
+#define PPTI15 (PARAM_ARR_SZ - 1);
+                                                           // 0       1       2       3       4       5       6       7       8       9
+                                                                                                                                // PPTI15
+const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x0203, 0x00AA, 0x0002, 0x001F, 0x00F0, 0x006C, 0x00B0, 0x0002, 0x0020, 0x001A }; // number of parameters observed
+//byte packettype                                    = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D,   0x15 };
+const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      4,      1,      2,      3,      4,      2 }; // byte per parameter // was 8-bit
+const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x0357, 0x035D, 0x03D9, 0x0799, 0x0805, 0x0965, 0x096B, 0x09EB  /* , 0x0A1F */ }; // valstart = sum  (parnr_bytes * nr_params)
+const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x02AD, 0x02AF, 0x02CE, 0x03BE, 0x042A, 0x04DA, 0x04DC, 0x04FC  /* , 0x0516 */ }; // seenstart = sum (parnr_bytes)
 
-#define sizeParamVal  0x0871
-#define sizeParamSeen    128 // ceil(0x03FC/8) = ceil(1020/8) = 128
+#define sizeParamVal  0x0A1C
+#define sizeParamSeen    163 // ceil(0x0516/8) = 163
 
 #define PCKTP_START  0x0B
 #define PCKTP_END    0x15 // 0x0B-0x15 / 0x31 0x20 0x21 0x60-0x9F mapped to 0x16-.. ; 0x31/0x32 4x separately for 0xF0 0xF1 0xF2 0xFF
@@ -1660,6 +1663,7 @@ uint16_t newCheckParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr,
   ppts = (paramSrc >> 6) & 0x01; // 0x00 -> 0; 0x40 -> 1; others not used
   if (paramSrc & 0xBF) printfTopicS("UNEXPECTED paramSrc 0x%02X in newCHeckParamVal", paramSrc);
   ppti = paramPacketType - PARAM_TP_START;
+  if (paramPacketType == 0x15) ppti = PPTI15;
   uint16_t ptbv = valstart[ppti] + paramNr * parnr_bytes[ppti];
   ptbs = seenstart[ppti] + paramNr;
 
@@ -1670,7 +1674,7 @@ uint16_t newCheckParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr,
     printfTopicS("paramNr 0x%04X >= expected nr_params 0x%04X for packetType 0x%02X", paramNr, nr_params[ppti], paramPacketType);
     return 0;
   }
-  if (paramPacketType < PARAM_TP_START) {
+  if ((paramPacketType < PARAM_TP_START) && (paramPacketType != 0x15)) {
     printfTopicS("paramTp 0x%04X < PARAM_TP_START", paramPacketType);
     return 0;
   }
@@ -1958,6 +1962,25 @@ uint8_t param_value_u_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, 
   return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
 }
 
+uint8_t param_value_udiv2_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
+  uint32_t v = u_payloadValue_LE(payload + payloadIndex, paramValLength);
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", v * 0.5);
+  return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
+}
+
+/*
+uint8_t param_value_u16div10_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
+  // assuming paramValLength = 2
+  if (paramValLength != 2) {
+    printfTopicS("Only u16div10_LE supported, not %i bit", 8*paramValLength);
+    return 0;
+  }
+  uint16_t v = u_payloadValue_LE(payload + payloadIndex, paramValLength);
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", v * 0.1);
+  return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
+}
+*/
+
 // Parameters, signed, LE
 
 uint8_t param_value_s_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
@@ -1967,6 +1990,17 @@ uint8_t param_value_s_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, 
   }
   int16_t v = (uint16_t) u_payloadValue_BE(payload + payloadIndex, paramValLength);
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", v);
+  return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
+}
+
+uint8_t param_value_s16div10_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
+  // assuming paramValLength = 2
+  if (paramValLength != 2) {
+    printfTopicS("Only s16div10_LE supported, not %i bit", 8*paramValLength);
+    return 0;
+  }
+  int16_t v = (uint16_t) u_payloadValue_LE(payload + payloadIndex, paramValLength);
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", v * 0.1);
   return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
 }
 
@@ -2027,6 +2061,21 @@ byte param_value_hex_BE(byte paramSrc, byte paramPacketType, uint16_t paramNr, b
     case 2 : snprintf(mqtt_value, MQTT_VALUE_LEN, "0x%02X%02X", payload[payloadIndex], payload[payloadIndex - 1]); break;
     case 3 : snprintf(mqtt_value, MQTT_VALUE_LEN, "0x%02X%02X%02X", payload[payloadIndex], payload[payloadIndex - 1], payload[payloadIndex - 2]); break;
     case 4 : snprintf(mqtt_value, MQTT_VALUE_LEN, "0x%02X%02X%02X%02X", payload[payloadIndex], payload[payloadIndex - 1], payload[payloadIndex - 2], payload[payloadIndex - 3]); break;
+  }
+  return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
+}
+
+// misc, LE
+
+byte unknownParam_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
+  if (!outputUnknown) return 0;
+  snprintf(mqttTopic + mqttTopicPrefixLength, MQTT_TOPIC_LEN, "ParamSrc_0x%02X_Type_0x%02X_Nr_0x%04X", paramSrc, paramPacketType, paramNr);
+  switch (paramValLength) {
+    case 1 : snprintf(mqtt_value, MQTT_VALUE_LEN, "0x%02X", payload[payloadIndex]); break;
+    case 2 : snprintf(mqtt_value, MQTT_VALUE_LEN, "0x%02X%02X", payload[payloadIndex - 1], payload[payloadIndex]); break;
+    case 3 : snprintf(mqtt_value, MQTT_VALUE_LEN, "0x%02X%02X%02X", payload[payloadIndex - 2], payload[payloadIndex - 1], payload[payloadIndex]); break;
+    case 4 : snprintf(mqtt_value, MQTT_VALUE_LEN, "0x%02X%02X%02X%02X", payload[payloadIndex - 3], payload[payloadIndex - 2], payload[payloadIndex - 1], payload[payloadIndex]); break;
+    default : return 0;
   }
   return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
 }
@@ -2492,10 +2541,13 @@ uint8_t publishFieldSetting(byte paramNr) {
 #define VALUE_header             { value_header(packetSrc, packetType, mqtt_value);                                                      return 0; }
 
 #define PARAM_VALUE_u8           { param_value_u_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
+#define PARAM_VALUE_u8div2       { param_value_udiv2_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
 #define PARAM_VALUE_s8           { param_value_s_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
 #define PARAM_VALUE_u16_BE       { param_value_u_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
 #define PARAM_VALUE_u24_BE       { param_value_u_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
 #define PARAM_VALUE_u32_BE       { param_value_u_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
+#define PARAM_VALUE_u16div10_LE  { param_value_u16div10_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, 2);    return 0; }
+#define PARAM_VALUE_s16div10_LE  { param_value_s16div10_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, 2); return 0; }
 #define PARAM_VALUE_u16div10_BE  { param_value_u16div10_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);    return 0; }
 #define PARAM_VALUE_u32div100_BE { param_value_u32div100_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);   return 0; }
 #define PARAM_VALUE_s16div10_BE  { param_value_s16div10_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);    return 0; }
@@ -2505,11 +2557,14 @@ uint8_t publishFieldSetting(byte paramNr) {
 #define PARAM_FIELD_SETTING      { param_field_setting(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value);                        return 0; }
 
 #define UNKNOWN_PARAM            { CAT_UNKNOWN; CHECKPARAM(paramValLength); if (pubEntity && (haConfig || (EE.outputMode & 0x0100))) unknownParam_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength); return 0; }
+#define UNKNOWN_PARAM_LE         { CAT_UNKNOWN; CHECKPARAM(paramValLength); if (pubEntity && (haConfig || (EE.outputMode & 0x0100))) unknownParam_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength); return 0; }
 
 #define UNKNOWN_PARAM8 UNKNOWN_PARAM
 #define UNKNOWN_PARAM16 UNKNOWN_PARAM
+#define UNKNOWN_PARAM16_LE UNKNOWN_PARAM_LE
 #define UNKNOWN_PARAM24 UNKNOWN_PARAM
 #define UNKNOWN_PARAM32 UNKNOWN_PARAM
+
 
 #define HANDLE_PARAM(paramValLength)     { handleParam(packetSrc, packetType, payloadIndex, payload, mqtt_value, paramValLength); return 0; }
 
@@ -2524,9 +2579,51 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
 // similar to bytes2keyvalue but using indirect parameter references in payloads
 // always returns 0, no bit handling needed
 
-  uint16_t paramNr = (((uint16_t) payload[payloadIndex - paramValLength]) << 8) | payload[payloadIndex - paramValLength - 1];
+  uint16_t paramNr;
+  if (paramPacketType == 0x15) {
+     paramNr = payload[payloadIndex - 2];
+  } else {
+     paramNr = (((uint16_t) payload[payloadIndex - paramValLength]) << 8) | payload[payloadIndex - paramValLength - 1];
+  }
 
   switch (paramPacketType) {
+    case 0x15 : SUBDEVICE("_15_param");
+                switch (paramSrc) {
+      case 0x00 : switch (paramNr) {
+        default     : UNKNOWN_PARAM16_LE;
+        }
+      case 0x40 : // HATEMP1;
+                  switch (paramNr) { CAT_TEMP; // guessed
+        case 0x00   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_00"); PARAM_VALUE_s16div10_LE;
+        case 0x01   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_01"); PARAM_VALUE_s16div10_LE;
+        case 0x02   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_02"); PARAM_VALUE_s16div10_LE;
+        case 0x03   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_03"); PARAM_VALUE_s16div10_LE;
+        case 0x04   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_04"); PARAM_VALUE_s16div10_LE;
+        case 0x05   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_05"); PARAM_VALUE_s16div10_LE;
+        case 0x06   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_06"); PARAM_VALUE_s16div10_LE;
+        case 0x07   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_07"); PARAM_VALUE_s16div10_LE;
+        case 0x08   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_08"); PARAM_VALUE_s16div10_LE;
+        case 0x09   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_09"); PARAM_VALUE_s16div10_LE;
+        case 0x0A   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_0A"); PARAM_VALUE_s16div10_LE;
+        case 0x0B   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_0B"); PARAM_VALUE_s16div10_LE;
+        case 0x0C   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_0C"); PARAM_VALUE_s16div10_LE;
+        case 0x0D   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_0D"); PARAM_VALUE_s16div10_LE;
+        case 0x0E   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_0E"); PARAM_VALUE_s16div10_LE;
+        case 0x0F   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_0F"); PARAM_VALUE_s16div10_LE;
+        case 0x10   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_10"); PARAM_VALUE_s16div10_LE;
+        case 0x11   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_11"); PARAM_VALUE_s16div10_LE;
+        case 0x12   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_12"); PARAM_VALUE_s16div10_LE;
+        case 0x13   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_13"); PARAM_VALUE_s16div10_LE;
+        case 0x14   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_14"); PARAM_VALUE_s16div10_LE;
+        case 0x15   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_15"); PARAM_VALUE_s16div10_LE;
+        case 0x16   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_16"); PARAM_VALUE_s16div10_LE;
+        case 0x17   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_17"); PARAM_VALUE_s16div10_LE;
+        case 0x18   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_18"); PARAM_VALUE_s16div10_LE;
+        case 0x19   : HACONFIG; HADEVICE_SENSOR; PARAM_KEY("Param15_Temperature_19"); PARAM_VALUE_s16div10_LE;
+        default     : UNKNOWN_PARAM16_LE;
+        }
+      default   : return 0;
+      }
     case 0x35 : switch (paramSrc) {
 // 35: 8-bit, use M.paramValue8
 //
@@ -2580,7 +2677,7 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x005E :                                                                                                       PARAM_KEY("External_Thermostat_Cooling");                                  PARAM_VALUE_u8;
         case 0x005F :                                                                                                       PARAM_KEY("External_Thermostat_Heating_Add");                              PARAM_VALUE_u8;
         case 0x0060 :                                                                                                       PARAM_KEY("External_Thermostat_Cooling_Add");                              PARAM_VALUE_u8;
-        case 0x009D :                                                                                                       PARAM_KEY("Counter_Schedules");                                            PARAM_VALUE_u8; // increments at scheduled changes
+//        case 0x009D :                                                                                                       PARAM_KEY("Counter_Schedules");                                            PARAM_VALUE_u8; // increments at scheduled changes
         case 0x013A ... 0x0145 : return 0;                                                                                                                                                                             // characters for product name
         case 0x00A2 : return 0;                                                                                                                                                                                        // useless? sequence counter
         case 0x0013 :                                                                                                       PARAM_KEY("Climate_On_Q");                                                 PARAM_VALUE_u8; //  0x00 0x01 // was Reboot_Related_Q12-35-13
@@ -2589,17 +2686,53 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x004D :                                                                                                       PARAM_KEY("Reboot_Related_Q15-35-4D");                                     PARAM_VALUE_u8; //  0x00 0x01
         case 0x004E :                                                                                                       PARAM_KEY("Reboot_Related_Q15-35-4E");                                     PARAM_VALUE_u8; //
         case 0x005A :                                                                                                       PARAM_KEY("Reboot_Related_Q16-35-5A");                                     PARAM_VALUE_u8; //  0x00 0x01 related to F036-0x0002
-        case 0x005C :                                                                                                       PARAM_KEY("Restart_Byte_2");                                               PARAM_VALUE_u8hex; //  0x00 0x7F
-        case 0x009B :                                                                                                       PARAM_KEY("Reboot_Related_Q18-35-9B");                                     PARAM_VALUE_u8; //  0x00 0x01 0x02 // RR RT-ext LWT?
+        case 0x005C :                                                                                                       PARAM_KEY("SG_General_Power_Limit_Q_2");                                   PARAM_VALUE_s8; //  0x00 0x7F
+
+
+
         case 0x0021 : // fallthrough
         case 0x0022 : // fallthrough
         case 0x004F : // fallthrough
         case 0x0088 : // fallthrough
         case 0x008D : // fallthrough
         case 0x0090 : // fallthrough // changes on/off when? <= copy of 400012 byte 10 bit 2
-        case 0x0093 : // fallthrough
-        case 0x0098 : // fallthrough // changes wd+prog -> wd
-        case 0x009A : // fallthrough // copy of 0x400020  byte 16
+
+        case 0x0093 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_General_Power_Limit_Active_Q");                              PARAM_VALUE_u8; // SG related
+        case 0x0094 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_General_Power_Limit");                                       PARAM_VALUE_u8div2; // SG related
+        case 0x0095 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0095");                                                 PARAM_VALUE_u8; // SG related
+        case 0x0096 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0096");                                                 PARAM_VALUE_u8; // SG related
+        case 0x0097 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0097");                                                 PARAM_VALUE_u8; // SG related
+        case 0x0098 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0098");                                                 PARAM_VALUE_u8; // SG related
+        case 0x0099 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0099");                                                 PARAM_VALUE_u8; // SG related
+        case 0x009A : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-009A");                                                 PARAM_VALUE_u8; // SG related
+        case 0x009B : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-009B");                                                 PARAM_VALUE_u8; // SG related // earlier:0x00 0x01 0x02 // RR RT-ext LWT?
+        case 0x009C : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-009C");                                                 PARAM_VALUE_u8; // SG related
+        case 0x009D : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-009D");                                                 PARAM_VALUE_u8; // SG related // increments at counter schedules ?
+        case 0x009E : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-009E");                                                 PARAM_VALUE_u8; // SG related
+        case 0x009F : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-009F");                                                 PARAM_VALUE_u8; // SG related
+        case 0x00A0 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-00A0");                                                 PARAM_VALUE_u8; // SG related
+        case 0x0194 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0194");                                                 PARAM_VALUE_u8; // SG related
+        case 0x0195 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0195");                                                 PARAM_VALUE_u8; // SG related
+        case 0x0202 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0202");                                                 PARAM_VALUE_u8; // SG related
+
+/*
+        case 0x0093 : // fallthrough // SG related ?
+        case 0x0094 : // fallthrough // SG related ? // VALUES 22 24 26 28
+        case 0x0194 : // fallthrough // SG related ?
+        case 0x0095 : // fallthrough // SG related ?
+        case 0x0195 : // fallthrough // SG related ?
+        case 0x0096 : // fallthrough // SG related ?
+        case 0x0097 : // fallthrough // SG related ?
+        case 0x0098 : // fallthrough // changes wd+prog -> wd // SG related ?
+        case 0x0099 : // fallthrough // SG related ?
+        case 0x009A : // fallthrough // copy of 0x400020  byte 16 // SG related ?
+        case 0x009B : // SG related?
+        case 0x009C : // SG related?
+        case 0x009D : // SG related?
+        case 0x009E : // SG related?
+        case 0x009F : // SG related?
+        case 0x00A0 : // fallthrough // SG related ?
+*/
         case 0x00B4 : // fallthrough
         case 0x00B6 : // fallthrough
         case 0x00B7 : // fallthrough
@@ -2670,11 +2803,18 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x0018 :                            CAT_TEMP;                                 HYST_S16_BE(1);                  PARAM_KEY("Temperature_Refrigerant_2");                                    PARAM_VALUE_s16div10_BE; // TempRefr2
         case 0x0027 : SUBDEVICE("_DHW");         CAT_SETTING;                              HYST_U16_BE(1);                  PARAM_KEY("Setpoint_DHW_3");                                               PARAM_VALUE_u16div10_BE; // = 0x13-0x40-0 ??  // 0x13-0x40-[1-7] unknown;  = 0x0028-0x0029 ?
         case 0x002A :                            CAT_MEASUREMENT;              HANONE;     HYST_U16_BE(1);                  PARAM_KEY("Flow");                                                         PARAM_VALUE_u16div10_BE; // Flow  0x13-0x40-9
-        case 0x002B :                            CAT_SETTING;                  HANONE;                                      PARAM_KEY("SW_Version_Inside_Unit");                                       PARAM_VALUE_u16hex_BE;
+        case 0x002B : switch (paramSrc) {
+          case 0x00 :                           CAT_UNKNOWN;                  HANONE;                                      PARAM_KEY("Aux_Controller_Status_Q");                                      PARAM_VALUE_u16hex_BE; // EKRUCBL1 reports 0x0076-0x0079; Madoka reports 0x0068-0x00C3
+          case 0x40 :                           CAT_SETTING;                  HANONE;                                      PARAM_KEY("SW_Version_Inside_Unit");                                       PARAM_VALUE_u16hex_BE;
+          default : UNKNOWN_PARAM16;
+        }
         case 0x002C : if (!payload[payloadIndex] && !payload[payloadIndex - 1]) return 0;
                                                  CAT_SETTING;                  HANONE;                                      PARAM_KEY("SW_Version_Outside_Unit");                                      PARAM_VALUE_u16hex_BE;
         case 0x002D :                            CAT_SETTING;                  HANONE;                                      PARAM_KEY("Unknown_P36_002D");                                             PARAM_VALUE_u16hex_BE; // no Temp. value 0016 or 040C. Schedule related ?
         case 0x002E :                            CAT_SETTING;                  HANONE;                                      PARAM_KEY("Unknown_P36_002E");                                             PARAM_VALUE_u16hex_BE; // 0x0000
+        case 0x00A7 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_36-00A7");                                                 PARAM_VALUE_u16hex_BE; // SG related
+        case 0x00A8 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_36-00A8");                                                 PARAM_VALUE_u16hex_BE; // SG related
+        case 0x00A9 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_36-00A9");                                                 PARAM_VALUE_u16hex_BE; // SG related
         case 0xFFFF : return 0;
         default     : UNKNOWN_PARAM16;
         }
@@ -3491,7 +3631,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           default   : UNKNOWN_BIT;
         }
 
-        case   11 :                                                                                                         KEY1_PUB_CONFIG_CHECK_ENTITY("Restart_Byte");                              VALUE_u8hex;
+        case   11 :                                                                                                         KEY1_PUB_CONFIG_CHECK_ENTITY("SG_General_Power_Limit");                                     VALUE_s8; // reports 0x7F 0x11 0x12 0x13
         case   12 : switch (bitNr) {
           case    8 : bcnt = 20; BITBASIS;
           case    0 : SUBDEVICE("_Unknown");                         HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_On_Q"); // heatpump_enabled??? (preferential related ?)
@@ -3691,15 +3831,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                     }
                     CHECK_ENTITY;
                     VALUE_u16div100_LE; // 16 or 24 bit?
-        // case   6 : // some version E types // TODO byte 6 is param-nr 0x00-0x19, byte 7-8 is value?
-        // case   7 : // some version E types
-        // case   8 : // some version E types
-        default :   UNKNOWN_BYTE;
+        default   : return 0; // nothing to do
       }
-
-
-
-
       case 0x40 : switch (payloadIndex) {
         case    0 : return 0;
         case    1 : SUBDEVICE("_Unknown");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(20)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Unused_15_0");                   VALUE_f8_8_LE;
@@ -3707,6 +3840,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         case    3 : SUBDEVICE("_Sensors");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(20)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Refrigerant_2");                 VALUE_f8_8_LE;       // =? Brine_inlet_temp
         case    4 : return 0;
         case    5 : SUBDEVICE("_Unknown");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(25)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Refrigerant_3_Q");               VALUE_f8_8_LE;
+        case    6 : return 0;
+        case    7 : return 0;
+        case    8 : SUBDEVICE("_15"); HANDLE_PARAM(2); // s16div10_LE ?
+
+        // case  12 : // status / temp ? reports 0x10 0x11
+        // case  16 : // status? reports 0x34 0x42 0x52
+        case   17 : return 0;
+        case   18 : SUBDEVICE("_Unknown");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(25)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Unknown_Q");                     VALUE_f8_8_LE;
+
         default :             UNKNOWN_BYTE;
       }
       default :               UNKNOWN_BYTE;
