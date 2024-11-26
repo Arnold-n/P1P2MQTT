@@ -3424,9 +3424,7 @@ void loop() {
       if (throttleValue && (espUptime > throttleStepTime)) {
         throttleValue -= THROTTLE_STEP_P;
         throttleStepTime += THROTTLE_STEP_S;
-        if (throttleValue) {
-          printfTopicS("Throttling at %i", throttleValue);
-        } else {
+        if (!throttleValue) {
           printfTopicS("Ready throttling");
           pseudo0F = 9;
 #ifdef E_SERIES
@@ -3443,7 +3441,11 @@ void loop() {
           printfTopicS("Uptime %i, MQTT is disconnected (%i s total %i s)", espUptime, Mqtt_disconnectTime, Mqtt_disconnectTimeTotal);
         } else {
           // printfTopicS_mqttserialonly("Uptime %i free %i", espUptime, ESP.getMaxFreeBlockSize());
-          printfTopicS_mqttserialonly("Uptime %i", espUptime);
+          if (throttleValue) {
+            printfTopicS_mqttserialonly("Uptime %i (throttling at %i)", espUptime, throttleValue);
+          } else {
+            printfTopicS_mqttserialonly("Uptime %i", espUptime);
+          }
         }
       }
       pseudo0B++;
