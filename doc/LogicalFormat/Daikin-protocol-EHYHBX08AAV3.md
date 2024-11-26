@@ -481,7 +481,9 @@ These 2 parameters frequently differ by 1 or by 4 positions in parameter number.
 |  0040         | 00/01                         | DHW off/on (setting this parameter in a 40Fx35 response to 0x00/0x01 switches DHW off/on on some systems)
 |  0041         | 00/01                         | DHW related ?
 |  0042         | 00/01                         | DHW related ?
-|  0047         | 00/01                         | DHW booster on/off (on some systems: writable)
+|  0045         | 00/01                         | DHW booster on/off
+|  0046         | 00/01                         | DHW booster on/off (on some systems: writable)
+|  0047         | 00/01                         | DHW booster on/off
 |  0048         | 00/01                         | DHW booster on/off (on some systems: writable)
 |  004E         | 00/01/02                      | 00=Heating/01=cooling/02=automatic mode
 |  004F         | 01                            | ?

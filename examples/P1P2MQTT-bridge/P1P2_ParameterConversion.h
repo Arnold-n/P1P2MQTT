@@ -3344,7 +3344,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       QOS_SWITCH;
                       if (pubHaBit) {
                         HADEVICE_SWITCH;
-                        HADEVICE_SWITCH_PAYLOADS("E35004800", "E35004801");
+                        HADEVICE_SWITCH_PAYLOADS("E35004800 35004600", "E35004801 35004601");
                         HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
                         PUB_CONFIG;
                       }
