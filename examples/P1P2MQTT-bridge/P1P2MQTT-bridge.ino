@@ -2939,51 +2939,35 @@ void setup() {
   {
     // WiFiManager setup
     // Customize AP
-    WiFiManagerParameter custom_text("<p><b>P1P2MQTT</b></p>");
-    WiFiManagerParameter custom_text1("<b>Your MQTT server IPv4 address</b>");
-    WiFiManagerParameter custom_text2("<b>Your MQTT server port</b>");
-    WiFiManagerParameter custom_text3("<b>MQTT user</b>");
-    WiFiManagerParameter custom_text4("<b>MQTT password</b>");
-    WiFiManagerParameter custom_text5("<b>0=DHCP 1=static IP</b>");
-    WiFiManagerParameter custom_text6("<b>Static IPv4 (ignored for DHCP)</b>");
-    WiFiManagerParameter custom_text7("<b>Gateway (ignored for DHCP)</b>");
-    WiFiManagerParameter custom_text8("<b>Subnetwork (ignored for DHCP)</b>");
+    WiFiManagerParameter custom_text("<p><b>P1P2MQTT configuration</b></p>");
     // Debug info?
 #ifdef DEBUG_OVER_SERIAL
     wifiManager.setDebugOutput(true);
 #endif /* DEBUG_OVER_SERIAL */
 
     // add 4 MQTT settings to WiFiManager, with default settings preconfigured in NetworkParams.h
-    WiFiManagerParameter WiFiManMqttServer("mqttserver", "MqttServer (IPv4, required)", MQTT_SERVER, MQTT_SERVER_LEN - 1);
-    WiFiManagerParameter WiFiManMqttPort("mqttport", "MqttPort (optional, default 1883)", MQTT_PORT, 5);
-    WiFiManagerParameter WiFiManMqttUser("mqttuser", "MqttUser (optional)", MQTT_USER, MQTT_USER_LEN - 1);
-    WiFiManagerParameter WiFiManMqttPassword("mqttpassword", "MqttPassword (optional)", MQTT_PASSWORD, MQTT_PASSWORD_LEN - 1);
+    WiFiManagerParameter WiFiManMqttServer("mqttserver", "MQTT Server (IPv4)", MQTT_SERVER, MQTT_SERVER_LEN - 1);
+    WiFiManagerParameter WiFiManMqttPort("mqttport", "MQTT Port (default 1883)", MQTT_PORT, 5);
+    WiFiManagerParameter WiFiManMqttUser("mqttuser", "MQTT user (default P1P2)", MQTT_USER, MQTT_USER_LEN - 1);
+    WiFiManagerParameter WiFiManMqttPassword("mqttpassword", "MQTT password (default P1P2)", MQTT_PASSWORD, MQTT_PASSWORD_LEN - 1);
 
     // add 4 static IP settings to WiFiManager, with default settings preconfigured in NetworkParams.h
-    WiFiManagerParameter WiFiMan_use_static_ip("use_static_ip", "0=DHCP 1=staticIP", INIT_USE_STATIC_IP_STRING, 1);
-    WiFiManagerParameter WiFiMan_static_ip("static_ip", "Static IPv4 (optional)", STATIC_IP, STATIC_IP_LEN - 1);
-    WiFiManagerParameter WiFiMan_static_gw("static_gw", "Static GW (optional)", STATIC_GW, STATIC_IP_LEN - 1);
-    WiFiManagerParameter WiFiMan_static_nm("static_nm", "Static NM (optional)", STATIC_NM, STATIC_IP_LEN - 1);
+    WiFiManagerParameter WiFiMan_use_static_ip("use_static_ip", "0=DHCP 1=staticIP (default 0)", INIT_USE_STATIC_IP_STRING, 1);
+    WiFiManagerParameter WiFiMan_static_ip("static_ip", "Static IPv4 (ignored for DHCP)", STATIC_IP, STATIC_IP_LEN - 1);
+    WiFiManagerParameter WiFiMan_static_gw("static_gw", "Static GW (ignored for DHCP)", STATIC_GW, STATIC_IP_LEN - 1);
+    WiFiManagerParameter WiFiMan_static_nm("static_nm", "Static NM (ignored for DHCP)", STATIC_NM, STATIC_IP_LEN - 1);
 
     // Set config save notify callback
     wifiManager.setSaveConfigCallback(WiFiManagerSaveConfigCallback);
 
     wifiManager.addParameter(&custom_text);
-    wifiManager.addParameter(&custom_text1);
     wifiManager.addParameter(&WiFiManMqttServer);
-    wifiManager.addParameter(&custom_text2);
     wifiManager.addParameter(&WiFiManMqttPort);
-    wifiManager.addParameter(&custom_text3);
     wifiManager.addParameter(&WiFiManMqttUser);
-    wifiManager.addParameter(&custom_text4);
     wifiManager.addParameter(&WiFiManMqttPassword);
-    wifiManager.addParameter(&custom_text5);
     wifiManager.addParameter(&WiFiMan_use_static_ip);
-    wifiManager.addParameter(&custom_text6);
     wifiManager.addParameter(&WiFiMan_static_ip);
-    wifiManager.addParameter(&custom_text7);
     wifiManager.addParameter(&WiFiMan_static_gw);
-    wifiManager.addParameter(&custom_text8);
     wifiManager.addParameter(&WiFiMan_static_nm);
 
     // reset WiFiManager settings - for testing only;
