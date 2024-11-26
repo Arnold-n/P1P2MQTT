@@ -19,7 +19,7 @@ The w5500 ethernet driver hangs and (WDT-)crashes the ESP8266 if the w5500 hardw
 
 - for P1P2Monitor: none (the EEPROM library is part of the BSP)
 - for P1P2-bridge-esp8266:
-  - WiFiManager 0.16.0 by tablatronix, installable via Arduino IDE (MIT license, [github repo with newer beta releases](https://github.com/tzapu/WiFiManager))
+  - WiFiManager 2.0.17 by tzapu and tablatronix, installable via Arduino IDE (MIT license, [github repo](https://github.com/tzapu/WiFiManager)), with additional modifications for reliable low-memory operation
   - ESP Telnet 2.0.0 by Lennart Hennigs, installable via Arduino IDE (MIT license, [github repo with newer versions](https://github.com/LennartHennigs/ESPTelnet))
   - [async-mqtt-client 0.9.0 by Marvin Roger](libraries/async-mqtt-client-develop.zip) (MIT license, download/unzip this in library folder, [github repo](https://github.com/marvinroger/async-mqtt-client))
   - [ESPAsyncTCP 2.0.1 by Phil Bowles with extra fix](libraries/ESPAsyncTCP-master-modified.zip) (LGPLv3, download/unzip this in library folder, [github repo](https://github.com/philbowles/ESPAsyncTCP))
