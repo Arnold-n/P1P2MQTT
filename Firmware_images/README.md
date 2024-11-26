@@ -16,15 +16,17 @@ P1P2Monitor v0.9.53 does not yet add buffered commands, but a future version wil
 
 P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and FDY/FDYQ/FXMQ F-series. Monitoring is also available for certain F-series models (using the generic F-series firmware).
 
-[P1P2Monitor v0.9.55 for Daikin E-series](P1P2Monitor-v0.9.55-Daikin-E.ino.hex)
+[P1P2Monitor v0.9.56 for Daikin E-series](P1P2Monitor-v0.9.56-Daikin-E.ino.hex)
 
-[P1P2Monitor v0.9.55 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.55-Daikin-F.ino.hex)
+[P1P2Monitor v0.9.56 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.56-Daikin-F.ino.hex)
 
-[P1P2Monitor v0.9.55 (experimental for Hitachi models)](P1P2Monitor-v0.9.55-Hitachi.ino.hex)
+[P1P2Monitor v0.9.56 (experimental for Hitachi models)](P1P2Monitor-v0.9.56-Hitachi.ino.hex)
 
-[P1P2Monitor v0.9.55 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.55-MHI.ino.hex)
+[P1P2Monitor v0.9.56 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.56-MHI.ino.hex)
 
-[P1P2Monitor v0.9.55 (experimental for Toshiba models)](P1P2Monitor-v0.9.55-Toshiba.ino.hex)
+[P1P2Monitor v0.9.56 (experimental for Toshiba models)](P1P2Monitor-v0.9.56-Toshiba.ino.hex)
+
+For monitoring F1/F2 traffic, use [P1P2Monitor v0.9.56 for Daikin F1/F2 monitoring)](P1P2Monitor-v0.9.56-Daikin-F1F2.ino.hex).
 
 To flash this image OTA (Linux CLI):
 
@@ -47,17 +49,20 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 
 Minimal recommended upgrade is v0.9.53 for P1P2MQTT-bridge.
 
-[P1P2MQTT-bridge v0.9.55 for Daikin E-series](P1P2MQTT-bridge-v0.9.55-Daikin-E.ino.bin)
+[P1P2MQTT-bridge v0.9.57 for Daikin E-series](P1P2MQTT-bridge-v0.9.57-Daikin-E.ino.bin)
 
-[P1P2MQTT-bridge v0.9.55 for Daikin F-series](P1P2MQTT-bridge-v0.9.55-Daikin-F.ino.bin)
+[P1P2MQTT-bridge v0.9.57 for Daikin F-series](P1P2MQTT-bridge-v0.9.57-Daikin-F.ino.bin)
 
-[P1P2MQTT-bridge v0.9.55 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.55-Hitachi.ino.bin)
 
-[P1P2MQTT-bridge v0.9.55 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.55-MHI.ino.bin)
+[P1P2MQTT-bridge v0.9.57 for Hitachi models (experimental)](P1P2MQTT-bridge-v0.9.57-Hitachi.ino.bin)
+
+[P1P2MQTT-bridge v0.9.57 for Mitsubishi Heavy Industries (MHI) models (experimental)](P1P2MQTT-bridge-v0.9.57-MHI.ino.bin)
 
 (for Toshiba, use Hitachi code for now).
 
 Stable version is currently v0.9.55.
+
+For monitoring Daikin F1/F2 traffic, use [P1P2MQTT-bridge v0.9.57 for Daikin F1/F2 monitoring](P1P2MQTT-bridge-v0.9.57-Daikin-F1F2.ino.bin).
 
 Note to users of the original v1.0 version: please do not erase the flash memory of the ESP8266 when flashing these images; if you do, you will need to reset the hardware identifier back to 0 using the 'P31 0' command (or you will not be able to flash the ATmega328P).
 
