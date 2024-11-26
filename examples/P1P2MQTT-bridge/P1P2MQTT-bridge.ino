@@ -2991,7 +2991,6 @@ void setup() {
     // If it does not connect it starts an access point with the specified name,
     // and goes into a blocking loop awaiting configuration.
     // First parameter is name of access point, second is the password.
-    Serial_println(F("* [ESP] Trying autoconnect"));
 #ifdef WIFIPORTAL_TIMEOUT
     wifiManager.setConfigPortalTimeout(WIFIPORTAL_TIMEOUT);
 #endif /* WIFIPORTAL_TIMEOUT */
@@ -3019,6 +3018,7 @@ void setup() {
       doubleResetData ^= 0xFFFFFF00;
       ESP.rtcUserMemoryWrite(doubleResetAddress, &doubleResetData, sizeof(doubleResetData));
     }
+    Serial_println(F("* [ESP] Trying autoconnect"));
     if (!wifiManager.autoConnect(EE.wifiManager_SSID, EE.wifiManager_password)) {
       Serial_println(F("* [ESP] Failed to connect and hit AP timeout, resetting"));
       // Reset and try again
