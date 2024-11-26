@@ -8,6 +8,7 @@
 
 ### Software related, fixed
 
+ - (solved in 0.9.57) WiFiManager sometimes does not show MQTT (or even WiFi) configuration fields; using refresh may solve this
  - (solved in 0.9.45) in some cases counter requests may stop after Daikin system restart
  - (solved in 0.9.27) Power\_\* was not visible in HA
  - (solved in 0.9.26) MQTT username/password length was limited to 19/39 characters in WiFiManager. Max length now 80.

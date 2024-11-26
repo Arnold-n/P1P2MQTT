@@ -1,11 +1,13 @@
-# Build and flash P1P2Monitor on ATmega328P and P1P2-bridge-esp8266 on ESP8266 for P1P2-ESP-Interface
+# Build and flash P1P2Monitor on ATmega328P and P1P2MQTT-bridge on ESP8266 for P1P2MQTT bridge
+
+Firmware images are provided in this repository, this information is only for if you would like to compile the code yourself.
 
 ## Install Arduino IDE 1.8.19 and libraries
 
 - add board support package via File/Preferences in text box "Additional Board Manager URLs", this is a comma-separated strings of URLs, add at the end
 ",http://arduino.esp8266.com/stable/package_esp8266com_index.json,
 https://mcudude.github.io/MiniCore/package_MCUdude_MiniCore_index.json", optionally click "Use external editor" if you prefer to use vim/emacs/your-own to edit outside the IDE (recommended, see below) and click OK,
-- add libraries via Tools/Manage-libraries, filter on "wifi" and install WiFiManager by tablatronix version 0.16.0, filter on "telnet" and install ESP Telnet by Lennart Hennigs version 2.0.0,
+- add libraries via Tools/Manage-libraries, filter on "wifi" and install WiFiManager by tzapu (and tablatronix) version 2.0.17, filter on "telnet" and install ESP Telnet by Lennart Hennigs version 2.0.0,
 - find library folder (I think this is in libraries within the folder mentioned as Sketchblook location in File/Preferences)
 - close Arduino IDE
 - add two more libraries manually by either "cd ~/Arduino/libraries ; git clone https://github.com/marvinroger/async-mqtt-client; git clone https://github.com/philbowles/ESPAsyncTCP" (or by downloading ZIP files from Github and unzipping these)

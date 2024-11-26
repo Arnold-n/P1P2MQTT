@@ -6,7 +6,7 @@ Many of these commands are also available in Home Assistant.
 
 #### Initial set-up of WiFi and MQTT on ESP8266
 
-Only for first time usage: Wifi parameters and MQTT settings can be configured after first boot using wifimanager's AP (connect to 192.168.4.1 on SSID P1P2MQTT, password P1P2P3P4, and fill in details). WiFi and MQTT server details will be stored afterwards. Note: if MQTT details are not correct, the only way to connect to the bridge is by telnet or by retriggigering the wifiManager (by a double-reset).
+Only for first time usage: Wifi parameters and MQTT settings can be configured after first boot using WiFiManager's AP (connect to 192.168.4.1 on SSID P1P2MQTT, password P1P2P3P4, and fill in details). WiFi and MQTT server details will be stored afterwards. Note: if MQTT details are not correct, the only way to connect to the bridge is by telnet or by retriggigering the WiFiManager (by a double-reset).
 
 Both telnet and MQTT allow direct command execution and feedback.
 

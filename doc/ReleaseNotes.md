@@ -1,6 +1,13 @@
 **Release notes**
 
-v0.9.55rc3
+v0.9.57
+
+- Daikin E: smart-grid entities
+- Daikin F1/F2: initial version added
+- all: support for P1P2MQTT bridge v1.3
+- all: firmware built with modified version of WiFiManager
+
+v0.9.54
 
 - Buffered writes
 - Daikin E: add Quiet_Mode_Active output

@@ -22,7 +22,7 @@ with packet-type and new-value hexadecimal, and payload-index in decimal format.
 
 Multiple commands can be given in one line with `F <packet-type1> <parameter-number1> <new-value1>  <packet-type2> <parameter-number2> <new-value2>`.
 
-Please pause for a few seconds between commands as commands are not yet buffered (buffering will be added in a future version).
+Before P1P2Monitor version v0.9.55rc2 please pause for a few seconds between commands as commands are not yet buffered (buffering will be added in a future version). As of v0.9.55rc2, write commands are buffered.
 
 Some example parameters and commands (these may or may not work on other models) are given below. As an example, the first command in each table shows how to change payload byte 0 in packet type 38 or 3B for switching cooling/heating off.
 
