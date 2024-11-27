@@ -2526,7 +2526,7 @@ void handleCommand(char* cmdString) {
     case 'V': // command v handled both by P1P2MQTT-bridge and P1P2Monitor
               switch (cmdString[0]) {
                 case 'v':
-                case 'V': printWelcome();
+                case 'V': printWelcome(true);
                           break;
                 default : break;
               }
@@ -2803,7 +2803,7 @@ void reportState(void) {
 #endif /* E_SERIES */
 }
 
-void printWelcome(void) {
+void printWelcome(bool includeParams) {
   printfTopicS(WELCOMESTRING);
 #ifdef E_SERIES
   printfTopicS("Compiled %s %s for Daikin E-Series", __DATE__, __TIME__);
@@ -2823,17 +2823,24 @@ void printWelcome(void) {
 #ifdef W_SERIES
   printfTopicS("Compiled %s %s for HomeWizard kWh bridge", __DATE__, __TIME__);
 #endif /* W_SERIES */
-  printfTopicS("MAC: %s", WiFi.macAddress());
+  printfTopicS("IPv4 address: %d.%d.%d.%d", local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+  uint8_t mac[6];
+  wifi_get_macaddr(STATION_IF, mac);
+  printfTopicS("MAC address STA: %2x:%2x:%2x:%2x:%2x:%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  wifi_get_macaddr(SOFTAP_IF, mac);
+  printfTopicS("MAC address  AP: %2x:%2x:%2x:%2x:%2x:%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   if (mqttClient.connected()) {
     printfTopicS("Connected to MQTT server");
   } else {
     delayedPrintfTopicS("Warning: not connected to MQTT server");
   }
-  checkParam();
-  for (byte i = 0; i < PARAM_NR; i++) {
-    printModifyParam(i, 0);
+  if (includeParams) {
+    checkParam();
+    for (byte i = 0; i < PARAM_NR; i++) {
+      printModifyParam(i, 0);
+    }
+    reportState();
   }
-  reportState();
 }
 
 char willTopic[ WILL_TOPIC_LEN ] = "\0"; // contents should not change
@@ -3282,11 +3289,10 @@ void setup() {
 
   configTZ();
 
-  printfTopicS("IPv4 address: %s", mqtt_value);
-
   checkParam();
   loadData();
   printfTopicS("Setup ready");
+  printWelcome(false);
 }
 
 void process_for_mqtt(byte* rb, int n) {
