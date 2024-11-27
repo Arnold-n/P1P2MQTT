@@ -2823,6 +2823,7 @@ void printWelcome(void) {
 #ifdef W_SERIES
   printfTopicS("Compiled %s %s for HomeWizard kWh bridge", __DATE__, __TIME__);
 #endif /* W_SERIES */
+  printfTopicS("MAC: %s", WiFi.macAddress());
   if (mqttClient.connected()) {
     printfTopicS("Connected to MQTT server");
   } else {
