@@ -28,10 +28,11 @@ For safety, remove power from your system (likely from the outdoor unit) to remo
 
 The P1P2MQTT bridge can be connected in parallel to your room thermostat, either near your thermostat or near your indoor unit. *If you have a monoblock, the P1/P2 connection may be outside. It is recommended to use a P1/P2 cable such that the P1P2MQTT bridge can be in-house.*
 
+Polarity of the P1/P2 cables is irrelevant, you can connect the 2 P1/P2 wires without looking which one is P1 or P2.
+
 ##### Power on Daikin system
 
 A WiFi Access Point with SSID `P1P2MQTT` (or `P1P2MQTT-2x` after a double-reset) should become available.
-
 
 ##### Provide WiFi and MQTT server credentials
 
