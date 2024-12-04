@@ -110,7 +110,7 @@
 #define SAVEPACKETS
 // to save memory to avoid ESP instability (until P1P2MQTT is released): do not #define SAVESCHEDULE // format of schedules will change to JSON format in P1P2MQTT
 
-#define WELCOMESTRING "P1P2MQTT bridge v0.9.58rc2"
+#define WELCOMESTRING "P1P2MQTT bridge v0.9.58rc3"
 #define HA_SW "0.9.58rc2"
 #define SW_PATCH_VERSION 58
 #define SW_MINOR_VERSION 9
