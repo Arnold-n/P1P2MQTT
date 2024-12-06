@@ -619,6 +619,7 @@ typedef struct RTCdata {
   byte overshootX10;
   byte quietMode;
   byte quietLevel;
+  byte presetMode;
 #endif /* E_SERIES */
 };
 
@@ -640,7 +641,7 @@ typedef struct mqttSaveStruct {
 byte bcnt = 0;
 
 mqttSaveStruct M;
-#define RTC_VERSION 7
+#define RTC_VERSION 8
 #define M_VERSION 8
 
 // local
@@ -941,6 +942,7 @@ void initDataRTC() {
   M.R.overshootX10 = 10;
   M.R.quietMode = 0;
   M.R.quietLevel = 0;
+  M.R.presetMode = 0;
 #endif /* E_SERIES */
 }
 
@@ -1091,8 +1093,9 @@ void writePseudoSystemPacket0D(void) {
   readHex[11] = M.R.overshootX10 / 10;
   readHex[12] = M.R.quietMode;
   readHex[13] = M.R.quietLevel;
+  readHex[14] = M.R.presetMode;
 
-  writePseudoPacket(readHex, 14); // history currently max 14+3
+  writePseudoPacket(readHex, 15);
 #endif /* E_SERIES */
 }
 
@@ -2967,6 +2970,7 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x003D :                                                                                                       PARAM_KEY("Unit_Flow");                                                    PARAM_VALUE_u8;
         case 0x003F :                                                                                                       PARAM_KEY("Unit_Temperature");                                             PARAM_VALUE_u8;
         case 0x0040 :                                                                                                       PARAM_KEY("Unit_Energy");                                                  PARAM_VALUE_u8;
+        case 0x0049 : M.R.presetMode = payload[payloadIndex]; pseudo0D = 9;                                                 PARAM_KEY("Prog_Mode_Q");                                                  PARAM_VALUE_u8; // 0 = schedule, 1 = eco, 2 = comfort
         case 0x004B :                                                                                                       PARAM_KEY("Unit_DST");                                                     PARAM_VALUE_u8;
         case 0x004C : M.R.quietMode = payload[payloadIndex]; pseudo0D = 9;                                                  PARAM_KEY("Quiet_Mode_UI");                                                PARAM_VALUE_u8; // interface 0=auto 1=always_off 2=on
         case 0x004D : M.R.quietLevel = payload[payloadIndex]; pseudo0D = 9;                                                 PARAM_KEY("Quiet_Level_UI");                                               PARAM_VALUE_u8; // 0=mild .. 2=most silent (different encoding from basic package)
@@ -5043,6 +5047,20 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       HADEVICE_SELECT;
                       HADEVICE_SELECT_OPTIONS("\"Level 1\",\"Level 2\",\"Level 3\"", "'0':'Level 1','1':'Level 2','2':' Level 3'");
                       HADEVICE_SELECT_COMMAND_TEMPLATE("{% set modes={'Level 1':0,'Level 2':1,'Level 3':2}%}{{'E3A004D%i'|format(((modes[value])|int) if value in modes.keys() else 0)}}")
+                      HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+                      PUB_CONFIG;
+                    }
+                    CHECK_ENTITY;
+                    VALUE_u8;
+        case   11 : HACONFIG;
+                    CHECK(1);
+                    SUBDEVICE("_Mode");
+                    KEY("Preset_Mode");
+                    QOS_SELECT;
+                    if (pubHa) {
+                      HADEVICE_SELECT;
+                      HADEVICE_SELECT_OPTIONS("\"Schedule\",\"Eco\",\"Comfort\"", "'0':'Schedule','1':'Eco','2':'Comfort'");
+                      HADEVICE_SELECT_COMMAND_TEMPLATE("{% set modes={'Schedule':0,'Eco':1,'Comfort':2}%}{{'E3A0049%i'|format(((modes[value])|int) if value in modes.keys() else 0)}}")
                       HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
                       PUB_CONFIG;
                     }
