@@ -1987,11 +1987,15 @@ uint8_t param_value_u16div10_LE(byte paramSrc, byte paramPacketType, uint16_t pa
 // Parameters, signed, LE
 
 uint8_t param_value_s_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
-  if (paramValLength != 2) {
-    printfTopicS("Only s16_LE supported, not %i bit", 8*paramValLength);
-    return 0;
+  int16_t v;
+  switch (paramValLength) {
+    case 1 : v = (int8_t) (uint8_t) u_payloadValue_BE(payload + payloadIndex, paramValLength);
+             break;
+    case 2 : v = (int16_t) u_payloadValue_BE(payload + payloadIndex, paramValLength);
+             break;
+    default: printfTopicS("Only s8/s16_LE supported, not %i bit", 8*paramValLength);
+             return 0;
   }
-  int16_t v = (uint16_t) u_payloadValue_BE(payload + payloadIndex, paramValLength);
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", v);
   return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
 }
