@@ -188,6 +188,7 @@
         case    8 :           KEY2_PUB_CONFIG_CHECK_ENTITY("P1P2_Monitor_Counter_Parameter_Writes");                                                                      VALUE_u16_LE;
         case    9 :           KEY1_PUB_CONFIG_CHECK_ENTITY("Control_Level_If_Active");                                                                                    VALUE_u8;
         case   10 :           HACONFIG;
+                              CAT_SETTING;
                               KEY1_PUB_CONFIG_CHECK_ENTITY("Control_ID");
 #ifdef E_SERIES
                               if (pubEntity && !newButtons2) newButtons2 = NR_BUTTONS_2;
