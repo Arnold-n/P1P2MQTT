@@ -16,17 +16,17 @@ P1P2Monitor v0.9.53 does not yet add buffered commands, but a future version wil
 
 P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and FDY/FDYQ/FXMQ F-series. Monitoring is also available for certain F-series models (using the generic F-series firmware).
 
-[P1P2Monitor v0.9.56 for Daikin E-series](P1P2Monitor-v0.9.56-Daikin-E.ino.hex)
+[P1P2Monitor v0.9.58 for Daikin E-series](P1P2Monitor-v0.9.58-Daikin-E.ino.hex)
 
-[P1P2Monitor v0.9.56 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.56-Daikin-F.ino.hex)
+[P1P2Monitor v0.9.58 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.58-Daikin-F.ino.hex)
 
-[P1P2Monitor v0.9.56 (experimental for Hitachi models)](P1P2Monitor-v0.9.56-Hitachi.ino.hex)
+[P1P2Monitor v0.9.58 (experimental for Hitachi models)](P1P2Monitor-v0.9.58-Hitachi.ino.hex)
 
-[P1P2Monitor v0.9.56 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.56-MHI.ino.hex)
+[P1P2Monitor v0.9.58 (experimental for Mitsubishi Heavy Industries (MHI) models)](P1P2Monitor-v0.9.58-MHI.ino.hex)
 
-[P1P2Monitor v0.9.56 (experimental for Toshiba models)](P1P2Monitor-v0.9.56-Toshiba.ino.hex)
+[P1P2Monitor v0.9.58 (experimental for Toshiba models)](P1P2Monitor-v0.9.58-Toshiba.ino.hex)
 
-For monitoring F1/F2 traffic, use [P1P2Monitor v0.9.56 for Daikin F1/F2 monitoring)](P1P2Monitor-v0.9.56-Daikin-F1F2.ino.hex).
+For monitoring F1/F2 traffic, use [P1P2Monitor v0.9.58 for Daikin F1/F2 monitoring)](P1P2Monitor-v0.9.58-Daikin-F1F2.ino.hex).
 
 To flash this image OTA (Linux CLI):
 
@@ -50,6 +50,8 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 Minimal recommended upgrade is v0.9.53 for P1P2MQTT-bridge.
 
 [P1P2MQTT-bridge v0.9.57 for Daikin E-series](P1P2MQTT-bridge-v0.9.57-Daikin-E.ino.bin)
+
+[experimental version P1P2MQTT-bridge v0.9.58rc4 for Daikin E-series](P1P2MQTT-bridge-v0.9.58rc4-Daikin-E.ino.bin)
 
 [P1P2MQTT-bridge v0.9.57 for Daikin F-series](P1P2MQTT-bridge-v0.9.57-Daikin-F.ino.bin)
 
