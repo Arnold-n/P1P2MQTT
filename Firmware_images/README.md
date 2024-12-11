@@ -51,7 +51,7 @@ Minimal recommended upgrade is v0.9.53 for P1P2MQTT-bridge.
 
 [P1P2MQTT-bridge v0.9.57 for Daikin E-series](P1P2MQTT-bridge-v0.9.57-Daikin-E.ino.bin)
 
-[experimental version P1P2MQTT-bridge v0.9.58rc4 for Daikin E-series](P1P2MQTT-bridge-v0.9.58rc4-Daikin-E.ino.bin)
+[experimental version P1P2MQTT-bridge v0.9.58rc5 for Daikin E-series](P1P2MQTT-bridge-v0.9.58rc5-Daikin-E.ino.bin)
 
 [P1P2MQTT-bridge v0.9.57 for Daikin F-series](P1P2MQTT-bridge-v0.9.57-Daikin-F.ino.bin)
 

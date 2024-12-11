@@ -432,11 +432,11 @@ bool scheduleMemSeen[2][SCHEDULE_MEM_SIZE] = {}; // 2 * 1166 = 2332 bytes
 #define PCKTP_ARR_SZ ((2 * PCKTP_ARR_BLOCK) + 1)
 //byte packetsrc                                   = { 00                                                                                                                                                                                          , 40                                                                                                                                                                                         ,    80 }
 //byte packettype                                  = { 08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  15,  17,  18,  19,  1F,  20,  21,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80,  A1,  A3,  B1,  08,  09,  0A,  0B,  0C,  0D,  0E,  0F,  10,  11,  12,  15,  17,  18,  19,  1F,  20,  21,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  3A,  3B,  3C,  3D,  3E,  3F,  80,  A1,  A3, B1 ,    18 }
-const PROGMEM uint32_t nr_bytes [PCKTP_ARR_SZ]     = {  0,  20,  20,  20,   0,  20,  20,  20,  20,  17,  17,  18,   6,   7,   5,   0,   1,  20,  20,  20,   0,   0,   0,   0,   0,   0,  20,  12,  11,  20,  12,   0,   0,   0,  10,  16,   0,  18,   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  18,  11,  19,   4,  20,  20,  20,   0,  20,   0,   0,   0,   0,   0,   0,  20,   5,   7,  19,   2,   0,   0,   0,  10,  16,  19, 18,    11     };
-const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 157, 174, 192, 198, 205, 210, 210, 211, 231, 251, 271, 271, 271, 271, 271, 271, 271, 291, 303, 314, 334, 346, 346, 346, 346, 356, 372, 372, 390, 390, 410, 430, 450, 450, 470, 490, 510, 530, 550, 570, 588, 599, 618, 622, 642, 662, 682, 682, 702, 702, 702, 702, 702, 702, 702, 722, 727, 734, 753, 755, 755, 755, 755, 765, 781, 800, 818  /*, sizePayloadByteVal = 829 */ };
+const PROGMEM uint32_t nr_bytes [PCKTP_ARR_SZ]     = {  0,  20,  20,  20,   0,  20,  20,  20,  20,  17,  17,  18,   6,   7,   5,   0,   1,  20,  20,  20,   8,   0,   5,  19,  19,   0,  20,  14,  18,  20,  12,   0,   0,   0,  10,  16,   0,  18,   0,  20,  20,  20,   0,  20,  20,  20,  20,  20,  20,  18,  11,  19,   4,  20,  20,  20,   0,  20,   1,   0,   0,   0,   0,   0,  20,   5,   8,  19,   2,   0,   0,   0,  10,  16,  19, 18,    11     };
+const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,   0,  20,  40,  60,  60,  80, 100, 120, 140, 157, 174, 192, 198, 205, 210, 210, 211, 231, 251, 271, 279, 279, 284, 303, 322, 322, 342, 356, 374, 394, 406, 406, 406, 406, 416, 432, 432, 450, 450, 470, 490, 510, 510, 530, 550, 570, 590, 610, 630, 648, 659, 678, 682, 702, 722, 742, 742, 762, 763, 763, 763, 763, 763, 763, 783, 788, 796, 815, 817, 817, 817, 817, 827, 843, 862, 880  /*, sizePayloadByteVal = 891 */ };
 
-#define sizePayloadByteVal  829
-#define sizePayloadByteSeen 104 // ceil(829/8)
+#define sizePayloadByteVal  891
+#define sizePayloadByteSeen 112 // ceil(891/8)
 
 #define sizePayloadBitsSeen 1
 
@@ -630,6 +630,10 @@ typedef struct RTCdata {
   byte quietMode;
   byte quietLevel;
   byte presetMode;
+  byte coolingComfort;
+  byte coolingEco;
+  byte heatingComfort;
+  byte heatingEco;
 #endif /* E_SERIES */
 };
 
@@ -651,7 +655,7 @@ typedef struct mqttSaveStruct {
 byte bcnt = 0;
 
 mqttSaveStruct M;
-#define RTC_VERSION 8
+#define RTC_VERSION 9
 #define M_VERSION 8
 
 // local
@@ -959,6 +963,10 @@ void initDataRTC() {
   M.R.quietMode = 0;
   M.R.quietLevel = 0;
   M.R.presetMode = 0;
+  M.R.coolingComfort = 80; // 24C
+  M.R.coolingEco = 84;     // 26C
+  M.R.heatingComfort = 74; // 21C
+  M.R.heatingEco = 70;     // 19C
 #endif /* E_SERIES */
 }
 
@@ -1111,7 +1119,11 @@ void writePseudoSystemPacket0D(void) {
   readHex[13] = M.R.quietLevel;
   readHex[14] = M.R.presetMode;
 
-  writePseudoPacket(readHex, 15);
+  readHex[15] = M.R.heatingComfort;
+  readHex[16] = M.R.heatingEco;
+  readHex[17] = M.R.coolingComfort;
+  readHex[18] = M.R.coolingEco;
+  writePseudoPacket(readHex, 19);
 #endif /* E_SERIES */
 }
 
@@ -1871,6 +1883,13 @@ uint8_t value_u8div10(byte packetSrc, byte packetType, byte payloadIndex, byte* 
   return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
 }
 
+float FN_u8div2min16(uint8_t *b)     { return (b[0] * 0.5 - 16);}
+
+uint8_t value_u8div2min16(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value) {
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", FN_u8div2min16(&payload[payloadIndex]));
+  return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
+}
+
 float FN_u16div10_LE(uint8_t *b)     { if (b[-1] == 0xFF) return 0; else return (b[0] * 0.1 + b[-1] * 25.6);}
 
 float FN_u16div100_LE(uint8_t *b)     { if (b[-1] == 0xFF) return 0; else return (b[0] * 0.01 + b[-1] * 2.56);}
@@ -1985,6 +2004,12 @@ uint8_t param_value_u_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, 
 uint8_t param_value_udiv2_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
   uint32_t v = u_payloadValue_LE(payload + payloadIndex, paramValLength);
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", v * 0.5);
+  return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
+}
+
+uint8_t param_value_udiv2min16_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
+  uint32_t v = u_payloadValue_LE(payload + payloadIndex, paramValLength);
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.1f", v * 0.5 - 16);
   return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
 }
 
@@ -2106,6 +2131,10 @@ byte unknownParam_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte
 #define UNSEEN_BYTE_00_10_19_CLIMATE_DHW registerUnseenByte(0x00, 0x00, 0x10, 19);
 #define UNSEEN_BYTE_00_30_0_CLIMATE_ROOM_HEATING registerUnseenByte(0x00, 0x00, 0x30,  0);
 #define UNSEEN_BYTE_00_30_1_CLIMATE_ROOM_COOLING registerUnseenByte(0x00, 0x00, 0x30,  1);
+#define UNSEEN_BYTE_40_0D_12_PRESET_HEATING_COMFORT registerUnseenByte(0x40, 0x00, 0x00,  12);
+#define UNSEEN_BYTE_40_0D_13_PRESET_HEATING_ECO registerUnseenByte(0x40, 0x00, 0x00,  13);
+#define UNSEEN_BYTE_40_0D_14_PRESET_COOLING_COMFORT registerUnseenByte(0x40, 0x00, 0x00,  14);
+#define UNSEEN_BYTE_40_0D_15_PRESET_COOLING_ECO registerUnseenByte(0x40, 0x00, 0x00,  15);
 #define UNSEEN_BYTE_00_30_2_CLIMATE_LWT_HEATING registerUnseenByte(0x00, 0x00, 0x30,  2);
 #define UNSEEN_BYTE_00_30_3_CLIMATE_LWT_COOLING registerUnseenByte(0x00, 0x00, 0x30,  3);
 #define UNSEEN_BYTE_00_30_4_CLIMATE_LWT_HEATING_ADD registerUnseenByte(0x00, 0x00, 0x30,  4);
@@ -2214,13 +2243,13 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x30 : FIELDKEY("3_03_Unspecified_3_03_rw_4");
     case 0x31 : FIELDKEY("3_04_Unspecified_3_04_rw_2");
     case 0x32 : FIELDKEY("3_05_Unspecified_3_05_rw_1");
-    case 0x33 : FIELDSTORE(M.R.roomTempHeatingMaxX10, UNSEEN_BYTE_00_30_0_CLIMATE_ROOM_HEATING;);
+    case 0x33 : FIELDSTORE(M.R.roomTempHeatingMaxX10, UNSEEN_BYTE_00_30_0_CLIMATE_ROOM_HEATING; UNSEEN_BYTE_40_0D_12_PRESET_HEATING_COMFORT; UNSEEN_BYTE_40_0D_13_PRESET_HEATING_ECO;);
                 FIELDKEY("3_06_A3212_Temp_Range_Room_Heating_Max");
-    case 0x34 : FIELDSTORE(M.R.roomTempHeatingMinX10, UNSEEN_BYTE_00_30_0_CLIMATE_ROOM_HEATING;);
+    case 0x34 : FIELDSTORE(M.R.roomTempHeatingMinX10, UNSEEN_BYTE_00_30_0_CLIMATE_ROOM_HEATING; UNSEEN_BYTE_40_0D_12_PRESET_HEATING_COMFORT; UNSEEN_BYTE_40_0D_13_PRESET_HEATING_ECO;);
                 FIELDKEY("3_07_A3211_Temp_Range_Room_Heating_Min");
-    case 0x35 : FIELDSTORE(M.R.roomTempCoolingMaxX10, UNSEEN_BYTE_00_30_1_CLIMATE_ROOM_COOLING;);
+    case 0x35 : FIELDSTORE(M.R.roomTempCoolingMaxX10, UNSEEN_BYTE_00_30_1_CLIMATE_ROOM_COOLING; UNSEEN_BYTE_40_0D_14_PRESET_COOLING_COMFORT; UNSEEN_BYTE_40_0D_15_PRESET_COOLING_ECO;);
                 FIELDKEY("3_08_A3214_Temp_Range_Room_Cooling_Max");
-    case 0x36 : FIELDSTORE(M.R.roomTempCoolingMinX10, UNSEEN_BYTE_00_30_1_CLIMATE_ROOM_COOLING;);
+    case 0x36 : FIELDSTORE(M.R.roomTempCoolingMinX10, UNSEEN_BYTE_00_30_1_CLIMATE_ROOM_COOLING; UNSEEN_BYTE_40_0D_14_PRESET_COOLING_COMFORT; UNSEEN_BYTE_40_0D_15_PRESET_COOLING_ECO;);
                 FIELDKEY("3_09_A3213_Temp_Range_Room_Cooling_Min");
     case 0x37 : FIELDKEY("3_0A_9I_Pump_Model"); // EHSX08P50EF
     // field settings [4_XX]
@@ -2542,6 +2571,7 @@ uint8_t publishFieldSetting(byte paramNr) {
 #define VALUE_u8_add2k           { value_u8_add2k(packetSrc, packetType, payloadIndex, payload, mqtt_value);                             return 0; }
 #define VALUE_s4abs1c            { value_s4abs1c(packetSrc, packetType, payloadIndex, payload, mqtt_value);                              return 0; }
 #define VALUE_u8div10            { value_u8div10(packetSrc, packetType, payloadIndex, payload, mqtt_value);                              return 0; }
+#define VALUE_u8div2min16        { value_u8div2min16(packetSrc, packetType, payloadIndex, payload, mqtt_value);                              return 0; }
 #define VALUE_u16div10_LE        { value_u16div10_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value);                          return 0; }
 #define VALUE_u16div100_LE       { value_u16div100_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value);                         return 0; }
 #define VALUE_f8_8_BE            { value_f8_8_BE(packetSrc, packetType, payloadIndex, payload, mqtt_value);                              return 0; }
@@ -2565,6 +2595,7 @@ uint8_t publishFieldSetting(byte paramNr) {
 
 #define PARAM_VALUE_u8           { param_value_u_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
 #define PARAM_VALUE_u8div2       { param_value_udiv2_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
+#define PARAM_VALUE_u8div2min16  { param_value_udiv2min16_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
 #define PARAM_VALUE_s8           { param_value_s_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
 #define PARAM_VALUE_u16_BE       { param_value_u_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
 #define PARAM_VALUE_u24_BE       { param_value_u_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);           return 0; }
@@ -2763,13 +2794,13 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x00B4 : // fallthrough
         case 0x00B6 : // fallthrough
         case 0x00B7 : // fallthrough
-        case 0x00C2 : // fallthrough
+        case 0x00C2 : // fallthrough counter (#operations?)
         case 0x00C3 : // fallthrough
         case 0x00C5 : // fallthrough
         case 0x00C6 : // fallthrough
         case 0x00C7 : // fallthrough
         case 0x00C8 : // fallthrough
-        case 0x00C9 : // fallthrough
+        case 0x00C9 : // fallthrough counter, wraps around (#seconds/#packets?)
         case 0x00CA : // fallthrough
         case 0x00CC : // fallthrough
         case 0x010C : // fallthrough
@@ -2995,6 +3026,10 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x003D :                                                                                                       PARAM_KEY("Unit_Flow");                                                    PARAM_VALUE_u8;
         case 0x003F :                                                                                                       PARAM_KEY("Unit_Temperature");                                             PARAM_VALUE_u8;
         case 0x0040 :                                                                                                       PARAM_KEY("Unit_Energy");                                                  PARAM_VALUE_u8;
+        case 0x0045 : M.R.coolingComfort = payload[payloadIndex]; pseudo0D = 9;                                             PARAM_KEY("Prog_Cooling_Comfort");                                         PARAM_VALUE_u8div2min16;
+        case 0x0046 : M.R.coolingEco = payload[payloadIndex]; pseudo0D = 9;                                                 PARAM_KEY("Prog_Cooling_Eco");                                             PARAM_VALUE_u8div2min16;
+        case 0x0047 : M.R.heatingComfort = payload[payloadIndex]; pseudo0D = 9;                                             PARAM_KEY("Prog_Heating_Comfort");                                         PARAM_VALUE_u8div2min16;
+        case 0x0048 : M.R.heatingEco = payload[payloadIndex]; pseudo0D = 9;                                                 PARAM_KEY("Prog_Heating_Eco");                                             PARAM_VALUE_u8div2min16;
         case 0x0049 : M.R.presetMode = payload[payloadIndex]; pseudo0D = 9;                                                 PARAM_KEY("Prog_Mode_Q");                                                  PARAM_VALUE_u8; // 0 = schedule, 1 = eco, 2 = comfort
         case 0x004B :                                                                                                       PARAM_KEY("Unit_DST");                                                     PARAM_VALUE_u8;
         case 0x004C : M.R.quietMode = payload[payloadIndex]; pseudo0D = 9;                                                  PARAM_KEY("Quiet_Mode_UI");                                                PARAM_VALUE_u8; // interface 0=auto 1=always_off 2=on
@@ -3011,7 +3046,7 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x0033            : // all 0x05
         case 0x0037 ... 0x003A : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x0041            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
-        case 0x0044 ... 0x0048  : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
+        case 0x0044            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x005C            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x0060            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x0066            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
@@ -3061,10 +3096,10 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case      : FIELDKEY("[____]_7.4.1.2_Setpoint_Room_Cooling_Eco");
         case      : FIELDKEY("[____]_7.4.1.3_Setpoint_Room_Heating_Comfort");   // step A.3.2.4, range [3-09 - 3-08 ]
         case      : FIELDKEY("[____]_7.4.1.4_Setpoint_Room_Cooling_Eco");
-        case      : FIELDKEY("[____]_7.4.2.5_Setpoint_Room_Heating_Comfort");   // Deviation -10 .. +10
-        case      : FIELDKEY("[____]_7.4.2.6_Setpoint_Room_Cooling_Eco");
-        case      : FIELDKEY("[____]_7.4.2.7_Setpoint_Room_Heating_Comfort");
-        case      : FIELDKEY("[____]_7.4.2.8_Setpoint_Room_Cooling_Eco");
+        case      : FIELDKEY("[____]_7.4.2.5_Setpoint_LWT_Main_Heating_Offset_Comfort");   // Deviation -10 .. +10
+        case      : FIELDKEY("[____]_7.4.2.6_Setpoint_LWT_Main_Cooling_Offset_Eco");
+        case      : FIELDKEY("[____]_7.4.2.7_Setpoint_LWT_Main_Heating_Offset_Comfort");
+        case      : FIELDKEY("[____]_7.4.2.8_Setpoint_LWT_Main_Cooling_Offset_Eco");
                     FIELDKEY("[____]_A.5.2.1_DHW_Auto_Emergency_Operation"); // 0 default: Manual, 1 Automatic
                     FIELDKEY("[____]_A.6.B___Calorific_Value"); // 7-40 step 0,1 default 10.5
                     FIELDKEY("[____]_A.3.2.4_Room_Temperature_Step"); // 0: 1C, 1: 0.5C
@@ -5100,6 +5135,66 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                     }
                     CHECK_ENTITY;
                     VALUE_u8;
+        case   12 : HACONFIG;
+                    CHECK(1);
+                    SUBDEVICE("_Mode");
+                    KEY("Preset_Heating_Comfort");
+                    QOS_NUMBER;
+                    if (pubHa) {
+                      HADEVICE_NUMBER;
+                      HADEVICE_NUMBER_RANGE(M.R.roomTempHeatingMinX10 * 0.1, M.R.roomTempHeatingMaxX10 * 0.1, 0.5); // [3-07] - [3-06] step A.3.2.4
+                      HADEVICE_NUMBER_MODE("box");
+                      HADEVICE_NUMBER_COMMAND_TEMPLATE("{{'E3A0047%02X'|format((32+value*2)|int)}}");
+                      HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+                      PUB_CONFIG;
+                    }
+                    CHECK_ENTITY;
+                    VALUE_u8div2min16;
+        case   13 : HACONFIG;
+                    CHECK(1);
+                    SUBDEVICE("_Mode");
+                    KEY("Preset_Heating_Eco");
+                    QOS_NUMBER;
+                    if (pubHa) {
+                      HADEVICE_NUMBER;
+                      HADEVICE_NUMBER_RANGE(M.R.roomTempHeatingMinX10 * 0.1, M.R.roomTempHeatingMaxX10 * 0.1, 0.5); // [3-07] - [3-06] step A.3.2.4
+                      HADEVICE_NUMBER_MODE("box");
+                      HADEVICE_NUMBER_COMMAND_TEMPLATE("{{'E3A0048%02X'|format((32+value*2)|int)}}");
+                      HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+                      PUB_CONFIG;
+                    }
+                    CHECK_ENTITY;
+                    VALUE_u8div2min16;
+        case   14 : HACONFIG;
+                    CHECK(1);
+                    SUBDEVICE("_Mode");
+                    KEY("Preset_Cooling_Comfort");
+                    QOS_NUMBER;
+                    if (pubHa) {
+                      HADEVICE_NUMBER;
+                      HADEVICE_NUMBER_RANGE(M.R.roomTempCoolingMinX10 * 0.1, M.R.roomTempCoolingMaxX10 * 0.1, 0.5); // [3-09] - [3-08] step A.3.2.4
+                      HADEVICE_NUMBER_MODE("box");
+                      HADEVICE_NUMBER_COMMAND_TEMPLATE("{{'E3A0045%02X'|format((32+value*2)|int)}}");
+                      HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+                      PUB_CONFIG;
+                    }
+                    CHECK_ENTITY;
+                    VALUE_u8div2min16;
+        case   15 : HACONFIG;
+                    CHECK(1);
+                    SUBDEVICE("_Mode");
+                    KEY("Preset_Cooling_Eco");
+                    QOS_NUMBER;
+                    if (pubHa) {
+                      HADEVICE_NUMBER;
+                      HADEVICE_NUMBER_RANGE(M.R.roomTempCoolingMinX10 * 0.1, M.R.roomTempCoolingMaxX10 * 0.1, 0.5); // [3-09] - [3-08] step A.3.2.4
+                      HADEVICE_NUMBER_MODE("box");
+                      HADEVICE_NUMBER_COMMAND_TEMPLATE("{{'E3A0046%02X'|format((32+value*2)|int)}}");
+                      HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+                      PUB_CONFIG;
+                    }
+                    CHECK_ENTITY;
+                    VALUE_u8div2min16;
         default   : return 0;
       }
       default   : return 0;
