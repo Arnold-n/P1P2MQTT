@@ -2332,6 +2332,77 @@ void handleCommand(char* cmdString) {
                          printfTopicS("Start output field settings");
 #endif /* E_SERIES */
                          break;
+                case 35: { char new_ssid[65] = "\0";
+                           char new_psk[65] = "\0";
+                           char old_ssid[65];
+                           char old_psk[65];
+                           strlcpy(old_ssid, WiFi.SSID().c_str() , 65);
+                           strlcpy(old_psk, WiFi.psk().c_str(), 65);
+                           n = sscanf((const char*) (cmdString + 1), "%d \"%64[^\n\"]\" \"%64[^\n\"]\"", &temp, &new_ssid, &new_psk);
+                           if (n > 2) {
+                             WiFi.disconnect();
+                             byte dc = 0;
+                             while ((dc < 60) && (WiFi.status() == WL_CONNECTED)) {
+                               Serial.println("Waiting for disconnect");
+                               delay(1000);
+                               dc++;
+                             }
+                             WiFi.persistent(false); // first try, only keep WiFi settings if this succeeds
+                             if (new_psk[0]) {
+                               WiFi.begin(new_ssid, new_psk);
+                             } else {
+                               WiFi.begin(new_ssid);
+                             }
+                             Serial.println("New SSID");
+                             byte i = 0;
+                             while ((i < 190) && (WiFi.status() != WL_CONNECTED)) {
+                               Serial.println("Waiting for new WiFi");
+                               delay(1000);
+                               i++;
+                             }
+                             if (i == 190) {
+                               Serial.println("Time out new WiFi");
+                               // time-out connecting to new WiFi
+                               WiFi.disconnect();
+                               dc = 0;
+                               while ((dc < 60) && (WiFi.status() == WL_CONNECTED)) {
+                                 delay(1000);
+                                 dc++;
+                               }
+                               if (old_psk[0]) {
+                                 WiFi.begin(old_ssid, old_psk);
+                               } else {
+                                 WiFi.begin(old_ssid);
+                               }
+                               i = 0;
+                               while ((i < 30) && (WiFi.status() != WL_CONNECTED)) {
+                               Serial.println("Waiting for old WiFi");
+                                 delay(1000);
+                                 i++;
+                               }
+                               delay(1000);
+                               if (i == 30) {
+                                 Serial.print("Failed to fallback to old WiFi");
+                                 Serial.print(old_ssid);
+                                 Serial.println(" - RESTART");
+                                 delay(1000);
+                                 ESP.restart();
+                               } else {
+                                 Serial.println("Back to old WiFi");
+                               }
+                             } else {
+                               Serial.println("Connected to new WiFi");
+                               Serial.println("Make new WiFi permanent and restart");
+                               WiFi.persistent(true); // keep
+                               WiFi.begin(new_ssid, new_psk);
+                               delay(1000);
+                               ESP.restart();
+                             }
+                           } else {
+                             printfTopicS("Expected 2 arguments \"SSID\" \"password\"");
+                           }
+                         }
+                         break;
                 case 99: // no argument, fall-through to:
                 default: printfTopicS("D0: restart ESP (+initDataRTC/resetData/resetFS in case of factoryreset)");
                          printfTopicS("D1: reset ESP");
@@ -2351,6 +2422,7 @@ void handleCommand(char* cmdString) {
 #endif /* E_SERIES */
                          printfTopicS("D14: delete all and rebuild retained MQTT config/data (deletes old data from all bridges)");
                          printfTopicS("D15: start MQTT output of field settings");
+                         printfTopicS("D35 \"SSID\" \"password\": change WiFi configuration");
                          reportState();
                          break;
               }
