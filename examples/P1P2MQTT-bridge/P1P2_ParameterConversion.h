@@ -372,14 +372,14 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
 #define PPTI15 (PARAM_ARR_SZ - 1);
                                                            // 0       1       2       3       4       5       6       7       8       9
                                                                                                                                 // PPTI15
-const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x0203, 0x00B1, 0x0002, 0x001F, 0x00F0, 0x006C, 0x00B0, 0x0002, 0x0020, 0x001A }; // number of parameters observed
+const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x0203, 0x00B1, 0x0002, 0x001F, 0x00F0, 0x006D, 0x00B0, 0x0002, 0x0020, 0x001A }; // number of parameters observed
 //byte packettype                                    = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D,   0x15 };
 const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      4,      1,      2,      3,      4,      2 }; // byte per parameter // was 8-bit
-const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x0365, 0x036B, 0x03E7, 0x07A7, 0x0813, 0x0973, 0x0979, 0x09F9  /* , 0x0A2D */ }; // valstart = sum  (parnr_bytes * nr_params)
-const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x02B4, 0x02B6, 0x02D5, 0x03C5, 0x0431, 0x04E1, 0x04E3, 0x0503  /* , 0x051D */ }; // seenstart = sum (parnr_bytes)
+const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x0365, 0x036B, 0x03E7, 0x07A7, 0x0814, 0x0974, 0x097A, 0x09FA  /* , 0x0A2E */ }; // valstart = sum  (parnr_bytes * nr_params)
+const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x02B4, 0x02B6, 0x02D5, 0x03C5, 0x0432, 0x04E2, 0x04E4, 0x0504  /* , 0x051E */ }; // seenstart = sum (parnr_bytes)
 
-#define sizeParamVal  0x0A2D
-#define sizeParamSeen    164 // ceil(0x051D/8) = 164
+#define sizeParamVal  0x0A2E
+#define sizeParamSeen    164 // ceil(0x051E/8) = 164
 
 #define PCKTP_START  0x0B
 #define PCKTP_END    0x15 // 0x0B-0x15 / 0x31 0x20 0x21 0x60-0x9F mapped to 0x16-.. ; 0x31/0x32 4x separately for 0xF0 0xF1 0xF2 0xFF
@@ -3053,6 +3053,7 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x0067            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x006A            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x006B            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
+        case 0x006C            : // observed on Altherma 3 GEO (EGSAH10D)
         default     : UNKNOWN_PARAM8;
       }
       default   : return 0;
