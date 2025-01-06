@@ -10,7 +10,7 @@ With the P1P2MQTT project (previously P1P1Serial) you can monitor and control yo
 
 Understanding your heat pump system operation is crucial to optimizing comfort, lifetime and reducing your energy bill. We reduced our energy bill by more than 100 Euro per year by monitoring, understanding and then improving our Daikin system settings.
 
-Hopefully this project will reduce your energy consumption/CO2 emission and will increase comfort at your home. You can support this project by sharing your feedback, [buying a P1P2MQTT bridge](mailto:info@home-click.nl?subject=P1P2MQTT%20bridge) from me (please add brand/model/country), [sponsoring](https://github.com/sponsors/Arnold-n) this project or [buying me a coffee](https://www.buymeacoffee.com/arnoldniessen). It helps to bring functionality to other brands and models.
+Hopefully this project will reduce your energy consumption/CO2 emission and will increase comfort at your home. You can support this project by sharing your feedback, [buying a P1P2MQTT bridge](mailto:arnold.niessen@home-click.nl?subject=P1P2MQTT%20bridge) from me (please add brand/model/country), [sponsoring](https://github.com/sponsors/Arnold-n) this project or [buying me a coffee](https://www.buymeacoffee.com/arnoldniessen). It helps to bring functionality to other brands and models.
 
 ![Home Assistant 1](doc/images/home-assistant-1.png)
 
@@ -28,7 +28,7 @@ Hopefully this project will reduce your energy consumption/CO2 emission and will
 
 ![P1P2MQTT bridge closed](doc/circuits/P1P2MQTT-bridge-2.jpg)
 
-The P1P2MQTT bridge (v1.2) is a stand-alone bus-powered circuit, based on an ESP8266, an ATmega328P, and the MAX22088 HBS adapter. An optional power supply can be connected for systems where the interface cannot provide power. Factory-assembled pre-programmed P1P2MQTT bridges with enclosures are available from me - if you are interested [please mail me for details](mailto:info@home-click.nl?subject=P1P2MQTT%20bridge) and indicate which brand and model system you have, and where you live. Unfortunately I cannot ship everywhere yet.
+The P1P2MQTT bridge (v1.2) is a stand-alone bus-powered circuit, based on an ESP8266, an ATmega328P, and the MAX22088 HBS adapter. An optional power supply can be connected for systems where the interface cannot provide power. Factory-assembled pre-programmed P1P2MQTT bridges with enclosures are available from me - if you are interested [please mail me for details](mailto:arnold.niessen@home-click.nl?subject=P1P2MQTT%20bridge) and indicate which brand and model system you have, and where you live. Unfortunately I cannot ship everywhere yet.
 
 After connecting the P1P2MQTT bridge to your P1/P2 interface (in parallel to the room thermostat), the bridge will create an AP (default SSID: P1P2, initial password: P1P2P3P4), and you can enter WiFI and MQTT server credentials. The P1P2MQTT bridge will restart and will configure the necessary controls in Home Assistant. The P1P2MQTT bridge
 - monitors and (for various models) controls the Daikin heat pump via the P1/P2 bus via MQTT or directly from Home Assistant,
