@@ -1211,10 +1211,10 @@ byte calculatePti(const byte packetSrc, const byte packetDst, const byte packetT
                 break;
     default   : pti = 0xFF; break;
   }
-  if (pti != 0xFF) switch (packetSrc) {
+  switch (packetSrc) {
     case 0x00  : // do nothing
                  break;
-    case 0x40  : pti += PCKTP_ARR_BLOCK;
+    case 0x40  : if (pti != 0xFF) pti += PCKTP_ARR_BLOCK;
                  break;
     case 0x80  : pti = (PCKTP_ARR_BLOCK << 1); // overrule earlier pti calculation
                  switch (packetType) {
@@ -1229,7 +1229,6 @@ byte calculatePti(const byte packetSrc, const byte packetDst, const byte packetT
     default    : pti = 0xFF;
                  break;
   }
-
 
   if ((pti < 0xFE) && (pti >= PCKTP_ARR_SZ)) {
     printfTopicS("pti error pti 0x%02X packetSrc 0x%02X packetDst 0x%02X packetType 0x%02X\n", pti, packetSrc, packetDst, packetType);
