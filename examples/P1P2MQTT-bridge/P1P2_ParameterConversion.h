@@ -932,7 +932,7 @@ void initDataRTC() {
   M.R.prevMin = 0xFF;
   M.R.compressor = 0;
   M.R.useDHW = 3;  // assume 0x01=tank-installed 0x02=DHW-installed (until field setting detection)
-  M.R.controlRTX10 = 0; // default (for me) RT, (Daikin default = 20)
+  M.R.controlRTX10 = 20; // default 20 = RT
   M.R.numberOfLWTzonesX10 = 0;
   M.R.climateMode = 0; // 0x40=WD 0x00=ABS 0x80/0xC0 = +prog
   M.R.allowModulationX10 = 0;
