@@ -4059,6 +4059,12 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           case 10 : return 0;
           case 11 : return 0;
           case 12 :                                                            HAKWH;                                       KEY3_PUB_CONFIG_CHECK_ENTITY("Energy_Produced_Compressor_Total");          VALUE_u24_LE; // energy produced total
+          case 13 :           return 0;
+          case 14 :           return 0;
+          case 15 :                                                            HAHOURS;                                     KEY3_PUB_CONFIG_CHECK_ENTITY("Counter_Q_1_4");                             VALUE_u24_LE; // new counter on E[BD]LA, value 0 so far
+          case 16 :           return 0;
+          case 17 :           return 0;
+          case 18 :                                                            HAHOURS;                                     KEY3_PUB_CONFIG_CHECK_ENTITY("Counter_Q_1_5");                    VALUE_u24_LE; // counter not seen
           default : UNKNOWN_BYTE;
         }
         case 0x02 : switch (payloadIndex) { // payload B8 subtype 02
@@ -4076,6 +4082,12 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           case 11 :           return 0;
           case 12 : if (!(M.R.useDHW & 0x02)) return 0;
                                                                                HAHOURS;                                     KEY3_PUB_CONFIG_CHECK_ENTITY("Hours_Compressor_DHW");                      VALUE_u24_LE;
+          case 13 :           return 0;
+          case 14 :           return 0;
+          case 15 :                                                            HAHOURS;                                     KEY3_PUB_CONFIG_CHECK_ENTITY("Counter_Q_2_4");                    VALUE_u24_LE; // counter not seen
+          case 16 :           return 0;
+          case 17 :           return 0;
+          case 18 :                                                            HAHOURS;                                     KEY3_PUB_CONFIG_CHECK_ENTITY("Counter_Q_2_5");                    VALUE_u24_LE; // counter not seen
           default :           UNKNOWN_BYTE;
         }
         case 0x03 : switch (payloadIndex) { // payload B8 subtype 03
