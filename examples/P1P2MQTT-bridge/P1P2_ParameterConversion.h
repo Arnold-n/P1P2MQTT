@@ -2743,7 +2743,7 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x004D :                                                                                                       PARAM_KEY("Reboot_Related_Q15-35-4D");                                     PARAM_VALUE_u8; //  0x00 0x01
         case 0x004E :                                                                                                       PARAM_KEY("Reboot_Related_Q15-35-4E");                                     PARAM_VALUE_u8; //
         case 0x005A :                                                                                                       PARAM_KEY("Reboot_Related_Q16-35-5A");                                     PARAM_VALUE_u8; //  0x00 0x01 related to F036-0x0002
-        case 0x005C : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_General_Power_Limit_Q_2");                                   PARAM_VALUE_s8; //  0x00 0x7F
+        case 0x005C : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_35_005C-General_Power_Limit_Q_2");                                   PARAM_VALUE_s8; //  0x00 0x7F
 
 
 
@@ -2754,8 +2754,8 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x008D : // fallthrough
         case 0x0090 : // fallthrough // changes on/off when? <= copy of 400012 byte 10 bit 2
 
-        case 0x0093 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_General_Power_Limit_Active_Q");                              PARAM_VALUE_u8; // SG related
-        case 0x0094 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_General_Power_Limit");                                       PARAM_VALUE_u8div2; // SG related
+        case 0x0093 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_35_0093-General_Power_Limit_Active_Q");                              PARAM_VALUE_u8; // SG related
+        case 0x0094 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_35_0094-General_Power_Limit_kW");                                    PARAM_VALUE_u8div2; // SG related
         case 0x0095 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0095");                                                 PARAM_VALUE_u8; // SG related
         case 0x0096 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0096");                                                 PARAM_VALUE_u8; // SG related
         case 0x0097 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0097");                                                 PARAM_VALUE_u8; // SG related
@@ -2769,7 +2769,7 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x009F : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-009F");                                                 PARAM_VALUE_u8; // SG related
         case 0x00A0 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-00A0");                                                 PARAM_VALUE_u8; // SG related
         case 0x0194 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0194");                                                 PARAM_VALUE_u8; // SG related
-        case 0x0195 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0195");                                                 PARAM_VALUE_u8; // SG related
+        case 0x0195 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0195-Mode3");                                                 PARAM_VALUE_u8; // SG related
         case 0x0202 : SUBDEVICE("_SG");                            HACONFIG; HADEVICE_SENSOR;                               PARAM_KEY("SG_Q_35-0202");                                                 PARAM_VALUE_u8; // SG related
 
 /*
@@ -3703,7 +3703,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           default   : UNKNOWN_BIT;
         }
 
-        case   11 : SUBDEVICE("_SG");                                HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("SG_General_Power_Limit");                                     VALUE_s8; // reports 0x7F 0x11 0x12 0x13
+        case   11 : SUBDEVICE("_SG");                                HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("SG_General_Power_Limit_2");                                     VALUE_s8; // reports 0x7F 0x11 0x12 0x13
         case   12 : switch (bitNr) {
           case    8 : bcnt = 20; BITBASIS;
           case    0 : SUBDEVICE("_Unknown");                         HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_On_Q"); // heatpump_enabled??? (preferential related ?)
