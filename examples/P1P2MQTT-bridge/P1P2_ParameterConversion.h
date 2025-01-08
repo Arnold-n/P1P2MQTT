@@ -3229,8 +3229,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
     }
     case 0x00 :
                 switch (payloadIndex) {
-      case  EMPTY_PAYLOAD : printfTopicS("Restart phase 0");
-                            KEYHEADER("RestartPhase0");
+      case  EMPTY_PAYLOAD : return 0;
+                            // printfTopicS("Restart phase 0"); // do not print, EKHBRD repeats this message once every 7 seconds
+                            // KEYHEADER("RestartPhase0");
       default   : UNKNOWN_BYTE; // not observed
     }
     case 0x01 :
