@@ -2282,18 +2282,22 @@ void handleCommand(char* cmdString) {
                          printfTopicS("HA_KEY_LEN %i MaxSeen %i", HA_KEY_LEN, haConfigTopicLengthMax);
                          printfTopicS("EXTRA_AVAILABILITY_STRING_LEN %i MaxSeen %i", EXTRA_AVAILABILITY_STRING_LEN, extraAvailabilityStringLengthMax);
                          break;
-                case 12: if (throttleValue) {
-                           printfTopicS("Please wait until throttling is ready - then reissue D12");
-                         } else {
-                           digitalWrite(ATMEGA_SERIAL_ENABLE, LOW);
-                           printfTopicS("Deleting own homeassistant and MQTT entities and resetting and rebuilding MQTT topics and HA configuration");
-                           mqttDeleting = 1;
-                           deleteSpecific = 1;
-                           mqttSubscribeToDelete(deleteSpecific);
-                           M.R.RTCdataLength = 0; // invalidate RCT data
-                           ESP.rtcUserMemoryWrite(RTC_REGISTER, reinterpret_cast<uint32_t *>(&M.R), sizeof(M.R));
-                           mqttUnsubscribeTime = espUptime + DELETE_STEP;
+                case 12: if (mqttDeleting) {
+                           printfTopicS("Please wait until currently active mqtt-delete action is finished");
+                           break;
                          }
+                         throttleValue = 0;
+#ifdef E_SERIES
+                         fieldSettingPublishNr = 0xF1;
+#endif /* E_SERIES */
+                         digitalWrite(ATMEGA_SERIAL_ENABLE, LOW);
+                         printfTopicS("Deleting own homeassistant and MQTT entities and resetting and rebuilding MQTT topics and HA configuration");
+                         mqttDeleting = 1;
+                         deleteSpecific = 1;
+                         mqttSubscribeToDelete(deleteSpecific);
+                         M.R.RTCdataLength = 0; // invalidate RTC data
+                         ESP.rtcUserMemoryWrite(RTC_REGISTER, reinterpret_cast<uint32_t *>(&M.R), sizeof(M.R));
+                         mqttUnsubscribeTime = espUptime + DELETE_STEP;
                          break;
 #ifdef E_SERIES
                 case 13: if ((M.R.electricityConsumedCompressorHeating > 0) && (M.R.energyProducedCompressorHeating > 0)) {
@@ -2314,18 +2318,19 @@ void handleCommand(char* cmdString) {
                          }
                          break;
 #endif /* E_SERIES */
-                case 14: if (throttleValue) {
-                           printfTopicS("Please wait until throttling is ready - then reissue D14");
-                         } else {
-                           digitalWrite(ATMEGA_SERIAL_ENABLE, LOW);
-                           printfTopicS("Deleting ALL homeassistant and MQTT entities and resetting and rebuilding MQTT topics and HA configuration");
-                           mqttDeleting = 1;
-                           deleteSpecific = 0;
-                           mqttSubscribeToDelete(deleteSpecific);
-                           M.R.RTCdataLength = 0; // invalidate RCT data
-                           ESP.rtcUserMemoryWrite(RTC_REGISTER, reinterpret_cast<uint32_t *>(&M.R), sizeof(M.R));
-                           mqttUnsubscribeTime = espUptime + DELETE_STEP;
-                         }
+                case 14: // no check on mqttDeleting - this allows to start D14 during D12 action
+                         throttleValue = 0;
+#ifdef E_SERIES
+                         fieldSettingPublishNr = 0xF1;
+#endif /* E_SERIES */
+                         digitalWrite(ATMEGA_SERIAL_ENABLE, LOW);
+                         printfTopicS("Deleting ALL homeassistant and MQTT entities and resetting and rebuilding MQTT topics and HA configuration");
+                         mqttDeleting = 1;
+                         deleteSpecific = 0;
+                         mqttSubscribeToDelete(deleteSpecific);
+                         M.R.RTCdataLength = 0; // invalidate RCT data
+                         ESP.rtcUserMemoryWrite(RTC_REGISTER, reinterpret_cast<uint32_t *>(&M.R), sizeof(M.R));
+                         mqttUnsubscribeTime = espUptime + DELETE_STEP;
                          break;
 #ifdef E_SERIES
                 case 15: fieldSettingPublishNr = 0;

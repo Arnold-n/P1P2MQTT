@@ -790,7 +790,6 @@ byte  createButtonsSwitches1(void) {
     HADEVICE_BUTTON;
     HADEVICE_BUTTON_CLASS("update");
     HADEVICE_BUTTON_COMMAND("D12");
-    HADEVICE_AVAILABILITY("S\/9\/ESP_Throttling", 0, 1);
     HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
     if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
     newButtons1 = nrButtonsLeft;
@@ -802,7 +801,6 @@ byte  createButtonsSwitches1(void) {
     HADEVICE_BUTTON;
     HADEVICE_BUTTON_CLASS("update");
     HADEVICE_BUTTON_COMMAND("D14");
-    HADEVICE_AVAILABILITY("S\/9\/ESP_Throttling", 0, 1);
     HADEVICE_AVAILABILITY("A\/9\/HA_Setup", 1, 0);
     if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
     newButtons1 = nrButtonsLeft;
