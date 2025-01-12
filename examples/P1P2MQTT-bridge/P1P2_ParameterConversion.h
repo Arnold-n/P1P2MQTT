@@ -5714,7 +5714,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       HADEVICE_CLIMATE;
                       // temps, byte 6 in 40F038
                       HADEVICE_CLIMATE_TEMPERATURE("S/2/Setpoint_Heating", EE.setpointHeatingMin, EE.setpointHeatingMax, 1); // only visible in L1(/L5) mode, not in L0 mode
-                      HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/0/Temperature_Room");
+                      if (EE.useAirIntake) {
+                        HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_Inside_Air_Intake");
+                      } else {
+                        HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/0/Temperature_Room");
+                      }
                       HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'F3B06%02X'|format(value|int)}}");
                       // modes byte 0 (off/on) and 1 (mode) in 40F03B
 #ifdef Use_HA_and_off

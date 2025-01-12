@@ -192,6 +192,7 @@ typedef struct EEPROMSettings {
   uint8_t setpointCoolingMax;
   uint8_t setpointHeatingMin;
   uint8_t setpointHeatingMax;
+  bool useAirIntake;
 #endif /* F_SERIES */
 #ifdef H_SERIES
   uint8_t hitachiModel;
@@ -322,6 +323,7 @@ const char paramName_35[] PROGMEM = "Setpoint cooling minimum"; // PARAM_SETPOIN
 const char paramName_36[] PROGMEM = "Setpoint cooling maximum"; // PARAM_SETPOINT_COOLING_MAX
 const char paramName_37[] PROGMEM = "Setpoint heating minimum"; // PARAM_SETPOINT_HEATING_MIN
 const char paramName_38[] PROGMEM = "Setpoint heating maximum"; // PARAM_SETPOINT_HEATING_MAX
+const char paramName_39[] PROGMEM = "use Inside_Air_Intake   ";
 #endif /* F_SERIES */
 
 #ifdef H_SERIES
@@ -388,6 +390,7 @@ const char* const paramName[] PROGMEM = {
   paramName_36,
   paramName_37,
   paramName_38,
+  paramName_39,
 #endif /* F_SERIES */
 #ifdef H_SERIES
   paramName_35,
@@ -462,6 +465,7 @@ const paramTypes PROGMEM paramType[] = {
   P_UINT,
   P_UINT,
   P_UINT,
+  P_BOOL,
 #endif /* F_SERIES */
 #ifdef H_SERIES
   P_UINT,
@@ -524,6 +528,7 @@ const int PROGMEM paramSize[] = {
   1,
 #endif /* E_SERIES */
 #ifdef F_SERIES
+  1,
   1,
   1,
   1,
@@ -594,6 +599,7 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   40,
   40,
   40,
+  1,
 #endif /* F_SERIES */
 #ifdef H_SERIES
    2,
@@ -660,6 +666,7 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.setpointCoolingMax,
   (char*) &EE.setpointHeatingMin,
   (char*) &EE.setpointHeatingMax,
+  (char*) &EE.useAirIntake,
 #endif /* F_SERIES */
 #ifdef H_SERIES
   (char*) &EE.hitachiModel,
@@ -2129,6 +2136,12 @@ void loadEEPROM() {
 #endif /* F_SERIES */
     EE.EE_size = sizeof(EE); // EE_size never used - and not really needed, relying on EE_version and EE.signature
   }
+#ifdef F_SERIES
+  if (EE.EE_version < 7) {
+    // delayedPrintfTopicS("Upgrade EEPROM_version to 7");
+    EE.useAirIntake = 0;
+  }
+#endif /* F_SERIES */
 #ifdef H_SERIES
   if (EE.EE_version < 7) {
     EE.hitachiModel = INIT_HITACHI_MODEL;
@@ -2139,9 +2152,9 @@ void loadEEPROM() {
     saveEEPROM();
   }
 #else
-  if (EE.EE_version < 6) {
-    delayedPrintfTopicS("Upgrade EEPROM_version to 6");
-    EE.EE_version = 6;
+  if (EE.EE_version < 7) {
+    delayedPrintfTopicS("Upgrade EEPROM_version to 7");
+    EE.EE_version = 7;
     saveEEPROM();
   }
 #endif /* H_SERIES */
