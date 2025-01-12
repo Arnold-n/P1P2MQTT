@@ -567,8 +567,10 @@ bool lcdMode = 0; // default Aux_LCD off
 byte userMode = 1; // default advanced user mode
 #endif /* E_SERIES */
 
+/*
 byte compressor = 0;
 byte althermaOn = 0;
+*/
 
 #ifdef E_SERIES
 bool writeParam(void) {
@@ -1446,10 +1448,13 @@ byte writeBudget_prev = 0;
                           case 92 : Serial_println(F("* Installer mode"));
                                     userMode = 2;
                                     break;
-                          case 99 : if (althermaOn) {
+                          case 99 : 
+/*
+                                    if (althermaOn) { // was: if (compressor)
                                       Serial_println(F("* restart refused, because Altherma_On is on"));
                                       break;
                                     }
+*/
                                     if (insertMessageCnt) {
                                       Serial_println(F("* insertMessage already scheduled, retry later"));
                                       break;
@@ -1882,13 +1887,14 @@ byte writeBudget_prev = 0;
           Tminprev = Tmin;
         }
       }
+/*
       if ((RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x10)) {
         compressor = RB[21] & 0x01;
       }
       if ((RB[0] == 0x00) && (RB[1] == 0x00) && (RB[2] == 0x10)) {
         althermaOn = RB[3] & 0x01;
       }
-
+*/
       if (counterCycleStealDelay) {
         // request one counter per cycle in short pause after first 0012 msg at start of each minute
         if ((nread > 4) && (RB[0] == 0x40) && (RB[1] == 0x00) && (RB[2] == 0x12)) {
