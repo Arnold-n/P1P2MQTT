@@ -3533,6 +3533,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         case   18 : switch (bitNr) {
           case    8 : M.R.compressor = payloadByte & 0x01; bcnt = 15; BITBASIS;
           case    0 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Compressor");
+          case    1 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("BUH");
           case    3 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Circulation_Pump");
           case    5 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("BUH_2");
           default   : UNKNOWN_BIT;
