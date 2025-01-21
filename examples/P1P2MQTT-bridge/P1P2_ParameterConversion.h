@@ -3743,7 +3743,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           case    8 : bcnt = 20; BITBASIS;
           case    0 : SUBDEVICE("_Unknown");                         HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_On_Q"); // heatpump_enabled??? (preferential related ?)
           case    2 : SUBDEVICE("_Unknown");                         HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_Related_Q");
-          case    6 : SUBDEVICE("_Unknown");                         HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_Active_Q"); // status depends both on DHW on/off and heating on/off ? // was System_On_Q
+          case    6 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("BUH_On");
           case    7 : if (!(M.R.useDHW & 0x02)) return 0;
                       SUBDEVICE("_DHW");                             HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("DHW_Demand");
           default   : UNKNOWN_BIT;
