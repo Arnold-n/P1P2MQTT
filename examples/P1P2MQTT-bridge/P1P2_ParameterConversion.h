@@ -2199,6 +2199,9 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x05 : FIELDKEY("0_05_A3124_LWT_Cooling_Add_WD_Curve_Low_Amb_LWT");
     case 0x06 : FIELDKEY("0_06_A3124_LWT_Cooling_Add_WD_Curve_High_Amb");
     case 0x07 : FIELDKEY("0_07_A3124_LWT_Cooling_Add_WD_Curve_Low_Amb");
+    case 0x08 : FIELDKEY("0_08_Unspecified_0");
+    case 0x09 : FIELDKEY("0_09_Unspecified_0");
+    case 0x0A : FIELDKEY("0_0A_Unspecified_0");
     case 0x0B : FIELDKEY("0_0B_A47_DHW_WD_Curve_High_Amb_Setpoint");
     case 0x0C : FIELDKEY("0_0C_A47_DHW_WD_Curve_Low_Amb_Setpoint");
     case 0x0D : FIELDKEY("0_0D_A47_DHW_WD_Curve_High_Amb");
@@ -2227,6 +2230,8 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x22 : FIELDKEY("2_04_A445_DHW_Disinfection_Duration");
     case 0x23 : FIELDKEY("2_05_Room_Antifrost_Temperature"); // 4-16 step 1 default 8
     case 0x24 : FIELDKEY("2_06_Room_Antifrost_Protection"); // 0-1 step 1 frost protection room ro
+    case 0x25 : FIELDKEY("2_07_Unspecified_0");
+    case 0x26 : FIELDKEY("2_08_Unspecified_0");
     case 0x27 : FIELDKEY("2_09_A323_Ext_Room_Sensor_Offset"); // -5 .. 5 step 0.5
     case 0x28 : FIELDKEY("2_0A_A322_Room_Temperature_Offset"); // -5 .. 5 step 0.5
     case 0x29 : FIELDKEY("2_0B_A65_Ext_Amb_Sensor_Offset"); // -5..5 step 0.5
@@ -2249,6 +2254,10 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x36 : FIELDSTORE(M.R.roomTempCoolingMinX10, UNSEEN_BYTE_00_30_1_CLIMATE_ROOM_COOLING; UNSEEN_BYTE_40_0D_14_PRESET_COOLING_COMFORT; UNSEEN_BYTE_40_0D_15_PRESET_COOLING_ECO;);
                 FIELDKEY("3_09_A3213_Temp_Range_Room_Cooling_Min");
     case 0x37 : FIELDKEY("3_0A_9I_Pump_Model"); // EHSX08P50EF
+    case 0x38 : FIELDKEY("3_0B_Unspecified_0");
+    case 0x39 : FIELDKEY("3_0C_Unspecified_0");
+    case 0x3A : FIELDKEY("3_0D_Unspecified_0");
+    case 0x3B : FIELDKEY("3_0E_Unspecified_0");
     // field settings [4_XX]
     case 0x3C : FIELDKEY("4_00_Unspecified_4_00_ro_1");
     case 0x3D : FIELDKEY("4_01_Unspecified_4_01_ro_0");
@@ -2262,6 +2271,7 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x45 : FIELDKEY("4_09_A632_Power_Consumption_Control_Type"); // 0 Current, 1 Power
     case 0x46 : FIELDKEY("4_0A_Unspecified_4_0A_ro_0"); // 0
     case 0x47 : FIELDKEY("4_0B_Auto_Cooling_Heating_Changeover_Hysteresis"); //1-10 step 0.5 default 1
+    case 0x48 : FIELDKEY("4_0C_Unspecified_0");
     case 0x49 : FIELDKEY("4_0D_Auto_Cooling_Heating_Changeover_Offset"); // 1-10 step0.5 default 3
     case 0x4A : FIELDKEY("4_0E_Unspecified_4_0E_ro_0");
     // field settings [5_XX]
@@ -2335,6 +2345,7 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x83 : FIELDKEY("8_0B_Flow_Target_Heatpump"); // 10-20 step 0.5 default 15
     case 0x84 : FIELDKEY("8_0C_Flow_Target_Hybrid"); // 10-20 step 0.5 default 10
     case 0x85 : FIELDKEY("8_0D_Flow_Target_Gasboiler"); // 10-20 step 0.5 default 14
+    case 0x86 : FIELDKEY("8_0E_Unspecified_0");
     // field settings [9_XX]
     case 0x87 : FIELDSTORE(M.R.LWTheatMainMaxX10, UNSEEN_BYTE_00_30_2_CLIMATE_LWT_HEATING;);
                 FIELDKEY("9_00_A31122_Temp_Heating_Main_Max"); // 37-80 step 1
@@ -2366,12 +2377,32 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0x98 : FIELDKEY("A_02_Unspecified_A_02_0"); // 0-(0)-0 or 0-(1)-7  for src=2?
     case 0x99 : FIELDKEY("A_03_Unspecified_A_03_0"); // 0-(0)-0 or 0-(1)-7  for src=2?
     case 0x9A : FIELDKEY("A_04_Unspecified_A_04_0"); // 0-(0)-0 or 0-(1)-7  for src=2?
+    case 0x9B : FIELDKEY("A_05_Unspecified_0");
+    case 0x9C : FIELDKEY("A_06_Unspecified_0");
+    case 0x9D : FIELDKEY("A_07_Unspecified_0");
+    case 0x9E : FIELDKEY("A_08_Unspecified_0");
+    case 0x9F : FIELDKEY("A_09_Unspecified_0");
+    case 0xA0 : FIELDKEY("A_0A_Unspecified_0");
+    case 0xA1 : FIELDKEY("A_0B_Unspecified_0");
+    case 0xA2 : FIELDKEY("A_0C_Unspecified_0");
+    case 0xA3 : FIELDKEY("A_0D_Unspecified_0");
+    case 0xA4 : FIELDKEY("A_0E_Unspecified_0");
     // field settings [B_XX] // no longer documented/present on version E
     case 0xA5 : FIELDKEY("B_00_Unspecified_B_00_0");
     case 0xA6 : FIELDKEY("B_01_Unspecified_B_01_0");
     case 0xA7 : FIELDKEY("B_02_Unspecified_B_02_0");
     case 0xA8 : FIELDKEY("B_03_Unspecified_B_03_0");
     case 0xA9 : FIELDKEY("B_04_Unspecified_B_04_0");
+    case 0xAA : FIELDKEY("B_05_Unspecified_0");
+    case 0xAB : FIELDKEY("B_06_Unspecified_0");
+    case 0xAC : FIELDKEY("B_07_Unspecified_0");
+    case 0xAD : FIELDKEY("B_08_Unspecified_0");
+    case 0xAE : FIELDKEY("B_09_Unspecified_0");
+    case 0xAF : FIELDKEY("B_0A_Unspecified_0");
+    case 0xB0 : FIELDKEY("B_0B_Unspecified_0");
+    case 0xB1 : FIELDKEY("B_0C_Unspecified_0");
+    case 0xB2 : FIELDKEY("B_0D_Unspecified_0");
+    case 0xB3 : FIELDKEY("B_0E_Unspecified_0");
     // field settings [C_XX]
     case 0xB4 : FIELDKEY("C_00_DHW_Priority"); // 0 (default) Solar priority, 1: heat pump priority
     case 0xB5 : FIELDKEY("C_01_Unspecified_C_01_ro_0");
@@ -2397,6 +2428,7 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
     case 0xC6 : FIELDKEY("D_03_LWT_0C_Compensation_Shift"); // 0 (default) Disabled, 1: 2C (-2..+2), 2: 4C (-2..+2), 3: 2C (-4..+4C), 4C (-4..+4C)
     case 0xC7 : FIELDKEY("D_04_A227_Demand_PCB"); // 0 No, 1 power consumption control
     case 0xC8 : FIELDKEY("D_05_Unspecified_D_05_ro_0");
+    case 0xC9 : FIELDKEY("D_06_Unspecified_0");
     case 0xCA : FIELDKEY("D_07_A2262_Digital_IO_PCB_Solar_Kit"); // 0-1
     case 0xCB : FIELDKEY("D_08_A228_External_kWh_Meter_1"); // 0: No, 1-5: 0.1 - 1000 pulses/kWh
     case 0xCC : FIELDKEY("D_09_Unspecified_D_09_ro_0");
@@ -2485,7 +2517,10 @@ void field_setting(byte packetSrc, byte packetType, byte payloadIndex, byte* pay
     byte ppti = 0x39 - PARAM_TP_START;
     uint16_t ptbs = seenstart[ppti] + paramNr;
     uint16_t ptbv = valstart[ppti] + paramNr * parnr_bytes[ppti];
-    for (byte i = 0; i < 4; i++) M.paramVal[0][ptbv + i] = payload[payloadIndex - 3 + i] & 0x3F;
+    M.paramVal[0][ptbv + 0] = payload[payloadIndex - 3] & 0x3F;
+    M.paramVal[0][ptbv + 1] = payload[payloadIndex - 2];
+    M.paramVal[0][ptbv + 2] = payload[payloadIndex - 1];
+    M.paramVal[0][ptbv + 3] = payload[payloadIndex - 0] & 0x7E;
     M.paramSeen[0][ptbs >> 3] |= (1 << (ptbs & 0x07));
   }
 }
