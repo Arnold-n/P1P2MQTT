@@ -3819,10 +3819,10 @@ void loop() {
 #endif /* E_SERIES */
                 }
 #endif /* W_SERIES */
-                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F)) {
+#define ATMEGA_UPTIME_LOC 17 // depends on pseudo msg format of P1P2Monitor
+                if ((readHex[0] == 0x00) && (readHex[1] == 0x00) && (readHex[2] == 0x0F) && rh > (ATMEGA_UPTIME_LOC + 3)) {
 #ifndef W_SERIES
                   pseudo0E = 9;                                                                         // Insert pseudo packet 40000E in output serial after 00000E
-#define ATMEGA_UPTIME_LOC 17 // depends on pseudo msg format of P1P2Monitor
                   uint32_t ATmega_uptime = (readHex[ ATMEGA_UPTIME_LOC ] << 24) | (readHex[ ATMEGA_UPTIME_LOC + 1 ] << 16) | (readHex[ ATMEGA_UPTIME_LOC + 2 ] << 8) | readHex[ ATMEGA_UPTIME_LOC + 3 ];
                   if (ATmega_uptime < ATmega_uptime_prev) {
                     // unexpected ATmega reboot detected, flush ATmega's serial input
