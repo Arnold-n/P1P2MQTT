@@ -126,7 +126,7 @@ Toshiba TCC-Link (used for indoor-outdoor) is also HBS-based, so monitoring raw 
 
 ### Panasonic/Sanyo SIII-Net, perhaps Haier, York, ..
 
-Monitoring raw hex data may be possible, if the interface is indeed HBS-based.
+Monitoring raw hex data may be possible, if the interface is indeed HBS-based. The Panasonic R1/R2 bus is likely HBS-based.
 
 ## Warnings
 
