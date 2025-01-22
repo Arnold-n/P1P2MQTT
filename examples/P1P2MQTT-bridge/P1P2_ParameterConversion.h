@@ -704,7 +704,6 @@ byte  createButtonsSwitches1(void) {
     HADEVICE_BUTTON;
     HADEVICE_BUTTON_CLASS("restart");
     HADEVICE_BUTTON_COMMAND("L99");
-    HADEVICE_AVAILABILITY("S\/0\/Altherma_On", 0, 1);
     if (!publishHomeAssistantConfig(deviceSubName, haDevice, haEntity, haEntityCategory, haPrecision, haButtonDeviceClass, useSrc)) return 0;
     newButtons1 = nrButtonsLeft;
   }
