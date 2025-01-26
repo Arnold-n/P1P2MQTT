@@ -1362,8 +1362,39 @@ byte writeBudget_prev = 0;
                       }
                       break;
 #endif /* EF_SERIES */
+#ifdef E_SERIES
+            case 'm': // set Daikin E-series model type
+            case 'M': if (scanint(RSp, temp) == 1) {
+                        if ((temp >= 3) && (temp <= 4)) {
+                          Serial_print(F("* model -> "));
+                          model = temp;
+                          pseudo0E = 9;
+                          EEPROM.update(EEPROM_ADDRESS_MODEL, model);
+                          Serial_print(model);
+                        }
+                      }
+                      Serial_print(F("* Brand is "));
+                      Serial_print(brand);
+                      switch (brand) {
+                        case  1 : Serial_println(F(": Daikin"));
+                                  break;
+                        default : Serial_println();
+                                  break;
+                      }
+                      Serial_print(F("* Model is "));
+                      Serial_print(model);
+                      switch (model) {
+                        case  3 : Serial_println(F(": Generic E-series model"));
+                                  break;
+                        case  4 : Serial_println(F(": E-series version DA with MMI bug"));
+                                  break;
+                        default : Serial_println();
+                                  break;
+                      }
+                      break;
+#endif /* E_SERIES */
 #ifdef F_SERIES
-            case 'm': // set Daikin model type (currently for F-series only)
+            case 'm': // set Daikin F-series model type
             case 'M': if (scanint(RSp, temp) == 1) {
                         if (((temp >= 10) && (temp <= 12)) || (temp == 1)) {
                           Serial_print(F("* F_series model will be set to "));
@@ -1479,7 +1510,7 @@ byte writeBudget_prev = 0;
                           case  5 : 
 #endif /* F_SERIES */
                                     if (temp & 0x01) {
-                                      if (errorsPermitted < MIN_ERRORS_PERMITTED) {
+                                      if ((errorsPermitted < MIN_ERRORS_PERMITTED) && (model != 4)) {
                                         Serial_println(F("* Errorspermitted (error budget) too low; control not enabled"));
                                         break;
                                       }
@@ -1605,7 +1636,7 @@ byte writeBudget_prev = 0;
                             Serial_println(F("* No free controller slot found (yet). Counter functionality will not enabled"));
                             break;
                           }
-                          if (errorsPermitted < MIN_ERRORS_PERMITTED) {
+                          if ((errorsPermitted < MIN_ERRORS_PERMITTED) && (model != 4)) {
                             Serial_println(F("* Errorspermitted too low; counter functionality will not enabled"));
                             break;
                           }
@@ -1867,7 +1898,7 @@ byte writeBudget_prev = 0;
 #ifdef EF_SERIES
       if (errorsPermitted) {
         errorsPermitted--;
-        if (!errorsPermitted) {
+        if ((!errorsPermitted) && (model != 4)) {
           Serial_println(F("* WARNING: too many read errors detected"));
           stopControlAndCounters(1);
         }
@@ -1977,7 +2008,7 @@ byte writeBudget_prev = 0;
           FxAbsentCnt[RB[1] & 0x03] = 0;
           if (RB[1] == CONTROL_ID) {
             // this should only happen if another auxiliary controller is connected if/after CONTROL_ID is set
-            Serial_print(F("* Warning: another aux controller answering to address 0x"));
+            Serial_print(F("* Warning: another aux controller on 0x"));
             Serial_print(RB[1], HEX);
             Serial_println(F(" detected"));
             stopControlAndCounters(0);
@@ -1989,20 +2020,18 @@ byte writeBudget_prev = 0;
         if ((RB[2] == 0x30) && (FxAbsentCnt[RB[1] & 0x03] < F0THRESHOLD)) {
           FxAbsentCnt[RB[1] & 0x03]++;
           if (FxAbsentCnt[RB[1] & 0x03] == F0THRESHOLD) {
-            Serial_print(F("* No auxiliary controller answering to address 0x"));
+            Serial_print(F("* No aux controller on 0x"));
             Serial_print(RB[1], HEX);
+            Serial_print(F(" detected"));
             if (CONTROL_ID == RB[1]) {
-              Serial_println(F(" detected, control functionality will restart"));
+              Serial_println(F(", control will restart"));
               insertMessageCnt = 0;  // avoid delayed insertMessage/restartDaikin
 #ifdef E_SERIES
               restartDaikinCnt = 0;
 #endif /* E_SERIES */
             } else {
-#ifdef E_SERIES
-              Serial_println(F(" detected, switching control functionality can be switched on (using L command, L1 for full control)"));
-#else /* E_SERIES */
-              Serial_println(F(" detected, switching control functionality can be switched on (using L command, L1 for full control, L5 for partial control, subject to model selection (M command))"));
-#endif /* E_SERIES */
+              if (!CONTROL_ID) Serial_print(F(", control can be switched on (L1)"));
+              Serial_println();
             }
           }
         }

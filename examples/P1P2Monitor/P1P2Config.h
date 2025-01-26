@@ -76,7 +76,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "P1P2Monitor v0.9.59rc2"
+#define WELCOMESTRING "P1P2Monitor v0.9.59rc3"
 #define SW_PATCH_VERSION 59
 #define SW_MINOR_VERSION 9
 #define SW_MAJOR_VERSION 0
@@ -186,11 +186,11 @@
 
 #ifdef E_SERIES
 #define INIT_BRAND 1
-#define INIT_MODEL 3
+#define INIT_MODEL 3 // 3 = E-series default, 4 = E-series DA+MMI-bug
 #endif
 #ifdef F_SERIES
 #define INIT_BRAND 1
-#define INIT_MODEL 1
+#define INIT_MODEL 1 // 1 = F-series, unknown version, 10-12 see below
 #endif
 #ifdef F1F2_SERIES
 #define INIT_BRAND 1
