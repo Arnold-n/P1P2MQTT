@@ -372,14 +372,28 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
 #define PPTI15 (PARAM_ARR_SZ - 1);
                                                            // 0       1       2       3       4       5       6       7       8       9
                                                                                                                                 // PPTI15
+#ifdef FULLHISTORY
+
 const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x0203, 0x00B1, 0x0002, 0x001F, 0x00F0, 0x006D, 0x00B0, 0x0002, 0x0020, 0x001A }; // number of parameters observed
 //byte packettype                                    = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D,   0x15 };
 const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      4,      1,      2,      3,      4,      2 }; // byte per parameter // was 8-bit
 const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x0365, 0x036B, 0x03E7, 0x07A7, 0x0814, 0x0974, 0x097A, 0x09FA  /* , 0x0A2E */ }; // valstart = sum  (parnr_bytes * nr_params)
 const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x02B4, 0x02B6, 0x02D5, 0x03C5, 0x0432, 0x04E2, 0x04E4, 0x0504  /* , 0x051E */ }; // seenstart = sum (parnr_bytes)
-
 #define sizeParamVal  0x0A2E
 #define sizeParamSeen    164 // ceil(0x051E/8) = 164
+
+#else /* FULLHISTORY */
+
+const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x0203, 0x00B1,      0,      0, 0x00F0,      0,      0,      0,      0, 0x001A }; // number of parameters observed
+//byte packettype                                    = {   0x35,   0x36,   0x37,   0x38,   0x39,   0x3A,   0x3B,   0x3C,   0x3D,   0x15 };
+const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,      4,      4,      1,      2,      3,      4,      2 }; // byte per parameter // was 8-bit
+const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x0365, 0x0365, 0x0365, 0x0725, 0x0725, 0x0725, 0x0725, 0x0725  /* , 0x0759 */ }; // valstart = sum  (parnr_bytes * nr_params)
+const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x02B4, 0x02B4, 0x02B4, 0x03A4, 0x03A4, 0x03A4, 0x03A4, 0x03A4  /* , 0x03BE */ }; // seenstart = sum (parnr_bytes)
+
+#define sizeParamVal  0x0759
+#define sizeParamSeen    120 // ceil(0x03BE/8) = 120
+
+#endif /* FULLHISTORY */
 
 #define PCKTP_START  0x0B
 #define PCKTP_END    0x15 // 0x0B-0x15 / 0x31 0x20 0x21 0x60-0x9F mapped to 0x16-.. ; 0x31/0x32 4x separately for 0xF0 0xF1 0xF2 0xFF
@@ -2922,15 +2936,17 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
       case 0x40 :
                   switch (paramNr) {
         case 0xFFFF : return 0;
-        default     : UNKNOWN_PARAM24;
+        default     : return 0; // UNKNOWN_PARAM24;
         }
       default   : return 0;
       }
     case 0x38 : switch (paramSrc) {
       case 0x00 :                                CAT_COUNTER;
                   switch (paramNr) {
+#ifdef FULHISTORY
         case 0x0000 :                                                          HAKWH;                                       PARAM_KEY("Electricity_Consumed_Backup1_Heating");                          PARAM_VALUE_u32_BE;
         case 0x0001 :                                                          HAKWH;                                       PARAM_KEY("Electricity_Consumed_Backup1_DHW");                              PARAM_VALUE_u32_BE;
+#endif /* FULLHISTORY */
         case 0x0002 :
                       if (!EE.useTotal) {
                         uint32_t v = u_payloadValue_BE(payload + payloadIndex, paramValLength);
@@ -2947,9 +2963,15 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
                           }
                         }
                       }
+#ifdef FULHISTORY
                                                                                HAKWH;                                       PARAM_KEY("Electricity_Consumed_Compressor_Heating");                      PARAM_VALUE_u32_BE;
+#else /* FULLHISTORY */
+                      break;
+#endif /* FULLHISTORY */
+#ifdef FULHISTORY
         case 0x0003 :                                                          HAKWH;                                       PARAM_KEY("Electricity_Consumed_Compressor_Cooling");                      PARAM_VALUE_u32_BE;
         case 0x0004 :                                                          HAKWH;                                       PARAM_KEY("Electricity_Consumed_Compressor_DHW");                          PARAM_VALUE_u32_BE;
+#endif /* FULLHISTORY */
         case 0x0005 :
                       if (EE.useTotal) {
                         uint32_t v = u_payloadValue_BE(payload + payloadIndex, paramValLength);
@@ -2966,8 +2988,11 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
                           }
                         }
                       }
+#ifdef FULHISTORY
                                                                                HAKWH;                                       PARAM_KEY("Electricity_Consumed_Total");                                   PARAM_VALUE_u32_BE;
-
+#else /* FULLHISTORY */
+                      break;
+#endif /* FULLHISTORY */
         case 0x0006 :
                       {
                         uint32_t v = u_payloadValue_BE(payload + payloadIndex, paramValLength);
@@ -2984,8 +3009,12 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
                           }
                         }
                       }
+#ifdef FULHISTORY
                                                                                HAKWH;                                       PARAM_KEY("Energy_Produced_Compressor_Heating");                           PARAM_VALUE_u32_BE;
-
+#else /* FULLHISTORY */
+                      break;
+#endif /* FULLHISTORY */
+#ifdef FULHISTORY
         case 0x0007 :                                                          HAKWH;                                       PARAM_KEY("Energy_Produced_Compressor_Cooling");                           PARAM_VALUE_u32_BE;
         case 0x0008 :                                                          HAKWH;                                       PARAM_KEY("Energy_Produced_Compressor_DHW");                               PARAM_VALUE_u32_BE;
         case 0x0009 :                                                          HAKWH;                                       PARAM_KEY("Energy_Produced_Compressor_Total");                             PARAM_VALUE_u32_BE;
@@ -3004,13 +3033,14 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x001C :                                                          HAHOURS;                                     PARAM_KEY("Starts_Compressor");                                            PARAM_VALUE_u32_BE;
         case 0x001D :                                                          HAHOURS;                                     PARAM_KEY("Starts_Gasboiler");                                             PARAM_VALUE_u32_BE;
         case 0x001E :                            CAT_SETTING;                  HACOST;                                      PARAM_KEY("Electricity_Price_2");                                          PARAM_VALUE_u32div100_BE;
+#endif /* FULLHISTORY */
         case 0xFFFF : return 0;
-        default     : UNKNOWN_PARAM32;
+        default     : return 0; // UNKNOWN_PARAM32;
       }
       case 0x40 : // parameters written by auxiliary controller (does this happen?)
                   switch (paramNr) {
         case 0xFFFF : return 0;
-        default     : UNKNOWN_PARAM32;
+        default     : return 0; // UNKNOWN_PARAM32;
         }
       default   : return 0;
     }
@@ -3051,6 +3081,7 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
       case 0x00 :
       case 0x40 :
                   switch (paramNr) {
+#ifdef FULLHISTORY
         case 0x0000 :                                                                                                       PARAM_KEY("Format_24h");                                                   PARAM_VALUE_u8;
         case 0x0031 :                                                                                                       PARAM_KEY("Holiday_Enable");                                               PARAM_VALUE_u8;
         case 0x003B :                                                                                                       PARAM_KEY("Decimal_Delimiter");                                            PARAM_VALUE_u8;
@@ -3086,11 +3117,22 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x006B            : // observed non-zero values 0x74/0x2C/0x3E/0x42/0x52/..
         case 0x006C            : // observed on Altherma 3 GEO (EGSAH10D)
         default     : UNKNOWN_PARAM8;
+#else /* FULL_HISTORY */
+        case 0x0045 : M.R.coolingComfort = payload[payloadIndex]; pseudo0D = 9;             return 0;
+        case 0x0046 : M.R.coolingEco = payload[payloadIndex]; pseudo0D = 9;                 return 0;
+        case 0x0047 : M.R.heatingComfort = payload[payloadIndex]; pseudo0D = 9;             return 0;
+        case 0x0048 : M.R.heatingEco = payload[payloadIndex]; pseudo0D = 9;                 return 0;
+        case 0x0049 : M.R.presetMode = payload[payloadIndex]; pseudo0D = 9;                 return 0;
+        case 0x004C : M.R.quietMode = payload[payloadIndex]; pseudo0D = 9;                  return 0;
+        case 0x004D : M.R.quietLevel = payload[payloadIndex]; pseudo0D = 9;                 return 0;
+        default     : return 0;
+#endif /* FULLHISTORY */
       }
       default   : return 0;
     }
 
     case 0x3B : // unknown
+#ifdef FULLHISTORY
                 switch (paramSrc) {
       case 0x00 :
       case 0x40 :
@@ -3109,8 +3151,12 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         }
       default   : return 0;
       }
+#else /* FULL_HISTORY */
+                return 0;
+#endif /* FULL_HISTORY */
 
     case 0x3C : // unknown
+#ifdef FULHISTORY
                 switch (paramSrc) {
       case 0x00 :
       case 0x40 :
@@ -3122,6 +3168,9 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         }
       default   : return 0;
       }
+#else /* FULL_HISTORY */
+                return 0;
+#endif /* FULL_HISTORY */
 
 /* 0x3D : ?
         case      : FIELDKEY("[____]_7.4.1.1_Setpoint_Room_Heating_Comfort");   // step : A.3.2.4, range [3-07 - 3-06]
@@ -3155,6 +3204,7 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
 */
 
     case 0x3D :
+#ifdef FULHISTORY
                                                                 // unknown
                 switch (paramSrc) {
       case 0x00 :
@@ -3180,6 +3230,9 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         }
       default   : return 0;
       }
+#else /* FULL_HISTORY */
+                return 0;
+#endif /* FULL_HISTORY */
     default   : return 0; // unknown packet type
   }
 }
