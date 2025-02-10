@@ -327,6 +327,9 @@ void printWelcomeString(byte ign) {
 #ifdef T_SERIES
   Serial.print(F(" T-series"));
 #endif /* T_SERIES */
+#ifdef M_SERIES
+  Serial.print(F(" M-series"));
+#endif /* M_SERIES */
 #ifdef MHI_SERIES
   Serial.print(F(" MHI-series"));
 #endif /* T_SERIES */
@@ -1415,10 +1418,10 @@ byte writeBudget_prev = 0;
                                       break;
                            }
                         } else {
-                          Serial_println(F("* Model can (only) be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M111 or M12 to do so)"));
+                          Serial_println(F("* Model can (only) be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M11 or M12 to do so)"));
                         }
                       } else {
-                        Serial_println(F("* Model can be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M111 or M12 to do so)"));
+                        Serial_println(F("* Model can be set to 1 (F unknown), 10 (FDY B/C/L), 11 (FXMQ L/P/A), or 12 (FDYQ M) (enter M1, M10, M11 or M12 to do so)"));
                       }
                       Serial_print(F("* Brand is "));
                       Serial_print(brand);

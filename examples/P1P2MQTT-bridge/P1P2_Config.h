@@ -199,6 +199,10 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input of ATmega should start with SERIAL_MAGICSTRING, otherwise lines line is ignored by P1P2Monitor
 #endif /* SERIAL_MAGICSTRING */
 
+#ifdef M_SERIES
+#define CRC_GEN 0x00    // No CRC check for Mitsubishi
+#define CS_GEN 0x00    // No CS check for Mitsubishi (TODO: for now)
+#endif /* M_SERIES */
 #ifdef TH_SERIES
 #define CRC_GEN 0x00    // No CRC check for Toshiba/Hitachi
 #endif /* TH_SERIES */

@@ -200,6 +200,10 @@
 #define INIT_BRAND 2
 #define INIT_MODEL 0
 #endif
+#ifdef M_SERIES
+#define INIT_BRAND 3
+#define INIT_MODEL 0
+#endif
 #ifdef T_SERIES
 #define INIT_BRAND 6
 #define INIT_MODEL 0
@@ -235,9 +239,7 @@
 #ifdef F1F2_SERIES
 // for now: 80 bytes
 #define RS_SIZE 170
-// MHI: should be >22, tbd
 #define WB_SIZE 81
-// MHI: should be >22, tbd
 #define RB_SIZE 81
 #endif /* F1F2_SERIES */
 
@@ -249,6 +251,14 @@
 // MHI: should be >22, tbd
 #define RB_SIZE 41
 #endif /* MHI_SERIES */
+
+#ifdef M_SERIES
+// serial read buffer size for reading from serial port, max line length on serial input is 150 (2 characters per byte, plus some)
+#define RS_SIZE 140
+// read/write buffer size for writing to P1P2bus, max packet size is 64
+#define WB_SIZE 65
+#define RB_SIZE 65
+#endif /* H_SERIES */
 
 #ifdef TH_SERIES
 // serial read buffer size for reading from serial port, max line length on serial input is 150 (2 characters per byte, plus some)
@@ -264,18 +274,18 @@
 #define INIT_SD 50        // (uint16_t) delay setting in ms for each manually instructed packet write
 #define INIT_SDTO 2500    // (uint16_t) time-out delay in ms (applies both to manual instructed writes and controller writes)
 
-// CRC settings, values can be changed via serial port
+// CRC settings
 #ifdef EF_SERIES
 #define CRC_GEN 0xD9    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid
 #else /* EF_SERIES */
-#define CRC_GEN 0x00    // Default generator/Feed for CRC check; these values work at least for the Daikin hybrid; no CRC check for Hitachi/Toshiba (CS not checked in lib)
+#define CRC_GEN 0x00    // No CRC check for Hitachi/Toshiba/Mitsubishi/MHI
 #endif /* EF_SERIES */
-#define CRC_CS_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is checked when reading or added when writing (in case of Hitachi/Toshiba/MHI)
+#define CRC_CS_FEED 0x00   // Define CRC_GEN to 0x00 means no CRC is checked when reading or added when writing (in case of Hitachi/Toshiba/Mitsubishi/MHI)
 
 #ifdef MHI_SERIES
 #define CS_GEN 1        // Use (addition) checksum generator/verification for MHI
 #else
-#define CS_GEN 0        // Use (addition) checksum generator/verification for MHI
+#define CS_GEN 0        // No checksum for Mitsubishi (TODO: for now)
 #endif /* MHI_SERIES */
 
 #ifdef EF_SERIES

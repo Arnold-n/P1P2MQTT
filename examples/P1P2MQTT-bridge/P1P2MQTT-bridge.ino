@@ -1120,30 +1120,30 @@ void writePseudoPacket(byte* WB, byte rh)
   }
   sprint_value[ TZ_PREFIX_LEN - 1 ] = '\0';
   snprintf_P(pseudoWriteBuffer, 33, PSTR("R%sP         "), sprint_value + 7);
-#ifdef MHI_SERIES
+#if (defined MHI_SERIES || defined M_SERIES)
   uint8_t cs = 0;
-#else /* MHI_SERIES */
+#else /* MHI_SERIES  || M_SERIES */
   uint8_t crc = CRC_FEED;
-#endif /* MHI_SERIES */
+#endif /* MHI_SERIES  || M_SERIES */
   for (uint8_t i = 0; i < rh; i++) {
     uint8_t c = WB[i];
     snprintf(pseudoWriteBuffer + TZ_PREFIX_LEN + 3 + (i << 1), 3, "%02X", c);
-#ifdef MHI_SERIES
+#if (defined MHI_SERIES || defined M_SERIES)
     if (CS_GEN != 0) cs += c;
-#else /* MHI_SERIES */
+#else /* MHI_SERIES  || M_SERIES */
     if (CRC_GEN != 0) for (uint8_t i = 0; i < 8; i++) {
       crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ CRC_GEN) : (crc >> 1));
       c >>= 1;
     }
-#endif /* MHI_SERIES */
+#endif /* MHI_SERIES  || M_SERIES */
   }
-#ifdef MHI_SERIES
+#if (defined MHI_SERIES || defined M_SERIES)
   WB[rh] = cs;
   if (CS_GEN) snprintf(pseudoWriteBuffer + TZ_PREFIX_LEN + 3 + (rh << 1), 3, "%02X", cs);
-#else /* MHI_SERIES */
+#else /* MHI_SERIES  || M_SERIES */
   WB[rh] = crc;
   if (CRC_GEN) snprintf(pseudoWriteBuffer + TZ_PREFIX_LEN + 3+ (rh << 1), 3, "%02X", crc);
-#endif /* MHI_SERIES */
+#endif /* MHI_SERIES  || M_SERIES */
   if (EE.outputMode & 0x0004) clientPublishMqttChar('R', MQTT_QOS_HEX, MQTT_RETAIN_HEX, pseudoWriteBuffer);
   // pseudoWriteBuffer[22] = 'R';
   if (EE.outputMode & 0x0010) printfTelnet_MON("R %s", pseudoWriteBuffer + 22);
@@ -1681,11 +1681,11 @@ static char* rb_buffer = readBuffer;
 static uint16_t serial_rb = 0;
 static int c;
 static byte ESP_serial_input_Errors_Data_Short = 0;
-#ifdef MHI_SERIES
+#if (defined MHI_SERIES || defined M_SERIES)
 static byte ESP_serial_input_Errors_CS = 0;
-#else /* MHI_SERIES */
+#else /* MHI_SERIES  || M_SERIES */
 static byte ESP_serial_input_Errors_CRC = 0;
-#endif /* MHI_SERIES */
+#endif /* MHI_SERIES  || M_SERIES */
 static byte ignoreRemainder = 2; // first line from serial input ignored - robustness
 static uint32_t ATmega_uptime_prev = 0;
 byte fallback = 0;
@@ -2908,6 +2908,9 @@ void printWelcome(bool includeParams) {
 #ifdef F1F2_SERIES
   printfTopicS("Compiled %s %s for Daikin F1/F2", __DATE__, __TIME__);
 #endif /* F1F2_SERIES */
+#ifdef M_SERIES
+  printfTopicS("Compiled %s %s for Mitsubishi ", __DATE__, __TIME__);
+#endif /* M_SERIES */
 #ifdef H_SERIES
   printfTopicS("Compiled %s %s for Hitachi", __DATE__, __TIME__);
 #endif /* H_SERIES */
@@ -3779,19 +3782,19 @@ void loop() {
               printfTopicS("Unexpected input buffer full/overflow, received %i, ignoring remainder", rh);
               rh = RB;
             }
-#ifdef MHI_SERIES
+#if (defined MHI_SERIES || defined M_SERIES)
             if ((rh > 1) || (rh == 1) && !CS_GEN)
-#else /* MHI_SERIES */
+#else /* MHI_SERIES  || M_SERIES */
             if ((rh > 1) || (rh == 1) && !CRC_GEN)
-#endif /* MHI_SERIES */
+#endif /* MHI_SERIES  || M_SERIES */
             {
-#ifdef MHI_SERIES
+#if (defined MHI_SERIES || defined M_SERIES)
               if (CS_GEN) rh--;
               // rh is packet length (not counting CS byte readHex[rh])
               uint8_t cs = 0;
               for (uint8_t i = 0; i < rh; i++) cs += readHex[i];
               if ((!CS_GEN) || (cs == readHex[rh]))
-#else /* MHI_SERIES */
+#else /* MHI_SERIES  || M_SERIES */
               if (CRC_GEN) rh--;
               // rh is packet length (not counting CRC byte readHex[rh])
               uint8_t crc = CRC_FEED;
@@ -3803,7 +3806,7 @@ void loop() {
                 }
               }
               if ((!CRC_GEN) || (crc == readHex[rh]))
-#endif /* MHI_SERIES */
+#endif /* MHI_SERIES  || M_SERIES */
               {
                 if (((EE.outputMode & 0x0001) && (readBuffer[22] != 'P')) || ((EE.outputMode & 0x0004) && (readBuffer[22] == 'P')) ) {
                   clientPublishMqttChar('R', MQTT_QOS_HEX, MQTT_RETAIN_HEX, readBuffer);
@@ -3834,13 +3837,13 @@ void loop() {
 #endif /* W_SERIES */
                 }
               } else {
-#ifdef MHI_SERIES
+#if (defined MHI_SERIES || defined M_SERIES)
                 printfTopicS("Serial input buffer overrun or CS error in R data:%s expected 0x%02X", readBuffer + 1, cs);
                 if (ESP_serial_input_Errors_CS < 0xFF) ESP_serial_input_Errors_CS++;
-#else /* MHI_SERIES */
+#else /* MHI_SERIES  || M_SERIES */
                 printfTopicS("Serial input buffer overrun or CRC error in R data:%s expected 0x%02X", readBuffer + 1, crc);
                 if (ESP_serial_input_Errors_CRC < 0xFF) ESP_serial_input_Errors_CRC++;
-#endif /* MHI_SERIES */
+#endif /* MHI_SERIES  || M_SERIES */
 #ifdef H_SERIES
 /* TODO implement Hitachi checksum tests previously on ATmega
                 Serial_print(F(" CS1=")); // checksum starting at byte 1 (which is usually 0)
@@ -3957,11 +3960,11 @@ void loop() {
       readHex[15] = (m1 >> 8) & 0xFF;
       readHex[16] = m1 & 0xFF;
       readHex[17] = ESP_serial_input_Errors_Data_Short;
-#ifdef MHI_SERIES
+#if (defined MHI_SERIES || defined M_SERIES)
       readHex[18] = ESP_serial_input_Errors_CS;
-#else /* MHI_SERIES */
+#else /* MHI_SERIES  || M_SERIES */
       readHex[18] = ESP_serial_input_Errors_CRC;
-#endif /* MHI_SERIES */
+#endif /* MHI_SERIES  || M_SERIES */
       readHex[19] = WiFi.RSSI() & 0xFF;
       readHex[20] = WiFi.status() & 0xFF;
       readHex[21] = (Mqtt_msgSkipLowMem >> 8) & 0xFF;
