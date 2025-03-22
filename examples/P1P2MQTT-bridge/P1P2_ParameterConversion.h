@@ -2190,11 +2190,16 @@ uint8_t common_field_setting(byte packetSrc, byte packetType, byte payloadIndex,
   // byte 3 step as FP
   byte fieldSettingStepExponentSign = (payload[payloadIndex] & 0x80) >> 7;  // bit 7
   byte fieldSettingStepMantissa = (payload[payloadIndex] & 0x78) >> 3; // bits 6 - 3
-  byte fieldSettingStepExponent = (payload[payloadIndex] & 0x02) >> 1; // perhaps 0x03 or 0x07
+  byte fieldSettingStepExponent = (payload[payloadIndex] & 0x02) >> 1; // bit 1
   // byte3 unknown
-  byte fieldSettingUnknownBitsStep = payload[payloadIndex] & 0x05; // bit2,0; bit2 always 0?; bit0 0 or 1
+  byte fieldSettingUnknownBitsStep = payload[payloadIndex] & 0x05; // bit2,0;
   // byte 0 unknown
   byte fieldSettingUnknownBitsVal  = payload[payloadIndex - 3] & 0xC0; // bits 7,6   (src='0': 0x00,0x80,0xC0; src='2': 0x00, 0xC0)
+  // Catch Daikin's (new/strange?) use of 10E1 instead of 1E0 for stepsize 1
+  if (fieldSettingStepExponent && !fieldSettingStepExponentSign && (fieldSettingStepMantissa == 10)) {
+    fieldSettingStepExponent = 0;
+    fieldSettingStepMantissa = 1;
+  }
   uint16_t fieldSettingMax     = fieldSettingMin + payload[payloadIndex - 2] * (fieldSettingStepMantissa * (fieldSettingStepExponent ? (fieldSettingStepExponentSign ? 0.100001 : 10) : 1)); // <0.1 >10 not yet observed / unsure how to implement
   float fieldSettingVal        = fieldSettingMin + (payload[payloadIndex - 3] & 0x3F)  * (fieldSettingStepMantissa * (fieldSettingStepExponent ? (fieldSettingStepExponentSign ? 0.1 : 10) : 1)); // <0.1 >10 not yet observed / unsure how to implement
   int16_t fieldSettingValdiv10 = fieldSettingMin * 10 + (payload[payloadIndex - 3] & 0x3F)  * (fieldSettingStepMantissa * (fieldSettingStepExponent ? (fieldSettingStepExponentSign ? 1 : 100) : 10)); // <0.1 >10 not yet observed / unsure how to implement
