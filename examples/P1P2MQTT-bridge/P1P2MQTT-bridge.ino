@@ -2120,7 +2120,7 @@ void loadEEPROM() {
     // delayedPrintfTopicS("Upgrade EEPROM_version to 5");
     // EE.EE_version = 5;
 #ifdef E_SERIES
-    EE.minuteTimeStamp = 0;
+    EE.minuteTimeStamp = 1;
 #endif /* E_SERIES */
     // EE.EE_size = sizeof(EE); // EE_size never used - and not really needed, relying on EE_version and EE.signature
   }
