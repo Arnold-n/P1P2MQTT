@@ -76,7 +76,7 @@
 #define SERIAL_MAGICSTRING "1P2P" // Serial input line should start with SERIAL_MAGICSTRING, otherwise input line is ignored
 #endif /* F_CPU */
 
-#define WELCOMESTRING "P1P2Monitor v0.9.59rc3"
+#define WELCOMESTRING "P1P2Monitor v0.9.59rc4"
 #define SW_PATCH_VERSION 59
 #define SW_MINOR_VERSION 9
 #define SW_MAJOR_VERSION 0

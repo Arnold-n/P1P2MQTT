@@ -2291,16 +2291,16 @@ byte writeBudget_prev = 0;
 #ifdef F_SERIES
 // Messages and payload lengths:
 // ?   EKHBRD*ADV   0x30   /               0x34  5/0                                                                  0x38 20/14
-// BCL FDY          0x30 20/0                                                                                         0x38 16/15 / 0x39 11/4
-// LPA FXMQ         0x30 20/0   0x32 8/1              0x35 19/0   0x36 19/0                                           0x38 20/17   0x39 14/5   0x3A 18/8
-// M   FDYQ         0x30 20/0                                                 0x3700-0x3706 14/0 0x3707-0x3713 16/0                                       0x3B 20/19 / 0x3C 12/2
+// BCLM FDY          0x30 20/0  [0x31 7/0]                                                                             0x38 16/15 / 0x39 11/4
+// LPA  FXMQ         0x30 20/0   0x32 8/1              0x35 19/0   0x36 19/0                                           0x38 20/17   0x39 14/5   0x3A 18/8
+// M    FDYQ         0x30 20/0                                                 0x3700-0x3706 14/0 0x3707-0x3713 16/0                                       0x3B 20/19 / 0x3C 12/2
 // D=LPA?
 
 // Compatible systems:
 // ?   EKHBRD*ADV: ?
-// BCL FDY:  FDY125LV1, 2002 FBQ*B*, ADEQ100B2VEB, perhaps also: FBQ35B7V1
-// LPA FXMQ: FXMQ200PWM and/or FXMQ100PAVE ?, FDYQN160LAV1, perhaps also: FBA60A9
-// M   FDYQ: FDYQ180MV1
+// BCLM FDY:  FDY125LV1, 2002 FBQ*B*, ADEQ100B2VEB, FXZQ*M* perhaps also: FBQ35B7V1
+// LPA  FXMQ: FXMQ200PWM and/or FXMQ100PAVE ?, FDYQN160LAV1, perhaps also: FBA60A9
+// M    FDYQ: FDYQ180MV1
 
 // writable payload fields
 // 10 BCL FDY  38 0 1 2 4 6 8
@@ -2343,6 +2343,10 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
             case 0x30 : // all models: polling auxiliary controller, reply with empty payload
               d = F030DELAY;
               writeAction = 1; // auxiliary controller write
+              nwrite = 3;
+              break;
+            case 0x31 : // model 10+0x31
+              writeAction = controlLevel; // auxiliary controller write
               nwrite = 3;
               break;
             case 0x32 : // incoming message,  occurs only once, 8 bytes, first byte is 0xC0, others 0x00; reply is one byte value 0x01? polling auxiliary controller?, reply with empty payload
