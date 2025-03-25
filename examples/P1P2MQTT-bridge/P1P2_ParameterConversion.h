@@ -5448,6 +5448,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         case   15 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown_400010_15");                         VALUE_u8;
         default   : UNKNOWN_BYTE;
       }
+      case 0x80 : return 0;
       default   :               UNKNOWN_BYTE;
     }
     case 0x11 :
