@@ -30,8 +30,8 @@
                     if (pubHa) {
                       SUBDEVICE("_Bridge");
                       HADEVICE_SELECT;
-                      HADEVICE_SELECT_OPTIONS("\"F-series 1 generic\",\"F-series 10 (B C L)\",\"F-series 11 (LA P PA A)\",\"F-series 12 (M)\"", "'1':'F-series 1 generic','10':'F-series 10 (B C L)','11':'F-series 11 (LA P PA A)','12':'F-series 12 (M)'");
-                      HADEVICE_SELECT_COMMAND_TEMPLATE("{% set modes={'F-series 1 generic':1,'F-series 10 (B C L)':10,'F-series 11 (LA P PA A)':11,'F-series 12 (M)':12}%}{{'M%i'|format(((modes[value])|int) if value in modes.keys() else 1)}}")
+                      HADEVICE_SELECT_OPTIONS("\"F-series 1 generic\",\"F-series 10 (B C L M)\",\"F-series 11 (LA P PA A)\",\"F-series 12 (M)\"", "'1':'F-series 1 generic','10':'F-series 10 (B C L)','11':'F-series 11 (LA P PA A)','12':'F-series 12 (M)'");
+                      HADEVICE_SELECT_COMMAND_TEMPLATE("{% set modes={'F-series 1 generic':1,'F-series 10 (B C L M)':10,'F-series 11 (LA P PA A)':11,'F-series 12 (M)':12}%}{{'M%i'|format(((modes[value])|int) if value in modes.keys() else 1)}}")
                       PUB_CONFIG;
                     }
                     CHECK_ENTITY;
