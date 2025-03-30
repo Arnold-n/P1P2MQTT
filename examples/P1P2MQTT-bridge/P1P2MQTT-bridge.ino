@@ -187,6 +187,8 @@ typedef struct EEPROMSettings {
   bool haSetup;
 #endif /* E_SERIES */
   bool minuteTimeStamp;
+  byte voltage;
+  byte nrPhases;
 #ifdef F_SERIES
   uint8_t setpointCoolingMin;
   uint8_t setpointCoolingMax;
@@ -315,6 +317,8 @@ const char paramName_47[] PROGMEM = "HA dashboard setup      "; // PARAM_HA_SETU
 
 // Date_Time_Daikin updated per second or per minute
 const char paramName_48[] PROGMEM = "Minute timestamp only   ";
+const char paramName_49[] PROGMEM = "Voltage                 ";
+const char paramName_50[] PROGMEM = "Nr phases (1 or 3)      ";
 #endif /* E_SERIES */
 
 #ifdef F_SERIES
@@ -384,6 +388,8 @@ const char* const paramName[] PROGMEM = {
   paramName_46,
   paramName_47,
   paramName_48,
+  paramName_49,
+  paramName_50,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   paramName_35,
@@ -459,6 +465,8 @@ const paramTypes PROGMEM paramType[] = {
   P_UINT,
   P_BOOL,
   P_BOOL,
+  P_UINT,
+  P_UINT,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   P_UINT,
@@ -524,6 +532,8 @@ const int PROGMEM paramSize[] = {
   1,
   4,
   4,
+  1,
+  1,
   1,
   1,
 #endif /* E_SERIES */
@@ -593,6 +603,8 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   999999999, // E
   1,
   1,
+  255,
+  3,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   40,
@@ -660,6 +672,8 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.energyProducedCompressorHeating1,
   (char*) &EE.haSetup,
   (char*) &EE.minuteTimeStamp,
+  (char*) &EE.voltage,
+  (char*) &EE.nrPhases,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   (char*) &EE.setpointCoolingMin,
@@ -1336,7 +1350,7 @@ uint32_t ePowerTime = 0;        // time of last ePower update (in uptime/s)
 uint32_t eTotalTime = 0;        // time of last eTotal update (in uptime/s)
 uint32_t bPowerTime = 0;        // time of last bPower update (in uptime/s)
 uint32_t bTotalTime = 0;        // time of last bTotal update (in uptime/s)
-bool ePowerAvailable = false;   // indicates if ePower is available
+byte ePowerAvailable = 0;       // indicates if ePower is available (0: no, 1: based on param15, 2: based on MQTT)
 bool eTotalAvailable = false;   // indicates if eTotal is available
 bool bPowerAvailable = false;   // indicates if bPower is available
 bool bTotalAvailable = false;   // indicates if bTotal is available
@@ -2158,6 +2172,15 @@ void loadEEPROM() {
     saveEEPROM();
   }
 #endif /* H_SERIES */
+#ifdef E_SERIES
+  if (EE.EE_version < 8) {
+    delayedPrintfTopicS("Upgrade EEPROM_version to 8");
+    EE.EE_version = 8;
+    EE.voltage = 230;
+    EE.nrPhases = 1;
+    saveEEPROM();
+  }
+#endif /* E_SERIES */
   delayedPrintfTopicS("Loaded EEPROM_version %i", EE.EE_version);
 }
 
@@ -2739,7 +2762,7 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
   // active_power, ePower, 16 bits!
   if (!strcmp(topic, EE.mqttElectricityPower)) {
     if (sscanf(MQTT_payload, "%hu", &ePower) == 1) {
-      ePowerAvailable = true;
+      ePowerAvailable = 2;
       ePowerTime = espUptime;
     } else {
       delayedPrintfTopicS("Illegal ePower %s", MQTT_payload);
