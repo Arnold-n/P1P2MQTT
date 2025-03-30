@@ -1749,7 +1749,7 @@ uint16_t newCheckParamVal(byte paramSrc, byte paramPacketType, uint16_t paramNr,
   } else {
     // first time for this param
     // only available in bridge-control-function mode, so include avaibility check:
-    if (paramPacketType != 0x39) HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
+    if ((paramPacketType != 0x39) && (paramPacketType != 0x15)) HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
     pubParam = 1; // first time value shown irrespective of EE.outputFilter
   }
 
