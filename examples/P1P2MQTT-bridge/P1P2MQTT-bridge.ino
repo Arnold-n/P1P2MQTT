@@ -189,6 +189,8 @@ typedef struct EEPROMSettings {
   bool minuteTimeStamp;
   byte voltage;
   byte nrPhases;
+  byte powerBUH1;
+  byte powerBUH2;
 #ifdef F_SERIES
   uint8_t setpointCoolingMin;
   uint8_t setpointCoolingMax;
@@ -319,6 +321,8 @@ const char paramName_47[] PROGMEM = "HA dashboard setup      "; // PARAM_HA_SETU
 const char paramName_48[] PROGMEM = "Minute timestamp only   ";
 const char paramName_49[] PROGMEM = "Voltage                 ";
 const char paramName_50[] PROGMEM = "Nr phases (1 or 3)      ";
+const char paramName_51[] PROGMEM = "Power BUH step 1 (kW)   ";
+const char paramName_52[] PROGMEM = "Power BUH step 2 (kW)   ";
 #endif /* E_SERIES */
 
 #ifdef F_SERIES
@@ -390,6 +394,8 @@ const char* const paramName[] PROGMEM = {
   paramName_48,
   paramName_49,
   paramName_50,
+  paramName_51,
+  paramName_52,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   paramName_35,
@@ -409,6 +415,7 @@ typedef enum {
   P_HEX,
   P_BOOL,
   P_INTdiv100,
+  P_INTdiv10,
 } paramTypes;
 
 const paramTypes PROGMEM paramType[] = {
@@ -467,6 +474,8 @@ const paramTypes PROGMEM paramType[] = {
   P_BOOL,
   P_UINT,
   P_UINT,
+  P_INTdiv10,
+  P_INTdiv10,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   P_UINT,
@@ -532,6 +541,8 @@ const int PROGMEM paramSize[] = {
   1,
   4,
   4,
+  1,
+  1,
   1,
   1,
   1,
@@ -605,6 +616,8 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   1,
   255,
   3,
+  99,
+  99,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   40,
@@ -674,6 +687,8 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.minuteTimeStamp,
   (char*) &EE.voltage,
   (char*) &EE.nrPhases,
+  (char*) &EE.powerBUH1,
+  (char*) &EE.powerBUH2,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   (char*) &EE.setpointCoolingMin,
@@ -1352,7 +1367,7 @@ uint32_t bPowerTime = 0;        // time of last bPower update (in uptime/s)
 uint32_t bTotalTime = 0;        // time of last bTotal update (in uptime/s)
 byte ePowerAvailable = 0;       // indicates if ePower is available (0: no, 1: based on param15, 2: based on MQTT)
 bool eTotalAvailable = false;   // indicates if eTotal is available
-bool bPowerAvailable = false;   // indicates if bPower is available
+byte bPowerAvailable = 0;       // indicates if ePower is available (0: no, 1: based on param15, 2: based on MQTT)
 bool bTotalAvailable = false;   // indicates if bTotal is available
 
 // include file for parameter conversion
@@ -1721,6 +1736,24 @@ void checkParam(void) {
                         }
                       }
                       break;
+      case P_INTdiv10:
+                      // check value
+                      {
+                        int32_t pValue;
+                        switch (paramSize[i]) { // uint
+                          case 4 : pValue = *(int32_t*) paramLocation[i];
+                                   break;
+                          case 2 : pValue = *(int16_t*) paramLocation[i];
+                                   break;
+                          default:
+                          case 1 : pValue = *(int8_t*) paramLocation[i];
+                                   break;
+                        }
+                        if ((pValue < -paramMax[i]) || (pValue > paramMax[i])) {
+                            printfTopicS("Error: parameter %s value %1.1f out of allowed range (%1.1f-%1.1f)", paramName[i], pValue * 0.1, -(paramMax[i] * 0.1), paramMax[i] * 0.1);
+                        }
+                      }
+                      break;
       case P_INTdiv100:
                       // check value
                       {
@@ -1831,6 +1864,33 @@ void printModifyParam(byte paramNr, bool modParam = false, int32_t newValue = 0,
                  *(uint8_t*) paramLocation[paramNr] = newValue;
                } else {
                  printfTopicS("P%02i: %s is 0x%02X", paramNr, paramName[paramNr], *(uint8_t*) paramLocation[paramNr]);
+               }
+               break;
+    }
+  } else if (paramType[paramNr] == P_INTdiv10) {
+    if (modParam && ((newValue < -((int32_t) paramMax[paramNr])) || (newValue > paramMax[paramNr]))) {
+      printfTopicS("Range for %s is -%1.1f - %1.1f, argument entered is %1.1f", paramName[paramNr], paramMax[paramNr] * 0.1, paramMax[paramNr] * 0.1, newValue * 0.1);
+      return;
+    }
+    switch (paramSize[paramNr]) { // hex
+      case 4 : // fall-through
+      case 3 : // fall-through
+               printfTopicS(" INTdiv10 >2byte not supported");
+               break;
+      case 2 : // fall-through
+               if (modParam) {
+                 printfTopicS("P%02i: %s changed from %1.f to %1.f", paramNr, paramName[paramNr], *(int16_t*)paramLocation[paramNr] * 0.1, newValue * 0.1);
+                 *(int16_t*) paramLocation[paramNr] = (int16_t) newValue;
+               } else {
+                 printfTopicS("P%02i: %s is %1.1f", paramNr, paramName[paramNr], *(int16_t*) paramLocation[paramNr] * 0.1);
+               }
+               break;
+      case 1 :
+      default: if (modParam) {
+                 printfTopicS("P%02i: %s changed from %1.1f to %1.1f", paramNr, paramName[paramNr], *(int8_t*)paramLocation[paramNr] * 0.1, newValue * 0.1);
+                 *(int8_t*) paramLocation[paramNr] = (int8_t) newValue;
+               } else {
+                 printfTopicS("P%02i: %s is %1.1f", paramNr, paramName[paramNr], *(int8_t*) paramLocation[paramNr] * 0.1);
                }
                break;
     }
@@ -2180,6 +2240,13 @@ void loadEEPROM() {
     EE.nrPhases = 1;
     saveEEPROM();
   }
+  if (EE.EE_version < 9) {
+    delayedPrintfTopicS("Upgrade EEPROM_version to 9");
+    EE.EE_version = 9;
+    EE.powerBUH1 = 30; // 3.0kW
+    EE.powerBUH2 = 60; // 6.0kW
+    saveEEPROM();
+  }
 #endif /* E_SERIES */
   delayedPrintfTopicS("Loaded EEPROM_version %i", EE.EE_version);
 }
@@ -2496,6 +2563,17 @@ void handleCommand(char* cmdString) {
                                      break;
                   case P_HEX       : modifyParam = (sscanf((const char*) (cmdString + 1 + temp2), "%x", &temp2) > 0);
                                      break;
+                  case P_INTdiv10  : modifyParam = (sscanf((const char*) (cmdString + 1 + temp2), "%f", &tempf2) > 0);
+                                     switch(paramSize[temp]) {
+                                       case 1 : temp2 = (tempf2 > 0) ? ((int8_t) (tempf2 * 10 + 0.5)) : -((int8_t) (-tempf2 * 10 + 0.5));
+                                                break;
+                                       case 2 : temp2 = (tempf2 > 0) ? ((int16_t) (tempf2 * 10 + 0.5)) : -((int16_t) (-tempf2 * 10 + 0.5));
+                                                break;
+                                       default: printfTopicS("P_INTdiv10 only supported for 1/2-byte params");
+                                                modifyParam = 0;
+                                                break;
+                                     }
+                                     break;
                   case P_INTdiv100 : modifyParam = (sscanf((const char*) (cmdString + 1 + temp2), "%f", &tempf2) > 0);
                                      switch(paramSize[temp]) {
                                        case 1 : temp2 = (tempf2 > 0) ? ((int8_t) (tempf2 * 100 + 0.5)) : -((int8_t) (-tempf2 * 100 + 0.5));
@@ -2532,7 +2610,7 @@ void handleCommand(char* cmdString) {
                                                 }
                                                 break;
                                        case 4 : break;
-                                       default: printfTopicS("P_INTdiv100 only supported for 1/2/4-byte params");
+                                       default: printfTopicS("P_UINT only supported for 1/2/4-byte params");
                                                 modifyParam = 0;
                                                 break;
                                      }
@@ -2785,7 +2863,7 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
   // BUH/gas meter topic // bPower in W, bTotal in Wh (even for gas/hybrid)
   if (!strcmp(topic, EE.mqttBUHpower)) {
     if (sscanf(MQTT_payload, "%hu", &bPower) == 1) {
-      bPowerAvailable = true;
+      bPowerAvailable = 2;
       bPowerTime = espUptime;
     } else {
       delayedPrintfTopicS("Illegal bPower %s", MQTT_payload);

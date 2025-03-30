@@ -3654,7 +3654,12 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           default   : UNKNOWN_BIT;
         }
         case   18 : switch (bitNr) {
-          case    8 : M.R.compressor = payloadByte & 0x01; bcnt = 15; BITBASIS;
+          case    8 : if (ePowerAvailable < 2) {
+                        bPowerAvailable = 1;
+                        bPowerTime = espUptime;
+                        bPower = 100 * (((payloadByte & 0x02) ? EE.powerBUH1 : 0) + ((payloadByte & 0x20) ? EE.powerBUH2 : 0));
+                      }
+                      M.R.compressor = payloadByte & 0x01; bcnt = 15; BITBASIS;
           case    0 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Compressor");
           case    1 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("BUH");
           case    3 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Circulation_Pump");
@@ -3831,7 +3836,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           case    8 : bcnt = 20; BITBASIS;
           case    0 : SUBDEVICE("_Unknown");                         HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_On_Q"); // heatpump_enabled??? (preferential related ?)
           case    2 : SUBDEVICE("_Unknown");                         HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_Related_Q");
-          case    6 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("BUH_On");
+          case    6 : SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Compressor2_Q");
           case    7 : if (!(M.R.useDHW & 0x02)) return 0;
                       SUBDEVICE("_DHW");                             HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("DHW_Demand");
           default   : UNKNOWN_BIT;
@@ -4301,7 +4306,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                     }
 
                     if ((espUptime - bPowerTime > POWER_TIME_OUT)  && bPowerAvailable) {
-                      bPowerAvailable = false;
+                      bPowerAvailable = 0;
                       bPower = 0;
                     }
                     if ((espUptime - bTotalTime > ENERGY_TIME_OUT)  && bTotalAvailable) {
