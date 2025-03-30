@@ -4035,11 +4035,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
       }
       case 0x40 : switch (payloadIndex) {
         case    0 : return 0;
-        case    1 : SUBDEVICE("_Unknown");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(20)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Unused_15_0");                   VALUE_f8_8_LE;
+        case    1 : SUBDEVICE("_Sensors");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(20)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_R9T_Return_Water");              VALUE_f8_8_LE;
         case    2 : return 0;
         case    3 : SUBDEVICE("_Sensors");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(20)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Refrigerant_2");                 VALUE_f8_8_LE;       // =? Brine_inlet_temp
         case    4 : return 0;
-        case    5 : SUBDEVICE("_Unknown");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(25)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Refrigerant_3_Q");               VALUE_f8_8_LE;
+        case    5 : SUBDEVICE("_Sensors");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(25)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Refrigerant_After_Heat_Exchanger"); VALUE_f8_8_LE;
         case    6 : return 0;
         case    7 : return 0;
         case    8 : SUBDEVICE("_15"); HANDLE_PARAM(2); // s16div10_LE ?
@@ -4047,7 +4047,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         // case  12 : // status / temp ? reports 0x10 0x11
         // case  16 : // status? reports 0x34 0x42 0x52
         case   17 : return 0;
-        case   18 : SUBDEVICE("_Unknown");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(25)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Unknown_Q");                     VALUE_f8_8_LE;
+        case   18 : SUBDEVICE("_Sensors");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(25)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_R10T_After_Heat_Exchanger");     VALUE_f8_8_LE;
 
         default :             UNKNOWN_BYTE;
       }
