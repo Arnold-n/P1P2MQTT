@@ -369,9 +369,8 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
 #define PARAM_TP_START      0x35
 #define PARAM_TP_END        0x3D
 #define PARAM_ARR_SZ (PARAM_TP_END - PARAM_TP_START + 1 + 1)
-#define PPTI15 (PARAM_ARR_SZ - 1);
-                                                           // 0       1       2       3       4       5       6       7       8       9
-                                                                                                                                // PPTI15
+#define PPTI15 (PARAM_ARR_SZ - 1)
+                                                      //      0       1       2       3       4       5       6       7       8       9
 #ifdef FULLHISTORY
 
 const PROGMEM uint32_t  nr_params[PARAM_ARR_SZ]      = { 0x0203, 0x00B1, 0x0002, 0x001F, 0x00F0, 0x006D, 0x00B0, 0x0002, 0x0020, 0x001A }; // number of parameters observed
