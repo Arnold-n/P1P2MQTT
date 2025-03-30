@@ -380,7 +380,8 @@ const PROGMEM uint32_t  parnr_bytes [PARAM_ARR_SZ]   = {      1,      2,      3,
 const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x0365, 0x036B, 0x03E7, 0x07A7, 0x0814, 0x0974, 0x097A, 0x09FA  /* , 0x0A2E */ }; // valstart = sum  (parnr_bytes * nr_params)
 const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x02B4, 0x02B6, 0x02D5, 0x03C5, 0x0432, 0x04E2, 0x04E4, 0x0504  /* , 0x051E */ }; // seenstart = sum (parnr_bytes)
 #define sizeParamVal  0x0A2E
-#define sizeParamSeen    164 // ceil(0x051E/8) = 164
+#define sizeParamSeen 0x051E
+#define sizeParamSeenDiv8 ((sizeParamSeen + 7) / 8)
 
 #else /* FULLHISTORY */
 
@@ -391,7 +392,8 @@ const PROGMEM uint32_t   valstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x0365,
 const PROGMEM uint32_t  seenstart[PARAM_ARR_SZ]      = { 0x0000, 0x0203, 0x02B4, 0x02B4, 0x02B4, 0x03A4, 0x03A4, 0x03A4, 0x03A4, 0x03A4  /* , 0x03BE */ }; // seenstart = sum (parnr_bytes)
 
 #define sizeParamVal  0x0759
-#define sizeParamSeen    120 // ceil(0x03BE/8) = 120
+#define sizeParamSeen 0x03BE
+#define sizeParamSeenDiv8 ((sizeParamSeen + 7) / 8)
 
 #endif /* FULLHISTORY */
 
@@ -659,7 +661,7 @@ typedef struct mqttSaveStruct {
   byte payloadByteSeen[sizePayloadByteSeen];
 #ifdef E_SERIES
   byte paramVal [2][sizeParamVal];
-  byte paramSeen[2][sizeParamSeen];
+  byte paramSeen[2][sizeParamSeenDiv8];
   byte cntByte [36]; // for 0xB8 counters we store 36 bytes; 30 should suffice but not worth the extra code
 #endif /* E_SERIES */
   byte payloadBitsSeen[sizePayloadBitsSeen];
