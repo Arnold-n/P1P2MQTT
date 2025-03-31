@@ -2075,6 +2075,18 @@ uint8_t param_value_s16_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr
   return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
 }
 
+uint8_t param_value_s16fan_LE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
+  // assuming paramValLength = 2
+  if (paramValLength != 2) {
+    printfTopicS("Only s16fan_LE supported, not %i bit", 8*paramValLength);
+    return 0;
+  }
+  int16_t v = (uint16_t) u_payloadValue_LE(payload + payloadIndex, paramValLength);
+  if (v) v = 450 + 25 * v;
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%u", v);
+  return publishEntityParam(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);
+}
+
 // u16div10, s16div10 BE
 
 uint8_t param_value_u16div10_BE(byte paramSrc, byte paramPacketType, uint16_t paramNr, byte payloadIndex, byte* payload, char* mqtt_value, byte paramValLength) {
@@ -2665,6 +2677,7 @@ uint8_t publishFieldSetting(byte paramNr) {
 #define PARAM_VALUE_u16div10_LE  { param_value_u16div10_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, 2);    return 0; }
 #define PARAM_VALUE_s16div10_LE  { param_value_s16div10_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, 2); return 0; }
 #define PARAM_VALUE_s16_LE       { param_value_s16_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, 2); return 0; }
+#define PARAM_VALUE_s16fan_LE    { param_value_s16fan_LE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, 2); return 0; }
 #define PARAM_VALUE_u16div10_BE  { param_value_u16div10_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);    return 0; }
 #define PARAM_VALUE_u32div100_BE { param_value_u32div100_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);   return 0; }
 #define PARAM_VALUE_s16div10_BE  { param_value_s16div10_BE(paramSrc, paramPacketType, paramNr, payloadIndex, payload, mqtt_value, paramValLength);    return 0; }
@@ -2723,15 +2736,15 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
                         payload[payloadIndex - 1] = 0x00;
                         payload[payloadIndex - 0] = 0x00;
                       }
-                      SUBDEVICE("_Sensors"); HACONFIG; HAFREQ;  CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Compressor_RPM"); PARAM_VALUE_s16_LE;
-        case 0x03   :                        HACONFIG;          CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Param15_03_fan1_Q"); PARAM_VALUE_s16_LE; // related to consumption or fan ?
+                      SUBDEVICE("_Mode");    HACONFIG; HAFREQ;  CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Compressor_RPM"); PARAM_VALUE_s16_LE;
+        case 0x03   : SUBDEVICE("_Mode");    HACONFIG;          CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Fan_RPM"); PARAM_VALUE_s16fan_LE; // EPRA18: 0 or 450+25*value
         case 0x04   :                        HACONFIG;          CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Param15_04"); PARAM_VALUE_s16_LE; // binary ?
         case 0x05   : SUBDEVICE("_Sensors"); HACONFIG; HATEMP1;                  HADEVICE_SENSOR; PARAM_KEY("Temperature_Refrigerant_Q_param15"); PARAM_VALUE_s16div10_LE;
         case 0x06   :                        HACONFIG; HATEMP1;               HADEVICE_BINSENSOR; PARAM_KEY("Defrost_Active_param15"); PARAM_VALUE_s16div10_LE; // defrost_activity
         case 0x07   :                        HACONFIG;          CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Param15_07"); PARAM_VALUE_s16_LE; // binary ?
         case 0x08   : SUBDEVICE("_Sensors"); HACONFIG; HATEMP1;                  HADEVICE_SENSOR; PARAM_KEY("Temperature_Outside_param15"); PARAM_VALUE_s16div10_LE;
 
-        case 0x09   : SUBDEVICE("_Sensors"); HACONFIG;          CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Param15_09"); PARAM_VALUE_s16_LE;
+        case 0x09   :                        HACONFIG;          CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Param15_09"); PARAM_VALUE_s16_LE; // ?
 
         case 0x0A   : SUBDEVICE("_Sensors"); HACONFIG; HATEMP1;                  HADEVICE_SENSOR; PARAM_KEY("Temperature_Refrigerant_Discharge"); PARAM_VALUE_s16div10_LE;
         case 0x0B   :                        HACONFIG; HATEMP1; CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Param15_0B"); PARAM_VALUE_s16div10_LE; // binary ?
