@@ -5608,6 +5608,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
       }
       default   :               UNKNOWN_BYTE;
     }
+    case 0x37 : return 0;
 /*
  *  case 0x37 : // FDYQ180MV1 zone names TBD
  */
