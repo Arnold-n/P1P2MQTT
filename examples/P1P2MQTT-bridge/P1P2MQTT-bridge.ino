@@ -3311,9 +3311,9 @@ void setup() {
     reconnectTime = espUptime + 10;
   } else {
     if (fallback) {
-      delayedPrintfTopicS("Reconnect to MQTT server " MQTT2_SERVER ":%i (user " MQTT2_USER "/password *) not successful yet, retrying in 10 seconds", MQTT2_PORT);
+      delayedPrintfTopicS("Reconnect to fallback MQTT server " MQTT2_SERVER ":%i (user " MQTT2_USER "/password *) not successful yet, retrying in 10 seconds", MQTT2_PORT);
     } else {
-      delayedPrintfTopicS("Reconnect to fallback MQTT server %s:%i (user %s/password *) not successful yet, retrying in 10 seconds", EE.mqttServer, EE.mqttPort, EE.mqttUser);
+      delayedPrintfTopicS("Reconnect to MQTT server %s:%i (user %s/password *) not successful yet, retrying in 10 seconds", EE.mqttServer, EE.mqttPort, EE.mqttUser);
     }
     reconnectTime = espUptime + Mqtt_reconnectDelay;
   }
@@ -3751,7 +3751,7 @@ void loop() {
           reconnectTime = espUptime + 10;
         } else {
           if (fallback) {
-            delayedPrintfTopicS("Reconnect to MQTT server " MQTT2_SERVER ":%i (user " MQTT2_USER "/password *) not successful yet, retrying in 10 seconds", MQTT2_PORT);
+            delayedPrintfTopicS("Reconnect to fallback MQTT server " MQTT2_SERVER ":%i (user " MQTT2_USER "/password *) not successful yet, retrying in 10 seconds", MQTT2_PORT);
           } else {
             delayedPrintfTopicS("Reconnect to MQTT server %s:%i (user %s/password *) not successful yet, retrying in 10 seconds", EE.mqttServer, EE.mqttPort, EE.mqttUser);
           }
