@@ -18,7 +18,7 @@ P1P2Monitor auxiliary control is currently only usable for Daikin E-series, and 
 
 [P1P2Monitor v0.9.58 for Daikin E-series](P1P2Monitor-v0.9.58-Daikin-E.ino.hex)
 
-[P1P2Monitor v0.9.58 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.58rc4-Daikin-F.ino.hex)
+[P1P2Monitor v0.9.58 for Daikin F-series (model selectable with M command or via HA)](P1P2Monitor-v0.9.59rc4-Daikin-F.ino.hex)
 
 [P1P2Monitor v0.9.58 (experimental for Hitachi models)](P1P2Monitor-v0.9.58-Hitachi.ino.hex)
 
