@@ -876,8 +876,9 @@ bool initEthernet()
     _gw.fromString(EE.static_gw);
     _nm.fromString(EE.static_nm);
     eth.config(_ip, _gw, _nm, _gw);
+    eth.setDefault();
+    delay(100);
   }
-  // eth.setDefault();
   if (!eth.begin()) {
     Serial_println("* [ESP] No ethernet hardware detected");
     delayedPrintfTopicS("No ethernet hardware detected");
