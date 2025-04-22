@@ -3667,7 +3667,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           default   : UNKNOWN_BIT;
         }
         case   18 : switch (bitNr) {
-          case    8 : if (ePowerAvailable < 2) {
+          case    8 : if (bPowerAvailable < 2) {
                         bPowerAvailable = 1;
                         bPowerTime = espUptime;
                         bPower = 100 * (((payloadByte & 0x02) ? EE.powerBUH1 : 0) + ((payloadByte & 0x20) ? EE.powerBUH2 : 0));

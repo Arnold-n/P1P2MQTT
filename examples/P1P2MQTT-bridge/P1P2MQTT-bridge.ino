@@ -1366,9 +1366,9 @@ uint32_t ePowerTime = 0;        // time of last ePower update (in uptime/s)
 uint32_t eTotalTime = 0;        // time of last eTotal update (in uptime/s)
 uint32_t bPowerTime = 0;        // time of last bPower update (in uptime/s)
 uint32_t bTotalTime = 0;        // time of last bTotal update (in uptime/s)
-byte ePowerAvailable = 0;       // indicates if ePower is available (0: no, 1: based on param15, 2: based on MQTT)
+byte ePowerAvailable = 0;       // indicates if ePower is available (0: no, 1: based on param15, 2: based on MQTT input)
 bool eTotalAvailable = false;   // indicates if eTotal is available
-byte bPowerAvailable = 0;       // indicates if ePower is available (0: no, 1: based on param15, 2: based on MQTT)
+byte bPowerAvailable = 0;       // indicates if bPower is available (0: no, 1: based on param15, 2: based on MQTT input)
 bool bTotalAvailable = false;   // indicates if bTotal is available
 
 // include file for parameter conversion
