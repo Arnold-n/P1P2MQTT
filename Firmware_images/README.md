@@ -49,9 +49,7 @@ If you have trouble installing avrdude, you may prefer to wait for a later P1P2-
 
 Minimal recommended upgrade is v0.9.57 for P1P2MQTT-bridge (or v0.9.58rc5 for F-series).
 
-[P1P2MQTT-bridge v0.9.57 for Daikin E-series](P1P2MQTT-bridge-v0.9.57-Daikin-E.ino.bin)
-
-[experimental version P1P2MQTT-bridge v0.9.58rc5 for Daikin E-series](P1P2MQTT-bridge-v0.9.58rc5-Daikin-E.ino.bin)
+[P1P2MQTT-bridge v0.9.58rc21 for Daikin E-series](P1P2MQTT-bridge-v0.9.58rc21-Daikin-E.ino.bin)
 
 [P1P2MQTT-bridge v0.9.58rc5 for Daikin F-series](P1P2MQTT-bridge-v0.9.58rc15-Daikin-F.ino.bin)
 
