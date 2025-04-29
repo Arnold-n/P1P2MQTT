@@ -67,6 +67,26 @@ Warning:
 - I don't know yet how Arduino IDE can download code via ESP to ATmega, so do the following: while Arduino IDE is still open, find the most recent /tmp/arduino_build_xxx folder and copy firmware image /tmp/arduino_build_XX/P1P2Monitor.ino.hex to a permanent location, rename to include date/time/version/function in its name
 - continue to "Flash P1P2Monitor image on ATmega328P (OTA)" below
 
+## Build and flash P1P2Monitor for ATmega328P using platformio
+
+- Install Visual Studio Code (VSCode) from [https://code.visualstudio.com/](https://code.visualstudio.com/).
+- Install the PlatformIO extension in VSCode:
+  - Open VSCode, go to the Extensions view (Ctrl+Shift+X), and search for "PlatformIO IDE".
+  - Click "Install" to add the extension.
+- Open the folder `examples/P1P2Monitor` in VSCode.
+- Edit the `platformio.ini` file:
+  - Locate the line `bridge_ip = 192.168.XXX.XXX`.
+  - Replace `192.168.XXX.XXX` with the IP address of your P1P2-bridge-esp8266.
+- Build the firmware:
+  - Open the PlatformIO toolbar in VSCode.
+  - Click on the "Build" button (checkmark icon).
+  - The compiled firmware file will be created in the `/examples/P1P2Monitor/.pio/build/your_brand/` directory as `firmware.hex`.
+- Upload the firmware:
+  - Click on the "Upload" button (arrow icon) in the PlatformIO toolbar.
+  - Ensure the P1P2-bridge-esp8266 is running and connected to WiFi.
+
+> **Note:** To upload pre-built firmware for P1P2Monitor using PlatformIO, ensure the `platformio.ini` file is updated with the correct IP address of the P1P2-bridge-esp8266, and the bridge is running and connected to WiFi. In the PlatformIO toolbar, select the target corresponding to your brand, then choose `Custom > Flash official firmware` to perform the upload.
+
 ## Flash P1P2Monitor image on ATmega328P (OTA)
 
 - to flash P1P2Monitor it is necessary that P1P2-bridge-esp8266 is running and connected to WiFi
