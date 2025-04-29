@@ -41,7 +41,27 @@ Warning:
 
 ## Build P1P2-bridge-esp8266 image for ESP8266 using platformio
 
-- Not supported yet
+- Install Visual Studio Code (VSCode) from [https://code.visualstudio.com/](https://code.visualstudio.com/).
+- Install the PlatformIO extension in VSCode:
+  - Open VSCode, go to the Extensions view (Ctrl+Shift+X), and search for "PlatformIO IDE".
+  - Click "Install" to add the extension.
+- Open the folder `examples/P1P2MQTT-bridge` in VSCode.
+- Edit the `platformio.ini` file in the `examples/P1P2MQTT-bridge` folder:
+  - Add or modify the `upload_port` option to specify the correct port or IP address:
+    - For USB upload: Set `upload_port = /dev/ttyUSB0` (Linux/macOS) or `upload_port = COM3` (Windows).
+    - For OTA upload: Set `upload_port = 192.168.XXX.XXX` (replace `192.168.XXX.XXX` with the IP address of your ESP8266).
+- Build the firmware:
+  - Open the PlatformIO toolbar in VSCode.
+  - Select the target corresponding to your brand and the upload protocol (USB or OTA): yourbrand-protocol.
+  - Click on the "Build" button.
+  - The compiled firmware file will be created in the `.pio/build/your_brand-upload_target/` directory as `firmware.bin`.
+- Erase the flash memory (optional, with USB only):
+  - Go to "Platform -> Erase Flash" in the PlatformIO toolbar to completely erase the flash memory before uploading.
+- Upload the firmware:
+  - Click on the "Upload" button (arrow icon) in the PlatformIO toolbar.
+  - Ensure the ESP8266 is connected via USB or reachable via the specified IP address for OTA upload.
+
+> **Note:** Rather than recompiling the firmware, you can also upload the latest official firmware using the target `Custom > Flash official firmware`.
 
 ## Flash pre-built P1P2-bridge-esp8266 firmware image on ESP8266 (OTA)
 
