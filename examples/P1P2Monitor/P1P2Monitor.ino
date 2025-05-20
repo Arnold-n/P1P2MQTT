@@ -504,21 +504,42 @@ void writePseudoPacket(byte* WB, byte rh)
 {
   if (!suppressSerial) {
     Serial.print(F("R P         "));
-    uint8_t crc_cs = CRC_CS_FEED;
+#ifdef MHI_SERIES
+    uint8_t cs = CRC_CS_FEED;
+#elif defined H_SERIES
+    uint8_t cxor = 0;
+#else /* MHI_SERIES, H_SERIES */
+    uint8_t crc = CRC_CS_FEED;
+#endif /* MHI_SERIES, H_SERIES */
     for (uint8_t i = 0; i < rh; i++) {
       uint8_t c = WB[i];
       if (c <= 0x0F) Serial.print('0');
       Serial.print(c, HEX);
-      if (cs_gen != 0) crc_cs += c;
+#ifdef MHI_SERIES
+      if (cs_gen != 0) cs += c;
+#elif defined H_SERIES
+      if (i > 0) cxor ^= c;
+#else /* MHI_SERIES, H_SERIES */
       if (CRC_GEN != 0) for (uint8_t i = 0; i < 8; i++) {
-        crc_cs = ((crc_cs ^ c) & 0x01 ? ((crc_cs >> 1) ^ CRC_GEN) : (crc_cs >> 1));
+        crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ CRC_GEN) : (crc >> 1));
         c >>= 1;
       }
+#endif /* MHI_SERIES, H_SERIES */
     }
-    if (cs_gen || CRC_GEN) {
-      if (crc_cs <= 0x0F) Serial.print(F("0"));
-      Serial.print(crc_cs, HEX);
+#ifdef MHI_SERIES
+    if (cs_gen) {
+      if (cs <= 0x0F) Serial.print(F("0"));
+      Serial.print(cs, HEX);
     }
+#elif defined H_SERIES
+    if (cxor <= 0x0F) Serial.print(F("0"));
+    Serial.print(cxor, HEX);
+#else /* MHI_SERIES, H_SERIES */
+    if (CRC_GEN) {
+      if (crc <= 0x0F) Serial.print(F("0"));
+      Serial.print(crc, HEX);
+    }
+#endif /* MHI_SERIES, H_SERIES */
     Serial.println();
   }
 }
@@ -2597,7 +2618,6 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
 #endif /* EF_SERIES */
 #endif /* PSEUDO_PACKETS */
 
-    // uint8_t cs_hitachi = 0;
     packetDuplicate = 0;
     if (readError) {
       // error, so output data on line starting with E
@@ -2676,14 +2696,15 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
         // buffer overrun detected (overrun is after, not before, the read byte)
         Serial_print(F(":OR-"));
       }
-      // if (i) cs_hitachi ^= c;
       if (EB[i] & ERROR_CRC_CS) {
         // CS or CRC error detected in readpacket
 #ifdef MHI_SERIES
         Serial_print(F(" CS error"));
-#else /* MHI_SERIES */
+#elif defined H_SERIES
+        Serial_print(F(" XOR error"));
+#else /* MHI_SERIES, H_SERIES */
         Serial_print(F(" CRC error"));
-#endif /* MHI_SERIES */
+#endif /* MHI_SERIES, H_SERIES */
       }
     }
     Serial_println();

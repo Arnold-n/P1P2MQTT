@@ -1368,7 +1368,9 @@ uint16_t P1P2MQTT::readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* err
 #ifdef MHI_SERIES
   uint8_t mhicnt = 0;
   uint8_t cs = 0;
-#else /* MHI_SERIES */
+#elif defined H_SERIES
+  uint8_t cxor = 0;
+#else /* MHI_SERIES, H_SERIES */
   uint8_t crc = crc_feed;
 #endif
 #ifdef H_SERIES
@@ -1412,7 +1414,23 @@ uint16_t P1P2MQTT::readpacket(uint8_t* readbuf, uint16_t &delta, errorbuf_t* err
           }
         }
       }
-#else /* MHI_SERIES */
+#elif defined H_SERIES
+      if (bytecnt < maxlen) {
+        readbuf[bytecnt] = c;
+      }
+      if (!EOP && (expectedLength > bytecnt + 1)) { // not yet EOP
+        if (bytecnt > 0) cxor ^= c; // XOR calculation exclude the first byte
+      } else { // EOP
+        if (c != cxor && (bytecnt != 1 || c != 0x06)) { // wrong XOR and not a valid Ack
+          if (bytecnt < maxlen) {
+            errorbuf[bytecnt] |= ERROR_CRC_CS;
+          } else {
+            errorbuf[maxlen - 1] |= ERROR_CRC_CS;
+          }
+          DIGITAL_SET_LED_ERROR;
+        }
+      }
+#else /* MHI_SERIES, H_SERIES */
       if ((EOP == 0) || (crc_gen == 0)) {
         if (bytecnt < maxlen) {
           readbuf[bytecnt] = c;
@@ -1458,7 +1476,9 @@ void P1P2MQTT::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc
   setDelay(t);
 #ifdef MHI_SERIES
   uint8_t cs = 0;
-#else /* MHI_SERIES */
+#elif defined H_SERIES
+  uint8_t cxor = 0;
+#else /* MHI_SERIES, H_SERIES */
   uint8_t crc = crc_feed;
 #endif
   for (uint8_t i = 0; i < l; i++) {
@@ -1466,7 +1486,9 @@ void P1P2MQTT::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc
     write(c);
 #ifdef MHI_SERIES
     if (cs_gen != 0) cs += c;
-#else /* MHI_SERIES */
+#elif defined H_SERIES
+    if (i > 0) cxor ^= c; // XOR calculation exclude the first byte
+#else /* MHI_SERIES, H_SERIES */
     if (crc_gen != 0) for (uint8_t i = 0; i < 8; i++) {
       crc = ((crc ^ c) & 0x01 ? ((crc >> 1) ^ crc_gen) : (crc >> 1));
       c >>= 1;
@@ -1475,7 +1497,11 @@ void P1P2MQTT::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc
   }
 #ifdef MHI_SERIES
   if (cs_gen) write(cs);
-#else /* MHI_SERIES */
+#elif defined H_SERIES
+  if (l != 2 || cxor != 0x06) { // don't add XOR for ACK
+    write(cxor); // Add XOR checksum as the last byte
+  }
+#else /* MHI_SERIES, H_SERIES */
   if (crc_gen) write(crc);
 #endif
 }

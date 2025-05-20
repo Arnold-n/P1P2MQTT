@@ -6017,7 +6017,6 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
             case 25:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("CompressorTemperature");                     VALUE_s8;
             case 26:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("TemperatureEvaporator");                     VALUE_s8;
             case 29:                               CAT_SETTING;                  HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("TemperatureSetting");                        VALUE_s8;
-            case 37: return 0; // do not report checksum
             default  : UNKNOWN_BYTE;
           }
           case 2 : switch (payloadIndex) {
@@ -6033,15 +6032,11 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
             case 24:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("ExternalSensorTemperature");      VALUE_s8;
             case 26:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("CompressorDischargeTemperature"); VALUE_s8;
             case 27:                               CAT_TEMP;                     HATEMP0;                                     KEY1_PUB_CONFIG_CHECK_ENTITY("EvaporatorTemperature");          VALUE_s8;
-            case 37: return 0; // do not report checksum
             default  : UNKNOWN_BYTE;
           }
           default  : UNKNOWN_BYTE; // unknown hitachiModel
         }
-        default: switch (payloadIndex) {
-          case 37: return 0; // do not report checksum
-          default  : UNKNOWN_BYTE;
-        }
+        default: UNKNOWN_BYTE; // unknown payload[4]
       }
       // type 1 of message has length 0x2D, the most interesting (jetblack system)
       case 0x2D:
@@ -6110,7 +6105,6 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         case 0x26 :                                                                                                         KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown-892D--26");                          VALUE_u8; // useless
         case 0x27 :                                                                                                         KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown-892D--27");                          VALUE_u8; // useless
         case 0x28 :                                                                                                         KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown-892D--28");                          VALUE_u8; // useless
-        case 0x29: return 0; // do not report checksum
         default  : UNKNOWN_BYTE;
       }
     case 0x27: // type 2 of message
@@ -6179,7 +6173,6 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           case 7:                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("8927-1C-7");
           default: UNKNOWN_BIT;
         }
-        case 0x23: return 0; // do not report checksum
         default  : UNKNOWN_BYTE;
       }
       default  : UNKNOWN_BYTE; // unknown packet type
@@ -6198,14 +6191,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
           default: UNKNOWN_BIT;
         }
         case    9 : HACONFIG;                                                                                                 KEY1_PUB_CONFIG_CHECK_ENTITY("Temperature");   VALUE_u8;
-        // perhaps case 0x18 : return 0; // do not report checksum
         default   : UNKNOWN_BYTE;
       }
       case 0x29: switch (payload[4])  { // payload[4] can be 0xF1..0xF5, currently do not decode
-        default: switch (payloadIndex) {
-          case 0x25: return 0; // do not report checksum
-          default  : UNKNOWN_BYTE;
-        }
+        default: UNKNOWN_BYTE; // unknown payload[4]
       }
       // type 1 of message has length 0x12
       case 0x12:                                 CAT_SETTING;
@@ -6243,7 +6232,6 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         case 0x0C :                                                                                                         KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown-2112--0C");                          VALUE_u8; // useless
         case 0x0D :                                                                                                         KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown-2112--0D");                          VALUE_u8; // useless
 */
-        case 0x0E: return 0; // do not report checksum
         default  : UNKNOWN_BYTE;
       }
       /*
@@ -6302,14 +6290,10 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         case 0x11:                                                                                                          KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown-AZ11");                              VALUE_u8; // useless
         case 0x12:                                                                                                          KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown-AZ12");                              VALUE_u8; // useless
         case 0x13:                                                                                                          KEY1_PUB_CONFIG_CHECK_ENTITY("Unknown-AZ13");                              VALUE_u8; // useless
-        case 0x14: return 0; // do not report checksum
         default: UNKNOWN_BYTE;
       }
       case 0x29: switch (payload[4])  { // payload[4] can be 0xE1..0xE5, seen E1 only, currently decode only 0xE2
-        case 0xE1: switch (payloadIndex) {
-          case 0x25: return 0; // do not report checksum
-          default : UNKNOWN_BYTE;
-        }
+        case 0xE1: UNKNOWN_BYTE;
         default  : return 0;
       }
       default: UNKNOWN_BYTE; // unknown packet type
@@ -6317,10 +6301,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
     // 0x8A : sender is ?
     case 0x8A: switch (packetType) {
       case 0x29: switch (payload[4])  { // payload[4] can be 0xF1..0xF5, seen F1 only, currently decode only 0xE2
-        case 0xF1: switch (payloadIndex) {
-          // perhaps case 0x25: return 0; // do not report checksum
-          default : UNKNOWN_BYTE;
-        }
+        case 0xF1: UNKNOWN_BYTE;
         default  : return 0;
       }
       default: UNKNOWN_BYTE; // unknown packet type
@@ -6328,27 +6309,18 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
     // 0x79 : sender is ?
     // new in v0.9.55
     case 0x79: switch (packetType) {
-      case 0x2E: switch (payloadIndex) {
-        // perhaps case 0x2A: return 0; // do not report checksum
-        default : UNKNOWN_BYTE;
-      }
+      case 0x2E: UNKNOWN_BYTE;
       default  : return 0;
     }
     // 0xFF : sender is ?
     // new in v0.9.55
     case 0xFF: switch (packetType) {
-      case 0x23: switch (payloadIndex) {
-        // perhaps case 0x1F: return 0; // do not report checksum
-        default : UNKNOWN_BYTE;
-      }
+      case 0x23: UNKNOWN_BYTE;
       default  : return 0;
     }
     // new in v0.9.45 / v0.9.55
     case 0x19: switch (packetType) {
-      case 0x09: switch (payloadIndex) {
-        // perhaps case 0x05: return 0; // do not report checksum
-        default : UNKNOWN_BYTE;
-      }
+      case 0x09: UNKNOWN_BYTE;
       case 0x0A: switch (payloadIndex) {
         case  5  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Tgas");                         VALUE_u8; // Temperature_Gas
         case  6  : HACONFIG; CAT_TEMP;        HATEMP0;   KEY1_PUB_CONFIG_CHECK_ENTITY("Tliq");                         VALUE_u8; // Temperature_liquid // so this is not a checksum
