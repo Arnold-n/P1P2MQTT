@@ -903,11 +903,11 @@ bool initEthernet()
       }
       Serial_print("* [ESP] Waiting for ethernet connection... ");
       Serial_println(timeoutcnt);
-      delayedPrintfTopicS("Waiting for ethernet connection... %d", timeoutcnt);
+      // delayedPrintfTopicS("Waiting for ethernet connection... %d", timeoutcnt);
       delay(1000);
     }
     Serial_println(F("* [ESP] Ethernet connected"));
-    delayedPrintfTopicS("Ethernet connected");
+    delayedPrintfTopicS("Ethernet connected after %d seconds", timeoutcnt);
     return true;
   }
 }
@@ -3001,6 +3001,7 @@ void configTZ (void) {
 }
 
 void reportState(void) {
+  printfTopicS("Connected via ethernet: %s", ethernetConnected ? PSTR("yes") : PSTR("no"));
   printfTopicS("Factory reset scheduled (D8 to undo): %s", factoryReset ? PSTR("yes") : PSTR("no"));
   printfTopicS("EEPROM modifications pending (D5 to save): %s", EE_dirty ? PSTR("yes") : PSTR("no"));
 #ifdef E_SERIES
