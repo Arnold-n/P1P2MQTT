@@ -4108,6 +4108,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
       case 0x40 : UNKNOWN_BYTE;
       default : UNKNOWN_BYTE;
     }
+    case 0xA0 : return 0; // ignore for now, function unknown
     case 0xA1 : return 0; // ignore for now, name of outside unit
     case 0xB1 : return 0; // ignore for now, name of inside unit
     case 0xB8 : // SUBDEVICE("_counters");
