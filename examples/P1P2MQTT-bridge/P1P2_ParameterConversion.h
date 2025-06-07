@@ -2576,14 +2576,15 @@ void param_field_setting(byte paramSrc, byte paramPacketType, uint16_t paramNr, 
 
 uint8_t publishFieldSetting(byte paramNr) {
   byte  ppti = 0x39 - PARAM_TP_START;
-  uint16_t ptbs = seenstart[ppti] + paramNr;
+  ppts = 0; // for setting seen in publishEntityParam
+  ptbs = seenstart[ppti] + paramNr;
   uint16_t ptbv = valstart[ppti] + paramNr * parnr_bytes[ppti];
   if (M.paramSeen[0][ptbs >> 3] & (1 << (ptbs & 0x07))) {
     // FSB == 2 forces to output HA config message and entity even if seen before
     switch (common_field_setting(0x00, 0x39, 3, &M.paramVal[0][ptbv], paramNr, mqtt_value)) {
       case 0 : return 0; // PUB_CONFIG failed, retry later
       case 1 : return publishEntityParam(0x00, 0x39, paramNr, 3, &M.paramVal[0][ptbv], mqtt_value, 4);
-      case 2 : return 1; // to be skpped, continue with next
+      case 2 : return 1; // to be skipped, continue with next
       default: return 1; // should not occur
     }
   } else {
