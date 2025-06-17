@@ -14,9 +14,14 @@ All values in this document are hex, except for the byte numbering in the payloa
 
 **Cycle**
 
-Each regular data cycle consists of a package, where the thermostat and heat pump take turn as transmitter in a request-response pattern. Approximately every second one package of 6 pair of request/response packets are communicated this way, followed by a 13th packet. The 13th packet invites an auxiliary (or external/2nd) controller to identify itself. If there is no auxiliary controller answering within 140/160ms the cycle restarts. If there is a reply to the 13th packet, additional request/response pairs are being communicated between main and auxiliary controller.
+Each regular data cycle consists of a package, where the thermostat and heat pump take turn as transmitter in a request-response pattern. Approximately every second one package of 6 pair of request/response packets are communicated this way, followed by a 13th packet. The 13th packet invites an auxiliary (or external/2nd) controller to identify itself. If there is no auxiliary controller answering within 140-180ms the cycle restarts. If there is a reply to the 13th packet, additional request/response pairs are being communicated between main and auxiliary controller.
 
 If the user of the thermostat requests certain information in the menu items, such as energy consumed, additional packet types are inserted before such a package.
+
+The main controller expects to be the only bus user initiating *request packets*.
+There's no bus collision prevention on the main controller, thus the main controller does **not** monitor the bus for ongoing transfers.
+It will start transmitting after a fixed period of time.
+When using homebrew hardware it's possible that both units transmit at the same time, causing a bus collision.
 
 **Packet type**
 
@@ -33,9 +38,10 @@ Each packet has in the header a packet type (and in certain cases a packet subty
 
 - approximately 25ms between communication main controller and communication heat pump
 - approximately 30-50ms (42/37/47/31/29/36) between communication heat pump and communication thermostat
-- approximately 140 or 160 ms between last packet of a package and the first packet of a new package
+- approximately 60-160 ms between last packet of a package and the first packet of a new package
 
 This timing corresponds to the description found in a design guide from Daikin which specifies that a response must follow a request after 25ms, and a new request must not follow a response before another 25ms silence.
+Tests showed that the Daikin system accepts packets with just 5ms of silence.
 
 # Packet types 00-05 are used during restart process
 
@@ -401,7 +407,7 @@ Header: 00F030 or 00F130 (where F0 or F1 refers to first or second auxiliary con
 
 | Byte nr | Hex value observed | Description           | Data type
 |:--------|:-------------------|:----------------------|:-
-|  0-13   | 00-03              | indicates whether additional packets "00Fx3y" will be sent; byte 0 for 00F031 .. byte 13 for 00F03E  | u8
+|  0-13   | 00-03              | indicates how many additional packets "00Fx3y" will be sent; byte 0 for 00F031 .. byte 13 for 00F03E  | u8
 
 ### Packet type 30: response
 
@@ -410,6 +416,11 @@ Header: 40F030 or 40F130
 | Byte nr | Hex value observed | Description           | Data type
 |:--------|:-------------------|:----------------------|:-
 | 0-13    | 00/01              | indicates whether additional packets requests "00F03x" are needed by auxiliary controller to transmit setting changes; byte 0 for 00F031 .. byte 13 for 00F03E  | u8
+
+The auxiliary controller should answer all requests, even when no data is to be transmitted.
+This reduces the time spent on the main controller waiting for a response and can save up to 30msec
+per 3xh request.
+
 
 ## Packet type 31 - auxiliary controller ID, date, time
 
@@ -649,6 +660,10 @@ The parameter range in this system is 0x0000-0x001E, it can be different on othe
 On EJHA\* "Energy produced" always reads as zero.
 
 These parameters resemble the counters in packet type B8 but there are some differences and the order is different.
+They are only updated by the main controller after going to the
+energy statistics menu causing it to send a B8 packet.
+The main controller doesn't monitor the bus for B8 packets/replies and
+thus it won't update the parameters type 38 when P1P2Monitor inserts B8 requests.
 
 | Param nr | Description                                        | Data type
 |:---------|:---------------------------------------------------|:-
