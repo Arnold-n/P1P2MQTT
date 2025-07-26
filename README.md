@@ -173,7 +173,7 @@ The P1P2MQTT bridge connects directly to the thermostat interface, whereas ESPAl
 
 ## UDP support for Arduino based ESP-less ethernet operation
 
-The [Daikin-P1P2---UDP-Gateway](https://github.com/budulinek/Daikin-P1P2---UDP-Gateway) project is based on an earlier version of this project's hardware and software and provides additional documentation and code to enable direct communication between the P1/P2 heat pump interface and home automation/monitoring systems (such as Loxone) over ethernet/UDP. It enables Loxone to write parameters directly to the P1/P2 bus and set the leaving water temperature remotely.
+The [Arduino Altherma UDP Controller](https://github.com/budulinek/arduino-altherma-controller) project is based on an earlier version of this project's hardware and software and provides additional documentation and code to enable direct communication between the P1/P2 heat pump interface and home automation/monitoring systems (such as Loxone) over ethernet/UDP. It enables Loxone to write parameters directly to the P1/P2 bus and set the leaving water temperature remotely.
 
 ## What is the HBS or the Daikin P1/P2 and F1/F2 bus?
 
