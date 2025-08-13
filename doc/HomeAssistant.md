@@ -8,11 +8,11 @@ Text in *italics* applies only to Daikin Altherma/E-series models.
 
 As a new user you may skip this section.
 
-You can delete old MQTT topics and rebuild the new ones with the MQTT_Delete_Own_Rebuild button in HC_Bridge; this button may be unavailable until the bridge is running for 2 minutes. Deleting/rebuilding may take ~5 minutes. If upgrading from v0.9.44 or older, use MQTT_All_Delete_Rebuild because of the different topic structure, but be aware that this also deletes all homeassistant-config messages from other devices (if any) on the same MQTT server.
+You can delete old MQTT topics and rebuild the new ones with the `MQTT_Delete_Own_Rebuild` button in `HC_Bridge`; this button may be unavailable until the bridge has been running for 2 minutes. Deleting/rebuilding may take ~5 minutes. If upgrading from v0.9.44 or older, use `MQTT_All_Delete_Rebuild` because of the different topic structure, but be aware that this also deletes all homeassistant-config messages from other devices (if any) on the same MQTT server.
 
-The EEPROM data in the ESP includes MQTT server credentials and should survive a firmware update, but if that fails (especially for rc candidates shared by mail), you may encounter a bridge which connects to WiFi but not to MQTT. In that case you can either
--telnet to the bridge, and use the commands `P7 IPv4-MQTT-server`, and if necessary also `P8 MQTT-port-nr`, `P9 MQTT-username` and `P10 MQTT-password`, or
--double-tap the reset-button until the blue LED lights up, connect to the AP  with SSID `P1P2MQTT-2x` and password `P1P2P3P4`, and enter WiFi and MQTT server credentials.
+The EEPROM data in the ESP includes MQTT server credentials and should survive a firmware update, but if that fails (especially for rc candidates shared by mail), you may encounter a bridge which connects to WiFi but not to MQTT. In that case you can either:
+- telnet to the bridge, and use the commands `P7 IPv4-MQTT-server`, and if necessary also `P8 MQTT-port-nr`, `P9 MQTT-username` and `P10 MQTT-password`, or
+- double-tap the reset-button until the blue LED lights up, connect to the AP  with SSID `P1P2MQTT-2x` and password `P1P2P3P4`, and enter WiFi and MQTT server credentials.
 
 ##### Set up MQTT server
 
@@ -22,7 +22,7 @@ Under `Settings`/`People`, click blue button (lower right corner) `ADD PERSON`, 
 
 ##### Power off Daikin system
 
-For safety, remove power from your system (likely from the outdoor unit) to remove power from the P1/P2 interface. The display of your room thermostat (if you have any) should be off.
+For safety, remove power from your system (likely from the outdoor unit) to remove power from the P1/P2 interface. The display of your room thermostat (if you have them) should be off.
 
 ##### Connect P1P2MQTT bridge to P1/P2 wires
 
@@ -50,19 +50,19 @@ HA will start to recognize several controls and entities under various devices c
 
 Some entities become visible only when the bridge is operating in auxiliary control mode *and in counter request mode*. These modes can be switched on with the `Control_Function` switch *and the `Counter_Request_Function`* switch in the `HC_Bridge` device. After switching on, wait at least 10 minutes for all entities to be recognized in HA, then proceed to add the following subdevices to your HA dashboards.
 
-| Device (E-series)|#  | Function                                                   | # |Controls
-|:-----------------|--:|:----------------------------------------------------------|---:|:---------------|
-| HC_Bridge        | 4 | Settings and status of P1P2MQTT bridge                     | 5  | `Control_Function`<br>`Counter_Request_Function`<br>`Restart_*`<br>`EEPROM_*` `MQTT_Rebuild`
-| HC_Sensors       |16 | Temperature, flow, water pressure (*)                      | n/a|
+| Device (E-series)|#  | Function                                                   | #   |Controls
+|:-----------------|--:|:-----------------------------------------------------------|----:|:---------------|
+| HC_Bridge        | 4 | Settings and status of P1P2MQTT bridge                     | 5   | `Control_Function`<br>`Counter_Request_Function`<br>`Restart_*`<br>`EEPROM_*` `MQTT_Rebuild`
+| HC_Sensors       |16 | Temperature, flow, water pressure (*)                      | n/a |
 | HC_Room          |12 | Room temperature setpoints                                 |  1  | `Room_Heating`<br>`Room_Cooling` (*)
 | HC_LWT           |15 | Leaving Water Temperature setpoints main zone              |  2  | `LWT_ABS_Heating`<br>`LWT_ABS_Cooling`<br>`LWT_Deviation_Heating`<br>`LWT_Deviation_Cooling` (*)
 | HC_LWT2          |17 | Leaving Water Temperature setpoints add zone               |  3  | `LWT_ABS_Heating`<br>`LWT_ABS_Cooling`<br>`LWT_Deviation_Heating`<br>`LWT_Deviation_Cooling` (*)
-| HC_Prices        |11 | Electricity/gas price                                      | 10 |  `Gas price`
-| HC_Power         |13 | Power consumption (requires external meter) and production |n/a |
-| HC_Mode          |14 | Operating modes                                            |  6 |  `Altherma_ON`<br>`Daikin_Defrost_Request`<br>`Daikin_Restart_Careful`<br>`Heating/Cooling/Auto`<br>`Abs/WD/Abs+prog/WD+prog`
-| HC_FieldSettings |n/a| Field settings; changing these requires a system restart   |  7 |  `Nr_Of_Zones`<br>`Overshoot`<br>`RT/LWT`<br>`RT_Modulation`<br>`RT_Modulation_Max`
-| HC_DHW           |(D)| DHW settings and info                                      |(D) |  `DHC_Setpoint` <br>`DHW_heat/off`<br>`DHW_Boost`
-| HC_Quiet         |n/a| Quiet/silent mode setting                                  |  8 |  `Quiet_Level` <br>`Quiet_Level_When_On` <br>`Auto/On/Always-off`
+| HC_Prices        |11 | Electricity/gas price                                      | 10  |  `Gas price`
+| HC_Power         |13 | Power consumption (requires external meter) and production | n/a |
+| HC_Mode          |14 | Operating modes                                            | 6   |  `Altherma_ON`<br>`Daikin_Defrost_Request`<br>`Daikin_Restart_Careful`<br>`Heating/Cooling/Auto`<br>`Abs/WD/Abs+prog/WD+prog`
+| HC_FieldSettings |n/a| Field settings; changing these requires a system restart   | 7   |  `Nr_Of_Zones`<br>`Overshoot`<br>`RT/LWT`<br>`RT_Modulation`<br>`RT_Modulation_Max`
+| HC_DHW           |(D)| DHW settings and info                                      | (D) |  `DHC_Setpoint` <br>`DHW_heat/off`<br>`DHW_Boost`
+| HC_Quiet         |n/a| Quiet/silent mode setting                                  | 8   |  `Quiet_Level` <br>`Quiet_Level_When_On` <br>`Auto/On/Always-off`
 | HC_COP           | 9 | COP calculations
 | HC_Meters        |(S)| Hours/kWh counters (`C2` mode recommended to update counters)
 | HC_Unknown       |(S)| Some unknown entities
@@ -214,7 +214,7 @@ If you want to delete old MQTT topics (after an update from an earlier firmware,
 
 ##### HC_Quiet
 
-On (some?) newer Altherma 3 R models, Quiet\_Level monitors the current quiet status but controls do not work.
+On (some?) newer Altherma 3 R models, `Quiet_Level` monitors the current quiet status but controls do not work.
 
 | Function                                 | Description
 |:-----------------------------------------|:----------------------------------------------------------|
@@ -308,7 +308,7 @@ Note: COP_Realtime is only calculated if Consumption_Heatpump is (regularly) pro
 
 ##### HC_UI
 
-Simulates functions of the auxiliary controller
+Simulates functions of the auxiliary controller.
 
 | Function                                 | Description
 |:-----------------------------------------|:----------------------------------------------------------|
