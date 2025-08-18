@@ -57,6 +57,10 @@
 #define MONITORCONTROL   // enables P1P2 bus writing (as auxiliary controller and/or for requesting counters)
 #endif /* (defined E_SERIES || defined F_SERIES) */
 
+#if (defined H_SERIES)
+#define MONITORACK // enables P1P2 bus writing to acknowledge received packets
+#endif /* (defined H_SERIES) */
+
 #if (defined T_SERIES || defined H_SERIES)
 #define TH_SERIES
 #endif /* (defined T_SERIES || defined H_SERIES) */

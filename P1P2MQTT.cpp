@@ -695,7 +695,11 @@ void P1P2MQTT::writebyte(uint8_t b)
     // if not already writing, (previously: start or) schedule writing
     tx_byte = b;
     tx_byte_verify = b; // for read-back verification
+#ifdef H_SERIES
+    tx_paritybit = 1; // H-series uses inverted parity bit for first byte
+#else /* H_SERIES */
     tx_paritybit = 0;
+#endif /* H_SERIES */
     tx_rx_paritycheck = 0;
     tx_rx_readbackerror = 0;
     // we could initiate start writing here, as we did <=v0.9.4, but we can better leave it to the ISR, which is simpler
@@ -883,6 +887,9 @@ ISR(COMPARE_W_INTERRUPT)
       IRQ_STOP;
       return;
     } else {
+#ifdef H_SERIES
+      tx_paritybit = 1; // H-series uses inverted parity bit for first byte
+#endif /* H_SERIES */
       // it does not matter whether we are still in stop bit or beyond, we have to wait longer due to the delay setting
       tx_state = 99;
       tx_wait = delay;

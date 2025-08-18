@@ -1929,6 +1929,23 @@ byte writeBudget_prev = 0;
       }
 #endif /* EF_SERIES */
     }
+
+#ifdef MONITORACK
+    // immediate ack when main RC speaks to p1p2 monitor
+    if (!readError) {
+      if ((nread > 9) && (RB[0] == 0x41) && (RB[6] == 0x02) && (RB[8] == 0x02)) {
+        WB[0] = 0x41;
+        WB[1] = 0x06;
+        if (P1P2MQTT.writeready()) {
+          P1P2MQTT.writepacket(WB, 2, 5, CRC_GEN, CRC_CS_FEED);
+        } else {
+          Serial_println(F("* Refusing to write ack packet while previous packet wasn't finished"));
+          if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
+        }
+      }
+    }
+#endif /* MONITORACK */
+
 #ifdef MONITORCONTROL
     if (!readError) {
       // message received, no error detected, no buffer overrun

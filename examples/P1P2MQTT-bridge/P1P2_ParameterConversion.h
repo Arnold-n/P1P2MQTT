@@ -77,10 +77,10 @@
 // F field settings (from different sources)
 //
 // Hitachi:
-// 2 indoor unit info
-// 8 IU and OU system info
+// 2 a remote control to IU (includes 41 00 1E packets - inter RC - for model 3)
+// 8 IU to a remote control
 // 7 ?
-// 4 sender is Hitachi remote control or Airzone
+// 4 a remote control to another remote control (included Airzone) for models 1 and 2
 // 0 pseudopacket, ATmega (differs from Daikin convention)
 // 1 pseudopacket, ESP    (differs from Daikin convention)
 // 9 other
@@ -559,9 +559,35 @@ const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ]     = {  0,  16,  32,  48,  64  /
 // 2B: 79 00 2E
 // 2C: FF 00 23
 //
-// nr_bytes = value 3rd byte - 4; or - 3 to cover CS_GEN byte
+// Hitachi model 3
+//
+// 10: 21 xx 1C (p1p2 monitor does not emit this packet, no need to ckeck source : this is the main remote control)
+// 11: 89 xx 2D xx xx xx xx xx xx 01
+// 12: 89 xx 2D xx xx xx xx xx xx 06
+// 13: 41 xx 1E xx 01 (main remote control speaks to second one : p1p2 monitor)
+//   : 89 06 (acknowledgement only)
+//   : 21 06 (acknowledgement only)
+//   : 41 06 (acknowledgement only)
+//
+// nr_bytes = value 3rd byte - 4;
 
-#define sizePayloadBitsSeen 12 // for Hitachi, but not for Toshiba
+# if HITACHI_MODEL == 3
+
+#define sizePayloadBitsSeen 15
+
+#define PCKTP_ARR_SZ 0x14
+//byte pti                                      =    0    1    2    3    4    5    6    7    8    9   0A   0B   0C   0D   0E   0F      10   11   12   13
+//3rd byte                                      =                                                                                      1C   2D   2D   1E
+//payload[0x01]                                 =                                                                                                     01
+//payload[0x06]                                 =                                                                                           01   06
+const PROGMEM uint32_t nr_bytes[PCKTP_ARR_SZ]  = {  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,     24,  41,  41,  26 };
+const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ] = {   0,  20,  40,  60,  80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300,    320, 344, 385, 426 };
+#define sizePayloadByteVal 452
+#define sizePayloadByteSeen 57 // ceil(452/8)
+
+# else /* HITACHI_MODEL */
+
+#define sizePayloadBitsSeen 12 // for Hitachi model 1 or 2, but not for Toshiba
 
 #define PCKTP_ARR_SZ 0x2D
 //byte pti                                      =   0..F  (0..7 for 000008..00000F, 8..F for 400008..40000F)                           10-14                           15-1E                                             1F-20                                               2A       2B     2C
@@ -571,6 +597,8 @@ const PROGMEM uint32_t nr_bytes[PCKTP_ARR_SZ]  = {  20,  20,  20,  20,  20,  20,
 const PROGMEM uint32_t bytestart[PCKTP_ARR_SZ] = {   0,  20,  40,  60,  80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300,    320, 327, 341, 361, 396,/*rst*/ 320, 357, 394, 431, 468, 505, 524, 561, 598, 635, 672, 709, 746,796,846,896,946,996,1046,1096,1146,    1196   , 1221,1264     /* , 746 -> 1296 */ };
 #define sizePayloadByteVal 1296
 #define sizePayloadByteSeen 162 // ceil(1296/8)
+
+# endif /* HITACHI_MODEL */
 
 #elif defined W_SERIES
 
@@ -1322,6 +1350,27 @@ byte calculatePti(const byte packetSrc, const byte packetDst, const byte packetT
 
 #elif defined H_SERIES /* *_SERIES */
 
+# if HITACHI_MODEL == 3
+
+  pti = 0xFF; // default
+
+  switch (packetType) { // pseudo packets
+    case 0x08 ... 0x0F : pti = packetType - (packetSrc ? 0 : 8); break;
+  }
+
+  switch ((packetSrc << 8) | packetType) {
+    case 0x211C : pti = 0x10; break;
+    case 0x892D : switch (payload[0x06]) {
+      case 0x01 : pti = 0x11; break;
+      case 0x06 : pti = 0x12; break;
+    } break;
+    case 0x411E : if (payload[0x01] == 0x01) {
+      pti = 0x13;
+    } break;
+  }
+
+# else /* HITACHI_MODEL */
+
   switch (packetType) {
     // pseudo packets
     case 0x08 ... 0x0F : pti = packetType - (packetSrc ? 0 : 8); break;
@@ -1359,6 +1408,8 @@ byte calculatePti(const byte packetSrc, const byte packetDst, const byte packetT
     case 0xFF23 : pti = 0x2C; break;
     default     : break;
   }
+
+# endif /* HITACHI_MODEL */
 
 #elif defined MHI_SERIES /* *_SERIES */
 
@@ -3357,6 +3408,11 @@ uint16_t parameterWritesDone = 0; // # writes done by ATmega; perhaps useful for
 
 byte fieldSettingPublishNr = 0xF1; // 0xF1 = ready
 #endif /* E_SERIES */
+
+#ifdef H_SERIES
+char mqtt_value_text_buffer[MQTT_VALUE_LEN]; // buffer for text values, used by H_SERIES
+byte readyToWrite = 2; // 0 = writing, 1 = write echo received or first RC message, 2 = ready to write, RC confirmation received
+#endif /* H_SERIES */
 
 byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte payloadIndex, byte* payload, byte bitNr) {
 // A payloadIndex value EMPTY_PAYLOAD indicates an empty payload (used during restart)
@@ -6035,10 +6091,12 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
 
 # if HITACHI_MODEL == 1 || HITACHI_MODEL == 2
 #include "P1P2_ParameterConversion/P1P2_Hitachi_model_1_2.h"
+# elif HITACHI_MODEL == 3
+#include "P1P2_ParameterConversion/P1P2_Hitachi_model_3.h"
 # endif /* HITACHI_MODEL */
 
   if ((packetSrc == 0x00 || packetSrc == 0x40) && packetDst == 0x00) { // Pseudo packet
-  switch (packetType) {
+    switch (packetType) {
 #include "P1P2_ParameterConversion/P1P2_Pseudo.h"
     }
   }
