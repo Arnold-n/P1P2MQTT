@@ -1284,6 +1284,7 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
                           HACONFIGMESSAGE_ADD(",\"unit_of_meas\":\"%s\"", haUomString[haEntity]);
                           // fall-through
       case HA_BINSENSOR : // device_class
+      case HA_ENUM :
                           if (haDeviceClassString[haEntity][0]) {
                             HACONFIGMESSAGE_ADD(",\"dev_cla\":\"%s\"", haDeviceClassString[haEntity]);
                           }
@@ -1305,6 +1306,7 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
     case HA_SELECT     : // fall-through
     case HA_TEXT       : // fall-through
     case HA_SENSOR     : // fall-through
+    case HA_ENUM       : // fall-through
     case HA_NUMBER     : // fall-through
     case HA_SWITCH     : // state_topic based on mqttTopic (P)
                          HACONFIGMESSAGE_ADD(",\"stat_t\":\"%s\"", mqttTopic);

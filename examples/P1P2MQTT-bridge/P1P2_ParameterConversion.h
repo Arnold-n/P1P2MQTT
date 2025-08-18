@@ -261,6 +261,14 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
     , mqttTopic, mode_cmd_template); \
 }
 
+#define HADEVICE_CLIMATE_MODE_POWER_COMMAND_TEMPLATE(mode_pwr_cmd_template) { \
+  topicWrite; \
+  HACONFIGMESSAGE_ADD( \
+    "\"power_command_topic\":\"%s\"," \
+    "\"power_command_template\":\"%s\"," \
+    , mqttTopic, mode_pwr_cmd_template); \
+}
+
 //==================================================================================================================
 
 #define HADEVICE_AVAILABILITY(availability_topic, on_value, off_value) { \
@@ -1643,9 +1651,47 @@ uint8_t publishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, by
   } // else retry later
   return 0;
 }
+
+uint8_t doNotPublishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value, byte length) {
+  if (pi2 >= 0) {
+    M.payloadByteSeen[pi2 >> 3] |= (1 << (pi2 & 0x07));
+    uint16_t pi2i = pi2;
+    for (int8_t i = payloadIndex; i + length > payloadIndex; i--) {
+      if (pi2i >= sizePayloadByteVal) {
+        printfTopicS("Warning: pi2i %i > sizePayloadByteVal, Src 0x%02X Index %i payloadIndex %i", pi2i, packetSrc, i, payloadIndex);
+        return 0;
+      }
+      M.payloadByteVal[pi2i] = payload[i];
+      pi2i--;
+    }
+  } // else retry later
+  return 0;
+}
 #else /* MHI_SERIES */
 uint8_t publishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value, byte length) {
   if (clientPublish(mqtt_value, haQos) && (pi2 >= 0)) {
+#ifdef E_SERIES
+    if (packetType == 0xB8) {
+      M.cntByte[pi2] = payload[payloadIndex] & 0x7F;
+      return 0;
+    }
+#endif /* E_SERIES */
+    M.payloadByteSeen[pi2 >> 3] |= (1 << (pi2 & 0x07));
+    uint16_t pi2i = pi2;
+    for (int8_t i = payloadIndex; i + length > payloadIndex; i--) {
+      if (pi2i >= sizePayloadByteVal) {
+        printfTopicS("Warning: pi2i %i > sizePayloadByteVal, Src 0x%02X Tp 0x%02X Index %i payloadIndex %i", pi2i, packetSrc, packetType, i, payloadIndex);
+        return 0;
+      }
+      M.payloadByteVal[pi2i] = payload[i];
+      pi2i--;
+    }
+  } // else retry later
+  return 0;
+}
+
+uint8_t doNotPublishEntityByte(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value, byte length) {
+  if (pi2 >= 0) {
 #ifdef E_SERIES
     if (packetType == 0xB8) {
       M.cntByte[pi2] = payload[payloadIndex] & 0x7F;
@@ -1793,6 +1839,11 @@ uint8_t value_u0(byte packetSrc, byte packetType, byte payloadIndex, byte* paylo
   return 0;
 }
 
+uint8_t value_byte_nopub(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, const char* mqtt_value, byte length) {
+  doNotPublishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, length);
+  return 0;
+}
+
 uint8_t value_u_LE(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, byte length) {
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%u", u_payloadValue_LE(payload + payloadIndex, length));
   return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, length);
@@ -1862,8 +1913,7 @@ uint8_t unknownBit(byte packetSrc, byte packetType, byte payloadIndex, byte* pay
 
 // multiple bits, do not publish
 
-uint8_t value_bits_nopub(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, byte bitNr1, byte bitNr2) {
-  // use bits bitNr1 .. bitNr2
+uint8_t value_bits_nopub(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value) {
   return doNotPublishEntityBits(packetSrc, packetType, payloadIndex, payload, mqtt_value);
 }
 
@@ -1940,7 +1990,7 @@ uint8_t value_s(byte packetSrc, byte packetType, byte payloadIndex, byte* payloa
   return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, length);
 }
 
-uint8_t value_s_bit(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, byte v, byte bitNr) {
+uint8_t value_s_bit(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, byte v) {
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%i", v);
   return publishEntityBits(packetSrc, packetType, payloadIndex, payload, mqtt_value);
 }
@@ -1951,7 +2001,10 @@ uint8_t value_s_nosave(byte packetSrc, byte packetType, byte payloadIndex, byte*
 }
 
 uint8_t value_f(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, float v, int length = 0) {
-  snprintf(mqtt_value, MQTT_VALUE_LEN, "%1.3f", v); // make resolution depend on PRECISION?
+  // Format string based on haPrecision (0..3)
+  const char* formats[] = { "%1.0f", "%1.1f", "%1.2f", "%1.3f" };
+  byte prec = (haPrecision >= 0 && haPrecision <= 3) ? haPrecision : 3;
+  snprintf(mqtt_value, MQTT_VALUE_LEN, formats[prec], v);
   return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, length);
 }
 
@@ -1990,9 +2043,14 @@ uint8_t value_textString(char* mqtt_value, char* textString) {
   return 0;
 }
 
-uint8_t value_textStringOnce(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, char* textString) {
+uint8_t value_byte_textStringOnce(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, char* textString) {
   snprintf(mqtt_value, MQTT_VALUE_LEN, "%s", textString);
   return publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
+}
+
+uint8_t value_bits_textStringOnce(byte packetSrc, byte packetType, byte payloadIndex, byte* payload, char* mqtt_value, char* textString) {
+  snprintf(mqtt_value, MQTT_VALUE_LEN, "%s", textString);
+  return publishEntityBits(packetSrc, packetType, payloadIndex, payload, mqtt_value);
 }
 
 #ifdef E_SERIES
@@ -2639,7 +2697,8 @@ uint8_t publishFieldSetting(byte paramNr) {
 #define VALUE_u32_LE             { value_u_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 4);                              return 0; }
 #define VALUE_u32div1000_LE      { value_udiv1000_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value, 4);                       return 0; }
 #define VALUE_bits(n1, n2)       { value_bits(packetSrc, packetType, payloadIndex, payload, mqtt_value, n1, n2);                         return 0; }
-#define VALUE_bits_nopub(n1, n2)       { value_bits_nopub(packetSrc, packetType, payloadIndex, payload, mqtt_value, n1, n2);                         return 0; }
+#define VALUE_bits_nopub         { value_bits_nopub(packetSrc, packetType, payloadIndex, payload, mqtt_value);                           return 0; }
+#define VALUE_byte_nopub         { value_byte_nopub(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);                        return 0; }
 #define VALUE_flag8              { if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR; value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr); return 0; }
 #define VALUE_flag8_inv          { if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR; value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr, 1); return 0; }
 #define UNKNOWN_BIT              { CAT_UNKNOWN; CHECKBIT; if (pubEntity && (haConfig || (EE.outputMode & 0x0100))) unknownBit(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr); return 0; }
@@ -2657,14 +2716,15 @@ uint8_t publishFieldSetting(byte paramNr) {
 #endif /* MHI_SERIES */
 #define VALUE_S_L(v, l)          { value_s(packetSrc, packetType, payloadIndex, payload, mqtt_value, v, l);                              return 0; }
 
-#define VALUE_S_BIT(v)           { value_s_bit(packetSrc, packetType, payloadIndex, payload, mqtt_value, v, bitNr);                              return 0; }
+#define VALUE_S_BIT(v)           { value_s_bit(packetSrc, packetType, payloadIndex, payload, mqtt_value, v);                             return 0; }
 
 
 #define VALUE_F_L(v, l)          { value_f(packetSrc, packetType, payloadIndex, payload, mqtt_value, v, l);                              return 0; }
 #define VALUE_f8s8_LE            { value_f8s8_LE(packetSrc, packetType, payloadIndex, payload, mqtt_value);                              return 0; }
 #define VALUE_F_L_thr(v, tt, tv) { value_f(packetSrc, packetType, payloadIndex, payload, mqtt_value, v, tt, tv);                         return 0; }
 #define VALUE_textString(s)      { value_textString(mqtt_value, s);                                                                      return 0; }
-#define VALUE_textStringOnce(s)  { value_textStringOnce(packetSrc, packetType, payloadIndex, payload, mqtt_value, s);                    return 0; }
+#define VALUE_byte_textStringOnce(s)  { value_byte_textStringOnce(packetSrc, packetType, payloadIndex, payload, mqtt_value, s);                    return 0; }
+#define VALUE_bits_textStringOnce(s)  { value_bits_textStringOnce(packetSrc, packetType, payloadIndex, payload, mqtt_value, s);                    return 0; }
 #define UNKNOWN_BYTE             { CAT_UNKNOWN; CHECK(1); if (pubEntity && (haConfig || (EE.outputMode & 0x0100))) unknownByte(packetSrc, packetType, payloadIndex, payload, mqtt_value); return 0; }
 #define VALUE_header             { value_header(packetSrc, packetType, mqtt_value);                                                      return 0; }
 

@@ -70,7 +70,8 @@ typedef enum {
   HA_BUTTON,
   HA_SELECT,
   HA_TEXT,
-  HA_CLIMATE
+  HA_CLIMATE,
+  HA_ENUM
 } hadevice;
 
 #define HADEVICE_NONE      { haDevice = HA_NONE;      }
@@ -82,6 +83,7 @@ typedef enum {
 #define HADEVICE_SELECT    { haDevice = HA_SELECT;    }
 #define HADEVICE_TEXT      { haDevice = HA_TEXT;      }
 #define HADEVICE_CLIMATE   { haDevice = HA_CLIMATE;   }
+#define HADEVICE_ENUM      { haDevice = HA_ENUM;      }
 
 #define QOS_DATA_AVAILABILITY 1
 #define QOS_DATA_CLIMATE 1
@@ -107,7 +109,8 @@ const char* haPrefixString[] = {
     "button",
     "select",
     "text",
-    "climate"
+    "climate",
+    "sensor"
 };
 
 // home assistant entities
@@ -131,6 +134,7 @@ typedef enum {
   ENTITY_COST,
   ENTITY_COP,
   ENTITY_VOLTAGE,
+  ENTITY_ECOMODE
 } haentity;
 
 const char* haIconString[] = {
@@ -152,6 +156,7 @@ const char* haIconString[] = {
   "mdi:currency-eur",
   "mdi:poll",
   "mdi:current-dc", // used for interface voltage
+  "mdi:leaf"
 };
 
 const char* haUomString[] = {
@@ -177,6 +182,7 @@ const char* haUomString[] = {
   "€/kWh",
   " ",  // graph for unit-less COP
   "V",
+  ""
 };
 
 typedef enum {
@@ -205,6 +211,7 @@ const         byte haStateClass[] = {
   HASTATECLASS_TOTAL,
   HASTATECLASS_MEASUREMENT,
   HASTATECLASS_MEASUREMENT,
+  HASTATECLASS_NONE
 };
 
 const char* haStateClassString[] = {
@@ -234,6 +241,7 @@ const char* haDeviceClassString[] = {
   "",          // Euro/kWh cost
   "",
   "voltage",
+  "enum"
 // other options:
 //  "monetary",
 //  "problem",
@@ -326,6 +334,7 @@ uint16_t extraAvailabilityStringLength = 0;
 #define HACOST         { haEntity = ENTITY_COST;          PRECISION(2); }
 #define HACOP          { haEntity = ENTITY_COP;           PRECISION(3); }
 #define HAVOLTAGE      { haEntity = ENTITY_VOLTAGE;       PRECISION(1); }
+#define HAECOMODE      { haEntity = ENTITY_ECOMODE;                     }
 
 #define PRECISION(x)   { haPrecision = (x); }
 
