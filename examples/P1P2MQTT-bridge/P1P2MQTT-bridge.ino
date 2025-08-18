@@ -198,9 +198,6 @@ typedef struct EEPROMSettings {
   uint8_t setpointHeatingMax;
   bool useAirIntake;
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  uint8_t hitachiModel;
-#endif /* H_SERIES */
 };
 
 EEPROMSettings EE;
@@ -334,10 +331,6 @@ const char paramName_38[] PROGMEM = "Setpoint heating maximum"; // PARAM_SETPOIN
 const char paramName_39[] PROGMEM = "use Inside_Air_Intake   ";
 #endif /* F_SERIES */
 
-#ifdef H_SERIES
-const char paramName_35[] PROGMEM = "Hitachi Model Type      ";
-#endif /* H_SERIES */
-
 const char* const paramName[] PROGMEM = {
   paramName_00,
   paramName_01,
@@ -404,9 +397,6 @@ const char* const paramName[] PROGMEM = {
   paramName_38,
   paramName_39,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  paramName_35,
-#endif /* H_SERIES */
 };
 
 typedef enum {
@@ -626,9 +616,6 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   40,
   1,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-   2,
-#endif /* H_SERIES */
 };
 
 char* const PROGMEM paramLocation[] = {
@@ -697,9 +684,6 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.setpointHeatingMax,
   (char*) &EE.useAirIntake,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  (char*) &EE.hitachiModel,
-#endif /* H_SERIES */
 };
 
 #define outputUnknown (EE.outputMode & 0x0008)
@@ -2228,22 +2212,11 @@ void loadEEPROM() {
     EE.useAirIntake = 0;
   }
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  if (EE.EE_version < 7) {
-    EE.hitachiModel = INIT_HITACHI_MODEL;
-  }
   if (EE.EE_version < 7) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 7");
     EE.EE_version = 7;
     saveEEPROM();
   }
-#else
-  if (EE.EE_version < 7) {
-    delayedPrintfTopicS("Upgrade EEPROM_version to 7");
-    EE.EE_version = 7;
-    saveEEPROM();
-  }
-#endif /* H_SERIES */
 #ifdef E_SERIES
   if (EE.EE_version < 8) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 8");
@@ -2643,12 +2616,6 @@ void handleCommand(char* cmdString) {
                                 printfTopicS("%i: %s", i, PREDEFINED_TZ[i]);
                               }
                               break;
-#ifdef H_SERIES
-                    case 35 : printfTopicS("Options for Hitachi model parameter P%2d", temp);
-                              printfTopicS("1: (default) Yutaki S");
-                              printfTopicS("2: TBD");
-                              break;
-#endif /* H_SERIES */
                     default : break;
                   }
                 }
