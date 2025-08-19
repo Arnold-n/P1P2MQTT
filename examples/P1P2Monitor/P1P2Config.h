@@ -276,7 +276,11 @@
 #define INIT_SCOPE 0        // defines whether scopemode, recording timing info, is on/off at start (advise to keep this 0)
 
 #define INIT_SD 50        // (uint16_t) delay setting in ms for each manually instructed packet write
+#ifdef H_SERIES
+#define INIT_SDTO 0       // no need for time-out delay for Hitachi, write asap after normal write delay
+#else /* H_SERIES */
 #define INIT_SDTO 2500    // (uint16_t) time-out delay in ms (applies both to manual instructed writes and controller writes)
+#endif /* H_SERIES */
 
 // CRC settings
 #ifdef EF_SERIES
