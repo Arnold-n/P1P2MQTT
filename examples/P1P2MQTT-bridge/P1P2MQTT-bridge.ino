@@ -2795,20 +2795,23 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
   // handle P1P2/W/devicename/bridgename or P1P2/W
   topicCharSpecific('W');
   if ((!strcmp(topic, mqttTopic)) || (!strncmp(topic, mqttTopic, mqttTopicChar + 1) && (topic[ mqttTopicChar + 1 ] == '\0'))) {
-    if (mqttBufferFree < total + 1) {
-      // Serial_print(F("* [ESP] mqttBuffer full (W)"));
-      if ((mqttBufferFullReported < 2) && (mqttBufferFree >= 3)) {
-        mqttBuffer_writeChar('^');
-        mqttBuffer_writeChar('W');
+    if (MQTT_CMD_FILTER != '\0' && tolower(MQTT_payload[0]) != tolower(MQTT_CMD_FILTER)) {
+      delayedPrintfTopicS("MQTT command '%c' not allowed", MQTT_payload[0]);
+    } else {
+      if (mqttBufferFree < total + 1) {
+        // Serial_print(F("* [ESP] mqttBuffer full (W)"));
+        if ((mqttBufferFullReported < 2) && (mqttBufferFree >= 3)) {
+          mqttBuffer_writeChar('^');
+          mqttBuffer_writeChar('W');
+          mqttBuffer_writeChar('\n');
+          mqttBufferFullReported = 2;
+        }
+      } else {
+        if (mqttBufferFullReported > 1) mqttBufferFullReported = 1;
+        mqttBufferWriteString(MQTT_payload, total);
         mqttBuffer_writeChar('\n');
-        mqttBufferFullReported = 2;
       }
-      restoreTopic();
-      return;
     }
-    if (mqttBufferFullReported > 1) mqttBufferFullReported = 1;
-    mqttBufferWriteString(MQTT_payload, total);
-    mqttBuffer_writeChar('\n');
     restoreTopic();
     return;
   }
