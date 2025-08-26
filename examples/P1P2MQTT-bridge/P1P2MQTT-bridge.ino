@@ -474,9 +474,6 @@ const paramTypes PROGMEM paramType[] = {
   P_UINT,
   P_BOOL,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  P_UINT,
-#endif /* H_SERIES */
 };
 
 const int PROGMEM paramSize[] = {
@@ -545,9 +542,6 @@ const int PROGMEM paramSize[] = {
   1,
   1,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  1,
-#endif /* H_SERIES */
 };
 
 const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: max-length (length includes \0)
@@ -2801,7 +2795,7 @@ void handleCommand(char* cmdString) {
 
                 Serial.println(F("00000000000000010000FF"));
               } else {
-                printfTopicS("Hitachi command : Expected a selector (two digits) and a hex value (two digits), e.g. I 01 0A");
+                printfTopicS("Hitachi command : Expected a selector (two digits) and a hex value (two digits), e.g. Z 01 0A");
               }
               break;
 #endif /* H_SERIES */
