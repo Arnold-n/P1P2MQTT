@@ -198,9 +198,6 @@ typedef struct EEPROMSettings {
   uint8_t setpointHeatingMax;
   bool useAirIntake;
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  uint8_t hitachiModel;
-#endif /* H_SERIES */
 };
 
 EEPROMSettings EE;
@@ -334,10 +331,6 @@ const char paramName_38[] PROGMEM = "Setpoint heating maximum"; // PARAM_SETPOIN
 const char paramName_39[] PROGMEM = "use Inside_Air_Intake   ";
 #endif /* F_SERIES */
 
-#ifdef H_SERIES
-const char paramName_35[] PROGMEM = "Hitachi Model Type      ";
-#endif /* H_SERIES */
-
 const char* const paramName[] PROGMEM = {
   paramName_00,
   paramName_01,
@@ -404,9 +397,6 @@ const char* const paramName[] PROGMEM = {
   paramName_38,
   paramName_39,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  paramName_35,
-#endif /* H_SERIES */
 };
 
 typedef enum {
@@ -484,9 +474,6 @@ const paramTypes PROGMEM paramType[] = {
   P_UINT,
   P_BOOL,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  P_UINT,
-#endif /* H_SERIES */
 };
 
 const int PROGMEM paramSize[] = {
@@ -555,9 +542,6 @@ const int PROGMEM paramSize[] = {
   1,
   1,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  1,
-#endif /* H_SERIES */
 };
 
 const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: max-length (length includes \0)
@@ -626,9 +610,6 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   40,
   1,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-   2,
-#endif /* H_SERIES */
 };
 
 char* const PROGMEM paramLocation[] = {
@@ -697,9 +678,6 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.setpointHeatingMax,
   (char*) &EE.useAirIntake,
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  (char*) &EE.hitachiModel,
-#endif /* H_SERIES */
 };
 
 #define outputUnknown (EE.outputMode & 0x0008)
@@ -1284,6 +1262,7 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
                           HACONFIGMESSAGE_ADD(",\"unit_of_meas\":\"%s\"", haUomString[haEntity]);
                           // fall-through
       case HA_BINSENSOR : // device_class
+      case HA_ENUM :
                           if (haDeviceClassString[haEntity][0]) {
                             HACONFIGMESSAGE_ADD(",\"dev_cla\":\"%s\"", haDeviceClassString[haEntity]);
                           }
@@ -1305,6 +1284,7 @@ bool publishHomeAssistantConfig(const char* deviceSubName,
     case HA_SELECT     : // fall-through
     case HA_TEXT       : // fall-through
     case HA_SENSOR     : // fall-through
+    case HA_ENUM       : // fall-through
     case HA_NUMBER     : // fall-through
     case HA_SWITCH     : // state_topic based on mqttTopic (P)
                          HACONFIGMESSAGE_ADD(",\"stat_t\":\"%s\"", mqttTopic);
@@ -2226,22 +2206,11 @@ void loadEEPROM() {
     EE.useAirIntake = 0;
   }
 #endif /* F_SERIES */
-#ifdef H_SERIES
-  if (EE.EE_version < 7) {
-    EE.hitachiModel = INIT_HITACHI_MODEL;
-  }
   if (EE.EE_version < 7) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 7");
     EE.EE_version = 7;
     saveEEPROM();
   }
-#else
-  if (EE.EE_version < 7) {
-    delayedPrintfTopicS("Upgrade EEPROM_version to 7");
-    EE.EE_version = 7;
-    saveEEPROM();
-  }
-#endif /* H_SERIES */
 #ifdef E_SERIES
   if (EE.EE_version < 8) {
     delayedPrintfTopicS("Upgrade EEPROM_version to 8");
@@ -2641,12 +2610,6 @@ void handleCommand(char* cmdString) {
                                 printfTopicS("%i: %s", i, PREDEFINED_TZ[i]);
                               }
                               break;
-#ifdef H_SERIES
-                    case 35 : printfTopicS("Options for Hitachi model parameter P%2d", temp);
-                              printfTopicS("1: (default) Yutaki S");
-                              printfTopicS("2: TBD");
-                              break;
-#endif /* H_SERIES */
                     default : break;
                   }
                 }
@@ -2713,6 +2676,9 @@ void handleCommand(char* cmdString) {
               printfTopicS("L set control mode (Daikin only)");
               printfTopicS("C set counter request mode (Daikin E-series only)");
               printfTopicS("E/F parameter write command (Daikin E/F-series only)");
+#ifdef H_SERIES
+              printfTopicS("Z send Hitachi command (Hitachi only)");
+#endif /* H_SERIES */
               printfTopicS("W raw packet write command");
               printfTopicS("T write delay");
               printfTopicS("O write timeout");
@@ -2725,6 +2691,114 @@ void handleCommand(char* cmdString) {
               printfTopicS("E error mask (default 0x7F, Hitachi 0x3B)");
 #endif /* MHI_SERIES || TH_SERIES */
               break;
+#ifdef H_SERIES
+    case 'z':
+    case 'Z': // send command for Hitachi
+              if (readyToWrite != 2) {
+                printfTopicS("Hitachi command : Not ready to write");
+                break;
+              }
+              if (sscanf((const char*) (cmdString + 1), "%2x%2hhx", &temp, &temphex) == 2) {
+                byte pti_211C = calculatePti(0x21, 0x1C, nullptr);
+                if (pti_211C == 0xFF) { printfTopicS("Hitachi command : Error calculating pti for 0x21, 0x1C"); break; }
+                uint32_t start_211C = bytestart[pti_211C];
+                byte fake_payload[] = { 0x02, 0x01 };
+                byte pti_411E = calculatePti(0x41, 0x1E, fake_payload);
+                if (pti_411E == 0xFF) { printfTopicS("Hitachi command : Error calculating pti for 0x41, 0x1E"); break; }
+                uint32_t start_411E = bytestart[pti_411E];
+
+                int16_t pi2_tmp;
+
+                bool packetSeen_211C = true;
+                if (M.payloadBitsSeen[1] != 0xFF) { packetSeen_211C = false; }
+                if (M.payloadBitsSeen[2] != 0xFF) { packetSeen_211C = false; }
+                pi2_tmp = start_211C + 0x09; if (!(M.payloadByteSeen[pi2_tmp >> 3] & (1 << (pi2_tmp & 0x07)))) { packetSeen_211C = false; }
+                pi2_tmp = start_211C + 0x0B; if (!(M.payloadByteSeen[pi2_tmp >> 3] & (1 << (pi2_tmp & 0x07)))) { packetSeen_211C = false; }
+                
+                if (!packetSeen_211C) {
+                  printfTopicS("Hitachi command : Packet 21 00 1C not seen, cannot send command");
+                  break;
+                }
+
+                bool packetSeen_411E = true;
+                pi2_tmp = start_411E + 0x0A; if (!(M.payloadByteSeen[pi2_tmp >> 3] & (1 << (pi2_tmp & 0x07)))) { packetSeen_411E = false; }
+                pi2_tmp = start_411E + 0x0C; if (!(M.payloadByteSeen[pi2_tmp >> 3] & (1 << (pi2_tmp & 0x07)))) { packetSeen_411E = false; }
+                pi2_tmp = start_411E + 0x0D; if (!(M.payloadByteSeen[pi2_tmp >> 3] & (1 << (pi2_tmp & 0x07)))) { packetSeen_411E = false; }
+                if (M.payloadBitsSeen[12] != 0xFF) { packetSeen_411E = false; }
+
+                if (!packetSeen_411E) { printfTopicS("Hitachi command : Packet 41 00 1E not seen, default values used"); }
+
+                byte tmp_211C_07 = M.payloadByteVal[start_211C + 0x07];
+
+                bool valid = false;
+                switch (temp) {
+                  case 1:
+                    if (tmp_211C_07 & (0x01 << 3)) { // clim
+                      if (temphex > 23 && temphex < 31)                                                       { valid = true; }     break;
+                    } else if (tmp_211C_07 & (0x01 << 6)) { // heat
+                      if (temphex > 16 && temphex < 23)                                                       { valid = true; }     break;
+                    } else { // dehum and ventil
+                      if (temphex > 23 && temphex < 27)                                                       { valid = true; }     break;
+                    }
+                  case 2: if (temphex == 0 || temphex == 3 || temphex == 4 || temphex == 5 || temphex == 6)   { valid = true; }     break;
+                  case 3: if (temphex == 0 || temphex == 1)                                                   { valid = true; }     break;
+                  case 4: if (temphex == 1 || temphex == 2 || temphex == 3)                                   { valid = true; }     break;
+                  case 5: if (temphex == 0 || temphex == 1 || temphex == 2 || temphex == 3)                   { valid = true; }     break;
+                }
+                if (!valid) {
+                  printfTopicS("Hitachi command : Invalid command Z %02X %02X", temp, temphex);
+                  break;
+                }
+
+                readyToWrite = 0; // reset readyToWrite, so that no other command is sent before this one is sent
+
+                char buf[3];
+                Serial.print(F(SERIAL_MAGICSTRING "w41001E02020101010101"));
+
+                if (temp == 2 && temphex != 0x00) {
+                  snprintf(buf, 3, "%02X", (M.payloadByteVal[start_211C + 0x07] & 0x86) | (0x01 << temphex) | 0x01);
+                  if (!(tmp_211C_07 & (0x01 << temphex))) { // mode is changed
+                    switch (temphex) {
+                      case 3: temp = 1; temphex = 26; break; // clim
+                      case 4: temp = 1; temphex = 25; break; // dehum
+                      case 5: temp = 1; temphex = 25; break; // ventil
+                      case 6: temp = 1; temphex = 20; break; // heat
+                    }
+                  }
+                }
+                else if (temp == 2 || temp == 3) { snprintf(buf, 3, "%02X", (M.payloadByteVal[start_211C + 0x07] & 0xFE) | temphex); }
+                else { snprintf(buf, 3, "%02X", M.payloadByteVal[start_211C + 0x07]); }
+                Serial.print(buf);
+
+                if (temp == 4) { snprintf(buf, 3, "%02X", (M.payloadByteVal[start_211C + 0x08] & 0xF1) | (0x01 << temphex)); }
+                else { snprintf(buf, 3, "%02X", M.payloadByteVal[start_211C + 0x08]); }
+                Serial.print(buf);
+
+                if (temp == 1) { snprintf(buf, 3, "%02X", temphex); }
+                else { snprintf(buf, 3, "%02X", M.payloadByteVal[start_211C + 0x09]); }
+                Serial.print(buf);
+
+                if (packetSeen_411E) { snprintf(buf, 3, "%02X", M.payloadByteVal[start_411E + 0x0A]); Serial.print(buf); }
+                else { Serial.print(F("1C")); }
+
+                snprintf(buf, 3, "%02X", M.payloadByteVal[start_211C + 0x0B]);
+                Serial.print(buf);
+
+                if (packetSeen_411E) { snprintf(buf, 3, "%02X", M.payloadByteVal[start_411E + 0x0C]); Serial.print(buf); }
+                else { Serial.print(F("00")); }
+
+                if (packetSeen_411E) { snprintf(buf, 3, "%02X", M.payloadByteVal[start_411E + 0x0D]); Serial.print(buf); }
+                else { Serial.print(F("01")); }
+
+                if (packetSeen_411E) { snprintf(buf, 3, "%02X", M.payloadByteVal[start_411E + 0x0E]); Serial.print(buf); }
+                else { Serial.print(F("51")); }
+
+                Serial.println(F("00000000000000010000FF"));
+              } else {
+                printfTopicS("Hitachi command : Expected a selector (two digits) and a hex value (two digits), e.g. Z 01 0A");
+              }
+              break;
+#endif /* H_SERIES */
     case '\0':break;
     case '*': break;
     case 'v':
