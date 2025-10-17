@@ -122,7 +122,7 @@ Some limited data decoding can be done based on [Len Shustek's protocol observat
 
 ### Toshiba TCC-link
 
-Toshiba TCC-Link (used for indoor-outdoor) is also HBS-based, so monitoring raw hex data should be possible. However, the Toshiba AB-protocol is different (schematics and code at [issalig/toshiba_air_cond](https://github.com/issalig/toshiba_air_cond), [[here](https://github.com/burrocargado/toshiba-aircon-mqtt-bridge)](https://github.com/burrocargado/toshiba-aircon-mqtt-bridge) and on this [Hatena Blog](https://burro-hatenablog-com.translate.goog/entry/2022/07/18/230300?_x_tr_sl=auto&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=wapp)) post.
+Toshiba TCC-Link (used for indoor-outdoor) is also HBS-based, so monitoring raw hex data should be possible. However, the Toshiba AB-protocol is different (schematics and code at [issalig/toshiba_air_cond](https://github.com/issalig/toshiba_air_cond), [burrocargado/toshiba-aircon-mqtt-bridge](https://github.com/burrocargado/toshiba-aircon-mqtt-bridge) and on this [Hatena Blog](https://burro-hatenablog-com.translate.goog/entry/2022/07/18/230300?_x_tr_sl=auto&_x_tr_tl=en&_x_tr_hl=en&_x_tr_pto=wapp)) post.
 
 ### Panasonic/Sanyo SIII-Net; perhaps Haier, York...
 
