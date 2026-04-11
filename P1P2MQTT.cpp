@@ -661,15 +661,90 @@ bool P1P2MQTT::writeready(void)
 uint8_t tx_rx_paritycheck;
 uint8_t tx_rx_readbackerror;
 
+#ifdef MHI_SERIES
+static int32_t mhiLastCallUs = 0;
+
+// Encode one logical byte to 3 MHI wire bytes.
+// Each 3-bit group is one-hot encoded: the wire byte has all bits set except the one at position = group value.
+static void mhiEncode(uint8_t value, uint8_t &w1, uint8_t &w2, uint8_t &w3)
+{
+  
+#ifdef S_TIMER
+  int32_t now = (time_millisec);
+// Unsigned math naturally handles the rollover correctly!
+int32_t dt = now - mhiLastCallUs; 
+mhiLastCallUs = now;
+#endif
+
+  w1 = ~(1 << (value & 0x07));
+  w2 = ~(1 << ((value >> 3) & 0x07));
+  w3 = ~(1 << ((value >> 6) & 0x07));
+  /*
+  Serial.print(F("[+"));
+  Serial.print(dt);
+  Serial.print(F("ms] "));
+  Serial.print(value, HEX);
+  Serial.print(F(" -> w1: "));
+  Serial.print(w1, HEX);
+  Serial.print(F(" w2: "));
+  Serial.print(w2, HEX);
+  Serial.print(F(" w3: "));
+  Serial.println(w3, HEX);
+  */
+}
+
+// Decode 3 MHI wire bytes back to one logical byte; inverse of mhiEncode.
+// Masks 0xF0/0xCC/0xAA recover bit 2/1/0 of each 3-bit group index respectively.
+static uint8_t mhiDecode(uint8_t w1, uint8_t w2, uint8_t w3)
+{
+  
+  
+#ifdef S_TIMER
+  int32_t now = (time_millisec);
+// Unsigned math naturally handles the rollover correctly!
+int32_t dt = now - mhiLastCallUs; 
+mhiLastCallUs = now;
+#endif
+
+  uint8_t out = 0;
+  uint8_t b = ~w1;
+  if (b & 0xF0) out |= 0x04;
+  if (b & 0xCC) out |= 0x02;
+  if (b & 0xAA) out |= 0x01;
+  b = ~w2;
+  if (b & 0xF0) out |= 0x20;
+  if (b & 0xCC) out |= 0x10;
+  if (b & 0xAA) out |= 0x08;
+  b = ~w3;
+  // if (b & 0xF0): error, should be 0 (only 2 bits used in third group)
+  if (b & 0xCC) out |= 0x80;
+  if (b & 0xAA) out |= 0x40;
+/*
+Serial.print(F("[+"));
+Serial.print(dt);
+Serial.print(F("ms] w1: "));
+Serial.print(w1, HEX);
+Serial.print(F(" w2: "));
+Serial.print(w2, HEX);
+Serial.print(F(" w3: "));
+Serial.print(w3, HEX);
+Serial.print(F(" -> "));
+Serial.println(out, HEX);
+*/
+
+  return out;
+}
+#endif
+
 void P1P2MQTT::write(uint8_t b)
 #ifdef MHI_SERIES
 {
   if (mhiConvert) {
-    writebyte(~(1<< (b & 0x07)));
-    b >>= 3;
-    writebyte(~(1<< (b & 0x07)));
-    b >>= 3;
-    writebyte(~(1<< (b & 0x07)));
+    uint8_t w1, w2, w3;
+    mhiEncode(b, w1, w2, w3);
+    writebyte(w1);
+    writebyte(w2);
+    writebyte(w3);
   } else {
     writebyte(b);
   }
@@ -792,13 +867,14 @@ ISR(COMPARE_W_INTERRUPT)
       }
       // verify
       // state is even, check bit data (part 2), should be 1, otherwise suspect bus collission
-#ifndef H_SERIES
+#if !defined(H_SERIES) && !defined(MHI_SERIES)
       // for H-link, this results in bus collision errors being detected, as second bit data is not consistently 1, so omit this check on H_SERIES
+      // for MHI_SERIES, bus signal polarity differs from Daikin P1P2: during write, read-back sees LOW when HIGH expected, causing false ERROR_BC
       if (!bit_input) {
         tx_rx_readbackerror |= ERROR_BC;
         SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_BC);
       }
-#endif /* H_SERIES */
+#endif /* H_SERIES, MHI_SERIES */
       tx_bit = bit;
     }
 
@@ -846,7 +922,10 @@ ISR(COMPARE_W_INTERRUPT)
   if (tx_rx_readbackerror) {
     DIGITAL_SET_LED_ERROR;
     // As of version 0.9.22: if a bus collision is suspected (=if a read errors occurs during a write), reduce risk on further collissions by emptying write buffer
+    // MHI_SERIES: do not abort TX buffer — ERROR_BC is suppressed for MHI (bus polarity differs), but other errors may still set tx_rx_readbackerror
+#ifndef MHI_SERIES
     tx_buffer_tail = tx_buffer_head;
+#endif
   }
   // store transmitted byte as it it were received (if buffer space available, and if Echo), and check/store errors
   if (Echo) {
@@ -880,7 +959,14 @@ ISR(COMPARE_W_INTERRUPT)
     if (delay < 2) {
       // if delay=0 or 1, we effectively don't wait and we continue writing!
       // as we are in (silent, high) stop bit time, we set target time at end of stop bit (= next start bit)
+      // MHI: add one extra bit period (2 semibits = 104µs) to include the skipped stop bit,
+      // so each wire byte symbol period = 1248µs as required by the MHI XY bus spec (TD).
+      // Without this, symbols are 1144µs (104µs short), violating the spec.
+#ifdef MHI_SERIES
+      SET_COMPARE_W(GET_COMPARE_W() + Wticks_per_bit_and_semibit + 2 * Wticks_per_semibit);
+#else
       SET_COMPARE_W(GET_COMPARE_W() + Wticks_per_bit_and_semibit);
+#endif
       CONFIG_MATCH_CLEAR();
       CONFIG_CAPTURE_FALLING_EDGE();
       tx_state = 1;
@@ -1290,22 +1376,12 @@ uint8_t  P1P2MQTT::read(void)
 // many thanks to HamdiOlgun for reverse engineering byte encoding in MHI protocol (https://community.openhab.org/t/mitsubishi-heavy-x-y-line-protocol/82898/9)
 {
   if (mhiConvert) {
-    uint8_t b = ~readbyte();
-    uint8_t out = 0x00;
-    if (b & 0xF0) out += 0x04;
-    if (b & 0xCC) out += 0x02;
-    if (b & 0xAA) out += 0x01;
-    if (!available()) return out;
-    b = ~readbyte();
-    if (b & 0xF0) out += 0x20;
-    if (b & 0xCC) out += 0x10;
-    if (b & 0xAA) out += 0x08;
-    if (!available()) return out;
-    b = ~readbyte();
-    // if (b & 0xF0) error, should be 0
-    if (b & 0xCC) out += 0x80;
-    if (b & 0xAA) out += 0x40;
-    return out;
+    uint8_t w1 = readbyte();
+    if (!available()) return mhiDecode(w1, 0xFF, 0xFF);
+    uint8_t w2 = readbyte();
+    if (!available()) return mhiDecode(w1, w2, 0xFF);
+    uint8_t w3 = readbyte();
+    return mhiDecode(w1, w2, w3);
   } else {
     return readbyte();
   }
@@ -1480,7 +1556,7 @@ void P1P2MQTT::writepacket(uint8_t* writebuf, uint8_t l, uint16_t t, uint8_t crc
 // If crc_gen is not zero, adds CRC byte to packet
 // If cs_gen is not zero, adds CS byte to packet
 // Note that t=0 or t=1 increases risk of bus collisions, don't use it if not needed (t<2 will be changed to t=2 in new library).
-  setDelay(t);
+setDelay(t);
 #ifdef MHI_SERIES
   uint8_t cs = 0;
 #elif defined H_SERIES
