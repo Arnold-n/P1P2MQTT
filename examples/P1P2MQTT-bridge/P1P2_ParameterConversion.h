@@ -310,6 +310,21 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
     "\"fan_mode_cmd_tpl\":\"{{ value }}\"," \
     , mhiFanWriteTopic); \
 }
+// swing_mode_stat_t publishes "swing","top","mid_top","mid_bottom","bottom" directly
+#define MHI_HADEVICE_CLIMATE_SWING_MODES(swing_stat_topic) { \
+  topicCharSpecific('P'); \
+  HACONFIGMESSAGE_ADD( \
+    "\"swing_mode_stat_t\":\"%s/%s\"," \
+    "\"swing_mode_stat_tpl\":\"{{ value }}\"," \
+    "\"swing_modes\":[\"swing\",\"top\",\"mid_top\",\"mid_bottom\",\"bottom\"]," \
+    , mqttTopic, swing_stat_topic); \
+}
+#define MHI_HADEVICE_CLIMATE_SWING_COMMAND() { \
+  HACONFIGMESSAGE_ADD( \
+    "\"swing_mode_cmd_t\":\"%s\"," \
+    "\"swing_mode_cmd_tpl\":\"{{ value }}\"," \
+    , mhiSwingWriteTopic); \
+}
 #endif /* MHI_SERIES */
 
 //==================================================================================================================
@@ -6273,6 +6288,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       MHI_HADEVICE_CLIMATE_MODE_COMMAND();
                       MHI_HADEVICE_CLIMATE_TEMP_COMMAND();
                       MHI_HADEVICE_CLIMATE_FAN_COMMAND();
+                      MHI_HADEVICE_CLIMATE_SWING_MODES("S/0/MHI_Swing");
+                      MHI_HADEVICE_CLIMATE_SWING_COMMAND();
                       CAT_SETTING;
                       KEY("MHI_Climate");
                       printfTopicS("MHI: publishing climate HA config pb=0x%02X mLen=%i", pb, haConfigMessageLength);
@@ -6283,6 +6300,18 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                     KEY("MHI_Mode");
                     snprintf(mqtt_value, MQTT_VALUE_LEN, "%s", modeStr);
                     publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
+                    // Publish swing/vane state to S/0/MHI_Swing
+                    // Derived from byte3 bit6 (swing flag) and byte4 bits5-4 (vane position)
+                    { byte vane = (payload[payloadIndex + 1] >> 4) & 0x03;
+                      const char* swingStr = (pb & 0x40)  ? "swing"
+                                           : (vane == 0)  ? "top"
+                                           : (vane == 1)  ? "mid_top"
+                                           : (vane == 2)  ? "mid_bottom"
+                                           :                "bottom";
+                      KEY("MHI_Swing");
+                      snprintf(mqtt_value, MQTT_VALUE_LEN, "%s", swingStr);
+                      clientPublish(mqtt_value, haQos);
+                    }
                   }
                   BITBASIS;
         case  6 :                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Swing");
