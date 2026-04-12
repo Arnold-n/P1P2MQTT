@@ -899,6 +899,19 @@ bool shouldSaveConfig = false;
 //static byte cs_gen = CS_GEN;
 //#endif /* MHI_SERIES */
 
+#ifdef MHI_SERIES
+// Bridge-side MHI write state — tracks last sent/received AC state bytes
+// byte3: mode/power/swing  (default: auto on, no swing = 0xA3)
+// byte4: fan speed/vane    (default: fan L1, mid-top vane  = 0x98)
+// byte5: setpoint temp     (default: 22.0°C = 0xAC)
+static byte mhiBridgeByte3 = 0xA3;
+static byte mhiBridgeByte4 = 0x98;
+static byte mhiBridgeByte5 = 0xAC;
+char mhiModeWriteTopic[MQTT_TOPIC_LEN];
+char mhiTempWriteTopic[MQTT_TOPIC_LEN];
+char mhiFanWriteTopic[MQTT_TOPIC_LEN];
+#endif /* MHI_SERIES */
+
 
 #ifdef AVRISP
 const uint16_t avrisp_port = 328;
@@ -1624,6 +1637,23 @@ void mqttSubscribe() {
   printfTopicS("Subscribed to %s result %d", mqttTopic, result);
 
   restoreTopic();
+
+#ifdef MHI_SERIES
+  // subscribe to MHI per-parameter control topics (mode / temperature / fan)
+  topicCharSpecific('W');
+  strlcpy(mhiModeWriteTopic, mqttTopic, MQTT_TOPIC_LEN);
+  strlcat(mhiModeWriteTopic, "/MHI_Mode", MQTT_TOPIC_LEN);
+  strlcpy(mhiTempWriteTopic, mqttTopic, MQTT_TOPIC_LEN);
+  strlcat(mhiTempWriteTopic, "/MHI_Temp", MQTT_TOPIC_LEN);
+  strlcpy(mhiFanWriteTopic, mqttTopic, MQTT_TOPIC_LEN);
+  strlcat(mhiFanWriteTopic, "/MHI_Fan", MQTT_TOPIC_LEN);
+  result = mqttClient.subscribe(mhiModeWriteTopic, MQTT_QOS_CONTROL);
+  printfTopicS("Subscribed to %s result %d", mhiModeWriteTopic, result);
+  result = mqttClient.subscribe(mhiTempWriteTopic, MQTT_QOS_CONTROL);
+  printfTopicS("Subscribed to %s result %d", mhiTempWriteTopic, result);
+  result = mqttClient.subscribe(mhiFanWriteTopic, MQTT_QOS_CONTROL);
+  printfTopicS("Subscribed to %s result %d", mhiFanWriteTopic, result);
+#endif /* MHI_SERIES */
 
   // subscribe to homeassistant/status
   result = mqttClient.subscribe("homeassistant/status", MQTT_QOS_CONTROL);
@@ -3002,6 +3032,62 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
     return;
   }
 
+#ifdef MHI_SERIES
+  // MHI AC control: mode command  (off / auto / cool / heat / dry / fan_only)
+  if (!strcmp(topic, mhiModeWriteTopic)) {
+    byte newByte3 = mhiBridgeByte3;
+    if (!strcmp(MQTT_payload, "off")) {
+      newByte3 &= ~0x01;                              // clear power bit, keep rest
+    } else {
+      byte modeVal = 0;
+      if      (!strcmp(MQTT_payload, "auto"))     modeVal = 0;
+      else if (!strcmp(MQTT_payload, "dry"))       modeVal = 1;
+      else if (!strcmp(MQTT_payload, "cool"))      modeVal = 2;
+      else if (!strcmp(MQTT_payload, "fan_only"))  modeVal = 3;
+      else if (!strcmp(MQTT_payload, "heat"))      modeVal = 4;
+      else { restoreTopic(); return; }
+      // bits 1,5,6,7 fixed (0xA2 base); bit 0=power; bits 2-4=mode
+      newByte3 = (newByte3 & 0xE2) | 0x01 | (modeVal << 2);
+    }
+    mhiBridgeByte3 = newByte3;
+    char mhiCmd[24];
+    snprintf(mhiCmd, sizeof(mhiCmd), "MH %02X %02X %02X", mhiBridgeByte3, mhiBridgeByte4, mhiBridgeByte5);
+    Serial.print(F(SERIAL_MAGICSTRING));
+    Serial.println(mhiCmd);
+    restoreTopic();
+    return;
+  }
+  // MHI AC control: temperature setpoint (float string, e.g. "22.5")
+  if (!strcmp(topic, mhiTempWriteTopic)) {
+    float tempVal;
+    if (sscanf(MQTT_payload, "%f", &tempVal) == 1) {
+      mhiBridgeByte5 = (byte)((int)(tempVal * 2.0f + 0.5f) + 0x80);
+      char mhiCmd[24];
+      snprintf(mhiCmd, sizeof(mhiCmd), "MH %02X %02X %02X", mhiBridgeByte3, mhiBridgeByte4, mhiBridgeByte5);
+      Serial.print(F(SERIAL_MAGICSTRING));
+      Serial.println(mhiCmd);
+    }
+    restoreTopic();
+    return;
+  }
+  // MHI AC control: fan mode (auto / low / medium / high)
+  if (!strcmp(topic, mhiFanWriteTopic)) {
+    byte curVane = (mhiBridgeByte4 & 0x30);           // preserve bits 4-5 (vane position)
+    byte fanSpeed;
+    if      (!strcmp(MQTT_payload, "auto") || !strcmp(MQTT_payload, "low"))  fanSpeed = 0;
+    else if (!strcmp(MQTT_payload, "medium"))  fanSpeed = 1;
+    else if (!strcmp(MQTT_payload, "high"))    fanSpeed = 2;
+    else { restoreTopic(); return; }
+    mhiBridgeByte4 = 0x88 | fanSpeed | curVane;
+    char mhiCmd[24];
+    snprintf(mhiCmd, sizeof(mhiCmd), "MH %02X %02X %02X", mhiBridgeByte3, mhiBridgeByte4, mhiBridgeByte5);
+    Serial.print(F(SERIAL_MAGICSTRING));
+    Serial.println(mhiCmd);
+    restoreTopic();
+    return;
+  }
+#endif /* MHI_SERIES */
+
   // unknown topic received
   delayedPrintfTopicS("Unknown MQTT topic received %s payload %s", topic, MQTT_payload);
   restoreTopic();
@@ -3584,6 +3670,17 @@ void process_for_mqtt(byte* rb, int n) {
 #ifdef EF_SERIES
     if (n == 3) bytes2keyvalue(rb[0], rb[1], rb[2], EMPTY_PAYLOAD, rb + 3);
 #endif /* EF_SERIES */
+#ifdef MHI_SERIES
+    // Sync bridge write-state from the master's poll frame (packetSrc 0x00, FDUM poll).
+    // rb[0]=0x00 = master→FDUM; rb[2]=byte3, rb[3]=byte4, rb[4]=byte5.
+    // This keeps mhiBridgeByte* in sync when an external device (wall remote,
+    // physical RC-E5) changes the AC state without going through the bridge.
+    if ((rb[0] == 0x00) && (n >= 5)) {
+      mhiBridgeByte3 = rb[2];
+      mhiBridgeByte4 = rb[3];
+      mhiBridgeByte5 = rb[4];
+    }
+#endif /* MHI_SERIES */
 #ifdef MHI_SERIES
     for (byte i = 1; i < n; i++)
 #else /* MHI_SERIES */

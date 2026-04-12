@@ -270,6 +270,49 @@ char timeString2[23] = "Mo 2000-00-00 00:00:00"; // reads time from packet type 
 }
 
 //==================================================================================================================
+// MHI-specific climate macros — write topics point to bridge-side state-merging handlers
+
+#ifdef MHI_SERIES
+// mode_stat_t publishes string values directly ("off","auto","cool","heat","dry","fan_only")
+#define MHI_HADEVICE_CLIMATE_MODES(mode_stat_topic) { \
+  topicCharSpecific('P'); \
+  HACONFIGMESSAGE_ADD( \
+    "\"mode_stat_t\":\"%s/%s\"," \
+    "\"mode_stat_tpl\":\"{{ value }}\"," \
+    "\"modes\":[\"off\",\"auto\",\"cool\",\"heat\",\"dry\",\"fan_only\"]," \
+    , mqttTopic, mode_stat_topic); \
+}
+// fan_mode_stat_t publishes numeric 1/2/3 — template converts to HA strings
+#define MHI_HADEVICE_CLIMATE_FAN_MODES(fan_stat_topic) { \
+  topicCharSpecific('P'); \
+  HACONFIGMESSAGE_ADD( \
+    "\"fan_mode_stat_t\":\"%s/%s\"," \
+    "\"fan_mode_stat_tpl\":\"{%% set m={'1':'low','2':'medium','3':'high'} %%}{{ m[value] if value in m else 'low' }}\"," \
+    "\"fan_modes\":[\"low\",\"medium\",\"high\"]," \
+    , mqttTopic, fan_stat_topic); \
+}
+// Command topics use the bridge-side per-parameter write topics (defined in P1P2MQTT-bridge.ino)
+#define MHI_HADEVICE_CLIMATE_MODE_COMMAND() { \
+  HACONFIGMESSAGE_ADD( \
+    "\"mode_cmd_t\":\"%s\"," \
+    "\"mode_cmd_tpl\":\"{{ value }}\"," \
+    , mhiModeWriteTopic); \
+}
+#define MHI_HADEVICE_CLIMATE_TEMP_COMMAND() { \
+  HACONFIGMESSAGE_ADD( \
+    "\"temp_cmd_t\":\"%s\"," \
+    "\"temp_cmd_tpl\":\"{{ value }}\"," \
+    , mhiTempWriteTopic); \
+}
+#define MHI_HADEVICE_CLIMATE_FAN_COMMAND() { \
+  HACONFIGMESSAGE_ADD( \
+    "\"fan_mode_cmd_t\":\"%s\"," \
+    "\"fan_mode_cmd_tpl\":\"{{ value }}\"," \
+    , mhiFanWriteTopic); \
+}
+#endif /* MHI_SERIES */
+
+//==================================================================================================================
 
 #define HADEVICE_AVAILABILITY(availability_topic, on_value, off_value) { \
   topicCharSpecific('P'); \
@@ -1451,6 +1494,7 @@ void checkSize() {
   }
 #endif /* E_SERIES */
   for (uint16_t i = 1; i < PCKTP_ARR_SZ; i++) {
+    if (bytestart[i - 1] + nr_bytes[i - 1] >= sizePayloadByteVal) break; // stop at last valid entry
     if (bytestart[i] != bytestart[i - 1] + nr_bytes[i - 1]) printfTopicS("bytestart error i %i bytestart[i] 0x%04X bytestart[i-1] 0x%04X nr_bytes[i-1]", i, bytestart[i], bytestart[i-1], nr_bytes[i-1]);
   }
 }
@@ -6207,6 +6251,39 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                     case 0x80 ... 0x81 : bcnt = 0x08 + (packetSrc - 0x80); break;
                     default            : /* should not happen */; break;
                   }
+                  // Publish combined MHI_Mode string and HA CLIMATE entity for src 0x00 (master→FDUM)
+                  if (packetSrc == 0x00) {
+                    byte pb = payload[payloadIndex];
+                    const char* modeStr = !(pb & 0x01)            ? "off"
+                                        : ((pb >> 2) & 0x07) == 0 ? "auto"
+                                        : ((pb >> 2) & 0x07) == 1 ? "dry"
+                                        : ((pb >> 2) & 0x07) == 2 ? "cool"
+                                        : ((pb >> 2) & 0x07) == 3 ? "fan_only"
+                                        :                            "heat";
+                    HADEVICE_CLIMATE;
+                    QOS_CLIMATE;
+                    HATEMP1;
+                    CHECK(1);
+                    printfTopicS("MHI: src00 pi=%i pb=0x%02X pubHa=%d haCfg=%d", payloadIndex, pb, pubHa ? 1 : 0, haConfig);
+                    if (pubHa) {
+                      MHI_HADEVICE_CLIMATE_MODES("S/0/MHI_Mode");
+                      HADEVICE_CLIMATE_TEMPERATURE("S/0/Set_Temp", 16, 30, 0.5);
+                      HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/2/RC_Indoor_Temp");
+                      MHI_HADEVICE_CLIMATE_FAN_MODES("S/0/Fan_Speed");
+                      MHI_HADEVICE_CLIMATE_MODE_COMMAND();
+                      MHI_HADEVICE_CLIMATE_TEMP_COMMAND();
+                      MHI_HADEVICE_CLIMATE_FAN_COMMAND();
+                      CAT_SETTING;
+                      KEY("MHI_Climate");
+                      printfTopicS("MHI: publishing climate HA config pb=0x%02X mLen=%i", pb, haConfigMessageLength);
+                      PUB_CONFIG;
+                    }
+                    // Publish combined mode string to S/0/MHI_Mode
+                    // Use publishEntityByte so payloadByteSeen is set, preventing config re-publish every frame
+                    KEY("MHI_Mode");
+                    snprintf(mqtt_value, MQTT_VALUE_LEN, "%s", modeStr);
+                    publishEntityByte(packetSrc, packetType, payloadIndex, payload, mqtt_value, 1);
+                  }
                   BITBASIS;
         case  6 :                                                                                                           KEYBIT_PUB_CONFIG_PUB_ENTITY("Swing");
         case  3 ... 4 : // only call 3 and/or 4 in new method; so need to fall-through here:
@@ -6270,6 +6347,11 @@ void unSeen() {
   UNSEEN_BYTE_00_10_19_CLIMATE_DHW;
   UNSEEN_BYTE_40_0F_10_HEATING_ONLY;
 #endif /* E_SERIES */
+#ifdef MHI_SERIES
+  // Mark mode/power/swing byte (payloadIndex 1, packetSrc 0x00) as unseen
+  // so the MHI_Climate HA discovery config is republished on HA reconnect / MQTT Rebuild
+  registerUnseenByte(0x00, 0x00, 0x00, 1);
+#endif /* MHI_SERIES */
 }
 
 byte bits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte payloadIndex, byte* payload, byte j) {
