@@ -115,10 +115,6 @@ static byte mhiStateByte5 = 0;  // user-requested: setpoint temperature
 static byte mhiPrevByte3 = 0;   // previous 1FF7 byte3 — used to detect external state changes
 static byte mhiPrevByte4 = 0;   // previous 1FF7 byte4
 static byte mhiPrevByte5 = 0;   // previous 1FF7 byte5
-// RC-E5 absence detection: only reply after MHI_RC_THRESHOLD consecutive unanswered 1FF7 polls.
-// -1 = not yet started, 0..MHI_RC_THRESHOLD-1 = counting, MHI_RC_THRESHOLD = absent (we reply)
-#define MHI_RC_THRESHOLD 3
-static int8_t mhiRcAbsentCnt = -1;
 // Set after publishing a 9FF7 reply; causes the next 9FF7 seen on the bus to be skipped
 // (it is our own echo) and then cleared, preventing false "RC-E5 detected" triggering.
 static bool mhiSkipNext9FF7 = false;
@@ -2772,36 +2768,13 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
     
 #ifdef MHI_SERIES
 
-    // MHI RC-E5 absence detection: if a 9FF7 reply is seen (even corrupted, which happens
-    // when we collide with a real RC-E5), a physical RC-E5 is present — stop emulating.
     // If mhiSkipNext9FF7 is set, the message is our own echo — skip it and clear the flag.
-    if ((nread >= 2) && (RB[0] == 0x9F) && (RB[1] == 0xF7) && (delta < MHI_RC_DELAY + 10)) {
-      if (mhiSkipNext9FF7) {
-        mhiSkipNext9FF7 = false;
-      } else {
-        if (mhiRcAbsentCnt == MHI_RC_THRESHOLD) {
-          Serial_println(F("* MHI RC-E5 detected — stopping emulation"));
-        }
-        mhiRcAbsentCnt = 0;
-      }
+    if (mhiSkipNext9FF7 && (delta < MHI_RC_DELAY + 100)) {
+      mhiSkipNext9FF7 = false;
     }
-    // MHI RC-E5 emulation: act as slave, reply to master polls addressed to 0x1FF7.
-    // Only reply after MHI_RC_THRESHOLD consecutive unanswered polls (no real RC-E5 present).
-    // State is initialised from the first 0x1FF7 frame (always an echo of actual AC state).
-    // Subsequent replies echo back the same values unless changed via the 'A' command.
-    // Checksum (byte 16) is appended by the library (cs_gen=1).
+
     if ((nread >= 15) && (RB[0] == 0x1F) && (RB[1] == 0xF7)) {
-      if (mhiRcAbsentCnt < MHI_RC_THRESHOLD) {
-        // still counting — increment and wait
-        if (mhiRcAbsentCnt < 0) mhiRcAbsentCnt = 0;
-        mhiRcAbsentCnt++;
-        if (mhiRcAbsentCnt == MHI_RC_THRESHOLD) {
-          Serial_println(F("* No RC-E5 detected — starting MHI emulation"));
-        }
-      } else if (!readError) {
-        // RC-E5 confirmed absent — build and send reply.
-        // Apply user-requested state bytes only when the 1FF7 state is unchanged since last
-        // poll (i.e. no other party on the bus changed something in between).
+      if (!readError) {
         // If the master's state changed externally, echo it this cycle and let the user
         // override take effect once the state has stabilised.
         bool stateUnchanged = (RB[2] == mhiPrevByte3) &&
