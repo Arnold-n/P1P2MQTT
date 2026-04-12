@@ -679,18 +679,6 @@ mhiLastCallUs = now;
   w1 = ~(1 << (value & 0x07));
   w2 = ~(1 << ((value >> 3) & 0x07));
   w3 = ~(1 << ((value >> 6) & 0x07));
-  /*
-  Serial.print(F("[+"));
-  Serial.print(dt);
-  Serial.print(F("ms] "));
-  Serial.print(value, HEX);
-  Serial.print(F(" -> w1: "));
-  Serial.print(w1, HEX);
-  Serial.print(F(" w2: "));
-  Serial.print(w2, HEX);
-  Serial.print(F(" w3: "));
-  Serial.println(w3, HEX);
-  */
 }
 
 // Decode 3 MHI wire bytes back to one logical byte; inverse of mhiEncode.
@@ -719,19 +707,6 @@ mhiLastCallUs = now;
   // if (b & 0xF0): error, should be 0 (only 2 bits used in third group)
   if (b & 0xCC) out |= 0x80;
   if (b & 0xAA) out |= 0x40;
-/*
-Serial.print(F("[+"));
-Serial.print(dt);
-Serial.print(F("ms] w1: "));
-Serial.print(w1, HEX);
-Serial.print(F(" w2: "));
-Serial.print(w2, HEX);
-Serial.print(F(" w3: "));
-Serial.print(w3, HEX);
-Serial.print(F(" -> "));
-Serial.println(out, HEX);
-*/
-
   return out;
 }
 #endif
