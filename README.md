@@ -1,3 +1,15 @@
+## ESP32 Ethernet + PoE
+
+This fork also includes an ESP32 Ethernet + PoE implementation of P1P2MQTT.
+
+The ESP32 implementation provides a modern wired Ethernet/PoE network platform
+while maintaining compatibility with the existing P1P2MQTT architecture,
+P1/P2 communication and Home Assistant integration.
+
+See the [ESP32 Ethernet + PoE documentation](docs/ESP32_ETHERNET_POE.md) for
+architecture, hardware, configuration, build instructions and implementation
+details.
+
 # Control your heat pump from Home Assistant with P1P2MQTT
 
 Since the v0.9.46 release, climate controls are automatically configured in Home Assistant. v0.9.46 (or later) comes with a lot of improvements and changes, please see the [v0.9.46 release notes](doc/v0.9.46-ReleaseNotes.md).
