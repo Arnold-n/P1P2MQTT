@@ -2911,7 +2911,7 @@ uint8_t handleParam(byte paramSrc, byte paramPacketType, byte payloadIndex, byte
         case 0x03   : SUBDEVICE("_Mode");    HACONFIG;          CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Fan_RPM"); PARAM_VALUE_s16fan_LE; // EPRA18: 0 or 450+25*value
         case 0x04   :                        HACONFIG;          CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Param15_04"); PARAM_VALUE_s16_LE; // binary ?
         case 0x05   : SUBDEVICE("_Sensors"); HACONFIG; HATEMP1;                  HADEVICE_SENSOR; PARAM_KEY("Temperature_Refrigerant_Q_param15"); PARAM_VALUE_s16div10_LE;
-        case 0x06   :                        HACONFIG; HATEMP1;               HADEVICE_BINSENSOR; PARAM_KEY("Defrost_Active_param15"); PARAM_VALUE_s16div10_LE; // defrost_activity
+        case 0x06   :                        HACONFIG;                           HADEVICE_BINSENSOR; PARAM_KEY("Defrost_Active_param15"); PARAM_VALUE_s16div10_LE; // defrost_activity
         case 0x07   :                        HACONFIG;          CAT_MEASUREMENT; HADEVICE_SENSOR; PARAM_KEY("Param15_07"); PARAM_VALUE_s16_LE; // binary ?
         case 0x08   : SUBDEVICE("_Sensors"); HACONFIG; HATEMP1;                  HADEVICE_SENSOR; PARAM_KEY("Temperature_Outside_param15"); PARAM_VALUE_s16div10_LE;
 
