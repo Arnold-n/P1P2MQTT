@@ -24,7 +24,7 @@
  - smart grid / dynamic power limitation
  - web server ([security](Security.md), functionality)
  - logging/setting field settings
- - EKHBRD support
+ - deeper EKHBRD reverse engineering and auto-detection
  - documentation
  - Hitachi support
  - Mitsubishi support

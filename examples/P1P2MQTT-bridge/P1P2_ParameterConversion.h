@@ -772,6 +772,7 @@ byte maxOutputFilter = 0;
 uint16_t extraAvailabilityStringLengthMax = 0;
 #ifdef E_SERIES
 uint32_t espUptime030 = 0;
+#define EKHBRD_ADV1_PROFILE_ACTIVE (EE.daikinEkhbrdAdv1Profile)
 #endif /* E_SERIES */
 
 // global variable to maintain info from check* to pub*
@@ -3601,7 +3602,17 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
       case 0x00 : switch (payloadIndex) {
         case    0 : switch (bitNr) {
           case    8 : bcnt = 27; BITBASIS;
-          case    0 : SUBDEVICE("_Mode");
+          case    0 : if (EKHBRD_ADV1_PROFILE_ACTIVE) {
+                        SUBDEVICE("_Mode");
+                        HACONFIG;
+                        CHECKBIT;
+                        KEY("Heating_Enabled");
+                        PUB_CONFIG;
+                        CHECK_ENTITY;
+                        if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR;
+                        value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr);
+                      }
+                      SUBDEVICE("_Mode");
                       HACONFIG;
                       // CHECK(1) already done by BITBASIS
                       CHECKBIT;
@@ -3652,7 +3663,17 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         }
         case    2 : switch (bitNr) {
           case    8 : bcnt = 2; BITBASIS;
-          case    0 : SUBDEVICE("_DHW"); KEYBIT_PUB_CONFIG_PUB_ENTITY("DHW_Request_19Q");
+          case    0 : if (EKHBRD_ADV1_PROFILE_ACTIVE) {
+                        SUBDEVICE("_DHW");
+                        HACONFIG;
+                        CHECKBIT;
+                        KEY("DHW_Enabled");
+                        PUB_CONFIG;
+                        CHECK_ENTITY;
+                        if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR;
+                        value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr);
+                      }
+                      SUBDEVICE("_DHW"); KEYBIT_PUB_CONFIG_PUB_ENTITY("DHW_Request_19Q");
           default   : UNKNOWN_BIT;
         }
         case    7 : return 0;
@@ -3746,7 +3767,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       HADEVICE_CLIMATE;
                       HADEVICE_CLIMATE_TEMPERATURE("S/0/DHW_Setpoint", 30, M.R.DHWsetpointMaxX10 * 0.1, 1)
                       HADEVICE_CLIMATE_MODES("S/1/DHW", "\"off\",\"heat\"", "'0':'off','1':'heat'")
-                      if (M.R.useDHW & 0x01) HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R5T_DHW_Tank")
+                      if ((M.R.useDHW & 0x01) && !EKHBRD_ADV1_PROFILE_ACTIVE) HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R5T_DHW_Tank")
                       HADEVICE_CLIMATE_TEMPERATURE_COMMAND("{{'E360003%04X'|format((value*10)|int)}}");
                       HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E350040%02X 35003E%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
                       HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
@@ -3763,7 +3784,17 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       pseudo0D = 9;
                     }
                     bcnt = 7; BITBASIS;
-          case  0 : SUBDEVICE("_Unknown");                           HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_Active_Q4");
+          case  0 : if (EKHBRD_ADV1_PROFILE_ACTIVE) {
+                      SUBDEVICE("_Mode");
+                      HACONFIG;
+                      CHECKBIT;
+                      KEY("Heating_Enabled");
+                      PUB_CONFIG;
+                      CHECK_ENTITY;
+                      if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR;
+                      value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr);
+                    }
+                    SUBDEVICE("_Unknown");                           HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("Climate_Active_Q4");
           default : UNKNOWN_BIT;
         }
         case    1 : switch (bitNr) {
@@ -3795,6 +3826,16 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         case    3 : switch (bitNr) {
           case    8 : bcnt = 10; BITBASIS;
           case    0 : if (!(M.R.useDHW & 0x02)) return 0;
+                      if (EKHBRD_ADV1_PROFILE_ACTIVE) {
+                        SUBDEVICE("_DHW");
+                        HACONFIG;
+                        CHECKBIT;
+                        KEY("DHW_Enabled");
+                        PUB_CONFIG;
+                        CHECK_ENTITY;
+                        if (haDevice == HA_SENSOR) HADEVICE_BINSENSOR;
+                        value_flag8(packetSrc, packetType, payloadIndex, payload, mqtt_value, bitNr);
+                      }
                       SUBDEVICE("_DHW");                             HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("DHW"); // follows DHW_Request
           case    4 : if (!(M.R.useDHW & 0x01)) return 0;
                       SUBDEVICE("_Mode");                            HACONFIG;                                              KEYBIT_PUB_CONFIG_PUB_ENTITY("SHC_Tank");
@@ -3880,6 +3921,16 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
       case 0x40 : switch (payloadIndex) {
         case    0 : return 0;
         case    1 : if (EE.useR1T) return 0;
+                    // EKHBRD ADV1 currently reports clearly implausible values on the generic water-temperature mapping.
+                    if (EKHBRD_ADV1_PROFILE_ACTIVE) {
+                      SUBDEVICE("_Sensors");
+                      HACONFIG;
+                      HATEMP1;
+                      CHECK(2);
+                      KEY("Temperature_R2T_Leaving_Water");
+                      DEL_CONFIG;
+                      return 0;
+                    }
                     SUBDEVICE("_Sensors");
                     M.R.LWT = FN_f8_8_LE(payloadPointer)  + EE.R2Toffset * 0.01;
                     HACONFIG;
@@ -3889,6 +3940,15 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                     VALUE_F_L(M.R.LWT, 2); // R2T
         case    2 : return 0;                         // Domestic hot water temperature (on some models)
         case    3 : if (!(M.R.useDHW & 0x01)) return 0;
+                    if (EKHBRD_ADV1_PROFILE_ACTIVE) {
+                      SUBDEVICE("_DHW");
+                      HACONFIG;
+                      HATEMP1;
+                      CHECK(2);
+                      KEY("Temperature_R5T_DHW_Tank");
+                      DEL_CONFIG;
+                      return 0;
+                    }
                     SUBDEVICE("_DHW");
                     HACONFIG;
                     HATEMP1;
@@ -3898,10 +3958,32 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
         case    4 : return 0;                         // Outside air temperature (low res)
         case    5 : SUBDEVICE("_Sensors");                           HACONFIG; HATEMP1;    HYST_F8_8_LE(20)                 KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_Outside_Unit");                  VALUE_f8_8_LE; // outside temperature outside unit (0.5C) , no RxT reference
         case    6 : return 0;
-        case    7 : SUBDEVICE("_Sensors"); M.R.RWT = FN_f8_8_LE(payloadPointer) + EE.R4Toffset * 0.01;
+        case    7 : if (EKHBRD_ADV1_PROFILE_ACTIVE) {
+                      SUBDEVICE("_Sensors");
+                      HACONFIG;
+                      HATEMP1;
+                      CHECK(2);
+                      KEY("Temperature_R4T_Return_Water");
+                      DEL_CONFIG;
+                      return 0;
+                    }
+                    SUBDEVICE("_Sensors"); M.R.RWT = FN_f8_8_LE(payloadPointer) + EE.R4Toffset * 0.01;
                                                                      HACONFIG; HATEMP1;    HYST_F8_8_LE(20);                KEY2_PUB_CONFIG_CHECK_ENTITY("Temperature_R4T_Return_Water");              VALUE_F_L(M.R.RWT, 2); // R4T
         case    8 : return 0;
-        case    9 : SUBDEVICE("_Sensors");
+        case    9 : if (EKHBRD_ADV1_PROFILE_ACTIVE) {
+                      SUBDEVICE("_Sensors");
+                      HACONFIG;
+                      HATEMP1;
+                      CHECK(2);
+                      if (EE.useR1T) {
+                        KEY("Temperature_R1T_Leaving_Water");
+                      } else {
+                        KEY("Temperature_R1T_HP2Gas_Water");
+                      }
+                      DEL_CONFIG;
+                      return 0;
+                    }
+                    SUBDEVICE("_Sensors");
                     M.R.MWT = FN_f8_8_LE(payloadPointer) + EE.R1Toffset * 0.01;
                     if (EE.useR1T) M.R.LWT = M.R.MWT;
                     HACONFIG;
@@ -4601,9 +4683,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       if (M.R.climateMode & 0x40) { // WD
                         KEY("Deviation_Heating");
                         HADEVICE_CLIMATE_TEMPERATURE("S/0/Deviation_Heating", -10, 10, 1)
-                        if (EE.useR1T) {
+                        if (!EKHBRD_ADV1_PROFILE_ACTIVE && EE.useR1T) {
                           HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R1T_Leaving_Water");
-                        } else {
+                        } else if (!EKHBRD_ADV1_PROFILE_ACTIVE) {
                           HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water");
                         }
                         if (heatingMode || EE.haSetup || !(M.R.first030 & 0x04)) {
@@ -4621,9 +4703,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       } else { // Abs
                         KEY("Abs_Heating");
                         HADEVICE_CLIMATE_TEMPERATURE("S/0/Abs_Heating", M.R.LWTheatMainMinX10 * 0.1, M.R.LWTheatMainMaxX10 * 0.1, 1)
-                        if (EE.useR1T) {
+                        if (!EKHBRD_ADV1_PROFILE_ACTIVE && EE.useR1T) {
                           HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R1T_Leaving_Water");
-                        } else {
+                        } else if (!EKHBRD_ADV1_PROFILE_ACTIVE) {
                           HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water");
                         }
                         if (heatingMode || EE.haSetup || !(M.R.first030 & 0x04)) {
@@ -4655,9 +4737,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       if (M.R.climateMode & 0x40) { // WD
                         KEY("Deviation_Cooling");
                         HADEVICE_CLIMATE_TEMPERATURE("S/0/Deviation_Cooling", -10, 10, 1)
-                        if (EE.useR1T) {
+                        if (!EKHBRD_ADV1_PROFILE_ACTIVE && EE.useR1T) {
                           HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R1T_Leaving_Water");
-                        } else {
+                        } else if (!EKHBRD_ADV1_PROFILE_ACTIVE) {
                           HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water");
                         }
                         if (coolingMode || EE.haSetup || !(M.R.first030 & 0x08)) {
@@ -4676,9 +4758,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       } else { // Abs
                         KEY("Abs_Cooling");
                         HADEVICE_CLIMATE_TEMPERATURE("S/0/Abs_Cooling", M.R.LWTcoolMainMinX10 * 0.1, M.R.LWTcoolMainMaxX10 * 0.1, 1)
-                        if (EE.useR1T) {
+                        if (!EKHBRD_ADV1_PROFILE_ACTIVE && EE.useR1T) {
                           HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R1T_Leaving_Water");
-                        } else {
+                        } else if (!EKHBRD_ADV1_PROFILE_ACTIVE) {
                           HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water");
                         }
                         if (coolingMode || EE.haSetup || !(M.R.first030 & 0x08)) {
@@ -4714,7 +4796,7 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                         if (M.R.climateMode & 0x40) { // WD
                           KEY("Deviation_Heating_Add");
                           HADEVICE_CLIMATE_TEMPERATURE("S/0/Deviation_Heating_Add", -10, 10, 1)
-                          HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water")
+                          if (!EKHBRD_ADV1_PROFILE_ACTIVE) HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water")
                           if (heatingMode || EE.haSetup || !(M.R.first030 & 0x10)) {
                             HADEVICE_CLIMATE_MODES("S/0/Altherma_On", "\"off\",\"heat\"", "'0':'off','1':'heat'")
                             HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modes={'off':0,'heat':1} %}{{'E35002F%02X 350031%02X 35002D%02X'|format((modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0, (modes[value]|int) if value in modes.keys() else 0)}}");
@@ -4731,9 +4813,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                         } else { // Abs
                           KEY("Abs_Heating_Add");
                           HADEVICE_CLIMATE_TEMPERATURE("S/0/Abs_Heating_Add", M.R.LWTheatAddMinX10 * 0.1, M.R.LWTheatAddMaxX10 * 0.1, 1)
-                          if (EE.useR1T) {
+                          if (!EKHBRD_ADV1_PROFILE_ACTIVE && EE.useR1T) {
                             HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R1T_Leaving_Water");
-                          } else {
+                          } else if (!EKHBRD_ADV1_PROFILE_ACTIVE) {
                             HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water");
                           }
                           if (heatingMode || EE.haSetup || !(M.R.first030 & 0x10)) {
@@ -4771,9 +4853,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                         if (M.R.climateMode & 0x40) { // WD
                           KEY("Deviation_Cooling_Add");
                           HADEVICE_CLIMATE_TEMPERATURE("S/0/Deviation_Cooling_Add", -10, 10, 1)
-                          if (EE.useR1T) {
+                          if (!EKHBRD_ADV1_PROFILE_ACTIVE && EE.useR1T) {
                             HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R1T_Leaving_Water");
-                          } else {
+                          } else if (!EKHBRD_ADV1_PROFILE_ACTIVE) {
                             HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water");
                           }
                           if (coolingMode || EE.haSetup || !(M.R.first030 & 0x20)) {
@@ -4793,9 +4875,9 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                         } else { // Abs
                           KEY("Abs_Cooling_Add");
                           HADEVICE_CLIMATE_TEMPERATURE("S/0/Abs_Cooling_Add", M.R.LWTcoolAddMinX10 * 0.1, M.R.LWTcoolAddMaxX10 * 0.1, 1)
-                          if (EE.useR1T) {
+                          if (!EKHBRD_ADV1_PROFILE_ACTIVE && EE.useR1T) {
                             HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R1T_Leaving_Water");
-                          } else {
+                          } else if (!EKHBRD_ADV1_PROFILE_ACTIVE) {
                             HADEVICE_CLIMATE_TEMPERATURE_CURRENT("T/1/Temperature_R2T_Leaving_Water");
                           }
                           if (coolingMode || EE.haSetup || !(M.R.first030 & 0x20)) {

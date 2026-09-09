@@ -176,6 +176,7 @@ typedef struct EEPROMSettings {
   char reservedText[ RESERVED_LEN ];
 #ifdef E_SERIES
   byte useR1T; // use R1T instead of R2T
+  byte daikinEkhbrdAdv1Profile;
 #endif /* E_SERIES */
   byte useTZ;
 #define TZ_STRING_LEN 50
@@ -224,6 +225,7 @@ bool factoryReset = 0;
 #define PARAM_EC 45
 #define PARAM_EP 46
 #define PARAM_HA_SETUP 47
+#define PARAM_DAIKIN_EKHBRD_ADV1_PROFILE 53
 #define xstr(s) str(s)
 #define str(s) #s
 #endif /* E_SERIES */
@@ -320,6 +322,7 @@ const char paramName_49[] PROGMEM = "Voltage                 ";
 const char paramName_50[] PROGMEM = "Nr phases (1 or 3)      ";
 const char paramName_51[] PROGMEM = "Power BUH step 1 (kW)   ";
 const char paramName_52[] PROGMEM = "Power BUH step 2 (kW)   ";
+const char paramName_53[] PROGMEM = "EKHBRD ADV1 profile     ";
 #endif /* E_SERIES */
 
 #ifdef F_SERIES
@@ -389,6 +392,7 @@ const char* const paramName[] PROGMEM = {
   paramName_50,
   paramName_51,
   paramName_52,
+  paramName_53,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   paramName_35,
@@ -466,6 +470,7 @@ const paramTypes PROGMEM paramType[] = {
   P_UINT,
   P_INTdiv10,
   P_INTdiv10,
+  P_BOOL,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   P_UINT,
@@ -528,6 +533,7 @@ const int PROGMEM paramSize[] = {
   1,
   4,
   4,
+  1,
   1,
   1,
   1,
@@ -602,6 +608,7 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   3,
   99,
   99,
+  1,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   40,
@@ -670,6 +677,7 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.nrPhases,
   (char*) &EE.powerBUH1,
   (char*) &EE.powerBUH2,
+  (char*) &EE.daikinEkhbrdAdv1Profile,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   (char*) &EE.setpointCoolingMin,
@@ -2025,6 +2033,17 @@ void printModifyParam(byte paramNr, bool modParam = false, int32_t newValue = 0,
     pseudo0F = 9;
   }
   if (modParam && (paramNr == PARAM_HA_SETUP)) unSeen();
+  if (modParam && (paramNr == PARAM_DAIKIN_EKHBRD_ADV1_PROFILE)) {
+    unSeen();
+    registerUnseenByte(0x00, 0x00, 0x10, 0);
+    registerUnseenByte(0x00, 0x00, 0x10, 2);
+    registerUnseenByte(0x40, 0x00, 0x10, 0);
+    registerUnseenByte(0x40, 0x00, 0x10, 3);
+    registerUnseenByte(0x40, 0x00, 0x11, 1);
+    registerUnseenByte(0x40, 0x00, 0x11, 3);
+    registerUnseenByte(0x40, 0x00, 0x11, 7);
+    registerUnseenByte(0x40, 0x00, 0x11, 9);
+  }
 #endif /* E_SERIES */
 
 #ifdef F_SERIES
@@ -2197,6 +2216,7 @@ void loadEEPROM() {
     // EE.EE_version = 2;
 #ifdef E_SERIES
     EE.useR1T = 0;
+    EE.daikinEkhbrdAdv1Profile = 0;
 #endif /* E_SERIES */
   }
   if (EE.EE_version < 3) {
@@ -2259,6 +2279,12 @@ void loadEEPROM() {
     EE.EE_version = 9;
     EE.powerBUH1 = 30; // 3.0kW
     EE.powerBUH2 = 60; // 6.0kW
+    saveEEPROM();
+  }
+  if (EE.EE_version < 10) {
+    delayedPrintfTopicS("Upgrade EEPROM_version to 10");
+    EE.EE_version = 10;
+    EE.daikinEkhbrdAdv1Profile = 0;
     saveEEPROM();
   }
 #endif /* E_SERIES */
