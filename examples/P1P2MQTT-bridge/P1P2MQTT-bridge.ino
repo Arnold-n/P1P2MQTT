@@ -15,6 +15,7 @@
  * ArduinoJson 6.11.3 by Benoit Blanchon
  *
  * Version history
+ * 20260513 v0.9.57 Offset for COP calculation (elecrical/thermal)
  * 20241117 v0.9.56 P14/other changes initiate direct MQTT reconnect
  * 20240519 v0.9.51 onMqtt improved (D12 fixes + lower mem)
  * 20240519 v0.9.49 fix haConfigMsg max length
@@ -183,6 +184,8 @@ typedef struct EEPROMSettings {
 #ifdef E_SERIES
   uint32_t electricityConsumedCompressorHeating1;
   uint32_t energyProducedCompressorHeating1;
+  uint32_t electricityConsumedCompressorHeating1Offset;
+  uint32_t energyProducedCompressorHeating1Offset;
   byte D13;
   bool haSetup;
 #endif /* E_SERIES */
@@ -226,6 +229,8 @@ bool factoryReset = 0;
 #define PARAM_HA_SETUP 47
 #define xstr(s) str(s)
 #define str(s) #s
+#define PARAM_ECO 53
+#define PARAM_EPO 54
 #endif /* E_SERIES */
 #ifdef F_SERIES
 #define PARAM_SETPOINT_COOLING_MIN 35
@@ -320,6 +325,10 @@ const char paramName_49[] PROGMEM = "Voltage                 ";
 const char paramName_50[] PROGMEM = "Nr phases (1 or 3)      ";
 const char paramName_51[] PROGMEM = "Power BUH step 1 (kW)   ";
 const char paramName_52[] PROGMEM = "Power BUH step 2 (kW)   ";
+
+// COP calculation offset
+const char paramName_53[] PROGMEM = "COP Electricity kWh offs";  // PARAM_ECO
+const char paramName_54[] PROGMEM = "COP Energy kWh offset   ";  // PARAM_EPO
 #endif /* E_SERIES */
 
 #ifdef F_SERIES
@@ -389,6 +398,8 @@ const char* const paramName[] PROGMEM = {
   paramName_50,
   paramName_51,
   paramName_52,
+  paramName_53,
+  paramName_54,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   paramName_35,
@@ -466,6 +477,8 @@ const paramTypes PROGMEM paramType[] = {
   P_UINT,
   P_INTdiv10,
   P_INTdiv10,
+  P_UINT,
+  P_UINT,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   P_UINT,
@@ -534,6 +547,8 @@ const int PROGMEM paramSize[] = {
   1,
   1,
   1,
+  4,
+  4,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   1,
@@ -602,6 +617,8 @@ const int PROGMEM paramMax[] = { // non-string: max-value (inclusive); string: m
   3,
   99,
   99,
+  999999999,  // E
+  999999999,  // E
 #endif /* E_SERIES */
 #ifdef F_SERIES
   40,
@@ -670,6 +687,8 @@ char* const PROGMEM paramLocation[] = {
   (char*) &EE.nrPhases,
   (char*) &EE.powerBUH1,
   (char*) &EE.powerBUH2,
+  (char*) &EE.electricityConsumedCompressorHeating1Offset,
+  (char*) &EE.energyProducedCompressorHeating1Offset,
 #endif /* E_SERIES */
 #ifdef F_SERIES
   (char*) &EE.setpointCoolingMin,
@@ -2211,6 +2230,8 @@ void loadEEPROM() {
 #ifdef E_SERIES
     EE.electricityConsumedCompressorHeating1 = 0;
     EE.energyProducedCompressorHeating1 = 0;
+    EE.electricityConsumedCompressorHeating1Offset = 0;
+    EE.energyProducedCompressorHeating1Offset = 0;
     EE.D13 = 0x03;
     EE.haSetup = 1;
 #endif /* E_SERIES */
