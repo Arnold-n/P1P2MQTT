@@ -1,5 +1,5 @@
 /* P1P2Monitor: monitor and control program for HBS such as P1/P2 bus on many Daikin systems.
- *              Mitsubishi Heavy Industries (MHI) X-Y line protocol: no control yet
+ *              Mitsubishi Heavy Industries (MHI) X-Y line protocol: RC-E5 emulation for AC control
  *
  *              Reads the P1/P2 bus using the P1P2MQTT library, and outputs raw hex data and verbose output over serial.
  *              A few additional parameters are added in raw hex data as so-called pseudo-packets (packet type 0x08 and 0x09).
@@ -108,6 +108,17 @@
 
 #ifdef MHI_SERIES
 static byte mhiFormat = INIT_MHI_FORMAT;
+static bool mhiStateInitialized = false; // true after user sets via 'A' command (locks state)
+static byte mhiStateByte3 = 0;  // user-requested: mode/power/swing
+static byte mhiStateByte4 = 0;  // user-requested: fan speed/vane
+static byte mhiStateByte5 = 0;  // user-requested: setpoint temperature
+static byte mhiPrevByte3 = 0;   // previous 1FF7 byte3 — used to detect external state changes
+static byte mhiPrevByte4 = 0;   // previous 1FF7 byte4
+static byte mhiPrevByte5 = 0;   // previous 1FF7 byte5
+// Set after publishing a 9FF7 reply; causes the next 9FF7 seen on the bus to be skipped
+// (it is our own echo) and then cleared, preventing false "RC-E5 detected" triggering.
+static bool mhiSkipNext9FF7 = false;
+static byte mhiDataBlock[9];    // data block bytes 7-15 — initialized from first 0x1FF7
 #endif /* MHI_SERIES */
 static byte brand = INIT_BRAND;
 static byte model = INIT_MODEL;
@@ -1203,14 +1214,41 @@ byte writeBudget_prev = 0;
                       Serial_println(cs_gen);
                       break;
             case 'm':
-            case 'M': Serial_print(F("* MHI format translation 3-to-1 on/off "));
-                      if (scanint(RSp, temp) == 1) {
-                        mhiFormat = temp ? 1 : 0;
-                        P1P2MQTT.setMHI(mhiFormat);
-                        EEPROM.update(EEPROM_ADDRESS_MHI_FORMAT, mhiFormat);
-                        Serial_print(F("set to "));
+            case 'M': if (*RSp == 'H' || *RSp == 'h') {
+                        // MH <byte3> <byte4> <byte5> — Set MHI AC state (hex, space-separated)
+                        // byte3: mode/power/swing  e.g. AA=cooling off, AB=cooling on, EF=fan+swing on
+                        // byte4: fan speed/vane    e.g. 98=L1 mid-top, 99=L2, 9A=L3
+                        // byte5: setpoint temp     e.g. AC=22.0C, AD=22.5C, AE=23.0C (formula: (val-0x80)/2.0)
+                        RSp++; // skip 'H'
+                        uint16_t b3, b4, b5;
+                        Serial_print(F("* MHI AC state "));
+                        if (sscanf(RSp, (const char*) "%4x %4x %4x", &b3, &b4, &b5) == 3) {
+                          mhiStateByte3 = (byte)(b3 & 0xFF);
+                          mhiStateByte4 = (byte)(b4 & 0xFF);
+                          mhiStateByte5 = (byte)(b5 & 0xFF);
+                          mhiStateInitialized = true;
+                          Serial_print(F("set to "));
+                        }
+                        if (mhiStateInitialized) {
+                          Serial_print(F("byte3=0x")); if (mhiStateByte3 < 0x10) Serial_print('0'); Serial_print(mhiStateByte3, HEX);
+                          Serial_print(F(" byte4=0x")); if (mhiStateByte4 < 0x10) Serial_print('0'); Serial_print(mhiStateByte4, HEX);
+                          Serial_print(F(" byte5=0x")); if (mhiStateByte5 < 0x10) Serial_print('0'); Serial_println(mhiStateByte5, HEX);
+                        } else {
+                          Serial_println(F("(not yet initialized — waiting for first 0x1FF7)"));
+                        }
+                        Serial_println(F("* byte3: AA=cooling/off, AB=cooling/on, A3=auto/on, EF=fan+swing/on, AF=fan/on, E3=auto+swing/on"));
+                        Serial_println(F("* byte4: 88=L1top, 98=L1mid-top, A8=L1mid-bot, B8=L1bot, 99=L2, 9A=L3"));
+                        Serial_println(F("* byte5: AC=22.0C, AD=22.5C, AE=23.0C, A8=20.0C, B4=26.0C (formula: (val-0x80)/2.0)"));
+                      } else {
+                        Serial_print(F("* MHI format translation 3-to-1 on/off "));
+                        if (scanint(RSp, temp) == 1) {
+                          mhiFormat = temp ? 1 : 0;
+                          P1P2MQTT.setMHI(mhiFormat);
+                          EEPROM.update(EEPROM_ADDRESS_MHI_FORMAT, mhiFormat);
+                          Serial_print(F("set to "));
+                        }
+                        Serial_println(mhiFormat);
                       }
-                      Serial_println(mhiFormat);
                       break;
 #endif /* MHI_SERIES */
             case 'v':
@@ -2725,6 +2763,57 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
       }
     }
     Serial_println();
+
+
+    
+#ifdef MHI_SERIES
+
+    // If mhiSkipNext9FF7 is set, the message is our own echo — skip it and clear the flag.
+    if (mhiSkipNext9FF7 && (delta < MHI_RC_DELAY + 100)) {
+      mhiSkipNext9FF7 = false;
+    }
+
+    if ((nread >= 15) && (RB[0] == 0x1F) && (RB[1] == 0xF7)) {
+      if (!readError) {
+        // If the master's state changed externally, echo it this cycle and let the user
+        // override take effect once the state has stabilised.
+        bool stateUnchanged = (RB[2] == mhiPrevByte3) &&
+                              (RB[3] == mhiPrevByte4) &&
+                              (RB[4] == mhiPrevByte5);
+        bool applyOverride  = mhiStateInitialized && stateUnchanged;
+        mhiPrevByte3 = RB[2];   // record this poll as the new baseline
+        mhiPrevByte4 = RB[3];
+        mhiPrevByte5 = RB[4];
+        if (!stateUnchanged) {
+          // External change detected — reset pending override to current bus state
+          mhiStateByte3 = RB[2];
+          mhiStateByte4 = RB[3];
+          mhiStateByte5 = RB[4];
+          mhiStateInitialized = false;
+        }
+        WB[0] = 0x9F;                                    // RC-E5 reply address high byte
+        WB[1] = 0xF7;                                    // RC-E5 reply address low byte
+        WB[2] = applyOverride ? mhiStateByte3 : RB[2];  // override or echo: mode/power/swing
+        WB[3] = applyOverride ? mhiStateByte4 : RB[3];  // override or echo: fan speed/vane
+        WB[4] = applyOverride ? mhiStateByte5 : RB[4];  // override or echo: setpoint temperature
+        WB[5] = 0xFF;           // byte 6: no sensor on RC-E5 (per spec)
+        for (byte i = 6; i < 15; i++) WB[i] = RB[i]; // echo data block (bytes 7–15)
+
+        
+        if (P1P2MQTT.writeready()) {
+          P1P2MQTT.writepacket(WB, 15, MHI_RC_DELAY, cs_gen);
+          mhiSkipNext9FF7 = true;  // skip the bus echo of our own reply
+        } else {
+          Serial_println(F("* Refusing to write MHI RC-E5 reply while previous write wasn't finished"));
+          if (writeRefusedBusy < 0xFF) writeRefusedBusy++;
+        }
+        
+
+        
+      }
+    }
+
+#endif /* MHI_SERIES */
   }
 #ifdef PSEUDO_PACKETS
   if (pseudo0E > 4) {

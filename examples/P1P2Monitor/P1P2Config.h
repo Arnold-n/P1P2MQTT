@@ -215,6 +215,7 @@
 #ifdef MHI_SERIES
 #define INIT_BRAND 4
 #define INIT_MODEL 0
+#define MHI_RC_DELAY             250  // ms delay before sending RC-E5 reply (per spec) - 250ms for A slave, 350 for B slave
 #endif
 
 #ifdef EF_SERIES
