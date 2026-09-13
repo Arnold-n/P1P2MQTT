@@ -720,12 +720,10 @@ bool writeParam(void) {
     Serial_println(F(", not in range 0x10-0x20"));
     return 0;
   }
-*/
   if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && (wr_val[wr_n] < 0x03)) {
     wr_val[wr_n] = 0x11 + (wr_val[wr_n] << 5); // map 0x00 -> 0x11; 0x01 -> 0x31; 0x02 -> 0x51
     // return 1;
   } 
-/*
     else if (((wr_nr[wr_n] == 4) || (wr_nr[wr_n] == 8)) && ((wr_val[wr_n] < 0x11) || (wr_val[wr_n] > 0x51))) {
     Serial_print(F("wr_val for payload byte 4/8 (fan-speed cooling/heating) is 0x"));
     Serial_print(wr_val[wr_n], HEX);
@@ -2455,11 +2453,13 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
                 WB[5]  = RB[7];                  // W target temperature cooling
                 WB[6]  = 0x00;                   //   clear change flag 80 from input (alternative:? WB[6] = RB[8] & 0x7F)
-                WB[7]  = (RB[9] & 0x60) | 0x11;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
+                // WB[7]  = (RB[9] & 0x60) | 0x11;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
+                WB[7]  = RB[9] & 0x7F;           // W target fan speed cooling
                 WB[8]  = 0x00;                   //   clear change flag 80 from input
                 WB[9]  = RB[11];                 // W target temperature heating
                 WB[10] = 0x00;                   //   clear change flag from input    (alternative:? WB[10] = RB[12] & 0x7F)
-                WB[11] = (RB[13] & 0x60) | 0x11; // W target fan speed heating;       (alternative: WB[11] = RB[13] & 0x7F might work too)
+                // WB[11] = (RB[13] & 0x60) | 0x11; // W target fan speed heating;       (alternative: WB[11] = RB[13] & 0x7F might work too)
+                WB[11] = RB[13] & 0x7F;          // W target fan speed heating
                 WB[12] = RB[14] & 0x7F;          //   clear change flag from input
                 WB[16] = RB[18];                 //   target fan mode ?? & 0x03 ?
                 WB[17] = 0x00;                   //   ? (change flag, & 0x7F ?)
@@ -2554,11 +2554,13 @@ For FDYQ-like systems, try using the same commands with packet type 38 replaced 
                 WB[4]  = (RB[5] & 0x07) | 0x60;  // W target operating mode
                 WB[5]  = RB[7];                  // W target temperature cooling
                 WB[6]  = 0x00;                   //   clear change flag 80 from input (alternative:? WB[6] = RB[8] & 0x7F)
-                WB[7]  = (RB[9] & 0x60) | 0x11;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
+//                WB[7]  = (RB[9] & 0x70) | 0x01;  // W target fan speed cooling/fan    (alternative: WB[7] = RB[9] & 0x7F might work too)
+                WB[7]  = RB[9] & 0x7F;
                 WB[8]  = 0x00;                   //   clear change flag 80 from input
                 WB[9]  = RB[11];                 // W target temperature heating
                 WB[10] = 0x00;                   //   clear change flag from input    (alternative:? WB[10] = RB[12] & 0x7F)
-                WB[11] = (RB[13] & 0x60) | 0x11; // W target fan speed heating        (alternative: WB[11] = RB[13] & 0x7F might work too)
+//                WB[11] = (RB[13] & 0x70) | 0x01; // W target fan speed heating        (alternative: WB[11] = RB[13] & 0x7F might work too)
+                WB[11] = RB[13] & 0x7F;
                 WB[12] = RB[14] & 0x7F;          //   clear change flag from input
                 WB[19] = RB[20];                 // W active hvac zones
                 WB[20] = RB[21] & 0x03;          // W target fan mode

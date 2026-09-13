@@ -5805,14 +5805,14 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
 // 2   target operating mode      60-67                    <== combined with power off/on           P1P2/P/P1P2MQTT/bridge0/S/2/Target_Operating_Mode 60
 // 3   actual operating mode      0-2 (fan/heat/cool)
 // 4/8 setpoint temperature                                <===========                             P1P2/P/P1P2MQTT/bridge0/T/2/Setpoint_Cooling 0   and _Heating
-// 6/10 fan speed low/medium/high                          <===========                                                     T/2/Fanspeed_Cooling     and _Heating
+// 6/10 fan speed auto/low/medium/high                     <===========                                                     T/2/Fanspeed_Cooling     and _Heating
 //
 // 40F038/3B (aux controller)
 // C/H
 //  0  off/on 0-1
 //  1  target operating mode fan/heat/cool/auto/?/?/?/dry  60-67     (combined: 0 or 60-67)
 // 2/6 setpoint                                            14-28
-// 4/8 fan speed low/medium/high                           17/49/81
+// 4/8 fan speed auto/low/medium/high                      1/17/49/81
 //
 // HA
 // fan mode auto low medium high
@@ -5871,8 +5871,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       HADEVICE_CLIMATE_MODES("S/2/Target_Operating_Mode", "\"off\",\"auto\",\"heat\",\"cool\",\"dry\",\"fan_only\"","'0':'off','96':'fan_only','97':'heat','98':'cool','99':'auto','103':'dry'");
                       HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modesM={'off':0,'auto':1,'heat':1,'cool':1,'dry':1,'fan_only':1} %}{% set modes={'off':0,'auto':99,'heat':97,'cool':98,'dry':103,'fan_only':96} %}{{('F380001 3801%02X'|format((modes[value]|int) if value in modes.keys() else 0)) if (modesM[value]) else 'F380000'}}");
                       // fan_modes, fan speed heating, byte 8 in 40F038
-                      HADEVICE_CLIMATE_FAN_MODES("S/2/Fan_Speed_Cooling", "\"low\",\"medium\",\"high\"", "'17':'low','49':'medium','81':'high'"); // some models perhaps also auto mode?
-                      HADEVICE_CLIMATE_FAN_MODE_COMMAND_TEMPLATE("{% set modes={'low':17,'medium':49,'high':81} %} {{'F3804%02X'|format((modes[value]|int) if value in modes.keys() else 17)}} ");
+                      HADEVICE_CLIMATE_FAN_MODES("S/2/Fan_Speed_Cooling", "\"auto\",\"low\",\"medium-low\",\"medium\",\"medium-high\",\"high\"", "'1':'auto','17':'low','33':'medium-low','49':'medium','65':'medium-high','81':'high'");
+                      HADEVICE_CLIMATE_FAN_MODE_COMMAND_TEMPLATE("{% set modes={'auto':1,'low':17,'medium-low':33,'medium':49,'medium-high':65,'high':81} %} {{'F3804%02X'|format((modes[value]|int) if value in modes.keys() else 17)}} ");
                       HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
                       PUB_CONFIG;
                     }
@@ -5899,8 +5899,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       HADEVICE_CLIMATE_MODES("S/2/Target_Operating_Mode", "\"off\",\"auto\",\"heat\",\"cool\",\"dry\",\"fan_only\"","'0':'off','96':'fan_only','97':'heat','98':'cool','99':'auto','103':'dry'");
                       HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modesM={'off':0,'auto':1,'heat':1,'cool':1,'dry':1,'fan_only':1} %}{% set modes={'off':0,'auto':99,'heat':97,'cool':98,'dry':103,'fan_only':96} %}{{('F380001 3801%02X'|format((modes[value]|int) if value in modes.keys() else 0)) if (modesM[value]) else 'F380000'}}");
                       // fan_modes, fan speed heating, byte 8 in 40F038
-                      HADEVICE_CLIMATE_FAN_MODES("S/2/Fan_Speed_Heating", "\"low\",\"medium\",\"high\"", "'17':'low','49':'medium','81':'high'"); // some models perhaps also auto mode?
-                      HADEVICE_CLIMATE_FAN_MODE_COMMAND_TEMPLATE("{% set modes={'low':17,'medium':49,'high':81} %} {{'F3808%02X'|format((modes[value]|int) if value in modes.keys() else 17)}} ");
+                      HADEVICE_CLIMATE_FAN_MODES("S/2/Fan_Speed_Heating", "\"auto\",\"low\",\"medium-low\",\"medium\",\"medium-high\",\"high\"", "'1':'auto','17':'low','33':'medium-low','49':'medium','65':'medium-high','81':'high'");
+                      HADEVICE_CLIMATE_FAN_MODE_COMMAND_TEMPLATE("{% set modes={'auto':1,'low':17,'medium-low':33,'medium':49,'medium-high':65,'high':81} %} {{'F3808%02X'|format((modes[value]|int) if value in modes.keys() else 17)}} ");
                       HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
                       PUB_CONFIG;
                     }
@@ -6002,8 +6002,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       HADEVICE_CLIMATE_MODES("S/2/Target_Operating_Mode", "\"off\",\"auto\",\"heat\",\"cool\",\"dry\",\"fan_only\"","'0':'off','96':'fan_only','97':'heat','98':'cool','99':'auto','103':'dry'");
                       HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modesM={'off':0,'auto':1,'heat':1,'cool':1,'dry':1,'fan_only':1} %}{% set modes={'off':0,'auto':99,'heat':97,'cool':98,'dry':103,'fan_only':96} %}{{('F3B0001 3801%02X'|format((modes[value]|int) if value in modes.keys() else 0)) if (modesM[value]) else 'F3B0000'}}");
                       // fan_modes, fan speed heating, byte 8 in 40F03B
-                      HADEVICE_CLIMATE_FAN_MODES("S/2/Fan_Speed_Cooling", "\"low\",\"medium\",\"high\"", "'17':'low','49':'medium','81':'high'"); // some models perhaps also auto mode?
-                      HADEVICE_CLIMATE_FAN_MODE_COMMAND_TEMPLATE("{% set modes={'low':17,'medium':49,'high':81} %} {{'F3B04%02X'|format((modes[value]|int) if value in modes.keys() else 17)}} ");
+                      HADEVICE_CLIMATE_FAN_MODES("S/2/Fan_Speed_Cooling", "\"auto\",\"low\",\"medium-low\",\"medium\",\"medium-high\",\"high\"", "'1':'auto','17':'low','33':'medium-low','49':'medium','65':'medium-high','81':'high'");
+                      HADEVICE_CLIMATE_FAN_MODE_COMMAND_TEMPLATE("{% set modes={'auto':1,'low':17,'medium-low':33,'medium':49,'medium-high':65,'high':81} %} {{'F3804%02X'|format((modes[value]|int) if value in modes.keys() else 17)}} ");
                       HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
                       PUB_CONFIG;
                     }
@@ -6034,8 +6034,8 @@ byte bytesbits2keyvalue(byte packetSrc, byte packetDst, byte packetType, byte pa
                       HADEVICE_CLIMATE_MODES("S/2/Target_Operating_Mode", "\"off\",\"auto\",\"heat\",\"cool\",\"dry\",\"fan_only\"","'0':'off','96':'fan_only','97':'heat','98':'cool','99':'auto','103':'dry'");
                       HADEVICE_CLIMATE_MODE_COMMAND_TEMPLATE("{% set modesM={'off':0,'auto':1,'heat':1,'cool':1,'dry':1,'fan_only':1} %}{% set modes={'off':0,'auto':99,'heat':97,'cool':98,'dry':103,'fan_only':96} %}{{('F3B0001 3801%02X'|format((modes[value]|int) if value in modes.keys() else 0)) if (modesM[value]) else 'F3B0000'}}");
                       // fan_modes, fan speed heating, byte 8 in 40F03B
-                      HADEVICE_CLIMATE_FAN_MODES("S/2/Fan_Speed_Heating", "\"low\",\"medium\",\"high\"", "'17':'low','49':'medium','81':'high'"); // some models perhaps also auto mode?
-                      HADEVICE_CLIMATE_FAN_MODE_COMMAND_TEMPLATE("{% set modes={'low':17,'medium':49,'high':81} %} {{'F3B08%02X'|format((modes[value]|int) if value in modes.keys() else 17)}} ");
+                      HADEVICE_CLIMATE_FAN_MODES("S/2/Fan_Speed_Heating", "\"auto\",\"low\",\"medium-low\",\"medium\",\"medium-high\",\"high\"", "'1':'auto','17':'low','33':'medium-low','49':'medium','65':'medium-high','81':'high'");
+                      HADEVICE_CLIMATE_FAN_MODE_COMMAND_TEMPLATE("{% set modes={'auto':1,'low':17,'medium-low':33,'medium':49,'medium-high':65,'high':81} %} {{'F3808%02X'|format((modes[value]|int) if value in modes.keys() else 17)}} ");
                       HADEVICE_AVAILABILITY("A\/8\/Control_Function", 1, 0);
                       PUB_CONFIG;
                     }
