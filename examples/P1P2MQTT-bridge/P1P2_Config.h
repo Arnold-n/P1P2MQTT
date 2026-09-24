@@ -170,6 +170,8 @@
 #define MQTT_RETAIN_SIGNAL false // do not retain informational messages
 #define MQTT_RETAIN_HEX    false // do not retain hex data messages
 
+#define MQTT_CMD_FILTER  '\0'  // Filter incoming MQTT commands (topic W) by the first character. '\0' means no filter.
+
 #define INIT_OUTPUTFILTER 1    // outputfilter determines which parameters to report, can be changed run-time using 'S'/'s' command
                                // 0 all
                                // 1 only changed parameters
