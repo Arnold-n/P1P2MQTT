@@ -76,6 +76,8 @@ The system can be further identified by generation, which is a single letter or 
 
 Recent Altherma 3 (full-electric and hybrid) systems are generally supported. Version CA, CB, D, and newer are supported. Older versions AA, AB, AC, and BB can only be monitored and can likely not be controlled. Version AD can perhaps be controlled. Some systems (EWYQ, EKH\*) are very limited and can only be monitored.
 
+The ERSQ016AV1 + EKHBRD016ADV1 platform now has an initial manual compatibility profile that promotes confirmed heating/DHW enable bits and suppresses several misleading temperature entities. See [the model note](doc/LogicalFormat/Daikin-protocol-ERSQ016AV1-EKHBRD016ADV1.md).
+
 Not all Rotex R-series systems have the same capability as their Daikin counterpart.
 
 #### Daikin F-series
