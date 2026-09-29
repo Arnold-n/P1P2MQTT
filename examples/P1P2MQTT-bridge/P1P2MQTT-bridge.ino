@@ -2274,6 +2274,13 @@ void handleCommand(char* cmdString) {
 // handles a single command (not necessarily '\n'-terminated) received via telnet or MQTT (P1P2/W)
 // most of these messages are fowarded over serial to P1P2Monitor on ATmega
 // some messages are (also) handled on the ESP
+
+  while (*cmdString == ' ' || *cmdString == '\t') cmdString++;
+  int cmdLen = strlen(cmdString);
+  while (cmdLen > 0 && (cmdString[cmdLen - 1] == ' ' || cmdString[cmdLen - 1] == '\r' || cmdString[cmdLen - 1] == '\t')) {
+    cmdString[--cmdLen] = '\0';
+  }
+  
   int temp = 0;
   int temp2 = 0;
   char tempstring[ PARAM_MAX_LEN ];
