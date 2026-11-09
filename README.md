@@ -74,9 +74,13 @@ The system can be further identified by generation, which is a single letter or 
 
 #### Daikin(/Rotex) E-series
 
-Recent Altherma 3 (full-electric and hybrid) systems are generally supported. Version CA, CB, D, and newer are supported. Older versions AA, AB, AC, and BB can only be monitored and can likely not be controlled. Version AD can perhaps be controlled. Some systems (EWYQ, EKH\*) are very limited and can only be monitored.
+All hybrid systems are supported, including quiet mode setting and changing various field settings.
 
-Not all Rotex R-series systems have the same capability as their Daikin counterpart.
+All Altherma 3 systems (full-electric) are supported, except for quiet mode setting and changing field settings.
+
+Recent Altherma 2 (version CA or newer) are also supported. Altherma 2 versions AA, AB, AC, and BB can only be monitored and can likely not be controlled. Version AD can perhaps be controlled but is not supported yet. EWYQ* and EKH* systems are very limited and can only be monitored.
+
+Not all Rotex R-series systems have the same capability as their Daikin counterparts.
 
 #### Daikin F-series
 
@@ -92,7 +96,7 @@ Although electrically supported, no information on the protocol is available yet
 
 The Altherma 3 R ECH2O models with a E\*P30E\* or E\*P50\*E code use P1/P2 and are supported by the P1P2MQTT bridge.
 
-Other older Altherma 3R ECH2O models with a E\*P50D\* code originate from Rotex and use CANbus to connect to the RoCon+HP controller and are not supported by the P1P2MQTT bridge. These models are perhaps supported by the [pyHPSU project](https://github.com/zanac/pyHPSU).
+Older Altherma 3R ECH2O models with a E\*P50D\* code originate from Rotex and use CANbus to connect to the RoCon+HP controller and are not supported by the P1P2MQTT bridge. These models are perhaps supported by the [pyHPSU project](https://github.com/zanac/pyHPSU).
 
 #### Daikin Fit, Goodman, Amana
 
