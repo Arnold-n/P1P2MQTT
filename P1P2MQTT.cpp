@@ -806,19 +806,21 @@ ISR(COMPARE_W_INTERRUPT)
         // state=19, paritybit
         PRESET_ENABLE_MS_TIMER(); // start new milli-second timer measurement here, setting timer on 1msec given we are at paritybit.
       }
-      // check bit input signal
-      if (state == 1) {
-        // state is 1, start bit part 1, should be 0
-        if (bit_input) {
-          tx_rx_readbackerror = ERROR_SB;
-          SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_SB);
-        }
-      } else if (state & 1) {
-        // state is odd and >1, can be bit or parity bit
-        // faster to check bit value directly here than to reconstruct tx_rx_byte
-        if (bit_input != tx_bit) {
-          tx_rx_readbackerror |= ERROR_BE; // bit differs
-          SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_BE);
+      if (Echo) {
+        // check bit input signal
+        if (state == 1) {
+          // state is 1, start bit part 1, should be 0
+          if (bit_input) {
+            tx_rx_readbackerror = ERROR_SB;
+            SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_SB);
+          }
+        } else if (state & 1) {
+          // state is odd and >1, can be bit or parity bit
+          // faster to check bit value directly here than to reconstruct tx_rx_byte
+          if (bit_input != tx_bit) {
+            tx_rx_readbackerror |= ERROR_BE; // bit differs
+            SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_BE);
+          }
         }
       }
     } else {
@@ -845,9 +847,11 @@ ISR(COMPARE_W_INTERRUPT)
 #if !defined(H_SERIES) && !defined(MHI_SERIES)
       // for H-link, this results in bus collision errors being detected, as second bit data is not consistently 1, so omit this check on H_SERIES
       // for MHI_SERIES, bus signal polarity differs from Daikin P1P2: during write, read-back sees LOW when HIGH expected, causing false ERROR_BC
-      if (!bit_input) {
-        tx_rx_readbackerror |= ERROR_BC;
-        SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_BC);
+      if (Echo) {
+        if (!bit_input) {
+          tx_rx_readbackerror |= ERROR_BC;
+          SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_BC);
+        }
       }
 #endif /* H_SERIES, MHI_SERIES */
       tx_bit = bit;
@@ -894,7 +898,7 @@ ISR(COMPARE_W_INTERRUPT)
       SW_SCOPE_LOG_ERROR(sws_count_temp, SWS_EVENT_ERR_LOW);
     }
   }
-  if (tx_rx_readbackerror) {
+  if (Echo && tx_rx_readbackerror) {
     DIGITAL_SET_LED_ERROR;
     // As of version 0.9.22: if a bus collision is suspected (=if a read errors occurs during a write), reduce risk on further collissions by emptying write buffer
     // MHI_SERIES: do not abort TX buffer — ERROR_BC is suppressed for MHI (bus polarity differs), but other errors may still set tx_rx_readbackerror
