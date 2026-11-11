@@ -36,7 +36,7 @@ A WiFi Access Point with SSID `P1P2MQTT` (or `P1P2MQTT-2x` after a double-reset)
 
 ##### Provide WiFi and MQTT server credentials
 
-Connect to the AP `P1P2MQTT` or `P1P2MQTT-2x`. Default password for `P1P2MQTT` is `P1P2P3P4` but you can change it later. Password for `P1P2MTT-2x` is `P1P2P3P4` but cannot be changed. After connecting, enter WiFi credentials, and do not forget to also provide MQTT server credentials at the same time.
+Connect to the AP `P1P2MQTT` or `P1P2MQTT-2x`. Default password for `P1P2MQTT` is `P1P2P3P4` but you can change it later. Password for `P1P2MTT-2x` is `P1P2P3P4` but cannot be changed. After connecting, select `Configure Router` or browse to http://192.168.4.1, enter WiFi credentials, and do not forget to also provide MQTT server credentials at the same time.
 
 If you use the MQTT server from HA and do not know its IPv4 address, it can be found under `Settings`/`System`/`Network`/`Configure network interfaces`/`3-dots`/`IP-information`. Default port is 1883, MQTT user is `P1P2` and MQTT password is what you entered yourself.
 
